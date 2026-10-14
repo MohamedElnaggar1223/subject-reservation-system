@@ -3,7 +3,7 @@
  * the admin's (exams/layout.tsx); the entry deadline is the admin's alone.
  */
 
-import { getSession } from '~/lib/auth/session';
+import { requireAcademic } from '~/lib/auth/session';
 import SeriesClient from './series.client';
 
 export const metadata = {
@@ -11,6 +11,6 @@ export const metadata = {
 };
 
 export default async function SeriesPage(): Promise<React.JSX.Element> {
-  const session = await getSession();
-  return <SeriesClient viewerRole={session?.user.role ?? ''} />;
+  const session = await requireAcademic();
+  return <SeriesClient viewerRole={session.user.role ?? ''} />;
 }

@@ -1,0 +1,16 @@
+# pnpm --filter @repo/api check-types on 669cf84
+
+> @repo/api@ check-types /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/agent-acf43230a4e06e8b4/apps/api
+> tsc -p tsconfig.test.json --noEmit
+
+
+# pnpm --filter web check-types on 669cf84
+
+> web@0.1.0 check-types /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/agent-acf43230a4e06e8b4/apps/web
+> next typegen && tsc --noEmit
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Generating route types...
+✓ Types generated successfully
+
+# useQuery generics: 20

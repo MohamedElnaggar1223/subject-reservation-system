@@ -1,0 +1,63 @@
+# C61: what staff set by hand is brought back to the line's answer by a derivation
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a coordinator's untick on a draft stays", 'typed by hand on a draft stays']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27134ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it 373ms
+     → expected { series: { …(4) }, …(7) } to match object { created: +0, updated: +0 }
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it 378ms
+     → expected { series: { …(4) }, …(7) } to match object { created: +0, updated: +0 }
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 4f34ea03-5141-4796-bf0a-71c7fa2d5f7c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it
+AssertionError: expected { series: { …(4) }, …(7) } to match object { created: +0, updated: +0 }
+(14 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "created": 0,[22m
+[32m-   "updated": 0,[39m
+[31m+   "updated": 1,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:789:49
+    787|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+    788|       expect((await one<{ s: string[] }>(`select staff_set as s from e…
+    789|       expect(await derive(nov(), hu.studentId)).toMatchObject({ create…
+       |                                                 ^
+    790|       expect((await entriesOf(nov(), hu.studentId))[0]).toMatchObject(…
+    791|       expect((await rowOf(e!.id)).problems).not.toContain('retake_diff…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it
+AssertionError: expected { series: { …(4) }, …(7) } to match object { created: +0, updated: +0 }
+(14 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "created": 0,[22m
+[32m-   "updated": 0,[39m
+[31m+   "updated": 1,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:803:49
+    801|       // The statement had it wrong: the coordinator types the number …
+    802|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+    803|       expect(await derive(nov(), ht.studentId)).toMatchObject({ create…
+       |                                                 ^
+    804|       expect((await entriesOf(nov(), ht.studentId))[0]).toMatchObject(…
+    805|       expect((await rowOf(e!.id)).problems).not.toContain('carry_forwa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

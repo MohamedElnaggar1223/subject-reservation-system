@@ -1,0 +1,65 @@
+# C1b: derivation's per-line cut-off removed (a line past its deadline entered)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a first entry is not sent']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27098ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 16ms
+     → expected { …(4) } to deeply equal { …(4) }
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 8ms
+     → expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line a4e2d882-7def-4db6-ba01-6a999384b9ac: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+AssertionError: expected { …(4) } to deeply equal { …(4) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "30ed9b96-9ebb-485b-b64d-cd46b5746646": "entered",[22m
+[2m    "3c214c12-96f9-4556-a4c7-4208767e1082": "entered",[22m
+[2m    "58b53977-f3c7-40b2-96a1-76b0244b2c4c": "ready",[22m
+[32m-   "f3bb9873-c0bd-44b9-bf8c-483f1aafd942": "past_deadline",[39m
+[31m+   "f3bb9873-c0bd-44b9-bf8c-483f1aafd942": "ready",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:969:90
+    967|       const preview = await derive(juneSeries, undefined, false);
+    968|       expect(preview).toMatchObject({ pastDeadline: true, refusal: nul…
+    969|       expect(Object.fromEntries(preview.rows.map((r) => [r.registratio…
+       |                                                                                          ^
+    970|       expect(preview.rows.find((r) => r.registrationId === j2)!.deadli…
+    971|       expect(preview.rows.find((r) => r.registrationId === j4)!.note)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1)
+AssertionError: expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+(8 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "boardPart": 0,[39m
+[32m-   "boardSent": true,[39m
+[31m+   "boardPart": 500,[39m
+[31m+   "boardSent": false,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:1005:22
+    1003|     it("a declared retake rejected past the first-entry deadline is dr…
+    1004|       const before = await refundPreview(jf.j2!, j2);
+    1005|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
+       |                      ^
+    1006|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
+    1007|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

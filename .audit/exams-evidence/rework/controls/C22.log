@@ -1,0 +1,63 @@
+# C22: a cash-in entered by hand before it is paid
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['accepted but not paid']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27329ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 55ms
+     → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > paid: derived as the award its line's item enters, with exam_entry.charge_id 35ms
+     → expected { registrationId: null, …(12) } to match object { outcome: 'ready', …(1) }
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line faa03d0e-350f-4007-8de5-478ffa8750f3: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "Cash-in awaiting payment: Cash-in (claim the award) — Pearson Edexcel January 2027 (exams xw) is entered once it is paid",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 201,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:332:10
+    330|       // By hand too: refused until it is paid.
+    331|       expect(await refused(coord.api.v1.exams.entries.$post({ json: { …
+    332|         .toEqual({ status: 409, error: `Cash-in awaiting payment: ${c.…
+       |          ^
+    333|     });
+    334| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > paid: derived as the award its line's item enters, with exam_entry.charge_id
+AssertionError: expected { registrationId: null, …(12) } to match object { outcome: 'ready', …(1) }
+(18 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "outcome": "ready",[39m
+[31m+   "outcome": "entered",[39m
+[2m    "registrationId": null,[22m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:338:64
+    336|       await apiResponse(w.officer.api.v1.registrations.desk.collect.$p…
+    337|       const done = await derive(w.series.pearsonJan, w.families.a.stud…
+    338|       expect(done.rows.find((r) => r.chargeId === lineCharge)).toMatch…
+       |                                                                ^
+    339|       const award = (await entriesOf(w.series.pearsonJan, w.families.a…
+    340|       expect(award.map((e) => [e.entry_code, e.charge_id, e.registrati…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

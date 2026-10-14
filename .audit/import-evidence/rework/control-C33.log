@@ -1,0 +1,89 @@
+# C33: s9: a provisional fee row prices the line provisional at its amount, never 0 (priceLine reads provisional rows)
+# undone in apps/api/src/services/pricing.services.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 3 failed) 13900ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 164ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 372ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 11ms
+ Test Files  1 failed (1)
+      Tests  3 failed | 65 passed (68)
+   Duration  15.66s (transform 724ms, setup 2ms, collect 297ms, tests 13.90s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:651:45
+ ❯ test/08n-import.test.ts:706:56
+ ❯ test/08n-import.test.ts:754:63
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
+AssertionError: expected [ { code: 'price_provisional', …(2) } ] to deeply equal [ { code: 'price_provisional', …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "code": "price_provisional",
+-     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-po6r)",
++     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-po6r)",
+      "severity": "info",
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:651:45
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
+AssertionError: expected [ [ 'live.one', …(12) ], …(7) ] to deeply equal [ [ 'live.one', …(12) ], …(7) ]
+
+- Expected
++ Received
+
+@@ -62,13 +62,13 @@
+    [
+      "live.one",
+      "Live Subject Provisional",
+      "first",
+      "in_school",
+-     1600,
+      1000,
+-     600,
++     1000,
++     0,
+      true,
+      null,
+      null,
+      "Mr Live",
+      100,
+
+ ❯ test/08n-import.test.ts:706:56
+    704|          left join teacher t on t.id = r.teacher_id where r.session_id…
+    705|       expect(lines.map((r) => [r.email.replace(D, ''), r.subject, r.at…
+    706|         r.basis.coursePercent, r.basis.boardPercent])).toEqual([
+       |                                                        ^
+    707|         ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 100…
+    708|         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 100…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent
+AssertionError: expected 9950 to be 10550 // Object.is equality
+
+- Expected
++ Received
+
+- 10550
++ 9950
+
+ ❯ test/08n-import.test.ts:754:63
+    752|       expect(imported).toHaveLength(8);
+    753|       expect(imported.every((l) => l.unpaid && !l.paid && l.status ===…
+    754|       expect(imported.reduce((a, l) => a + l.outstanding, 0)).toBe(150…
+       |                                                               ^
+    755|       expect(imported.filter((l) => l.provisional).map((l) => [l.subje…
+    756|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

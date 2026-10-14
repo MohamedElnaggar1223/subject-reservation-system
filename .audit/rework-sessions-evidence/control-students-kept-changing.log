@@ -1,0 +1,441 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.5 ms (measured within 5 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [73d35f65-4216-4140-9e6b-5d08c2861f4a] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [1991668d-85d9-4d23-ad75-0b4ea6325845] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b23a6112-69d6-49f1-99d2-50744f7567b2] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [34924f1f-9456-4523-ab55-97014f25ac18] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b7fdf8d0-b2db-44f0-8afe-1650e1936cea] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ed01d7e9-eb2f-4d55-acb2-e8bbeea98d61] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [70480012-019d-456f-9f93-85e191123229] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f75740a2-0e99-42b5-9e90-c06f8f75d9e6] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [34ab11a5-b105-42ef-a332-d4e4d8d61224] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [0d0604f1-63f5-415f-afdd-c7bccd5cffb4] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [29aedbcb-80af-41f9-9c8c-cd2edb2efc56] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [0559571f-c55c-4182-b75c-e1f63698e0e1] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bfcd64c3-7205-4495-8c9a-8b698bba4c58] POST /v1/sessions/ecab267a-98e9-4f27-8a40-464fcc5f8178/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [17302f3a-3e40-44dd-b059-982a21500d01] POST /v1/sessions/f950ccf0-f4a7-40a2-bfa8-e404937be6f0/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [1d9735ad-b281-43e7-8646-330615d7adf8] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [8ecf2e59-628e-4a71-9016-075be6725578] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [967b29e4-11a0-4cf7-8e76-3374115c30b3] POST /v1/sessions/ecab267a-98e9-4f27-8a40-464fcc5f8178/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [2c384115-bd65-4cdb-8caa-e300b8a4ec3f] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: parent.t08-nc1-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: student.t08-nc1-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [512e68e5-ba37-4163-a8c9-8f084575eb83] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [c6e3a7fa-17a1-412f-a8c1-05edb8654aec] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [00a932bc-97f7-4c12-bc70-ac4e7ab6942a] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: parent.t08-nc2-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: student.t08-nc2-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [dc0f4fd1-a89b-41ad-9022-e6d37760b54c] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [4db01922-3fc9-4769-a3b5-631253791df3] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [8eabd3da-eef5-43f2-a0a3-786022d836b5] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: parent.t08-nc3-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: student.t08-nc3-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [2f12cd0d-92e5-4666-9e93-d40a77b45488] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [2feb11d9-1530-4abf-b6a9-a599550d6204] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [9ab46532-3967-4b72-92b0-d70aeea99116] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: parent.t08-nc4-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[email:stub] To: student.t08-nc4-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [5981474d-641f-4575-8682-60f4af92cd4a] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed
+[INFO] [6ef354ed-be35-4d6a-a00a-8e3cf59cace0] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [2ce89a26-f285-4060-adfc-2946bef19156] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [43af8a4a-0e52-4bf8-b352-8ae1a2b11459] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [203e420a-919d-4be4-8f93-6d24039f7858] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [685af10e-91a7-4b51-9783-f63bd5e33730] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [75301a44-060f-4efb-84ef-e09a491602ec] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [bfa88f25-0cec-4c69-9c33-cda7ef95b9ab] POST /v1/sessions/ecab267a-98e9-4f27-8a40-464fcc5f8178/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [dce76120-b7ec-4c73-a11d-1e544d1436f0] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[email:stub] To: parent.t08-ni-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[email:stub] To: student.t08-ni-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [a3041507-cf47-4b55-9135-318001eeeb4d] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [61d3f047-c2f4-429f-8946-4ed7e027ebda] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [8c41c448-f953-4228-a15f-55c24a3cd32a] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+[INFO] [23953161-9a01-4fec-b0fb-f1228b803a9b] PUT /v1/sessions/ecab267a-98e9-4f27-8a40-464fcc5f8178/offers/21340fb7-4d40-437d-aca6-0860cb718c08/items/1ec33482-4ad7-430a-a5b7-63540c433c6d
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [3c995385-19da-420e-89d5-42edf9f4a65b] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [d33933a0-f53c-4e69-8a21-7cda19e9d2ee] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: student.t08-nc1-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: student.t08-nc2-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: student.t08-nc3-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: student.t08-nc4-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: student.t08-ni-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: parent.t08-nc1-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: parent.t08-nc2-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: parent.t08-nc3-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: parent.t08-nc4-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: parent.t08-ni-8f17@test.local | Subject: Registration Open — June 2027 — t08-nc-8f17 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [4695763e-42af-4b3c-952b-d8e18504af1b] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [18a109d1-e608-4439-8c4c-1d47f7f3e60d] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [70a61a0c-2a59-47ed-bb25-516b8a558613] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [0e9c70b8-5092-4b17-ad10-6f33957a9458] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [0b4e7d18-a189-4bb0-bdf1-18a9af6f3e29] POST /v1/sessions/86decfcd-ac3b-49f6-9bbf-9f4f39c58157/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [b5b0f82c-d4ca-4ba4-b77b-d4d4fc8c4e6b] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: parent.t08-ncs-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[email:stub] To: student.t08-ncs-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [449c5117-0308-4b07-be5b-5dea2ca349c4] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [eaeedf32-d5b0-435f-988a-682d58cc033d] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [b20563de-d047-4959-bf54-e6de006fea7a] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+[INFO] [d2716aa0-b067-4cd8-bb5e-947e29b046cd] PUT /v1/sessions/86decfcd-ac3b-49f6-9bbf-9f4f39c58157/series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [a6d324d5-a648-49cd-8e69-3a6ae7fa831d] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [f7be8bde-5e2b-4f52-89a9-4268feca6a54] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [97b899b2-787f-484b-be6d-a208acc8d118] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [0c9ea606-c0b0-451c-9aa4-11ab5d983e8f] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [638ade23-f35b-4073-8b3c-a0046c73b4e2] POST /v1/sessions/ecab267a-98e9-4f27-8a40-464fcc5f8178/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [8a4b12ff-840d-4771-a01a-16d22908bb5b] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[email:stub] To: parent.t08-nbs-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[email:stub] To: student.t08-nbs-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [e2ca440e-b77f-45aa-88f4-b884caa2e9d9] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [70e3c618-9dae-4f7d-9159-ee3c7782134f] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [b9f39d76-7444-4e16-8142-30724bdc4905] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [7bbed5b6-b8d0-4c13-b575-d4707df813d0] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+[INFO] [6e380a20-6e91-4010-94f4-ba0ee4dca91c] PUT /v1/subjects/bba31b21-0011-4b0b-9914-ce80c16e5dee
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [06949575-09e9-4ec0-bffa-e82f4a1041b7] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [7409750a-1b55-48ae-815e-2bdeff7100ed] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [a8fc73e4-2e91-4fd5-aeb5-f8ac584d4786] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [3afed801-23e9-42ee-9488-d17c6f3aa1d2] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [faf160e7-5e2f-463b-8a8a-ac5997b28d23] POST /v1/sessions/ecab267a-98e9-4f27-8a40-464fcc5f8178/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [f347623e-2884-4453-a816-24eb2111294c] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[email:stub] To: parent.t08-nbc-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[email:stub] To: student.t08-nbc-8f17@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [d75f7d6e-9764-458c-9533-a252fd736631] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [71d49834-c025-4eef-ba46-a993de7cb387] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [773bde7f-8fde-4e86-9171-073b1d25e629] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [f59d7bd5-71f2-4847-9741-8eeca40d3bd2] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+[INFO] [715ac4ff-4f1c-44ac-9206-97f8c6b5928e] PUT /v1/catalogue/registrable/d456da47-aa15-41a6-b8d7-4fe7891e6136
+
+ ❯ test/08t-rework-races.test.ts (44 tests | 4 failed | 40 skipped) 6165ms
+   ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+   ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+   ↓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+   ↓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+   ↓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+   ↓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+   ↓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+   ↓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > the checkout first: it opens its payment, and the rejection is refused while it is open
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > the rejection first: the line expires, and the checkout that waited is refused, no payment made
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > verified while its payment is confirmed: both land, the line paid and verified
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the approval first: the line is dropped, and the rejection that waited finds nothing to answer
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the rejection first: the paid line stands as a first entry, then the approval drops it
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment confirmed while a rejection waits for the line: the rejection is refused (try again), then answered with the receipt first
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the rejection first: it holds the receipt and the line; the reversal waits, then reverts the payment
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the reversal first: the line waits for payment again, and the rejection that waited ends it
+   ↓ 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once
+   ↓ 08t: the rework races > a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line) > the approval first: it drops the line; the reversal then refuses (the subject was dropped) — no deadlock
+   ↓ 08t: the rework races > a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line) > the reversal first: it reverts the line; the approval then refuses (already processed) — no deadlock
+   ↓ 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+   ↓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+   ↓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+   ↓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+   ↓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+   ↓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change 908ms
+     → expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction 901ms
+     → expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form 915ms
+     → expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue 876ms
+     → expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > an item's series change
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > a board change
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the session's series correction
+   ↓ 08t: the rework races — money (step C) > an exception revoked while a line relies on it: the revocation waits for the reservation, then re-dates its line; one that lands first leaves the line without it
+   ↓ 08t: the rework races — money (step C) > a family's one-shot gate wanted by two of its children at once: one reservation gets it, the other is refused
+   ↓ 08t: the rework races — money (step C) > the desk collects a line and another line's instalment while both lines' board fees are re-priced: every line taken in one id-ordered pass, so the two never deadlock
+   ↓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the confirmation first (begun before the deadline): the line is captured; the sweep after the deadline finds it confirmed and settles nothing
+   ↓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the sweep first (after the deadline): the line expires and its deposits are settled once; the confirmation is refused and the payment failed
+   ↓ 08t: the rework races — reminders (step D) > a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing
+   ↓ 08t: the rework races — reminders (step D) > a reminder claimed while the payment is taken: the payment waits for the line, the reminder goes out once, before the payment confirms
+   ↓ 08t: the rework races — reminders (step D) > two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once
+   ↓ 08t: the rework races — reminders (step D) > the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+AssertionError: expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   409,[39m
+[32m-   "The students with lines here changed while this change was running (new reservations kept arriving): nothing was changed. Try again.",[39m
+[31m+   400,[39m
+[31m+   "A reservation landed while this change waited: it runs again with that student locked first",[39m
+[2m  ][22m
+
+ ❯ test/08t-rework-races.test.ts:1069:36
+    1067|       });
+    1068|       made.push(...r.made);
+    1069|       expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGIN…
+       |                                    ^
+    1070|       expect(await one(`select board_series_id as s from session_offer…
+    1071|       expect(await one(`select board_series_id as s from registration …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+AssertionError: expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   409,[39m
+[32m-   "The students with lines here changed while this change was running (new reservations kept arriving): nothing was changed. Try again.",[39m
+[31m+   400,[39m
+[31m+   "A reservation landed while this change waited: it runs again with that student locked first",[39m
+[2m  ][22m
+
+ ❯ test/08t-rework-races.test.ts:1089:36
+    1087|       });
+    1088|       made.push(...r.made);
+    1089|       expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGIN…
+       |                                    ^
+    1090|       expect(await one(`select series_year as y from registration_sess…
+    1091|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+AssertionError: expected [ 400, …(1) ] to deeply equal [ 409, …(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   409,[39m
+[32m-   "The students with lines here changed while this change was running (new reservations kept arriving): nothing was changed. Try again.",[39m
+[31m+   400,[39m
+[31m+   "A reservation landed while this change waited: it runs again with that student locked first",[39m
+[2m  ][22m
+
+ ❯ test/08t-rework-races.test.ts:1115:38
+    1113|         });
+    1114|         made.push(...r.made);
+    1115|         expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANG…
+       |                                      ^
+    1116|         expect(await one(`select council from subject where id = $1`, …
+    1117|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 40 skipped (44)
+   Start at  02:27:23
+   Duration  8.31s (transform 623ms, setup 3ms, collect 454ms, tests 6.16s, environment 0ms, prepare 35ms)
+

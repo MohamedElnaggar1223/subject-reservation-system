@@ -8,6 +8,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { getQueryClient } from '~/lib/query-client';
 import { getServerApi } from '~/lib/hono-server';
 import { apiResponse } from '@repo/validations';
+import { requireAcademic } from '~/lib/auth/session';
 import CatalogueClient, { type CatalogueTab } from './catalogue.client';
 
 const TABS: CatalogueTab[] = ['registrable', 'qualifications', 'units'];
@@ -17,6 +18,7 @@ export const metadata = {
 };
 
 export default async function CataloguePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }): Promise<React.JSX.Element> {
+  await requireAcademic();
   const { tab } = await searchParams;
   const initialTab = TABS.find((t) => t === tab) ?? 'registrable';
   const queryClient = getQueryClient();

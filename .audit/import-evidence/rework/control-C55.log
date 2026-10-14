@@ -1,0 +1,29 @@
+# C55: item 5: the review's dry run reads the exception rows without a lock (a GET holds none)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 17427ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 4400ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  19.17s (transform 761ms, setup 2ms, collect 298ms, tests 17.43s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:1334:26
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction
+AssertionError: expected 'waited' to be 'answered' // Object.is equality
+
+Expected: "answered"
+Received: "waited"
+
+ ❯ test/08n-import.test.ts:1334:26
+    1332|       try {
+    1333|         const answered = await Promise.race([fetchView(adm, id).then((…
+    1334|         expect(answered).toBe('answered');
+       |                          ^
+    1335|       } finally {
+    1336|         await release();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

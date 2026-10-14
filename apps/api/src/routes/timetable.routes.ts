@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   IdParam, TimetablesQuery, CreateTimetable, UpdateTimetable, LessonParam, MoveLesson, UnplaceLesson, LockLesson, GenerateTimetable,
-  PublishTimetable, ExportCsvQuery, YearQuery,
+  PublishTimetableVersion, ExportCsvQuery, YearQuery,
 } from '@repo/validations';
 import { listPublishedClashes } from '../services/timetable-clash.services';
 import { success, error } from '../lib/response';
@@ -113,7 +113,7 @@ export const timetableRoutes = new Hono<HonoEnv>()
     }
   })
   /** POST /:id/publish — takes effect on a date (today or later, inside the term); clashes refused; the people concerned told. */
-  .post('/:id/publish', zValidator('param', IdParam), zValidator('json', PublishTimetable), async (c) => {
+  .post('/:id/publish', zValidator('param', IdParam), zValidator('json', PublishTimetableVersion), async (c) => {
     try {
       return success(c, await timetables.publishTimetable(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {

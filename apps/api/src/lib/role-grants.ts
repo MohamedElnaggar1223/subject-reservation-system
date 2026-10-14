@@ -122,6 +122,15 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/enrolments',
     'POST /v1/enrolments',
     '* /v1/enrolments/*',
+    // F4: exam-entry management — every exam endpoint (each route's own gate
+    // and handler still decide: the national ID is the coordinator's and
+    // the admin's alone, a family's own records the family's).
+    '* /v1/exams/*',
+    // F7: the day-one import (registering in a window and adding catalogue
+    // rows stay the admin's: the handlers refuse them).
+    'GET /v1/imports',
+    'POST /v1/imports',
+    '* /v1/imports/*',
     // F1: the timetable — groups, rules, versions, the grid, the generator,
     // publishing, exports, every view, and cover.
     '* /v1/scheduling/*',
@@ -137,6 +146,13 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     // F0b: what they teach — the catalogue, and their own class lists.
     'GET /v1/catalogue',
     'GET /v1/enrolments/class',
+    // F4: forecast grades for the candidates they teach, their invigilation
+    // duties, and the register of the room they invigilate (handlers check).
+    'GET /v1/exams/forecasts',
+    'PUT /v1/exams/entries/:id/forecast',
+    'GET /v1/exams/invigilation/mine',
+    'GET /v1/exams/registers',
+    'PUT /v1/exams/registers',
     // F1: their own teaching's timetable (the handler refuses anyone else's)
     // and a lesson's class on a date they teach or cover it.
     'GET /v1/schedule/day',

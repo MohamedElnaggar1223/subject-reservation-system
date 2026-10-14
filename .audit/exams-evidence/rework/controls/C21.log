@@ -1,0 +1,57 @@
+# C21: a cash-in entered before it is paid (derivation)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['accepted but not paid']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 28001ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 45ms
+     → expected { registrationId: null, …(12) } to match object { outcome: 'awaiting_payment', …(2) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 55 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line ecc78e52-314e-4ce1-a666-32d3f6233b4e: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered
+AssertionError: expected { registrationId: null, …(12) } to match object { outcome: 'awaiting_payment', …(2) }
+(17 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "entries": [],[39m
+[32m-   "note": "Cash-in awaiting payment: Cash-in (claim the award) — Pearson Edexcel January 2027 (exams xw) (EGP 700.00) — entered once it is paid",[39m
+[32m-   "outcome": "awaiting_payment",[39m
+[31m+   "entries": [[39m
+[31m+     {[39m
+[31m+       "carryForward": "none",[39m
+[31m+       "cfCandidateNumber": null,[39m
+[31m+       "cfCentreNumber": null,[39m
+[31m+       "cfFromMonth": null,[39m
+[31m+       "cfFromYear": null,[39m
+[31m+       "cfOption": null,[39m
+[31m+       "entryCode": "XWXMA01",[39m
+[31m+       "existingEntryId": null,[39m
+[31m+       "isRetake": false,[39m
+[31m+       "kind": "award",[39m
+[31m+       "optionCode": null,[39m
+[31m+       "qualificationId": "89b900b0-6cc1-45fc-b9f5-aed86ef7075e",[39m
+[31m+       "retakeSource": null,[39m
+[31m+       "staffSet": [],[39m
+[31m+       "state": "new",[39m
+[31m+       "tier": null,[39m
+[31m+       "title": "Mathematics XW",[39m
+[31m+       "unitId": null,[39m
+[31m+     },[39m
+[31m+   ],[39m
+[31m+   "note": null,[39m
+[31m+   "outcome": "ready",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:327:19
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

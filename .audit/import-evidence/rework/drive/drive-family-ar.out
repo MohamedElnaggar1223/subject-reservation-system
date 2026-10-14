@@ -1,0 +1,124 @@
+signed in → http://localhost:3090/approvals
+reservable boxes: 1
+shot 05-family-reserve
+RESERVE:
+الحجز
+
+اختر ابنك والجلسة، وحدد ما سيمتحن فيه، وادفع لكل دورة امتحان.
+
+الابن/الابنة
+اختر…
+Demo Family Student · Grade 11
+الجلسة
+اختر…
+June 2027 — Family check 3
+November 2026 – January 2027
+
+يُغلق الحجز 7 نوفمبر 2026
+
+حدد ما ستمتحن فيه. إعادة لا تعرفها المدرسة بعد: اختر «إعادة» وسمِّ الدورة كما في الاستمارة، وتتحقق منها المدرسة. رسوم المجلس المؤقتة (ⓟ) تُؤكَّد قبل الدفع.
+
+	المادة · ما يُقيَّد	معلم	القيد	السعر
+O.L.
+Demo Biology Cambridge International
+	المادة كاملة
+Cambridge International June 2027
+	Teacher Demo A	
+قيد أول، في المدرسة
+إعادة، في المدرسة — سمِّ الدورة
+إعادة، دراسة ذاتية — سمِّ الدورة
+	22,850 جنيه
+
+1 سطر · 22,850 جنيه
+
+مستحق 7 نوفمبر 2026
+
+أؤكد أنني قرأت سياسة الاسترداد: من رسوم التدريس، 100% حتى الأسبوع 2 · 50% في الأسبوع 3 · 0% من الأسبوع 4، محسوبة من أول حصة.
+أؤكد أن المعلومات المقدمة صحيحة وكاملة ودقيقة.
+الحجز
+1
+سطر
+close: 200
+shot 06-family-refused
+REFUSED:
+الحجز
+
+اختر ابنك والجلسة، وحدد ما سيمتحن فيه، وادفع لكل دورة امتحان.
+
+الابن/الابنة
+اختر…
+Demo Family Student · Grade 11
+الجلسة
+اختر…
+June 2027 — Family check 3
+November 2026 – January 2027
+
+يُغلق الحجز 7 نوفمبر 2026
+
+حدد ما ستمتحن فيه. إعادة لا تعرفها المدرسة بعد: اختر «إعادة» وسمِّ الدورة كما في الاستمارة، وتتحقق منها المدرسة. رسوم المجلس المؤقتة (ⓟ) تُؤكَّد قبل الدفع.
+
+	المادة · ما يُقيَّد	معلم	القيد	السعر
+O.L.
+Demo Biology Cambridge International
+	المادة كاملة
+Cambridge International June 2027
+	Teacher Demo A	
+قيد أول، في المدرسة
+إعادة، في المدرسة — سمِّ الدورة
+إعادة، دراسة ذاتية — سمِّ الدورة
+	22,850 جنيه
+
+1 سطر · 22,850 جنيه
+
+مستحق 7 نوفمبر 2026
+
+أؤكد أنني قرأت سياسة الاسترداد: من رسوم التدريس، 100% حتى الأسبوع 2 · 50% في الأسبوع 3 · 0% من الأسبوع 4، محسوبة من أول حصة.
+أؤكد أن المعلومات المقدمة صحيحة وكاملة ودقيقة.
+
+نافذة التسجيل غير مفتوحة
+
+الحجز
+1
+سطر
+shot 07-family-after-close
+AFTER:
+الحجز
+
+اختر ابنك والجلسة، وحدد ما سيمتحن فيه، وادفع لكل دورة امتحان.
+
+الابن/الابنة
+اختر…
+Demo Family Student · Grade 11
+الجلسة
+اختر…
+November 2026 – January 2027
+
+يُغلق الحجز 7 نوفمبر 2026
+
+حدد ما ستمتحن فيه. إعادة لا تعرفها المدرسة بعد: اختر «إعادة» وسمِّ الدورة كما في الاستمارة، وتتحقق منها المدرسة. رسوم المجلس المؤقتة (ⓟ) تُؤكَّد قبل الدفع.
+
+	المادة · ما يُقيَّد	معلم	القيد	السعر
+O.L.
+Demo Biology Cambridge International
+	المادة كاملة
+Cambridge International November 2026
+			
+Demo Chemistry Cambridge International
+	المادة كاملة
+Cambridge International November 2026
+			
+Demo Physics Cambridge International
+	المادة كاملة
+Cambridge International November 2026
+			
+Demo History Cambridge International
+	المادة كاملة
+Cambridge International November 2026
+			
+Demo Geography Cambridge Internation
+ERRORS: 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+console: Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 

@@ -52,6 +52,7 @@ const icons = {
   bell: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
   rooms: 'M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21',
   settings: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  upload: 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5',
   today: 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z',
   // F1
   timetable: 'M3.375 19.5h17.25M3.375 19.5A1.125 1.125 0 012.25 18.375V5.625c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125M2.25 9h19.5M2.25 13.5h19.5M8.25 4.5v15m7.5-15v15',
@@ -82,17 +83,39 @@ const ACADEMIC_ITEMS: NavItem[] = [
   { labelKey: 'nav.rooms', href: '/academic/rooms', icon: 'rooms' },
 ];
 
-/** The exam catalogue and the boards' series (F0b): the coordinator's and admin's. */
+/**
+ * Exams: F4's exam-entry management — the deadlines first (what is due), then
+ * the work in the order of a series — candidates, entries, the boards' lists,
+ * the timetable, exam days, results, certificates — and F0b's catalogue and
+ * board series. The coordinator's and admin's.
+ */
 const EXAMS_SECTION: NavSection = {
   titleKey: 'nav.exams',
   items: [
-    { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'documents' },
-    { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'calendar' },
+    { labelKey: 'nav.examDeadlines', href: '/exams/deadlines', icon: 'history' },
+    { labelKey: 'nav.candidates', href: '/exams/candidates', icon: 'students' },
+    { labelKey: 'nav.entries', href: '/exams/entries', icon: 'registrations' },
+    { labelKey: 'nav.entryLists', href: '/exams/entry-lists', icon: 'approvals' },
+    { labelKey: 'nav.forecasts', href: '/exams/forecasts', icon: 'reports' },
+    { labelKey: 'nav.examTimetable', href: '/exams/timetable', icon: 'calendar' },
+    { labelKey: 'nav.examDays', href: '/exams/days', icon: 'rooms' },
+    { labelKey: 'nav.examResults', href: '/exams/results', icon: 'reports' },
+    { labelKey: 'nav.certificates', href: '/exams/certificates', icon: 'documents' },
+    { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'subjects' },
+    { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'sessions' },
     // The reservations rework, step C (§3.6): the boards' services, their fees and deadlines per series.
     { labelKey: 'nav.boardServices', href: '/exams/services', icon: 'audit' },
   ],
 };
 
+/** F4: what a teacher does for exams — their candidates' forecasts, their invigilation. */
+const TEACHER_EXAM_ITEMS: NavItem[] = [
+  { labelKey: 'nav.forecasts', href: '/exams/forecasts', icon: 'approvals' },
+  { labelKey: 'nav.invigilation', href: '/exams/invigilation', icon: 'rooms' },
+];
+
+/** F4: a family's statement of entry, exam timetable and results. */
+const MY_EXAMS_ITEM: NavItem = { labelKey: 'nav.myExams', href: '/exams/my', icon: 'calendar' };
 /** The timetable (F1): built by the coordinator and the admin. */
 const TIMETABLE_SECTION: NavSection = {
   titleKey: 'nav.timetable',
@@ -116,7 +139,7 @@ const ACCOUNT_SECTION: NavSection = {
 const TEACHING_ITEM: NavItem = { labelKey: 'nav.myTeaching', href: '/teaching', icon: 'subjects' };
 
 function getNavSections(role: string | null | undefined, teaches = false): NavSection[] {
-  const teaching = teaches ? [TEACHING_ITEM] : [];
+  const teaching = teaches ? [TEACHING_ITEM, ...TEACHER_EXAM_ITEMS] : [];
 
   if (role === 'coordinator') {
     return [
@@ -126,14 +149,15 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       EXAMS_SECTION,
       // The reservations rework (§4.2): the coordinator keeps each session's subjects, teachers and items.
       // The reservations rework, step C (§3.7): the academic gates are the coordinator's to grant.
-      { titleKey: 'nav.school', items: [{ labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' }, { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' }, { labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
+      // F7: the coordinator stages and reviews the day-one import.
+      { titleKey: 'nav.school', items: [{ labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' }, { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' }, { labelKey: 'nav.import', href: '/imports', icon: 'upload' }, { labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
       ACCOUNT_SECTION,
     ];
   }
 
   if (role === 'teacher') {
     return [
-      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, TEACHING_ITEM] },
+      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, TEACHING_ITEM, ...TEACHER_EXAM_ITEMS] },
       ACCOUNT_SECTION,
     ];
   }
@@ -162,6 +186,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         items: [
           { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
           { labelKey: 'nav.team', href: '/admin/team', icon: 'profile' },
+          { labelKey: 'nav.import', href: '/imports', icon: 'upload' },
           { labelKey: 'nav.settings', href: '/settings', icon: 'settings' },
           { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
           { labelKey: 'nav.subjects', href: '/admin/subjects', icon: 'subjects' },
@@ -212,6 +237,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
+          // F4: certificates are handed over at the desk.
+          { labelKey: 'nav.certificates', href: '/exams/certificates', icon: 'documents' },
         ],
       },
       ...(role === 'finance_admin'
@@ -253,6 +280,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
           { labelKey: 'nav.approvals', href: '/approvals', icon: 'approvals' },
           { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },
+          MY_EXAMS_ITEM,
         ],
       },
       {
@@ -293,6 +321,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
         { labelKey: 'nav.browseSubjects', href: '/subjects', icon: 'subjects' },
         { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },
+        MY_EXAMS_ITEM,
       ],
     },
     {

@@ -1,0 +1,52 @@
+# C43: the review asks the rules on lines as the commit will (assertLineRules, rolled back)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13245ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 98ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 364ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 66 passed (68)
+   Duration  15.02s (transform 723ms, setup 2ms, collect 291ms, tests 13.25s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:987:92
+ ❯ test/08n-import.test.ts:1326:122
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper
+AssertionError: expected undefined to deeply equal { code: 'registration_refused', …(2) }
+
+- Expected: 
+{
+  "code": "registration_refused",
+  "detail": "Mathematics A.S./A.L. (imp) — P2 takes retakes only this cycle",
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:987:92
+    985|       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
+    986|       expect(rowAt(v, 'Units', 4).plan.lines[0]).toMatchObject({ itemL…
+    987|       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'reg…
+       |                                                                                            ^
+    988|         code: 'registration_refused', severity: 'error', detail: 'Math…
+    989|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction
+AssertionError: expected undefined to be 'Mathematics A.S./A.L. (imp) — P2 take…' // Object.is equality
+
+- Expected: 
+"Mathematics A.S./A.L. (imp) — P2 takes retakes only this cycle"
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:1326:122
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

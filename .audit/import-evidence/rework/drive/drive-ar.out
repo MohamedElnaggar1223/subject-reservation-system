@@ -1,0 +1,888 @@
+signed in → http://localhost:3090/admin/dashboard
+shot 01-imports
+staged f752dc2b-571f-403c-a676-d5bcbdc133d8
+shot 02-review-problems
+REVIEW:
+استيراد بدء التشغيل
+demo-sheet-4.xlsx
+
+جدول التسجيل الخاص بالمدرسة
+بانتظار المراجعة
+·
+رُفع
+8 أكتوبر 2026
+بواسطة
+School Admin
+
+نحِّ هذا الملف جانبًا
+اعتماد
+0
+أسر
+
+الأسطر
+
+10
+
+10 للاستيراد · 0 مستبعدة
+
+أسر جاهزة
+
+0
+
+0 معتمدة
+
+أسر موقوفة
+
+4
+
+4 أسطر للتصحيح
+
+سينشئ الاعتماد
+
+4 حسابات طلاب جديدة
+4 حسابات أولياء أمور جديدة
+4 روابط أولياء أمور بأبناء
+4 طلاب يوضعون في فصول
+7 حالات التحاق بالمقررات
+1 تسجيلات تُحفظ في السجل السابق
+9 سطور بانتظار الدفع
+2 ملاحظات في السجل المالي السابق
+عن هذا الملف: لا توجد أموال في هذا الملف · العام الدراسي غير مُعَدّ
+المشكلات
+4
+الأسطر
+10
+الأشخاص والتعارضات
+المطابقة
+لا رسوم مجلس في جدول الدورة
+يجب تصحيحه
+1 سطر
+دراسة ذاتية في قيد أول لمادة تدرّسها المدرسة
+IS-03
+يجب تصحيح
+series selects: 2
+shot 03-mapping
+MAPPING:
+استيراد بدء التشغيل
+demo-sheet-4.xlsx
+
+جدول التسجيل الخاص بالمدرسة
+بانتظار المراجعة
+·
+رُفع
+8 أكتوبر 2026
+بواسطة
+School Admin
+
+نحِّ هذا الملف جانبًا
+اعتماد
+0
+أسر
+
+الأسطر
+
+10
+
+10 للاستيراد · 0 مستبعدة
+
+أسر جاهزة
+
+0
+
+0 معتمدة
+
+أسر موقوفة
+
+4
+
+4 أسطر للتصحيح
+
+سينشئ الاعتماد
+
+4 حسابات طلاب جديدة
+4 حسابات أولياء أمور جديدة
+4 روابط أولياء أمور بأبناء
+4 طلاب يوضعون في فصول
+7 حالات التحاق بالمقررات
+1 تسجيلات تُحفظ في السجل السابق
+9 سطور بانتظار الدفع
+2 ملاحظات في السجل المالي السابق
+عن هذا الملف: لا توجد أموال في هذا الملف · العام الدراسي غير مُعَدّ
+المشكلات
+4
+الأسطر
+10
+الأشخاص والتعارضات
+المطابقة
+أوراق الملف
+
+تُقرأ كل ورقة بعناوينها. فصولها وصفوفها لعام دراسي واحد: عام الدورة الرئيسية في الورقة.
+
+Nov 2026
+استوردها
+9 أسطر · نوفمبر 2026
+الفصول في عام
+2026/27
+June 2026
+استوردها
+1 أسطر · يونيو 2026
+الفصول في عام
+2025/26 (غير مُعَدّ)
+2026/27
+العام غير مُعَدّ: لا فصول ولا التحاق
+الدورات والمستويات
+
+يسجل السجل السابق ما سجّله كل طالب قبل النظام؛ ولا يُستحق شيء. وتأخذ جلسة الدورة نفسها السطور حجوزاتٍ بانتظار الدفع — كلٌّ على المادة والبند اللذين يذكرهما الجدول، بسعر من جداول رسوم الجلسة — ثم تدفع الأسرة عبر التطبيق أو المكتب. وهذا الاختيار للمدير.
+
+يونيو 2026 · IGCSE
+العام الدراسي 2025/26 · 1 أسطر
+سجل سابق فقط
+سطور بانتظار الدفع في June 2026 — IGCSE (مغلقة)
+استبعد هذه الأسطر
+المجالس: Cambridge International
+نوفمبر 2026 · IGCSE
+العام الدراسي 2026/27 · 7 أسطر
+سجل سابق فقط
+سطور بانتظار الدفع في November 2026 – January 2027 — November IGCSE (مغلقة)
+سطور بانتظار الدفع في November 2026 – January 2027
+استبعد هذه الأسطر
+المجالس: Cambridge International
+نوفمبر 2026 · المستوى AS
+العام الدراسي 2026/27
+shot 04-problems-mapped
+PROBLEMS:
+استيراد بدء التشغيل
+demo-sheet-4.xlsx
+
+جدول التسجيل الخاص بالمدرسة
+بانتظار المراجعة
+·
+رُفع
+8 أكتوبر 2026
+بواسطة
+School Admin
+
+نحِّ هذا الملف جانبًا
+اعتماد
+0
+أسر
+
+الأسطر
+
+10
+
+10 للاستيراد · 0 مستبعدة
+
+أسر جاهزة
+
+0
+
+0 معتمدة
+
+أسر موقوفة
+
+4
+
+4 أسطر للتصحيح
+
+سينشئ الاعتماد
+
+4 حسابات طلاب جديدة
+4 حسابات أولياء أمور جديدة
+4 روابط أولياء أمور بأبناء
+4 طلاب يوضعون في فصول
+7 حالات التحاق بالمقررات
+1 تسجيلات تُحفظ في السجل السابق
+9 سطور بانتظار الدفع
+2 ملاحظات في السجل المالي السابق
+عن هذا الملف: لا توجد أموال في هذا الملف · العام الدراسي غير مُعَدّ
+المشكلات
+4
+الأسطر
+10
+الأشخاص والتعارضات
+المطابقة
+لا رسوم مجلس في جدول الدورة
+يجب تصحيحه
+1 سطر
+دراسة ذاتية في قيد أول لمادة تدرّسها المدرسة
+IS-03
+يجب تصحيحه
+1 سطر
+إعادة لا تسمّي دورة سابقة
+يجب تصحيحه
+1 سطر
+أي بند من المادة؟
+يجب تصحيحه
+1 سطر
+المادة غير موجودة في الدليل
+راجِعه
+2 أسطر
+دراسة ذاتية في إعادة
+IS-03
+للعلم
+2 أسطر
+ملاحظة رسوم
+IS-08
+للعلم
+2 أسطر
+رسوم المجلس مؤقتة
+للعلم
+1 سطر
+وحدة أو مجموعة أوراق مسجلة وحدها
+IS-01
+للعلم
+1 سطر
+rows for "Demo Biology" Demo Student 14+Nov 2026: 1
+shot 05-line-legacy
+ROW 6:
+Nov 2026، السطر 6
+إغلاق
+المشكلات
+دراسة ذاتية في إعادة — إعادة لدورة يونيو 2026 (سجل الطالب)
+دورة سابقة معروفة (سجل الطالب) أو مذكورة في السطر: إعادة بدراسة ذاتية، بنسبة الدراسة الذاتية.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Biology — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+إعادة، دراسة ذاتية
+الدورة التي يتبعها
+يونيو 2026 من سجل الطالب (السجل السابق)
+معلم
+لا أحد (دراسة ذاتية)
+السعر
+جنيه 16,850
+التدريس 12,000 × 50% + المجلس 10,850 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026
+Demo Physics — Whole subject · Cambridge International نوفمبر 2026
+القيد
+قيد أول
+إعادة
+كما يقول الجدول
+الدورة التي تتبعها الإعادة (تصريح المكتب، ويُتحقق منها في «للتحقق»)
+يناير
+يونيو
+أكتوبر
+نوفمبر
+سمِّ هذه الدورة
+كما قُرئ — صحّح أي حقل، ويحفظ Enter
+اسم الطالب
+بريد الطالب
+هاتف الطالب
+اسم ولي الأمر
+بريد ولي الأمر
+هاتف ولي الأمر
+لا يوجد ولي أمر مسجل
+الفصل والصف
+رمز المستوى
+المادة
+معلم
+دراسة ذاتية
+دورة الامتحان
+—
+
+rows for "Demo Chemistry" : 1
+shot 06-line-declared
+ROW 7:
+Nov 2026، السطر 7
+إغلاق
+المشكلات
+ملاحظة رسوم — Retake Self Study 50% fees (All Papers) From June 2026
+تُحفظ في السجل المالي السابق (نسبة، وليست دفعة أبدًا).
+دراسة ذاتية في إعادة — إعادة لدورة يونيو 2026 (مذكورة في الجدول أو السطر، للتحقق)
+دورة سابقة معروفة (سجل الطالب) أو مذكورة في السطر: إعادة بدراسة ذاتية، بنسبة الدراسة الذاتية.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Chemistry — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+إعادة، دراسة ذاتية
+الدورة التي يتبعها
+يونيو 2026 صرّح بها المكتب — مدرجة للتحقق
+معلم
+لا أحد (دراسة ذاتية)
+السعر
+جنيه 16,850
+التدريس 12,000 × 50% + المجلس 10,850 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026
+Demo Physics — Whole subject · Cambridge International نوفمبر 2026
+القيد
+قيد أول
+إعادة
+كما يقول الجدول
+الدورة التي تتبعها الإعادة (تصريح المكتب، ويُتحقق منها في «للتحقق»)
+يناير
+يونيو
+أكتوبر
+نوفمبر
+سمِّ هذه الدورة
+كما قُرئ — صحّح أي حقل، ويحفظ Enter
+اسم الطالب
+بر
+rows for "Demo Physics" Demo Student 14: 1
+shot 07-self-study-first-entry
+ROW 8:
+Nov 2026، السطر 8
+إغلاق
+المشكلات
+دراسة ذاتية في قيد أول لمادة تدرّسها المدرسة — الدراسة الذاتية في قيد أول تحتاج إلى الاستثناء: امنحه في صفحة الاستثناءات أو اجعلها إعادة مع دورتها
+الدراسة الذاتية في قيد أول تحتاج إلى الاستثناء: امنحه في صفحة الاستثناءات أو اجعلها إعادة مع دورتها. أو اختر في السطر: في المدرسة، أو الالتحاق فقط؛ أو غيّر إعداد الدراسة الذاتية حين يجيب المنسق.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Physics — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+قيد أول، دراسة ذاتية
+الدورة التي يتبعها
+—
+معلم
+لا أحد (دراسة ذاتية)
+السعر
+جنيه 16,850
+التدريس 12,000 × 50% + المجلس 10,850 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History 
+shot 07b-taught-instead
+rows for "Demo History" : 1
+shot 08-line-provisional
+ROW 4:
+Nov 2026، السطر 4
+إغلاق
+المشكلات
+رسوم المجلس مؤقتة — رسوم المجلس 9850 في Cambridge International November 2026
+يحمل جدول الدورة رسومًا مؤقتة: يُحجز السطر بهذا السعر، موسومًا مؤقتًا، ويُدفع حين تؤكد المدرسة رسوم المجلس.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo History — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 20,850
+التدريس 11,000 × 100% + المجلس 9,850 × 100%
+رسوم المجلس مؤقتة
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — 
+rows for "Demo Geography" : 1
+shot 09-fee-missing
+ROW 5:
+Nov 2026، السطر 5
+إغلاق
+المشكلات
+لا رسوم مجلس في جدول الدورة — Whole subject بلا رسوم مجلس في Cambridge International November 2026 بعد — حدّدها في تبويب الرسوم في الجلسة
+ليس للبند صف رسوم في دورة مجلسه بعد (الجدول مذكور). حدّده في تبويب الرسوم في الجلسة — والمؤقت حتى ينشر المجلس مقبول — فيُسعَّر السطر منه؛ ولا يُسعَّر شيء بصفر لغياب الرسوم.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Geography — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+غير مسعَّر: لا رسوم له في جدول الدورة
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+
+rows for "Demo Physics" Demo Student 15: 1
+shot 10-retake-no-sitting
+ROW 9:
+Nov 2026، السطر 9
+إغلاق
+المشكلات
+ملاحظة رسوم — Retake in School 100% fees (All Papers)
+تُحفظ في السجل المالي السابق (نسبة، وليست دفعة أبدًا).
+إعادة لا تسمّي دورة سابقة — "Retake in School 100% fees (All Papers)": سمِّ الدورة التي يتبعها في السطر، أو اجعله قيدًا أول
+يقول الجدول إنها إعادة (أو قيد ثانٍ)، ولا يذكر سجل الطالب ولا السطر الدورة التي تتبعها. سمِّ الدورة في السطر (فتكون تصريح المكتب، ويُتحقق منها في تبويب «للتحقق» في الجلسة)، أو اجعلها قيدًا أول.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Physics — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+إعادة، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 22,850
+التدريس 12,000 × 100% + المجلس 10,850 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo 
+shot 10b-sitting-named
+ROW 9 after:
+Nov 2026، السطر 9
+إغلاق
+المشكلات
+ملاحظة رسوم — Retake in School 100% fees (All Papers)
+تُحفظ في السجل المالي السابق (نسبة، وليست دفعة أبدًا).
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Physics — Whole subject
+دورات المجالس
+Cambridge International November 2026
+القيد
+إعادة، في المدرسة
+الدورة التي يتبعها
+يونيو 2026 صرّح بها المكتب — مدرجة للتحقق
+معلم
+Teacher Demo A
+السعر
+جنيه 22,850
+التدريس 12,000 × 100% + المجلس 10,850 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A
+rows for "Pure Mathematics" : 1
+shot 11-unit-line
+ROW 10:
+Nov 2026، السطر 10
+إغلاق
+المشكلات
+وحدة أو مجموعة أوراق مسجلة وحدها
+يسجل الجدول وحدات A-Level ومجموعات الأوراق واحدة واحدة (P1 وM1 وBiology Paper 3). يحفظها الدليل صفوفًا قابلة للتسجيل تدخل وحدات (F0b)؛ لا شيء مطلوب.
+المادة غير موجودة في الدليل — "Pure Mathematics 1 (P1)" A.S.
+طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Mathematics A.S./A.L. — P1
+دورات المجالس
+Pearson Edexcel November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 14,140
+التدريس 9,000 × 100% + المجلس 5,140 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge Internati
+rows for "Mathematics (P1" : 1
+shot 12-item-unclear
+ROW 11:
+Nov 2026، السطر 11
+إغلاق
+المشكلات
+المادة غير موجودة في الدليل — "Mathematics (P1 & P2)" A.S.
+طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.
+أي بند من المادة؟ — Demo Mathematics A.S./A.L.: M1 · P1 · P2
+لا تطابق كلمات السطر أيًّا من بنود المادة، أو تطابق أكثر من بند (المادة كاملة، أو وحدة، أو مسار، أو إعادة ورقة واحدة). اختر البند في السطر.
+السطر في الجلسة
+
+لا سطر بعد: انظر المشكلات أعلاه.
+
+البند
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نو
+shot 12b-item-chosen
+ROW 11 after:
+Nov 2026، السطر 11
+إغلاق
+المشكلات
+المادة غير موجودة في الدليل — "Mathematics (P1 & P2)" A.S.
+طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Mathematics A.S./A.L. — P2 مختار في السطر
+دورات المجالس
+Pearson Edexcel November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 14,140
+التدريس 9,000 × 100% + المجلس 5,140 × 100%
+البند
+مُصحَّح
+كما تجده كلمات الجدول
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematic
+shot 13-commit-dialog
+DIALOG:
+اعتماد 4 أسر؟
+
+تُنشأ كل أسرة دفعة واحدة: إذا رُفض أي شيء فيها لا يُنشأ منها شيء، وتذكر أسطرها السبب.
+
+4 حسابات طلاب جديدة
+4 حسابات أولياء أمور جديدة
+4 روابط أولياء أمور بأبناء
+4 طلاب يوضعون في فصول
+6 حالات التحاق بالمقررات
+1 تسجيلات تُحفظ في السجل السابق
+8 سطور بانتظار الدفع
+2 ملاحظات في السجل المالي السابق
+إلغاء
+اعتماد
+shot 14-result
+RESULT:
+استيراد بدء التشغيل
+demo-sheet-4.xlsx
+
+جدول التسجيل الخاص بالمدرسة
+معتمد
+·
+رُفع
+8 أكتوبر 2026
+بواسطة
+School Admin
+·
+معتمدة
+8 أكتوبر 2026
+بواسطة
+School Admin
+
+الأسطر
+
+10
+
+9 للاستيراد · 1 مستبعدة
+
+أسر جاهزة
+
+0
+
+4 معتمدة
+
+أسر موقوفة
+
+0
+
+0 أسطر للتصحيح
+
+سينشئ الاعتماد
+
+لا شيء جديد
+عن هذا الملف: لا توجد أموال في هذا الملف · العام الدراسي غير مُعَدّ
+المشكلات
+الأسطر
+10
+الأشخاص والتعارضات
+المطابقة
+النتيجة
+
+4 أسر معتمدة
+
+4 حسابات طلاب
+4 حسابات أولياء أمور
+4 روابط أولياء أمور بأبناء
+4 أماكن في الفصول
+6 حالات التحاق بالمقررات
+1 أسطر في السجل السابق
+8 سطور بانتظار الدفع
+2 ملاحظات في السجل المالي السابق
+
+كل سجل أُنشئ يشير إلى سطره في الملف. شاهدها في الطلاب, الفصول و الالتحاق بالمقررات. الحسابات المنشأة هنا بلا كلمة مرور بعد: تعيّن كل أسرة كلمة مرور من "نسيت كلمة المرور" في صفحة تسجيل الدخول، بالبريد المسجل في الحساب.
+
+اعرض الأسطر المعتمدة
+shot 15-session-money
+MONEY:
+← الجلسات
+نوفمبر 2026 – يناير 2027
+مفتوح
+
+الحجز 7 أكتوبر 2026 12:59 – 7 نوفمبر 2026 11:59
+بداية الدراسة 8 أكتوبر 2026
+مستحق 7 نوفمبر 2026 11:59
+
+الاسترداد: 100% حتى الأسبوع 2 · 50% في الأسابيع 3–6 · 0% من الأسبوع 7 · ثابتة: وافقت عليها أسرة
+
+تعديل
+إغلاق
+تصحيح الدورة
+المواعيد النهائية
+Cambridge International نوفمبر 2026
+17 نوفمبر 2026
+Pearson Edexcel نوفمبر 2026
+17 نوفمبر 2026
+المواد
+الرسوم
+المال
+للتحقق
+
+الأسطر
+
+32
+
+مدفوع
+
+0 · 0 جنيه
+
+غير مدفوع
+
+32 · 605,520 جنيه
+
+16 أسر
+
+متأخر
+
+0 · 0 جنيه
+
+4 مؤقتة (لا تُدفع بعد)
+
+الكل
+غير مدفوع
+متأخر
+مؤقتة
+مدفوع
+كل المواد
+Demo Biology
+Demo Chemistry
+Demo History
+Demo Mathematics A.S./A.L.
+Demo Physics
+تذكير
+تصدير
+طالب	المادة	الدورة	السعر	مستحق	الحالة
+
+Demo Student 1
+STU-20261008-B3D73 · 11A
+	Demo Biology
+قيد أول · في المدرسة
+	Cambridge International November 2026	22,850 جنيه
+12,000 جنيه + 10,850 جنيه
+	7 نوفمبر 2026	غير مدفوع
+
+Demo Student 1
+STU-20261008-B3D73 · 11A
+	Demo History
+قيد أول · في المدرسة
+	Cambridge International November 2026	20,850 جنيه
+11,000 جنيه + 9,850 جنيه
+مؤقتة	7 نوفمبر 2026	غير مدفوع
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Biology
+إعادة · دراسة ذاتية
+	Cambridge International November 2026	16,850 جنيه
+6,000 جنيه + 10,850 جنيه
+	7 نوفمبر 2026	غير مدفوع
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Chemistry
+إعادة · دراسة ذاتية
+	Cambridge International November 2026	16,850 جنيه
+6,000 جنيه + 10,850 جنيه
+	7 نوفمبر 2026	غير مدفوع
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Physics
+قيد أول · في المدرسة
+	Cambridge International November 2026	22,850 جنيه
+12,000 جنيه + 10,850 جنيه
+	7 نوفمبر 2026	غير مدفوع
+
+Demo Studen
+shot 16-to-verify
+VERIFY:
+← الجلسات
+نوفمبر 2026 – يناير 2027
+مفتوح
+
+الحجز 7 أكتوبر 2026 12:59 – 7 نوفمبر 2026 11:59
+بداية الدراسة 8 أكتوبر 2026
+مستحق 7 نوفمبر 2026 11:59
+
+الاسترداد: 100% حتى الأسبوع 2 · 50% في الأسابيع 3–6 · 0% من الأسبوع 7 · ثابتة: وافقت عليها أسرة
+
+تعديل
+إغلاق
+تصحيح الدورة
+المواعيد النهائية
+Cambridge International نوفمبر 2026
+17 نوفمبر 2026
+Pearson Edexcel نوفمبر 2026
+17 نوفمبر 2026
+المواد
+الرسوم
+المال
+للتحقق
+
+إعادات ودورات منقولة صرّحت بها أسرة أو المكتب. عند التحقق يبقى السطر. إن لم تُؤكَّد: ينتهي السطر غير المدفوع ويمكن للأسرة حجز قيد أول؛ ويبقى السطر المدفوع قيدًا أول قبل موعد القيد الأول للمجلس، ويُسحب مع استرداده بعده.
+
+للتحقق
+تمت الإجابة
+طالب	السطر	الدورة المُصرَّح بها	صرّح بها	مدفوع	الإجابة قبل	
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Chemistry
+إعادة · دراسة ذاتية · 16,850 جنيه
+	Cambridge International June 2026	المكتب
+School Admin · 8 أكتوبر 2026
+	ليس بعد	17 نوفمبر 2026
+40 أيام متبقية
+	تحقق لم تُؤكَّد
+
+Demo Student 11
+STU-20261008-527BF · 11A
+	Demo Physics
+إعادة · في المدرسة · 22,850 جنيه
+	Cambridge International June 2026	المكتب
+School Admin · 8 أكتوبر 2026
+	ليس بعد	17 نوفمبر 2026
+40 أيام متبقية
+	تحقق لم تُؤكَّد
+
+Demo Student 14
+STU-20261008-EE092 · 11A
+	Demo Chemistry
+إ
+student id found: true
+shot 17-statement
+STATEMENT:
+كشف الحساب
+
+كل سطر بسعره وسببه، وما دُفع وما بقي، والدفعات — دفعة لكل موعد للمجلس.
+
+إظهار الأسطر المنتهية (منتهية الصلاحية، مرفوضة)
+Demo Student 14
+
+الصف 11 · 11A · STU-20261008-EE092
+
+السعر
+
+56,550 جنيه
+
+مدفوع
+
+0 جنيه
+
+المتبقي
+
+56,550 جنيه
+
+الرصيد
+
+0 جنيه
+
+November 2026 – January 2027
+السطر	السعر	مدفوع	المتبقي	مستحق	الإيصال	الحالة	
+
+Demo Biology
+إعادة، دراسة ذاتية · Cambridge International November 2026
+من Cambridge International June 2026 (قبل النظام)
+	16,850 جنيه
+التدريس 12,000 × 50% + المجلس 10,850 × 100%
+	0 جنيه	16,850 جنيه	7 نوفمبر 2026	—	بانتظار الدفع	معلم
+
+Demo Chemistry
+إعادة، دراسة ذاتية · Cambridge International November 2026
+من Cambridge International June 2026 (صُرّح بها في المكتب) تتحقق منها المدرسة
+	16,850 جنيه
+التدريس 12,000 × 50% + المجلس 10,850 × 100%
+	0 جنيه	16,850 جنيه	7 نوفمبر 2026	—	بانتظار الدفع	معلم
+
+Demo Physics
+قيد أول، في المدرسة · Teacher Demo A · Cambridge International November 2026
+	22,850 جنيه
+التدريس 12,000 × 100% + المجلس 10,850 × 100%
+	0 جنيه	22,850 جنيه	7 نوفمبر 2026	—	بانتظار الدفع	معلم
+IMPORT f752dc2b-571f-403c-a676-d5bcbdc133d8
+ERRORS: 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 

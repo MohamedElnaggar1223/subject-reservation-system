@@ -1,0 +1,6 @@
+# igcse_exams_dev: the review of 426d565: 0053_exam_entries_staff_set
+2026-10-08T14:22:03Z
+before: 53|1791460691369
+migrate exit 0: [⣷] applying migrations...[2K[1G[✓] migrations applied successfully!
+after: 54|1791468717076
+column: staff_set|ARRAY|'{}'::text[]|NO

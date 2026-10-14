@@ -1,0 +1,61 @@
+# C26: flag 3: a line's fixes and decision carried from earlier files whatever their bytes (by what the line says)
+# undone in apps/api/src/services/import.services.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 14254ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 49ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 30ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 66 passed (68)
+   Duration  16.71s (transform 851ms, setup 2ms, collect 345ms, tests 14.25s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:493:41
+ ❯ test/08n-import.test.ts:1518:53
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing
+AssertionError: expected { kind: 'sheet', …(32) } to match object { Object (studentEmail) }
+(34 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "studentEmail": "farid@import.test.local",
++   "studentEmail": "",
+  }
+
+ ❯ test/08n-import.test.ts:493:41
+    491|       // The earlier files' decisions, found by what each line says: t…
+    492|       // email, the class, the confirmed link, the skip; the merge by …
+    493|       expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: …
+       |                                         ^
+    494|       expect(rowAt(v, '2024', 15).data).toMatchObject({ studentEmail: …
+    495|       expect(rowAt(v, '2024', 18).data).toMatchObject({ parentEmail: `…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out
+AssertionError: expected { …(25) } to match object { decision: 'skip', …(1) }
+(44 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "decision": "skip",
+-   "decisionSource": "staff",
++   "decision": "import",
++   "decisionSource": "default",
+  }
+
+ ❯ test/08n-import.test.ts:1518:53
+    1516|       const v = await fetchView(coordinator, id);
+    1517|       // Every later line moved down one: what staff decided goes with…
+    1518|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
+       |                                                     ^
+    1519|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
+    1520|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

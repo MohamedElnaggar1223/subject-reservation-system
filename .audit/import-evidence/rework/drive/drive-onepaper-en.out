@@ -1,0 +1,80 @@
+staged 43f7b76d-f1cb-4b25-b98a-4ed4ed67cc64
+shot 01-one-paper-row
+ROW:
+Nov 2026, row 3
+Close
+Problems
+A fee note — Retake in School 100% fees (One paper ONLY) From June 2026
+Kept as money history (a percentage, never a payment).
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Physics — Paper 4 only (retake)
+Board series
+Cambridge International November 2026
+Entry
+Retake, in school
+Sitting it follows
+June 2026 Declared by the desk — listed to verify
+Teacher
+Teacher Demo A
+Price
+EGP 22,850
+course 12,000 × 100% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel November 2026
+Demo Physics — Paper 4 only (retake) · Cambridge International November 2026
+Demo Physics — Whole subject · Cambridge International November 2026
+Entry
+First entry
+Retake
+As the sheet says
+The sitting a retake follows (the desk’s declaration, verified on To verify)
+January
+June
+October
+November
+Name this sitting
+As read — fix any field, Enter saves
+Student name
+Student email
+Student phone
+Pa
+discard 200
+fee prefilled: ""
+shot 02-add-subject-reason-asked
+DIALOG:
+Add a subject
+Subject
+Demo Astronomy DEMO-ASTRO
+Map on the Catalogue
+Course fee
+Availability
+Open
+Retakes only
+Self-study only
+Why the course fee is 0
+
+Self-study only at 0: its lines are priced at the board fee alone.
+
+Teachers
+
+No teacher in this subject's pool yet.
+
+Show every teacher
+
+What can be entered and its series come from the catalogue; change them on the subject's row after.
+
+Cancel
+Add subject
+shot 03-added-self-study-at-0
+after add, dialog open: 0
+ERRORS: none

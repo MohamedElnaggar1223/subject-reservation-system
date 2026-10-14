@@ -31,7 +31,7 @@ import { randomUUID } from 'crypto';
 import {
   gridFromBells, evaluate, measure, judgeMove, generate, canonicalInput, cardsFor, slotName, WEEKDAY_NAMES,
   type EngineInput, type GridDay, type CreateTimetableType, type UpdateTimetableType, type MoveLessonType, type UnplaceLessonType,
-  type LockLessonType, type GenerateTimetableType, type PublishTimetableType, type ExportCsvQueryType, type UnplacedLesson,
+  type LockLessonType, type GenerateTimetableType, type PublishTimetableVersionType, type ExportCsvQueryType, type UnplacedLesson,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
@@ -583,7 +583,7 @@ export async function versionInForce(termId: string, date: string, executor: Exe
   return t ?? null;
 }
 
-export async function publishTimetable(id: string, data: PublishTimetableType, actorId: string, ctx?: AuditContext) {
+export async function publishTimetable(id: string, data: PublishTimetableVersionType, actorId: string, ctx?: AuditContext) {
   const result = await db.transaction(async (tx) => {
     const draft = await timetableOrThrow(id, tx);
     // One publication per term at a time; then the draft itself.

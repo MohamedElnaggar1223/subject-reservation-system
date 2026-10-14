@@ -1,0 +1,38 @@
+# Full API suite, local time (Africa/Cairo), TEST_DB_NAME=igcse_exams_test, the tree of the commit carrying this file
+ ✓ test/00-harness.test.ts (4 tests) 1721ms
+ ✓ test/01-desk.test.ts (8 tests) 1669ms
+ ✓ test/02-money.test.ts (4 tests) 1731ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2125ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 6977ms
+ ✓ test/05-object-access.test.ts (16 tests) 6378ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3767ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1851ms
+ ✓ test/08-money-rules.test.ts (51 tests) 11780ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11623ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6522ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7829ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5912ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5378ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 9001ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2541ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4340ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4109ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4713ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3404ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6125ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 23971ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 16288ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8346ms
+ ✓ test/08q-charges.test.ts (46 tests) 27123ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8887ms
+ ✓ test/08t-rework-races.test.ts (36 tests) 31710ms
+ ✓ test/08x1-exam-entries.test.ts (17 tests) 3796ms
+ ✓ test/08x2-exam-days-results.test.ts (14 tests) 3780ms
+ ✓ test/08x3-exam-races.test.ts (8 tests) 4109ms
+ ✓ test/08x4-exam-entries-rework.test.ts (18 tests) 9571ms
+ ✓ test/09-money-invariants.test.ts (53 tests) 583ms
+ Test Files  32 passed (32)
+      Tests  561 passed | 1 todo (562)
+   Start at  12:55:48
+   Duration  257.14s (transform 1.07s, setup 52ms, collect 3.72s, tests 247.66s, environment 3ms, prepare 1.09s)
+exit 0

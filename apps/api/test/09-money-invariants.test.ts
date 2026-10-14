@@ -621,6 +621,165 @@ describe('money invariants over the whole database', () => {
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
   });
 
+  // ─── F4: exam entries (not money, but the hard stop is MO-10's) ─────────────
+
+  it("F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline", async () => {
+    // Since the reservations rework the cut-off is per line (RESERVATIONS_REWORK.md §3.3): a retake of
+    // the board's previous sitting runs to the retake deadline (line_effective_deadline, A's 0042/0044);
+    // a cash-in to its service's deadline; a late board entry granted while Q-20's setting is on moves a
+    // student's (A's lateEntryUntil), so a grant covering the moment is accepted here too.
+    const late = await sql(`
+      select e.id, e.created_at, e.submitted_at, d.at as deadline
+      from exam_entry e
+      join board_series s on s.id = e.board_series_id
+      left join registration r on r.id = e.registration_id
+      left join charge c on c.id = e.charge_id
+      cross join lateral (select case
+        when r.id is not null then line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)
+        when c.id is not null then coalesce((select sd.deadline from board_service_deadline sd where sd.board_series_id = c.board_series_id and sd.board_service_id = c.board_service_id), s.entry_deadline)
+        else s.entry_deadline end as at) d
+      where d.at is not null and (e.created_at > d.at or e.submitted_at > d.at)
+        and not exists (select 1 from exception x where x.policy_key = 'deadline.boardEntry' and x.student_id = e.student_id
+          and x.board_series_id = e.board_series_id and x.value_date >= greatest(e.created_at, coalesce(e.submitted_at, e.created_at)))`);
+    expect(late).toEqual([]);
+    // There was something to check: 08x1 withdrew an entry after its series' deadline, and 08x4
+    // entered and sent a retake of the board's previous sitting after the entry deadline, before the retake deadline.
+    expect((await sql(`
+      select 1 from exam_entry e join board_series s on s.id = e.board_series_id
+      where e.status = 'withdrawn' and e.withdrawn_at > s.entry_deadline`)).length).toBeGreaterThan(0);
+    expect((await sql(`
+      select 1 from exam_entry e join board_series s on s.id = e.board_series_id join registration r on r.id = e.registration_id
+      where r.attempt = 'retake' and e.created_at > s.entry_deadline and e.submitted_at > s.entry_deadline and e.submitted_at <= s.retake_deadline`)).length).toBeGreaterThan(0);
+  });
+
+  it('F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1)', async () => {
+    expect(await sql(`
+      select e.id, e.status, r.status as line from exam_entry e join registration r on r.id = e.registration_id
+      where e.status <> 'withdrawn' and r.status <> 'confirmed'`)).toEqual([]);
+    // There was something to check: 08x4 ended paid lines by each path, with entries made and sent.
+    expect((await sql(`select 1 from exam_entry where withdrawn_with_line and submitted_at is not null`)).length).toBeGreaterThan(0);
+    expect((await sql(`select 1 from exam_entry where withdrawn_with_line and submitted_at is null`)).length).toBeGreaterThan(0);
+  });
+
+  it('F4: an entry from a cash-in is an award entry of that charge\'s student, in its series, from a cash-in or late cash-in; one live entry per charge', async () => {
+    expect(await sql(`
+      select e.id from exam_entry e join charge c on c.id = e.charge_id
+      where e.kind <> 'award' or e.student_id <> c.student_id or e.board_series_id is distinct from c.board_series_id or c.kind not in ('cash_in', 'late_cash_in')`)).toEqual([]);
+    expect(await sql(`select charge_id from exam_entry where charge_id is not null and status <> 'withdrawn' group by charge_id having count(*) > 1`)).toEqual([]);
+    // There was something to check: 08x4 entered two cash-ins (one derived from its line's item, one by hand).
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from exam_entry where charge_id is not null`))[0]?.n)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("F4: a declared sitting verified from the board's results had a result for the line's student in that series", async () => {
+    // F4 answers a declared sitting only from a result (RESERVATIONS_REWORK.md §3.5); the answer is step B's own row.
+    expect(await sql(`
+      select a.entity_id from audit_log a join registration r on r.id = a.entity_id
+      where a.action = 'PRIOR_SITTING_VERIFIED' and a.new_data->>'reason' like '%(results import)'
+        and not exists (select 1 from exam_result x where x.student_id = r.student_id and x.board_series_id = r.prior_sitting_series_id)`)).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PRIOR_SITTING_VERIFIED' and new_data->>'reason' like '%(results import)'`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it("F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series", async () => {
+    // A live entry is in its line's series; one withdrawn was made for the series the line was in
+    // then — a line that moves withdraws its drafts and a sent entry refuses the move (the review of
+    // 426d565, item 2), so a live entry is never left behind in the series a line left.
+    expect(await sql(`
+      select e.id from exam_entry e join registration r on r.id = e.registration_id
+      where e.student_id <> r.student_id or (e.status <> 'withdrawn' and e.board_series_id is distinct from r.board_series_id)`)).toEqual([]);
+    // There was something to check: lines moved with their drafts withdrawn in the series they left.
+    expect((await sql(`
+      select 1 from exam_entry e join registration r on r.id = e.registration_id
+      where e.withdrawn_with_line and e.board_series_id <> r.board_series_id`)).length).toBeGreaterThan(0);
+    expect(await sql(`
+      select x.id from exam_result x join exam_entry e on e.id = x.entry_id
+      where x.student_id <> e.student_id or x.board_series_id <> e.board_series_id`)).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from exam_result where entry_id is not null`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('F4: every withdrawal and every certificate hand-over has exactly one audit row; a certificate is collected once', async () => {
+    expect(await sql(`
+      select e.id from exam_entry e
+      where e.status = 'withdrawn'
+        and (select count(*) from audit_log a where a.entity_id = e.id and a.action = 'EXAM_ENTRY_WITHDRAWN') <> 1`)).toEqual([]);
+    expect(await sql(`
+      select c.id from exam_certificate c
+      where (select count(*) from audit_log a where a.entity_id = c.id and a.action = 'EXAM_CERTIFICATE_COLLECTED') <> (case when c.status = 'collected' then 1 else 0 end)`)).toEqual([]);
+  });
+
+  it('F4: no seat holds two candidates and no candidate has two seats in a sitting; no invigilator is in two rooms of one', async () => {
+    expect(await sql(`select exam_date, session, room_id, seat_label from exam_seat group by 1, 2, 3, 4 having count(*) > 1`)).toEqual([]);
+    expect(await sql(`select exam_date, session, student_id from exam_seat group by 1, 2, 3 having count(*) > 1`)).toEqual([]);
+    expect(await sql(`select exam_date, session, teacher_id from exam_invigilation group by 1, 2, 3 having count(*) > 1`)).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from exam_seat`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('F4: a national ID or passport number appears in no audit row', async () => {
+    const ids = await sql<{ n: string }>(`select document_number as n from exam_candidate_identity`);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const { n } of ids) {
+      expect(await sql(`select id from audit_log where coalesce(previous_data::text, '') || coalesce(new_data::text, '') like $1`, [`%${n}%`])).toEqual([]);
+    }
+  });
+
+  it('F7: money from before the system is history only — traced to a committed import line, and never written with a payment, a ledger entry or a receipt', async () => {
+    // There is money history to check: 08n imports the sheet's fee notes and a money record.
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from money_history`))[0]?.n)).toBeGreaterThan(0);
+    // Every row points to the line it came from, and that line was committed.
+    const untraced = await sql(`
+      select m.id from money_history m left join import_row r on r.id = m.import_row_id
+      where r.id is null or r.status <> 'committed' or r.batch_id <> m.import_batch_id or m.source_ref = ''
+    `);
+    expect(untraced).toEqual([]);
+    // No transaction that wrote money history also wrote a payment, a payment's registrations or
+    // charges, a charge, an escrow ledger entry or a receipt (rows a transaction inserts carry its id
+    // in xmin; the ledger and the payment links are never updated, so theirs is always the inserting one).
+    const moved = await sql(`
+      select m.id from money_history m
+      where exists (select 1 from escrow_transaction t where t.xmin = m.xmin)
+         or exists (select 1 from payment_registration pr where pr.xmin = m.xmin)
+         or exists (select 1 from payment_charge pc where pc.xmin = m.xmin)
+         or exists (select 1 from charge c where c.xmin = m.xmin)
+         or exists (select 1 from payment p where p.xmin = m.xmin)
+         or exists (select 1 from receipt rc where rc.xmin = m.xmin)
+    `);
+    expect(moved).toEqual([]);
+  });
+
+  it('F7: every line the import made is a line like any other — priced from the grid with its basis, its two consents on the imported channel, traced to its committed import line, and paid only through a payment', async () => {
+    // The lines the import made, as its IMPORT_REGISTRATION rows list them (08n makes several).
+    const made = await sql<{ id: string }>(`
+      select distinct jsonb_array_elements_text(a.new_data->'registrationIds') as id from audit_log a where a.action = 'IMPORT_REGISTRATION'`);
+    expect(made.length).toBeGreaterThan(0);
+    const ids = made.map((m) => m.id);
+    // Each exists, with a pricing basis equal to its price, never priced at 0 for want of a fee row.
+    const lines = await sql<{ id: string; price: string; basis_total: string | null; rows: number }>(`
+      select r.id, r.price_at_registration as price, (r.pricing_basis->>'total') as basis_total,
+        coalesce(jsonb_array_length(r.pricing_basis->'feeRows'), 0) as rows
+      from registration r where r.id in $1`, [ids]);
+    expect(lines.map((l) => l.id).sort()).toEqual([...ids].sort());
+    expect(lines.filter((l) => l.basis_total === null || Number(l.basis_total) !== Number(l.price) || Number(l.rows) === 0)).toEqual([]);
+    // Both consents, on the imported channel (the sheet's "I confirm my registration").
+    const unconsented = await sql(`
+      select r.id from registration r where r.id in $1
+        and (select count(distinct c.kind) from registration_consent c where c.registration_id = r.id and c.channel = 'imported') < 2`, [ids]);
+    expect(unconsented).toEqual([]);
+    // Each traced to the committed import line whose outcome names it.
+    const untraced = await sql(`
+      select r.id from registration r where r.id in $1
+        and not exists (select 1 from import_row ir where ir.status = 'committed' and ir.outcome->'registrations' ? r.id)`, [ids]);
+    expect(untraced).toEqual([]);
+    // A sitting it follows says where it is known from: the student's legacy history, or the desk's declaration.
+    const sourced = await sql(`
+      select r.id from registration r where r.id in $1
+        and r.prior_sitting_series_id is not null and r.prior_sitting_source not in ('legacy', 'declared_by_desk')`, [ids]);
+    expect(sourced).toEqual([]);
+    // Confirmed only by a completed payment covering it (the import makes none).
+    const unpaidConfirmed = await sql(`
+      select r.id from registration r where r.id in $1 and r.status = 'confirmed'
+        and not exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')`, [ids]);
+    expect(unpaidConfirmed).toEqual([]);
+  });
+
   // ─── The reservations rework, step C: charges, plans, the registry (RESERVATIONS_MONEY.md §6) ───
 
   it('there are charges, plans and exceptions to check: every kind happened in the suites above', async () => {
@@ -940,10 +1099,15 @@ describe('money invariants over the whole database', () => {
 
   it('a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5)', async () => {
     // Answered: who and when; a declared one only (the database checks the outcome's who and when).
+    // Who: a person — or, for a family's own declaration verified at once, the school's results on
+    // record (F4; the review of 54c225f, item 2: a family never answers its own declaration), which
+    // its audit row says, with no person on it.
     const answered = await sql(`
       select r.id from registration r
       where r.prior_sitting_verified_outcome is not null
-        and (r.prior_sitting_verified_by is null or r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk'))
+        and (r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk')
+          or (r.prior_sitting_verified_by is null and not exists (select 1 from audit_log a where a.entity_id = r.id
+            and a.action = 'PRIOR_SITTING_VERIFIED' and a.user_id is null and a.new_data->>'answeredFrom' = 'results_on_record')))
     `);
     expect(answered).toEqual([]);
     // One answer each: one PRIOR_SITTING_VERIFIED or PRIOR_SITTING_REJECTED row per answered line.

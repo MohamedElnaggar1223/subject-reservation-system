@@ -70,9 +70,19 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'exceptions.boardEntryDeadline': false,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
+        // F7: two more of the coordinator's pending answers, the import's defaults (IS-02, IS-03).
+        'import.selfStudyOnTaught': true,
+        'import.carryForward': true,
         // The reservations rework, step B: whether an unverified declared sitting is held at its
         // deadline is the owner's question (Q-22): the admin's setting.
         'verification.unverifiedAtDeadline': false,
+        // F4: the school as an exam centre — the coordinator keeps these.
+        'exams.centres': true,
+        'exams.carryForward': true,
+        'exams.selfStudyForecast': true,
+        'exams.certificateRetentionMonths': true,
+        'exams.candidatesPerInvigilator': true,
+        'exams.reminderDaysBefore': true,
         // The reservations rework, step D: the reminders' switch is the admin's; their send hour the
         // admin's and finance admin's.
         'reminders.enabled': false,

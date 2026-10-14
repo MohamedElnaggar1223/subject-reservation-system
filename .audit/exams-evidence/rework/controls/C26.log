@@ -1,0 +1,64 @@
+# C26: derivation reads the series' entry deadline, not the line's (the retake deadline ignored)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a retake of the board's previous sitting is still entered and sent"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 26634ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 18ms
+     → expected { series: { …(4) }, …(7) } to match object { pastDeadline: true, refusal: null }
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 6ms
+     → expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 5527a193-47fb-459c-abcd-a1026df90bd1: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+AssertionError: expected { series: { …(4) }, …(7) } to match object { pastDeadline: true, refusal: null }
+(14 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "pastDeadline": true,[22m
+[32m-   "refusal": null,[39m
+[31m+   "refusal": "The entry deadline for Cambridge International June 2027 (exams xw june) (8 October 2026 at 21:46) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:968:23
+    966|     it("past the entry deadline a retake of the board's previous sitti…
+    967|       const preview = await derive(juneSeries, undefined, false);
+    968|       expect(preview).toMatchObject({ pastDeadline: true, refusal: nul…
+       |                       ^
+    969|       expect(Object.fromEntries(preview.rows.map((r) => [r.registratio…
+    970|       expect(preview.rows.find((r) => r.registrationId === j2)!.deadli…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1)
+AssertionError: expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+(8 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "boardPart": 0,[39m
+[32m-   "boardSent": true,[39m
+[31m+   "boardPart": 500,[39m
+[31m+   "boardSent": false,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:1005:22
+    1003|     it("a declared retake rejected past the first-entry deadline is dr…
+    1004|       const before = await refundPreview(jf.j2!, j2);
+    1005|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
+       |                      ^
+    1006|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
+    1007|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

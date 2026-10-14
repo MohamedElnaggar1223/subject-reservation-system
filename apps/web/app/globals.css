@@ -371,6 +371,14 @@
     display: none !important;
   }
 
+  /* The shell is a flex row on screen; Chrome ignores page breaks inside a
+     flex container, so in print it is plain blocks (F4: one register page
+     per room). */
+  [data-app-shell],
+  [data-app-shell] > div {
+    display: block !important;
+  }
+
   /* Let the document flow onto as many pages as it needs */
   html,
   body,

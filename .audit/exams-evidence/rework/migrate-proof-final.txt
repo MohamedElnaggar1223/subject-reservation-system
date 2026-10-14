@@ -1,0 +1,23 @@
+# igcse_exams_proof: made from igcse_template_dev; main 2e96b34's migrations (through 0055), then the final merge's (F4's 0056, 0057)
+2026-10-08T19:18:27Z
+drop: DROP DATABASE
+create from the template: CREATE DATABASE
+before: 34|1790557902648
+main migrate exit 0: [✓] migrations applied successfully!
+after main: 56|1791464695610
+merge migrate exit 0: [✓] migrations applied successfully!
+after the merge: 58|1791486725177
+row|58|1791486725177
+row|57|1791486724477
+row|56|1791464695610
+row|55|1791453628209
+exam tables|20
+entry column|staff_set|ARRAY|'{}'::text[]
+entry column|withdrawn_with_line|boolean|false
+rule|cambridge|t|f
+rule|oxford|f|f
+rule|pearson_edexcel|f|t
+board|cambridge|13
+board|oxford|
+board|pearson_edexcel|
+D 0055|15

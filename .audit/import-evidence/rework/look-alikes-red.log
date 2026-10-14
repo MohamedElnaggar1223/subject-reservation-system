@@ -1,0 +1,36 @@
+# The look-alike case reproduced red before the fix (08n -t look-alikes)
+# summary
+ ❯ test/08n-import.test.ts (55 tests | 1 failed | 54 skipped) 2356ms
+   × F7: the day-one import > look-alikes inside one file are the review's warnings, and the commit makes what the review showed > two families whose children share a name and whose parents share a phone are both committed: an account the same commit made is not an account already in the system 134ms
+ ❯ test/08n-import.test.ts:539:35
+ Test Files  1 failed (1)
+      Tests  1 failed | 54 skipped (55)
+   Duration  4.35s (transform 683ms, setup 2ms, collect 268ms, tests 2.36s, environment 0ms, prepare 37ms)
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > look-alikes inside one file are the review's warnings, and the commit makes what the review showed > two families whose children share a name and whose parents share a phone are both committed: an account the same commit made is not an account already in the system
+AssertionError: expected { committed: 1, failed: 1 } to deeply equal { committed: 2, failed: +0 }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "committed": 2,[39m
+[32m-   "failed": 0,[39m
+[31m+   "committed": 1,[39m
+[31m+   "failed": 1,[39m
+[2m  }[22m
+
+ ❯ test/08n-import.test.ts:539:35
+    537|       expect(v.summary).toMatchObject({ families: 2, readyFamilies: 2,…
+    538|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+    539|       expect(out.result.families).toEqual({ committed: 2, failed: 0 });
+       |                                   ^
+    540|       expect(out.result.created).toMatchObject({ students: 2, parents:…
+    541|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+

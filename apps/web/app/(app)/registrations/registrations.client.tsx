@@ -96,15 +96,13 @@ const STATUS_STYLES: Record<string, string> = {
 // Transparency rule: every drop/swap dialog shows the exact refund the
 // windows allow BEFORE the user commits.
 
-type RefundPreview = { percentage: number; amount: number; fullPrice: number };
+// Typed by the API, never by hand (CLAUDE.md: Hono RPC everywhere).
+const fetchRefundPreview = (registrationId: string) => apiResponse(api.v1.receipts['refund-preview'].$get({ query: { registrationId } }));
 
 function RefundPreviewNote({ registrationId }: { registrationId: string }) {
-  const { data: preview } = useQuery<RefundPreview>({
+  const { data: preview } = useQuery({
     queryKey: ['refund-preview', registrationId],
-    queryFn: async () =>
-      (await apiResponse(
-        api.v1.receipts['refund-preview'].$get({ query: { registrationId } })
-      )) as RefundPreview,
+    queryFn: () => fetchRefundPreview(registrationId),
     retry: false,
   });
 
@@ -115,6 +113,8 @@ function RefundPreviewNote({ registrationId }: { registrationId: string }) {
       <span className="font-semibold">{preview.percentage}% = {formatPrice(preview.amount)}</span>{' '}
       back (of {formatPrice(preview.fullPrice)}), released to escrow once the subject&apos;s
       receipt is returned to the school.
+      {/* Why the board fee comes back or stays: the entries sent to the board and when (F4's mark, step C's refundFor). */}
+      {preview.boardNote && <p className="mt-1 text-muted-foreground">{preview.boardNote}</p>}
     </div>
   );
 }

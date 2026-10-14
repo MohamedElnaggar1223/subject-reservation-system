@@ -1,0 +1,37 @@
+# C4: the national ID write lets the driver's error through (it carries the number)
+# undone in: apps/api/src/services/exam-candidate.services.ts
+# ran: test/08x1-exam-entries.test.ts
+# expected red: ['are read only by the coordinator and the admin']
+# result: RED as expected
+
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 1 failed) 3825ms
+   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 13ms
+     → expected { status: 400, …(1) } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 passed (17)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row
+AssertionError: expected { status: 400, …(1) } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "This document number is already recorded for another candidate — check it against the document",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "The ID document could not be saved",[39m
+[31m+   "status": 400,[39m
+[2m  }[22m
+
+ ❯ test/08x1-exam-entries.test.ts:342:12
+    340|         // The same number for another candidate: refused, and the dri…
+    341|         expect(await refused(coord.api.v1.exams.candidates[':studentId…
+    342|           .toEqual({ status: 409, error: 'This document number is alre…
+       |            ^
+    343| 
+    344|         const read = await apiResponse(coord.api.v1.exams.candidates['…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

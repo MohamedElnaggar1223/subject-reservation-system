@@ -1,0 +1,114 @@
+# C24: the board's results do not verify a declared sitting
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["the board's results verify a declared sitting"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 4 failed) 27823ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > the board's results verify a declared sitting (step B's answer, by the importer); a sitting with no result is left to the coordinator 58ms
+     → expected [] to deeply equal [ { …(4) } ]
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing 141ms
+     → expected [] to deeply equal [ Array(1) ]
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1) 89ms
+     → expected [] to deeply equal [ Array(1) ]
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 62ms
+     → expected { series: { …(2) }, …(13) } to match object { committed: true, …(3) }
+ Test Files  1 failed (1)
+      Tests  4 failed | 52 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > the board's results verify a declared sitting (step B's answer, by the importer); a sitting with no result is left to the coordinator
+AssertionError: expected [] to deeply equal [ { …(4) } ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   {[39m
+[32m-     "code": "XWWMA11",[39m
+[32m-     "grade": "D",[39m
+[32m-     "registrationId": "209f8c26-dd99-496c-81ea-41f67d35d380",[39m
+[32m-     "studentId": "m1z0mOWFJevifMfWXTuF1v3RjkmZyBuy",[39m
+[32m-   },[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:292:37
+    290|         boardSeriesId: june, commit: true, source: { text: `UCI,Unit C…
+    291|       } }));
+    292|       expect(done.sittingsVerified).toEqual([{ registrationId: lines.e…
+       |                                     ^
+    293|       expect((await lineOf(lines.e!)).outcome).toBe('verified');
+    294|       expect((await lineOf(gLine!)).outcome).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing
+AssertionError: expected [] to deeply equal [ Array(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   "c6cb104e-4cca-4d20-b44e-00ac8e35d0d7",[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:837:66
+    835|       } }));
+    836|       expect(done).toMatchObject({ committed: true, verificationFailed…
+    837|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
+       |                                                                  ^
+    838|       expect((await lineOf(vi)).outcome).toBe('verified');
+    839|       expect((await lineOf(vp)).outcome).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1)
+AssertionError: expected [] to deeply equal [ Array(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   "72fe531a-211c-4398-b9f7-5c126f3f506c",[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:898:66
+    896|         boardSeriesId: june, commit: true, source: { text: `UCI,Unit C…
+    897|       } }));
+    898|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
+       |                                                                  ^
+    899|       expect((await lineOf(ku)).outcome).toBeNull();
+    900|       expect((await lineOf(kv)).outcome).toBe('verified');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator
+AssertionError: expected { series: { …(2) }, …(13) } to match object { committed: true, …(3) }
+(26 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "committed": true,[22m
+[2m    "sittingsVerified": [],[22m
+[32m-   "verificationFailed": 1,[39m
+[32m-   "verificationNote": "Results saved; the verification of 1 declared sitting failed — answer it on the session's To verify tab",[39m
+[31m+   "verificationFailed": 0,[39m
+[31m+   "verificationNote": null,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:915:20
+    913|         await release();
+    914|       }
+    915|       expect(done).toMatchObject({
+       |                    ^
+    916|         committed: true, sittingsVerified: [], verificationFailed: 1,
+    917|         verificationNote: "Results saved; the verification of 1 declar…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

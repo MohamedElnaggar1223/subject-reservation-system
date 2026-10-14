@@ -1,0 +1,32 @@
+# C66: 2ca07a4 item 4: "The item for …" translated only as the import's own aria-label
+# undone in apps/api/../web/lib/i18n-import.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14032ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 7ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.95s (transform 761ms, setup 3ms, collect 311ms, tests 14.03s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:1434:86
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line
+AssertionError: expected null to be 'بند الجلسة لرمز الجدول paper 2' // Object.is equality
+
+- Expected: 
+"بند الجلسة لرمز الجدول paper 2"
+
++ Received: 
+null
+
+ ❯ test/08n-import.test.ts:1434:86
+    1432|       expect(translateImportText('the sheet names Mr Teacher, who does…
+    1433|       expect(translateImportText('Mathematics A.S./A.L.: choose the it…
+    1434|       expect(translateImportText('The session’s item for the sheet’s c…
+       |                                                                                      ^
+    1435|       // Only the import's own sentence: another screen's "The item fo…
+    1436|       expect(translateImportText('The item for paper 2')).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

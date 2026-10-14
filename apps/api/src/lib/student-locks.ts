@@ -33,9 +33,23 @@ export function assertStudentsLocked(locked: Set<string>, studentIds: Iterable<s
   if (extra.length) throw new StudentSetChanged([...locked, ...extra]);
 }
 
+/** The refusal when the students kept changing: every route running the pattern answers it with 409. */
+export const STUDENTS_KEPT_CHANGING =
+  'The students with lines here changed while this change was running (new reservations kept arriving): nothing was changed. Try again.';
+
+/** A fourth newcomer in a row: the change is refused, nothing written (409 on every route). */
+export class StudentsKeptChanging extends Error {
+  readonly status = 409 as const;
+  constructor() {
+    super(STUDENTS_KEPT_CHANGING);
+  }
+}
+
 /**
  * Run a writer's transaction; when it finds a student it did not lock first, run it again with
- * that student among those locked first (`extra`). Three tries: a fourth newcomer is a refusal.
+ * that student among those locked first (`extra`). Three retries: a fourth newcomer is a refusal
+ * (`StudentsKeptChanging`, 409 with its sentence; until the review of F1 it reached the client
+ * as a 400 or a server error with the internal retry's message).
  */
 export async function withStudentsFirst<T>(run: (extra: string[]) => Promise<T>): Promise<T> {
   let extra: string[] = [];
@@ -43,9 +57,12 @@ export async function withStudentsFirst<T>(run: (extra: string[]) => Promise<T>)
     try {
       return await run(extra);
     } catch (err) {
-      if (err instanceof StudentSetChanged && attempt < 3) {
-        extra = err.students;
-        continue;
+      if (err instanceof StudentSetChanged) {
+        if (attempt < 3) {
+          extra = err.students;
+          continue;
+        }
+        throw new StudentsKeptChanging();
       }
       throw err;
     }

@@ -1,0 +1,186 @@
+# C36: the lead's Q2: a sitting from the student's history is the legacy source
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 6 failed) 13290ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 162ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 356ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting 7ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 11ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 56ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 90ms
+ Test Files  1 failed (1)
+      Tests  6 failed | 62 passed (68)
+   Duration  15.05s (transform 719ms, setup 2ms, collect 308ms, tests 13.29s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:638:44
+ ❯ test/08n-import.test.ts:706:56
+ ❯ test/08n-import.test.ts:730:111
+ ❯ test/08n-import.test.ts:746:68
+ ❯ test/08n-import.test.ts:842:71
+ ❯ test/08n-import.test.ts:1220:51
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
+AssertionError: expected [ { code: 'self_study_retake', …(2) } ] to deeply equal [ { code: 'self_study_retake', …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "code": "self_study_retake",
+-     "detail": "a retake of June 2026 (the student’s history)",
++     "detail": "a retake of June 2026 (named on the sheet or the line, to verify)",
+      "severity": "info",
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:638:44
+    636|       expect(lineOf(rowAt(v, 'Live', 6)).price).toBeNull();
+    637|       // 7: Live Two sat B last June (the Past tab, over by now): a re…
+    638|       expect(rowAt(v, 'Live', 7).problems).toEqual([{ code: 'self_stud…
+       |                                            ^
+    639|       expect(lineOf(rowAt(v, 'Live', 7))).toMatchObject({
+    640|         attempt: 'retake', mode: 'self_study', priorSitting: { month: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
+AssertionError: expected [ [ 'live.one', …(12) ], …(7) ] to deeply equal [ [ 'live.one', …(12) ], …(7) ]
+
+- Expected
++ Received
+
+@@ -111,11 +111,11 @@
+      "self_study",
+      1000,
+      500,
+      500,
+      false,
+-     "legacy",
++     "declared_by_desk",
+      "pearson_edexcel june 2026",
+      null,
+      50,
+      100,
+    ],
+
+ ❯ test/08n-import.test.ts:706:56
+    704|          left join teacher t on t.id = r.teacher_id where r.session_id…
+    705|       expect(lines.map((r) => [r.email.replace(D, ''), r.subject, r.at…
+    706|         r.basis.coursePercent, r.basis.boardPercent])).toEqual([
+       |                                                        ^
+    707|         ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 100…
+    708|         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 100…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting
+AssertionError: expected [ [ 'Live One', …(3) ], …(2) ] to deeply equal [ [ 'Live One', …(3) ], …(1) ]
+
+- Expected
++ Received
+
+@@ -9,6 +9,12 @@
+      "Live Two",
+      "Live Subject A",
+      "Pearson Edexcel November 2025",
+      "desk",
+    ],
++   [
++     "Live Two",
++     "Live Subject B",
++     "Pearson Edexcel June 2026",
++     "desk",
++   ],
+  ]
+
+ ❯ test/08n-import.test.ts:730:111
+    728|       const list = await apiResponse(coordinator.api.v1.sessions[':id'…
+    729|       const mine = list.lines.filter((l) => l.student.name.startsWith(…
+    730|       expect(mine.map((l) => [l.student.name, l.line.subject, l.sittin…
+       |                                                                                                               ^
+    731|         ['Live One', 'Live Subject C', `Pearson Edexcel June ${Y}`, 'd…
+    732|         ['Live Two', 'Live Subject A', `Pearson Edexcel November ${Y -…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent
+AssertionError: expected [ [ 'Live Subject A', …(9) ], …(1) ] to deeply equal [ [ 'Live Subject A', …(9) ], …(1) ]
+
+- Expected
++ Received
+
+@@ -21,11 +21,11 @@
+      1000,
+      0,
+      1000,
+      false,
+      "course 1,000 × 50% + board 500 × 100%",
+-     "legacy",
++     "declared_by_desk",
+      [
+        "imported",
+        "imported",
+      ],
+    ],
+
+ ❯ test/08n-import.test.ts:746:68
+    744|       const lines = st.students[0]!.sessions.find((s) => s.id === wind…
+    745|       expect(lines.map((l) => [l.subject, l.attempt, l.mode, l.price, …
+    746|         .sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toE…
+       |                                                                    ^
+    747|         ['Live Subject A', 'retake', 'self_study', 1000, 0, 1000, fals…
+    748|         ['Live Subject B', 'retake', 'self_study', 1000, 0, 1000, fals…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share
+AssertionError: expected { code: 'self_study_retake', …(2) } to deeply equal { code: 'self_study_retake', …(2) }
+
+- Expected
++ Received
+
+  {
+    "code": "self_study_retake",
+-   "detail": "a retake of November 2026 (the student’s history)",
++   "detail": "a retake of November 2026 (named on the sheet or the line, to verify)",
+    "severity": "info",
+  }
+
+ ❯ test/08n-import.test.ts:842:71
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting
+AssertionError: expected [ Array(1) ] to match object [ { …(5) } ]
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -8,10 +8,10 @@
+        "total": 1400,
+      },
+      "priorSitting": {
+        "from": "history",
+        "month": "june",
+-       "source": "legacy",
++       "source": "declared_by_desk",
+        "year": 2026,
+      },
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:1220:51
+    1218|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
+    1219|       // In school: a first entry carrying the AS sitting, at the full…
+    1220|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
+       |                                                   ^
+    1221|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
+    1222|       // Self-study: still a first entry — it needs the exception, nev…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+

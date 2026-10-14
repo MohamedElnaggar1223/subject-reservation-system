@@ -1,0 +1,32 @@
+# C27: flag 3: a person's decisions carried by email from every earlier file
+# undone in apps/api/src/services/import.services.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13188ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 38ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  14.99s (transform 748ms, setup 2ms, collect 337ms, tests 13.19s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:499:62
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing
+AssertionError: expected null to be 'karim.lotfy@import.test.local' // Object.is equality
+
+- Expected: 
+"karim.lotfy@import.test.local"
+
++ Received: 
+null
+
+ ❯ test/08n-import.test.ts:499:62
+    497|       expect(rowAt(v, '2024', 7).edits).toMatchObject({ confirmLink: t…
+    498|       expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', d…
+    499|       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`kar…
+       |                                                              ^
+    500|       expect(v.settings.carryForward).toBe('result');
+    501|       expect(v.summary).toMatchObject({ heldFamilies: 0 });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

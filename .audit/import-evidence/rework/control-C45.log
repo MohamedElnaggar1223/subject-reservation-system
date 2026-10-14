@@ -1,0 +1,46 @@
+# C45: reserving lines in a session is the admin's (the commit's 403)
+# undone in apps/api/src/services/import/commit.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13405ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines 724ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 3ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 66 passed (68)
+   Duration  15.17s (transform 717ms, setup 2ms, collect 288ms, tests 13.41s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:683:107
+ ❯ test/08n-import.test.ts:691:19
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 403, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Reserving lines for families in a session is the admin’s: ask the admin to commit this import, or set those series to \"History only\"",
+-   "status": 403,
++   "error": "\"\"",
++   "status": 200,
+  }
+
+ ❯ test/08n-import.test.ts:683:107
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
+Error: This import is already committed
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08n-import.test.ts:691:19
+    689|     it('the admin commits: lines through insertLines, priced from the …
+    690|       const payments = Number((await one<{ n: string }>(`select count(…
+    691|       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$…
+       |                   ^
+    692|       expect(out.result.created).toMatchObject({ students: 2, parents:…
+    693|       const lines = await sql<{
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

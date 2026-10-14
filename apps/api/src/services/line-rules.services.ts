@@ -87,6 +87,12 @@ export async function assertLineRules(
      * a declared retake, exclusive groups, the grade-10 core) was asked when it was made.
      */
     recheck?: boolean;
+    /**
+     * False: read the gate exceptions without locking them — a check that is rolled back and makes
+     * nothing (the day-one import's review, a GET) must not hold exception rows FOR UPDATE. Every
+     * path that makes a line leaves it true (one-shot gates are locked and marked used).
+     */
+    lockExceptions?: boolean;
   } = {},
 ): Promise<{ usedExceptionIds: string[] }> {
   const used: string[] = [];
@@ -99,7 +105,7 @@ export async function assertLineRules(
   }
   /** Refuse unless an exception of `key` covers the line; a one-shot one is used. */
   const gate = async (key: LinePolicyKey, scope: ExceptionScope, message: string, status: 400 | 409 = 400) => {
-    const exc = await lineExceptions.active(tx, ctx.studentId, [key], scope, { lock: 'update' });
+    const exc = await lineExceptions.active(tx, ctx.studentId, [key], scope, opts.lockExceptions === false ? undefined : { lock: 'update' });
     const e = exc.find((x) => !used.includes(x.id));
     if (!e) throw new LineRuleError(message, key, status);
     if (e.oneShot) used.push(e.id);

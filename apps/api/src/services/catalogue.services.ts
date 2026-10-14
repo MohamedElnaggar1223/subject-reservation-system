@@ -11,9 +11,9 @@
  * stored (@repo/validations level-code.ts).
  *
  * Contracts (FEATURES_PLAN.md §2, docs/features/CATALOGUE.md §7):
- * - F4 reads `entryItemsFor(registrationIds)`: per registration, its board,
- *   board series, qualification, units with their own level, the awards
- *   they count toward, and the derived level code.
+ * - F4 read `entryItemsFor(registrationIds)`; since the reservations rework it
+ *   reads A's `lineItemsFor` (what a line's item enters), and `entryItemsFor`
+ *   is that, in F0b's shape, for the window's series panel.
  * - F5 reads `getCatalogue()`: qualifications with their level, suite and
  *   subject area (AS and A Level of one subject share it), units and awards.
  * - F7 resolves the school's sheet against the catalogue with
@@ -22,22 +22,24 @@
 
 import {
   db, examBoard, qualification, examUnit, qualificationUnit, qualificationOption, qualificationOptionUnit,
-  subject, subjectUnit, registration, boardSeries, registrationSession, user,
+  subject, subjectUnit, registration, boardSeries, user,
   sessionOfferItem, sessionOfferItemUnit, sessionOfferItemFeeKey, boardFee,
   eq, and, inArray, notInArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  deriveLevelCode, seriesAcademicYearStart, gradeInAcademicYear, STARTER_SET_DATA, COUNCIL_LABELS, IGCSE_NEVER_MONTHS, type SeriesMonth,
+  deriveLevelCode, STARTER_SET_DATA, COUNCIL_LABELS, IGCSE_NEVER_MONTHS, type SeriesMonth,
   type UpdateBoardType, type CreateQualificationType, type UpdateQualificationType, type CreateUnitType,
   type UpdateUnitType, type SetQualificationUnitsType, type CreateQualificationOptionType,
   type UpdateQualificationOptionType, type MapRegistrableType, type StarterSet, type UnitLevel, type LevelCodeReading,
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
+import { entriesFollowMoveInTx } from './exam-entry.services';
 import { getSetting } from './settings.services';
 import { boardSeriesName } from './series.services';
 import { schoolDate } from './window.services';
 import { attachSeries, detachUnusedSeries, defaultSeriesFor, findOrCreateSeries } from './offer.services';
+import { lineItemsFor } from './line.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 import { effectiveDeadlinesOf, effectiveDeadlineFor, redateLines } from './deadline.services';
 import { itemBoardFees, PricingError } from './pricing.services';
@@ -436,7 +438,7 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
 
     const before = await tx.select({ unitId: subjectUnit.unitId }).from(subjectUnit).where(eq(subjectUnit.subjectId, subjectId));
     // The board changes: its live registrations follow it (IS-14).
-    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names) : { moved: [], repriced: [] as RepricedLine[] };
+    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names, ctx) : { moved: [], repriced: [] as RepricedLine[] };
     const moved = change.moved;
     repricedOut = change.repriced;
     await tx.update(subject).set({ qualificationId: q?.id ?? null, updatedAt: new Date() }).where(eq(subject.id, subjectId));
@@ -473,11 +475,15 @@ function levelWord(level: string): string {
  * 40c1447), the lines (id order), the series involved.
  */
 export async function applyBoardChange(
-  tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, locked: Set<string>, names?: Map<string, string>,
+  tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, locked: Set<string>, names?: Map<string, string>, ctx?: AuditContext,
 ) {
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
   const plan = await followBoardChange(tx, s, newBoard, boardNamesNow, actorId, locked);
+  // F4's entries of the lines that move (after the lines, §2.1): a sent one refuses the change, the
+  // drafts are withdrawn with it and made again in the new board's series (the review of 426d565, item 2).
+  const sent = await entriesFollowMoveInTx(tx, plan.moved.map((m) => m.id), "the subject's board changed", actorId, ctx);
+  if (sent) throw new CatalogueError(sent, 409);
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));
   const why = `The subject's board changed to ${boardName(boardNamesNow, newBoard)}`;
@@ -715,82 +721,36 @@ export async function loadStarterSet(set: StarterSet, actorId: string, ctx?: Aud
 // ─── What a registration enters (F4's contract) ──────────────────────────────
 
 /**
- * Per registration: what it enters with the board and how the school's code
- * reads for it — the board, the board series (with its entry deadline), the
- * qualification, the units with their own level, the awards those units
- * count toward, the student's grade in the series' academic year, and the
- * derived level code under the school's current reading. F4 derives its
- * entries per component from this; the screens show the code.
+ * Per registration: what it enters with the board and how the school's code reads for it — the
+ * board, the board series (with its entry deadline), the qualification, the units with their own
+ * level, the awards those units count toward, the student's grade in the series' academic year,
+ * and the derived level code under the school's current reading.
+ *
+ * Since the reservations rework a line enters what its **item** enters (an IAL unit of a parent
+ * subject, a Cambridge route), not the subject row's whole mapping: this reads A's
+ * `lineItemsFor` (line.services.ts), which F4 derives its entries from (RESERVATIONS_REWORK.md
+ * §10; docs/features/EXAM_ENTRIES.md §2a), and keeps F0b's shape for the window's series panel.
  */
 export async function entryItemsFor(registrationIds: string[], readingOverride?: LevelCodeReading) {
-  if (!registrationIds.length) return [];
-  const regs = await db.query.registration.findMany({
-    where: (r, { inArray: inArr }) => inArr(r.id, registrationIds),
-    columns: { id: true, studentId: true, sessionId: true, subjectId: true, status: true, boardSeriesId: true },
-    with: {
-      student: { columns: { id: true, cohortYear: true } },
-      session: { columns: { id: true, sessionType: true, seriesYear: true } },
-      subject: {
-        columns: { id: true, name: true, code: true, council: true, qualificationLevel: true },
-        with: {
-          qualification: { columns: { id: true, code: true, title: true, level: true, entryMethod: true, tier: true } },
-          units: { with: { unit: { columns: { id: true, code: true, shortCode: true, title: true, unitLevel: true, tier: true } } } },
-        },
-      },
-      boardSeries: { columns: { id: true, boardCode: true, month: true, year: true, label: true, entryDeadline: true } },
-    },
-  });
-  const reading = readingOverride ?? (await getSetting('catalogue.levelCodeReading'));
-  const unitIds = [...new Set(regs.flatMap((r) => r.subject.units.map((u) => u.unit.id)))];
-  const awards = unitIds.length
-    ? await db.select({ unitId: qualificationUnit.unitId, id: qualification.id, code: qualification.code, title: qualification.title, level: qualification.level })
-        .from(qualificationUnit).innerJoin(qualification, eq(qualification.id, qualificationUnit.qualificationId))
-        .where(inArray(qualificationUnit.unitId, unitIds))
-    : [];
-  // Whether each student sits any A2 unit in the same series (the default reading).
-  const seriesIds = [...new Set(regs.map((r) => r.boardSeriesId ?? `session:${r.sessionId}`))];
-  const studentIds = [...new Set(regs.map((r) => r.studentId))];
-  const a2Rows = studentIds.length
-    ? (await db.execute(sql`
-        select distinct r.student_id, coalesce(r.board_series_id, 'session:' || r.session_id) as series
-        from registration r
-        join subject_unit su on su.subject_id = r.subject_id
-        join exam_unit u on u.id = su.unit_id and u.unit_level = 'a2'
-        where r.student_id in (${sql.join(studentIds.map((id) => sql`${id}`), sql`, `)})
-          and r.status not in ('rejected', 'expired', 'dropped')
-      `)).rows as { student_id: string; series: string }[]
-    : [];
-  const sitsA2 = new Set(a2Rows.filter((r) => seriesIds.includes(r.series)).map((r) => `${r.student_id}|${r.series}`));
-  const names = await boardNames();
-
-  return regs.map((r) => {
-    const seriesKey = r.boardSeriesId ?? `session:${r.sessionId}`;
-    const ay = seriesAcademicYearStart(r.session.sessionType, r.session.seriesYear);
-    const grade = gradeInAcademicYear(r.student.cohortYear, ay);
-    const units = r.subject.units.map((u) => u.unit).sort((a, b) => a.code.localeCompare(b.code));
-    const counts = awards.filter((a) => units.some((u) => u.id === a.unitId));
-    const levelCode = deriveLevelCode({
-      qualificationLevel: r.subject.qualificationLevel,
-      unitLevels: units.map((u) => u.unitLevel as UnitLevel),
-      awardLevels: [...new Set(counts.map((a) => a.level))],
-      gradeInSeriesYear: grade,
-      studentSitsA2InSeries: sitsA2.has(`${r.studentId}|${seriesKey}`),
-    }, reading);
-    return {
-      registrationId: r.id,
-      studentId: r.studentId,
-      status: r.status,
-      boardCode: r.subject.council,
-      boardName: boardName(names, r.subject.council),
-      boardSeries: r.boardSeries ? { ...r.boardSeries, name: boardSeriesName(names, r.boardSeries) } : null,
-      subject: { id: r.subject.id, name: r.subject.name, code: r.subject.code, qualificationLevel: r.subject.qualificationLevel },
-      qualification: r.subject.qualification,
-      units,
-      countsToward: [...new Map(counts.map((a) => [a.id, { id: a.id, code: a.code, title: a.title, level: a.level }])).values()],
-      gradeInSeriesYear: grade,
-      levelCode,
-    };
-  });
+  const items = await lineItemsFor(registrationIds, db, readingOverride);
+  return items.map((i) => ({
+    registrationId: i.registrationId,
+    studentId: i.studentId,
+    status: i.status,
+    boardCode: i.boardCode,
+    boardName: i.boardName,
+    boardSeries: i.boardSeries
+      ? { id: i.boardSeries.id, boardCode: i.boardSeries.boardCode, month: i.boardSeries.month, year: i.boardSeries.year, label: i.boardSeries.label, entryDeadline: i.boardSeries.entryDeadline, name: i.boardSeries.name }
+      : null,
+    subject: i.subject,
+    qualification: i.enters.qualification
+      ? { id: i.enters.qualification.id, code: i.enters.qualification.code, title: i.enters.qualification.title, level: i.enters.qualification.level, entryMethod: i.enters.qualification.entryMethod, tier: i.enters.qualification.tier }
+      : null,
+    units: i.enters.units.map((u) => ({ id: u.id, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, tier: u.tier })),
+    countsToward: i.countsToward,
+    gradeInSeriesYear: i.gradeInSeriesYear,
+    levelCode: i.levelCode,
+  }));
 }
 
 /** The live registrations of a window with what each enters (the window's series panel). */

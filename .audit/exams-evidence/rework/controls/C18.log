@@ -1,0 +1,138 @@
+# C18: lineItemsFor reads the subject row's units, not the line's item
+# undone in: apps/api/src/services/line.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['two items of one subject are two lines']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 6 failed) 27115ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line 82ms
+     → expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ], [ …(3) ] ]
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 14ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 121ms
+     → expected 4 to be 2 // Object.is equality
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 45ms
+     → expected { status: 409, …(1) } to deeply equal { status: 409, …(1) }
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 7ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 20ms
+     → expected 0 to be greater than 0
+ Test Files  1 failed (1)
+      Tests  6 failed | 50 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line d866680d-7e9e-481e-823f-ab4e831fbc16: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line
+AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ], [ …(3) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -2,15 +2,19 @@[39m
+[2m    [[22m
+[2m      "207c2fbc-2d0d-43d5-b0ba-6593cee3f915",[22m
+[2m      "P1",[22m
+[2m      [[22m
+[2m        "unit:XWWMA11",[22m
+[31m+       "unit:XWWMA12",[39m
+[31m+       "award:XWXMA01",[39m
+[2m      ],[22m
+[2m    ],[22m
+[2m    [[22m
+[2m      "1b301f4f-47d9-4e99-9d1c-f9f5dea32129",[22m
+[2m      "P2",[22m
+[2m      [[22m
+[31m+       "unit:XWWMA11",[39m
+[2m        "unit:XWWMA12",[22m
+[31m+       "award:XWXMA01",[39m
+[2m      ],[22m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:138:124
+    136|       lines.dP1 = p1!; lines.dP2 = p2!;
+    137|       const preview = await derive(w.series.pearsonJan, fam.d!.student…
+    138|       expect(preview.rows.map((r) => [r.registrationId, r.item?.label,…
+       |                                                                                                                            ^
+    139|         [p1, 'P1', [`unit:${T}WMA11`]],
+    140|         [p2, 'P2', [`unit:${T}WMA12`]],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's
+TypeError: Cannot read properties of undefined (reading 'id')
+ ❯ test/08x4-exam-entries-rework.test.ts:153:103
+    151|       expect(units).toEqual([{ unit: `${T}WMA11`, teacher: w.teacherId…
+    152|       const [e1, e2] = await entriesOf(w.series.pearsonJan, fam.d!.stu…
+    153|       expect(await apiResponse(w.teacher.api.v1.exams.entries[':id'].f…
+       |                                                                                                       ^
+    154|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+    155|         .toEqual({ status: 403, error: "Only the candidate's teacher f…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified
+AssertionError: expected 4 to be 2 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 2[39m
+[31m+ 4[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:259:53
+    257|       expect(list.rows.find((r) => r.studentId === fam.e!.studentId)!.…
+    258|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
+    259|       expect(list.summary.prior_sitting_unverified).toBe(2);
+       |                                                     ^
+    260|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
+    261|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes
+AssertionError: expected { status: 409, …(1) } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "XWWMA12 follows a declared earlier sitting the school has not verified: it is held until it is (the To verify tab), and not sent",[39m
+[31m+   "error": "XWWMA11 follows a declared earlier sitting the school has not verified: it is held until it is (the To verify tab), and not sent",[39m
+[2m    "status": 409,[22m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:274:12
+    272|         const [fe] = await entriesOf(w.series.pearsonJan, fam.f!.stude…
+    273|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
+    274|           .toEqual({ status: 409, error: `${T}WMA12 follows a declared…
+       |            ^
+    275|         expect((await one<{ status: string }>(`select status from exam…
+    276|         // The coordinator verifies it: it goes.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when
+TypeError: Cannot read properties of undefined (reading 'id')
+ ❯ test/08x4-exam-entries-rework.test.ts:450:90
+    448|       expect(before.boardNote).toBe('The board fee comes back: the ent…
+    449|       const [u1] = await entriesOf(w.series.pearsonJan, fam.r1!.studen…
+    450|       await apiResponse(coord.api.v1.exams.entries.submit.$post({ json…
+       |                                                                                          ^
+    451|       const sentAt = new Date((await one<{ at: string }>(`select submi…
+    452|       const after = await preview(fam.r1!, lines.r1!);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full
+AssertionError: expected 0 to be greater than 0
+ ❯ withdrawnWithLine test/08x4-exam-entries-rework.test.ts:74:25
+     72|   const withdrawnWithLine = async (lineId: string, reason: string) => {
+     73|     const rows = await entriesOfLine(lineId);
+     74|     expect(rows.length).toBeGreaterThan(0);
+       |                         ^
+     75|     expect(rows.map((r) => [r.status, r.withdrawn_with_line, r.withdra…
+     76|     await audited(rows.map((r) => r.id), rows.map(() => 'EXAM_ENTRY_WI…
+ ❯ test/08x4-exam-entries-rework.test.ts:478:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+

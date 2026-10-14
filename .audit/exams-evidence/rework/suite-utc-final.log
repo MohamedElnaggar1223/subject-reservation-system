@@ -1,0 +1,38 @@
+# Full API suite, TZ=UTC, TEST_DB_NAME=igcse_exams_test, the tree of the commit carrying this file
+ ✓ test/00-harness.test.ts (4 tests) 1704ms
+ ✓ test/01-desk.test.ts (8 tests) 1665ms
+ ✓ test/02-money.test.ts (4 tests) 1848ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2124ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 6988ms
+ ✓ test/05-object-access.test.ts (16 tests) 6467ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3744ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1815ms
+ ✓ test/08-money-rules.test.ts (51 tests) 11872ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11912ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6562ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 8061ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 6066ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5400ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 9121ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2650ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4400ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4334ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4979ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3733ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6355ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 24016ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 17619ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8601ms
+ ✓ test/08q-charges.test.ts (46 tests) 27354ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8960ms
+ ✓ test/08t-rework-races.test.ts (36 tests) 31438ms
+ ✓ test/08x1-exam-entries.test.ts (17 tests) 3858ms
+ ✓ test/08x2-exam-days-results.test.ts (14 tests) 3891ms
+ ✓ test/08x3-exam-races.test.ts (8 tests) 4236ms
+ ✓ test/08x4-exam-entries-rework.test.ts (18 tests) 9686ms
+ ✓ test/09-money-invariants.test.ts (53 tests) 642ms
+ Test Files  32 passed (32)
+      Tests  561 passed | 1 todo (562)
+   Start at  10:00:05
+   Duration  261.44s (transform 1.12s, setup 51ms, collect 3.82s, tests 252.10s, environment 3ms, prepare 1.06s)
+exit 0

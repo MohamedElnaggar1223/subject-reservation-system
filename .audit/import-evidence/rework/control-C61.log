@@ -1,0 +1,44 @@
+# C61: 2ca07a4 item 1: a "one paper" note is never the whole subject (the one-paper item, else staff choose)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13479ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 194ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.24s (transform 728ms, setup 2ms, collect 296ms, tests 13.48s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:1090:31
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1)
+AssertionError: expected [ Array(1) ] to match object [ { …(6) } ]
+(17 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -1,10 +1,10 @@
+  [
+    {
+      "attempt": "retake",
+-     "found": "paper",
+-     "itemLabel": "Paper 4 only (retake)",
++     "found": "whole",
++     "itemLabel": "Whole subject",
+      "mode": "in_school",
+      "priorSitting": {
+        "from": "note",
+        "month": "june",
+        "source": "declared_by_desk",
+
+ ❯ test/08n-import.test.ts:1090:31
+    1088|       expect(chem.data).toMatchObject({ noteOnePaper: true, noteRetake…
+    1089|       // One one-paper item: the line's, a retake of the sitting the n…
+    1090|       expect(chem.plan.lines).toMatchObject([{ subjectName: 'Imp Chemi…
+       |                               ^
+    1091|         priorSitting: { month: 'june', year: Y, source: 'declared_by_d…
+    1092|       expect(chem.problems.filter((p) => p.severity === 'error')).toEq…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,65 @@
+# C25: a new link to an existing account waits for staff (re-run on the new base)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13562ms
+   × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email 7ms
+   × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > the mapping suggests the catalogue rows and teachers; what a commit would do is counted 1ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 66 passed (68)
+   Duration  15.50s (transform 763ms, setup 2ms, collect 303ms, tests 13.56s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:213:95
+ ❯ test/08n-import.test.ts:260:25
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email
+AssertionError: expected undefined to match object { severity: 'error', …(1) }
+
+- Expected: 
+{
+  "detail": "Link Tarek Nour to Bassem Nour? Already in the system: Bassem Nour (bassem@import.test.local)",
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:213:95
+    211|       // account, never made silently — the line names the account and…
+    212|       expect(codes(rowAt(v, '2024', 6))).toEqual([]);
+    213|       expect(rowAt(v, '2024', 7).problems.find((p) => p.code === 'link…
+       |                                                                                               ^
+    214|         severity: 'error', detail: `Link Tarek Nour to Bassem Nour? Al…
+    215|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > the mapping suggests the catalogue rows and teachers; what a commit would do is counted
+AssertionError: expected { rows: 24, importing: 23, …(11) } to match object { rows: 24, importing: 23, …(4) }
+(46 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "families": 12,
+-   "heldFamilies": 5,
++   "heldFamilies": 4,
+    "importing": 23,
+-   "readyFamilies": 7,
++   "readyFamilies": 8,
+    "rows": 24,
+    "skipped": 1,
+  }
+
+ ❯ test/08n-import.test.ts:260:25
+    258|         ['Mr Karim', null, true], ['Mr Wael', null, true], ['Ms Mona',…
+    259|       ]);
+    260|       expect(v.summary).toMatchObject({ rows: 24, importing: 23, skipp…
+       |                         ^
+    261|     });
+    262| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

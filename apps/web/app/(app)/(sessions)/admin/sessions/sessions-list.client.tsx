@@ -25,6 +25,7 @@ import { EmptyState } from '~/components/ui/query-state';
 import { DeadlineBadge, SeriesName } from '~/app/(app)/exams/exams-shared';
 import {
   fetchSessions, SESSIONS_KEY, StatusBadge, Money, Day, Modal, Field, INPUT_CLASS, ErrorLine, errorText, type SessionRow,
+  CopySummary,
 } from './sessions-shared';
 
 /** The series year a new session most likely is: June of the academic year's end, or this November. */
@@ -145,15 +146,20 @@ function NewSessionModal({ sessions, onClose }: { sessions: SessionRow[]; onClos
     })),
     onSuccess: async (made) => {
       await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
-      window.location.assign(`/admin/sessions/${made.id}`);
+      // What the copy brought across closed, or self-study only at 0, is said before the session opens (MO-9).
+      const c = made.copied;
+      if (!c || (!c.closedNoTeacher && !c.closedNoFee.length && !c.zeroFeeSelfStudy.length)) window.location.assign(`/admin/sessions/${made.id}`);
     },
   });
+  const made = create.data && create.data.copied && (create.data.copied.closedNoTeacher > 0 || create.data.copied.closedNoFee.length > 0 || create.data.copied.zeroFeeSelfStudy.length > 0)
+    ? create.data : null;
   const ready = Number.isInteger(y) && y >= 2000 && y <= 2100 && startDate && endDate && courseStartsOn && paymentDueAt;
 
   return (
     <Modal title="New session" onClose={onClose}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (ready) create.mutate(); }}>
         <ErrorLine message={create.error ? errorText(create.error) : null} />
+        {made && made.copied && <CopySummary copied={made.copied} />}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Type" htmlFor="ns-type">
             <select id="ns-type" className={INPUT_CLASS} value={type} onChange={(e) => { const t = e.target.value as SessionType; setType(t); setYear(String(suggestedYear(t))); setCopyFrom(''); }}>
@@ -186,7 +192,9 @@ function NewSessionModal({ sessions, onClose }: { sessions: SessionRow[]; onClos
         </p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!ready || create.isPending}>{create.isPending ? 'Creating…' : 'Create session'}</Button>
+          {made
+            ? <Button type="button" onClick={() => window.location.assign(`/admin/sessions/${made.id}`)}>Open the session</Button>
+            : <Button type="submit" disabled={!ready || create.isPending}>{create.isPending ? 'Creating…' : 'Create session'}</Button>}
         </div>
       </form>
     </Modal>

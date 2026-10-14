@@ -21,10 +21,11 @@ import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import * as catalogue from '../services/catalogue.services';
 import { SeriesError } from '../services/series.services';
+import { StudentsKeptChanging } from '../lib/student-locks';
 
 const fail = (err: unknown, fallback: string) => ({
   message: clientMessage(err, fallback),
-  status: err instanceof catalogue.CatalogueError || err instanceof SeriesError ? err.status : 400,
+  status: err instanceof catalogue.CatalogueError || err instanceof SeriesError || err instanceof StudentsKeptChanging ? err.status : 400,
 });
 
 /** Staff who read the catalogue: admin, the desk, the coordinator, teachers (not the gate). */

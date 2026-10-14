@@ -16,7 +16,7 @@
  */
 
 import { db, schoolSetting, eq, sql } from '@repo/db';
-import { SETTINGS, SETTING_KEYS, isSettingKey, hasRole, type SettingKey, type SettingValue, type Role } from '@repo/validations';
+import { SETTINGS, SETTING_KEYS, isSettingKey, hasRole, type SettingKey, type SettingValue, type SettingUnit, type Role } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -52,10 +52,11 @@ export async function listSettings(role: string | null | undefined) {
       source: def.source ?? null,
       input: def.input,
       choices: 'choices' in def ? (def.choices as readonly { value: string; label: string }[]) : [],
-      // A number's bounds and unit, as the screen shows them (the reservations rework's pricing and payment settings).
+      // A number's bounds and unit, as the screen shows them (the reservations rework's pricing and
+      // payment settings; F4's exam settings).
       min: 'min' in def ? (def.min as number) : null,
       max: 'max' in def ? (def.max as number) : null,
-      unit: 'unit' in def ? (def.unit as 'percent' | 'days' | 'hour') : null,
+      unit: 'unit' in def ? (def.unit as SettingUnit) : null,
       editableBy: [...def.editableBy] as string[],
       canEdit: hasRole(role, ...def.editableBy),
       value: (parsed?.success ? parsed.data : def.default) as unknown,

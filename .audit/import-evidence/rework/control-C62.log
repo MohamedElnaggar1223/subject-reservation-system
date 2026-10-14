@@ -1,0 +1,36 @@
+# C62: 2ca07a4 item 2: a self-study-only offer at a course fee of 0 says why
+# undone in apps/api/src/services/offer.services.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14422ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 94ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  16.81s (transform 824ms, setup 2ms, collect 330ms, tests 14.42s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:1664:86
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 400, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Fee Rule Untaught (imp) is self-study only at a course fee of 0: say why (its lines are priced at the board fee alone)",
+-   "status": 400,
++   "error": "\"\"",
++   "status": 201,
+  }
+
+ ❯ test/08n-import.test.ts:1664:86
+    1662|       expect(await refused(post(winter, offerJson(taught, 'retake_only…
+    1663|       // Self-study only: 0 needs a reason, as a board fee of 0 does; …
+    1664|       expect(await refused(post(winter, offerJson(untaught, 'self_stud…
+       |                                                                                      ^
+    1665|         status: 400, error: 'Fee Rule Untaught (imp) is self-study onl…
+    1666|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

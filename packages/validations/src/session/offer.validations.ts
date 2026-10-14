@@ -53,6 +53,9 @@ export const EntersInput = z.discriminatedUnion('kind', [
 ]);
 export type EntersInputType = z.infer<typeof EntersInput>;
 
+/** Why a self-study-only offer's course fee is 0 (MO-9; as a board fee of 0 says why). */
+const ZeroFeeReason = z.string().trim().min(5, 'Say why the course fee is 0 (at least 5 characters)').max(500);
+
 export const OfferItemInput = z.object({
   label: z.string().trim().min(1).max(120),
   kind: ItemKindSchema,
@@ -86,6 +89,9 @@ export const CreateOffer = z.object({
   grade10Core: z.boolean().default(false),
   notes: z.string().trim().max(1000).nullable().optional(),
   teachers: z.array(OfferTeacherInput).max(10).default([]),
+  // MO-9: why a self-study-only offer carries a course fee of 0 (its lines priced at the board fee alone);
+  // an open or retakes-only offer is refused at 0.
+  zeroFeeReason: ZeroFeeReason.optional(),
   // Absent: generated from the catalogue (§3.2's table).
   items: z.array(OfferItemInput).min(1).max(30).optional(),
 });
@@ -102,6 +108,8 @@ export const UpdateOffer = z.object({
   teachers: z.array(OfferTeacherInput).max(10).optional(),
   sortOrder: z.number().int().min(0).max(1000).optional(),
   reason: z.string().trim().max(500).optional(),
+  // MO-9: as on CreateOffer, when the change makes it self-study only at 0.
+  zeroFeeReason: ZeroFeeReason.optional(),
 });
 export type UpdateOfferType = z.infer<typeof UpdateOffer>;
 

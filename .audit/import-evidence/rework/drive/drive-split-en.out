@@ -1,0 +1,216 @@
+signed in → http://localhost:3090/admin/dashboard
+staged c28005bb-02ac-4710-8492-9281aa230918
+series selects: 2
+rows for "Mathematics (P1 & P2)": 1
+shot 01-split-row
+SPLIT ROW:
+Nov 2026, row 3
+Close
+Problems
+Subject not in the catalogue — "Mathematics (P1 & P2)" A.S.
+Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.
+One line of the sheet, several lines in the session — p1: P1 · p2: P2
+The line names several units or papers the session offers as separate items: it makes one line per item, each priced on its own.
+The lines in the session
+
+This line of the sheet names several units or papers: it makes one line for each, priced on its own.
+
+Session
+November 2026 – January 2027
+Subject and item
+Demo Mathematics A.S./A.L. — P1 (p1)
+Board series
+Pearson Edexcel November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 14,140
+course 9,000 × 100% + board 5,140 × 100%
+Session
+November 2026 – January 2027
+Subject and item
+Demo Mathematics A.S./A.L. — P2 (p2)
+Board series
+Pearson Edexcel November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 14,140
+course 9,000 × 100% + board 5,140 × 100%
+The item of each unit or paper the line names
+p1
+As the sheet’s words find it: P1
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P1 · Pe
+rows for "Mathematics (P1 & P5)": 1
+shot 02-code-unclear
+UNCLEAR ROW:
+Nov 2026, row 4
+Close
+Problems
+Subject not in the catalogue — "Mathematics (P1 & P5)" A.S.
+Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.
+Which item of the subject? — Demo Mathematics A.S./A.L.: choose the item for p5 (M1 · P1 · P2)
+The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line — for a line naming several units or papers, the item of each one the words cannot tell.
+The line in the session
+
+No line yet: see the problems above.
+
+The item of each unit or paper the line names
+p1
+As the sheet’s words find it: P1
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel November 2026
+Demo Physics — Whole subject · Cambridge International November 2026
+p5
+Choose its item
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2
+p5 options: Choose its item | Demo Biology — Whole subject · Cambridge International November 2026 | Demo Chemistry — Whole subject · Cambridge International November 2026 | Demo Geography — Whole subject · Cambridge International November 2026 | Demo History — Whole subject · Cambridge International November 2026 | Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026 | Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel November 2026 | Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel November 2026 | Demo Physics — Whole subject · Cambridge International November 2026
+shot 03-code-chosen
+CHOSEN ROW:
+Nov 2026, row 4
+Close
+Problems
+Subject not in the catalogue — "Mathematics (P1 & P5)" A.S.
+Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.
+One line of the sheet, several lines in the session — p1: P1 · p5: M1
+The line names several units or papers the session offers as separate items: it makes one line per item, each priced on its own.
+The lines in the session
+
+This line of the sheet names several units or papers: it makes one line for each, priced on its own.
+
+Session
+November 2026 – January 2027
+Subject and item
+Demo Mathematics A.S./A.L. — P1 (p1)
+Board series
+Pearson Edexcel November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 14,140
+course 9,000 × 100% + board 5,140 × 100%
+Session
+November 2026 – January 2027
+Subject and item
+Demo Mathematics A.S./A.L. — M1 (p5) Chosen on the line
+Board series
+Pearson Edexcel November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 14,140
+course 9,000 × 100% + board 5,140 × 100%
+The item of each unit or paper the line names
+p1
+As the sheet’s words find it: P1
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics 
+DIALOG:
+Commit 3 families?
+
+Each family is made in one go: if anything in it is refused, nothing of it is made and its rows say why.
+
+3 new student accounts
+3 new parent accounts
+3 parent–child links
+3 students placed in sections
+1 course enrolments
+5 lines awaiting payment
+Cancel
+Commit
+shot 04-result
+RESULT:
+Day-one import
+split-sheet-en.xlsx
+
+The school's registration sheet
+Committed
+·
+Staged
+8 Oct 2026
+by
+School Admin
+·
+committed
+8 Oct 2026
+by
+School Admin
+
+ROWS
+
+3
+
+3 to import · 0 left out
+
+FAMILIES READY
+
+0
+
+3 committed
+
+FAMILIES HELD BACK
+
+0
+
+0 rows to fix
+
+A COMMIT WOULD MAKE
+
+Nothing new
+About this file: No money in this file
+Problems
+Rows
+3
+People and conflicts
+Mapping
+Result
+
+3 families committed
+
+3 student accounts
+3 parent accounts
+3 parent–child links
+3 section places
+1 course enrolments
+5 lines awaiting payment
+
+Lines of the sheet split into one line per unit or paper: Nov 2026 row 3 (2 lines), Nov 2026 row 4 (2 lines)
+
+Every record made points back to its line of the file. See them on Students, Sections and Course enrolment. Accounts made here have no password yet: each family sets one with “Forgot password” on the sign-in page, using the email on the account.
+
+Show the committed rows
+IMPORT c28005bb-02ac-4710-8492-9281aa230918
+ERRORS: none

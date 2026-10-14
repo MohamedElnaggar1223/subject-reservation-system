@@ -41,8 +41,12 @@ import { teachingRoutes } from './routes/teaching.routes';
 import { catalogueRoutes } from './routes/catalogue.routes';
 import { boardSeriesRoutes } from './routes/board-series.routes';
 import { enrolmentRoutes } from './routes/enrolment.routes';
+import { examEntryRoutes } from './routes/exam-entry.routes';
+import { examTimetableRoutes } from './routes/exam-timetable.routes';
+import { examResultRoutes } from './routes/exam-result.routes';
 import { boardFeeRoutes } from './routes/board-fee.routes';
 import { lineRoutes, sessionVerifyRoutes, statementRoutes } from './routes/reservation.routes';
+import { importRoutes } from './routes/import.routes';
 import { schedulingRoutes } from './routes/scheduling.routes';
 import { timetableRoutes } from './routes/timetable.routes';
 import { scheduleRoutes, icalRoutes } from './routes/schedule.routes';
@@ -371,6 +375,14 @@ const v1 = new Hono<HonoEnv>()
    * - /v1/sessions/:id/board-series   the series a window feeds
    * - /v1/enrolments     course enrolment per academic year
    *
+   * F4 — exam-entry management (docs/features/EXAM_ENTRIES.md):
+   * - /v1/exams          candidates, entries, forecasts, entry lists, the
+   *                      exam timetable, rooms, seats, invigilators, the
+   *                      boards' registers, special consideration, results,
+   *                      certificates, the deadlines dashboard
+   * F7 — the day-one import:
+   * - /v1/imports        a file staged, reviewed (fix, merge, skip, mapping)
+   *                      and committed one family per transaction
    * F1 — scheduling:
    * - /v1/scheduling     teaching groups and the year's timetable rules
    * - /v1/timetables     timetables per term: drafts, the grid, the
@@ -440,6 +452,13 @@ const v1 = new Hono<HonoEnv>()
   .route('/charges', charges)
   .route('/board-services', boardServices)
   .route('/policies', policies)
+  // F4: exam-entry management — candidates, entries, entry lists, the exam
+  // timetable and exam days, results, certificates, the deadlines.
+  .route('/exams', examEntryRoutes)
+  .route('/exams', examTimetableRoutes)
+  .route('/exams', examResultRoutes)
+  // F7: the day-one import
+  .route('/imports', importRoutes)
   // F1: scheduling
   .route('/scheduling', schedulingRoutes)
   .route('/timetables', timetableRoutes)

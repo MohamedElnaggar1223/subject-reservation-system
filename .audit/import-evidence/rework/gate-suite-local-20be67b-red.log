@@ -1,0 +1,64 @@
+# The suite on 20be67b in local time (Africa/Cairo), igcse_import_test: red once (the import-and-desk race test; see the trail), green when run again
+ ✓ test/00-harness.test.ts (4 tests) 2210ms
+ ✓ test/01-desk.test.ts (8 tests) 3648ms
+ ✓ test/02-money.test.ts (4 tests) 2790ms
+ ✓ test/03-v3-flows.test.ts (6 tests | 1 skipped) 3186ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 7831ms
+ ✓ test/05-object-access.test.ts (16 tests) 5461ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 4033ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 2389ms
+ ✓ test/08-money-rules.test.ts (51 tests) 16036ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 17957ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 8322ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 9382ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 6309ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 6095ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 9443ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2842ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4688ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4249ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4942ms
+ ✓ test/08l-board-change.test.ts (7 tests) 5077ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 9538ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 37976ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 38643ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 21990ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 9522ms
+ ✓ test/08q-charges.test.ts (46 tests) 47200ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 22946ms
+ ✓ test/08t-rework-races.test.ts (36 tests) 48458ms
+ ✓ test/09-money-invariants.test.ts (48 tests) 1363ms
+ ❯ test/08n-import.test.ts:1306:23
+ Test Files  1 failed | 28 passed (29)
+      Tests  1 failed | 566 passed | 1 todo (568)
+   Start at  17:23:58
+   Duration  378.30s (transform 1.71s, setup 86ms, collect 5.79s, tests 364.52s, environment 3ms, prepare 1.83s)
+rc=1
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
+AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "session_id": "cc9beab3-6b00-4403-92b6-957fefe1ed25",
++     "session_id": "a4375354-2465-47a6-bf18-637b076461c3",
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:1306:23
+    1304|         const lines = await sql<{ session_id: string }>(`select r.sess…
+    1305|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
+    1306|         expect(lines).toEqual([{ session_id: sess }]);
+       |                       ^
+    1307|         expect(c.status).toBe(200);
+    1308|         expect(d.status).toBe(409);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+

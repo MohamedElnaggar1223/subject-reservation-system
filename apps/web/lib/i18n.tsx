@@ -10,6 +10,8 @@ import {
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
+import { examsArabic, translateExamsText } from './i18n-exams';
+import { importArabic, translateImportText } from './i18n-import';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
 import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
@@ -91,6 +93,18 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'Exams',
     'nav.catalogue': 'Exam Catalogue',
     'nav.boardSeries': 'Board Series',
+    'nav.examDeadlines': 'Exam Deadlines',
+    'nav.candidates': 'Candidates',
+    'nav.entries': 'Exam Entries',
+    'nav.entryLists': 'Entry Lists',
+    'nav.examTimetable': 'Exam Timetable',
+    'nav.examDays': 'Exam Days',
+    'nav.examResults': 'Exam Results',
+    'nav.certificates': 'Certificates',
+    'nav.forecasts': 'Forecast Grades',
+    'nav.invigilation': 'Invigilation',
+    'nav.myExams': 'My Exams',
+    'nav.import': 'Day-one Import',
     'nav.boardServices': 'Board Services',
     'nav.charges': 'Charges',
     'nav.chargesDue': 'Charges & Instalments',
@@ -199,6 +213,18 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
+    'nav.examDeadlines': 'مواعيد الامتحانات',
+    'nav.candidates': 'المرشحون',
+    'nav.entries': 'قيود الامتحانات',
+    'nav.entryLists': 'قوائم القيد',
+    'nav.examTimetable': 'جدول الامتحانات',
+    'nav.examDays': 'أيام الامتحانات',
+    'nav.examResults': 'نتائج الامتحانات',
+    'nav.certificates': 'الشهادات',
+    'nav.forecasts': 'الدرجات المتوقعة',
+    'nav.invigilation': 'المراقبة',
+    'nav.myExams': 'امتحاناتي',
+    'nav.import': 'استيراد بدء التشغيل',
     'nav.boardServices': 'خدمات المجالس',
     'nav.charges': 'الرسوم الأخرى',
     'nav.chargesDue': 'الرسوم والأقساط',
@@ -1520,6 +1546,8 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F7 screens (lib/i18n-import.ts), the same way.
+for (const [en, ar] of Object.entries(importArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
 for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step C's money screens (lib/i18n-money.ts): the same rule.
@@ -1528,10 +1556,20 @@ for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText))
 for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step D's screens (lib/i18n-messages.ts): Messages, reminders, the Money tab's Remind, the notification types.
 for (const [en, ar] of Object.entries(messagesArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F4 screens (lib/i18n-exams/): likewise only words not already translated — after A's, B's, C's
+// and D's, so a word their screens share with F4's ("Session", "Dropped", "Collected") keeps the
+// rework's Arabic (the reviews of 093dbd1, item 10, and 54c225f, item 7).
+for (const [en, ar] of Object.entries(examsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // F1: the timetable screens (their own words never replace a phrase already translated).
 for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
+
+/** Whether one of the rework's sentence rules (A's, B's, C's, D's) translates this text. */
+function reworkClaims(text: string): boolean {
+  return translateSessionsText(text) !== null || translateMoneyText(text, translateExactText) !== null
+    || translateReservationsText(text) !== null || translateMessagesText(text, translateExactText) !== null;
+}
 
 function translateDynamicText(text: string): string | null {
   const gradeMatch = /^Grade (\d+)$/.exec(text);
@@ -1605,9 +1643,18 @@ function translateDynamicText(text: string): string | null {
   // F0a: the API's refusal sentences that carry a name, a date or a year.
   const f0aRefusal = translateFoundationRefusal(text);
   if (f0aRefusal) return f0aRefusal;
+  // F4: exam entries' sentences with names, codes and dates in them — before
+  // F0b's, whose broad "X: Y with Z" rule would take F4's sentences; but never a
+  // sentence the rework's rules (A's, B's, C's below) translate: theirs keep the
+  // order they have on main (the review of 093dbd1, item 10).
+  const f4Text = translateExamsText(text);
+  if (f4Text && !reworkClaims(text)) return f4Text;
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // F7: the import's sentences with a name, a number or a year in them.
+  const f7Text = translateImportText(text);
+  if (f7Text) return f7Text;
   // The reservations rework: session names, refund sentences, the refusals of its screens.
   const reworkText = translateSessionsText(text);
   if (reworkText) return reworkText;
@@ -1831,7 +1878,11 @@ function localizeDom(language: Language) {
       // source. Keeping the first one forever put stale names back.
       if (original === null || (current !== original && current !== translatePreservingWhitespace(original))) {
         original = current;
-        element.setAttribute(originalAttr, current);
+        // English translates nothing, so a source not yet recorded waits for
+        // Arabic. Recording it here wrote into server HTML React had not yet
+        // hydrated (a page under Suspense): a hydration mismatch on every
+        // such page with an aria-label, in English.
+        if (language === 'ar' || element.hasAttribute(originalAttr)) element.setAttribute(originalAttr, current);
       }
       const nextValue = language === 'ar' ? translatePreservingWhitespace(original) : original;
       if (element.getAttribute(attr) !== nextValue) element.setAttribute(attr, nextValue);

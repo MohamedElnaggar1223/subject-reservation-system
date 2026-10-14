@@ -1,0 +1,110 @@
+setting hold: 200
+shot held-derive-pearson-en
+ from reservations
+
+Each paid reservation becomes what its item enters with the board: a Cambridge syllabus as the award with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.
+
+Close
+Preview again
+
+7 paid reservations
+0 new entries to make
+
+Everything paid is already entered: there is nothing new to make.
+Show only what is new or needs a choice
+Candidate	Reserved	What it enters	To do
+Adam Sherif	Mathematics (IAL) IAL-MATHS— P1
+A.S.
+	
+WMA11
+Pure Mathematics 1
+Unit
+Already entered
+	—
+Adam Sherif	Mathematics (IAL) IAL-MATHS— P2
+A.S.
+	
+WMA12
+Pure Mathematics 2
+Unit
+Already entered
+	—
+Adam Sherif	
+Cash-in
+Mathematics (IAL)
+A.S.
+	
+XMA01
+Mathematics (AS)
+Award
+Already entered
+	—
+Hana Ibrahim	Mathematics (IAL) IAL-MATHS— M1
+A.S.
+	
+WME01
+Mechanics 1
+Unit
+Already entered
+	—
+Hana Ibrahim	Mathematics (IAL) IAL-MATHS— P1
+A.S.
+	
+WMA11
+Pure Mathematics 1
+Unit
+Already entered
+	—
+Hana Ibrahim	
+Cash-in
+Mathematics (IAL)
+A.S.
+Cash-in awaiting payment
+	Nothing	Cash-in awaiting payment: Cash-in (claim the award) — Pearson Edexcel January 2027 (EGP 700.00) — entered once it is paid
+Laila Mostafa	Mathematics (IAL) IAL-MATHS— P1
+A.S.
+	
+WMA11
+Pure Mathematics 1
+Unit
+Already entered
+	—
+Ziad Fouad	
+Cash-in
+Cash-in (claim the award) — Pearson Edexcel January 2027
+Choose the award
+	Nothing	Cash-in (claim the award) — Pearson Edexcel January 2027: its line does not say which award it cashes in — add the award entry by hand with this cash-in
+Ziad Fouad	Mathematics (IAL) IAL-MATHS— M1
+A.S.
+	
+WME01
+Mechanics 1
+Unit
+Alrea
+shot held-entrylist-pearson-en
+shot held-derive-pearson-ar
+shot held-entrylist-pearson-ar
+setting enter_as_declared: 200
+shot entries-cashin-added-en
+ADDED: 
+
+For what the reservations cannot make: a paid cash-in whose line does not say the award, a cash-in with no unit sat this series, or the unit of a choice (“one of M1, S1, D1”).
+
+Add an entry
+
+Entry added as a draft.
+Dismiss
+
+XMA01 Mathematics (AS) · Ziad Fouad
+Entries
+
+9 entries · 7 ready for the board · 2 not sent yet
+
+Show withdrawn entries
+0 ticked
+Mark as sent
+Withdraw
+	Entry	Option and tier	
+shot entries-cashin-added-ar
+shot entries-derive-cambridge-cf-en
+shot entries-derive-cambridge-cf-ar

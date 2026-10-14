@@ -1,0 +1,85 @@
+# C47: a declared sitting's carry forward written as confirmed before it is verified
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a carry forward declared and not verified is derived as suggested']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 3 failed) 27336ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed 21ms
+     → expected [ 'BY', 'confirmed', 'june', …(2) ] to deeply equal [ 'BY', 'suggested', 'june', …(2) ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward 15ms
+     → expected 'confirmed' to be 'suggested' // Object.is equality
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 31ms
+     → expected [ Array(4) ] to deeply equal [ Array(4) ]
+ Test Files  1 failed (1)
+      Tests  3 failed | 53 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line c39936ed-2f3c-40ae-8d76-a8b10eda2ae8: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed
+AssertionError: expected [ 'BY', 'confirmed', 'june', …(2) ] to deeply equal [ 'BY', 'suggested', 'june', …(2) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "BY",[22m
+[32m-   "suggested",[39m
+[31m+   "confirmed",[39m
+[2m    "june",[22m
+[2m    2026,[22m
+[2m    "EG123",[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:711:101
+    709|       await derive(nov(), af.ca!.studentId);
+    710|       const e = await only('ca');
+    711|       expect([e.option_code, e.carry_forward, e.cf_from_month, e.cf_fr…
+       |                                                                                                     ^
+    712|       const row = await rowOf(e.id);
+    713|       expect(row.problems).toContain('carry_forward_to_confirm');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward
+AssertionError: expected 'confirmed' to be 'suggested' // Object.is equality
+
+Expected: [32m"[7msuggest[27med"[39m
+Received: [31m"[7mconfirm[27med"[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:732:31
+    730|       await derive(nov(), af.cc!.studentId);
+    731|       const e = await only('cc');
+    732|       expect(e.carry_forward).toBe('suggested');
+       |                               ^
+    733|       await verify(al.cc!, { outcome: 'verified', reason: 'our own Jun…
+    734|       const row = await rowOf(e.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged
+AssertionError: expected [ Array(4) ] to deeply equal [ Array(4) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "BY",[22m
+[32m-   "suggested",[39m
+[31m+   "confirmed",[39m
+[2m    "BY",[22m
+[32m-   "suggested",[39m
+[31m+   "confirmed",[39m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:754:94
+    752|       const draft = await only('ce');
+    753|       const sent = await only('cs');
+    754|       expect([draft.option_code, draft.carry_forward, sent.option_code…
+       |                                                                                              ^
+    755|       await send(sent.id);
+    756|       for (const k of ['ce', 'cs']) expect(await verify(al[k]!, { outc…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

@@ -1,0 +1,116 @@
+# C62: a change by hand not recorded as staff-set
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a coordinator's untick on a draft stays", 'typed by hand on a draft stays']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 4 failed) 27298ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > what staff set on an entry withdrawn with its line is carried to the entry made again after a second payment (the review of 54c225f, item 3) 409ms
+     → expected { …(3) } to match object { option_code: 'B2', …(1) }
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it 346ms
+     → expected [] to deeply equal [ 'retake' ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it 399ms
+     → expected { series: { …(4) }, …(7) } to match object { created: +0, updated: +0 }
+   × F4 on the reservations rework > after a move (the review of 54c225f, items 1 and 3) > what staff set on a draft withdrawn by the move is carried to the entry made in the new series (item 3) 339ms
+     → expected { option_code: null, staff_set: [] } to deeply equal { option_code: 'A1', …(1) }
+ Test Files  1 failed (1)
+      Tests  4 failed | 52 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 4f12d082-39e8-446b-b71d-db56ca09c8a2: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > what staff set on an entry withdrawn with its line is carried to the entry made again after a second payment (the review of 54c225f, item 3)
+AssertionError: expected { …(3) } to match object { option_code: 'B2', …(1) }
+(1 matching property omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "option_code": "B2",[39m
+[32m-   "staff_set": [[39m
+[32m-     "option",[39m
+[32m-   ],[39m
+[31m+   "option_code": null,[39m
+[31m+   "staff_set": [],[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:564:20
+    562|       const made = await one<{ id: string; option_code: string | null;…
+    563|         `select id, option_code, staff_set from exam_entry where regis…
+    564|       expect(made).toMatchObject({ option_code: 'B2', staff_set: ['opt…
+       |                    ^
+    565|       expect(made.id).not.toBe(e!.id);
+    566|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it
+AssertionError: expected [] to deeply equal [ 'retake' ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   "retake",[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:788:110
+    786|       expect(e!.is_retake).toBe(true);
+    787|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+    788|       expect((await one<{ s: string[] }>(`select staff_set as s from e…
+       |                                                                                                              ^
+    789|       expect(await derive(nov(), hu.studentId)).toMatchObject({ create…
+    790|       expect((await entriesOf(nov(), hu.studentId))[0]).toMatchObject(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it
+AssertionError: expected { series: { …(4) }, …(7) } to match object { created: +0, updated: +0 }
+(14 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "created": 0,[22m
+[32m-   "updated": 0,[39m
+[31m+   "updated": 1,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:803:49
+    801|       // The statement had it wrong: the coordinator types the number …
+    802|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+    803|       expect(await derive(nov(), ht.studentId)).toMatchObject({ create…
+       |                                                 ^
+    804|       expect((await entriesOf(nov(), ht.studentId))[0]).toMatchObject(…
+    805|       expect((await rowOf(e!.id)).problems).not.toContain('carry_forwa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > after a move (the review of 54c225f, items 1 and 3) > what staff set on a draft withdrawn by the move is carried to the entry made in the new series (item 3)
+AssertionError: expected { option_code: null, staff_set: [] } to deeply equal { option_code: 'A1', …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "option_code": "A1",[39m
+[32m-   "staff_set": [[39m
+[32m-     "option",[39m
+[32m-   ],[39m
+[31m+   "option_code": null,[39m
+[31m+   "staff_set": [],[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:1180:115
+    1178|       expect(await derive(to, f.studentId)).toMatchObject({ created: 1…
+    1179|       expect(await one<{ option_code: string | null; staff_set: string…
+    1180|         `select option_code, staff_set from exam_entry where registrat…
+       |                                                                                                                   ^
+    1181|     });
+    1182|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

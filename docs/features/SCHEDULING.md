@@ -10,9 +10,9 @@ logs, control logs, screenshots, scratch scripts) is `.audit/scheduling-evidence
 **Resumed 8 Oct 2026 on the reservations rework's model** (RESERVATIONS_REWORK.md §9's F1 list and
 §10's F1 contract) and the second review round's flags: §17 says what changed, how each item was
 checked against main's code, the lock order, and the proof. Merged with main four times on the
-way (§14; a fifth, of trail rows only, after the review); F1's migrations are now `0056`/`0057`,
-after main's `0055`. The Opus 5.5 review of
-88898f6 (eight items, two material) is §17.5.
+way (§14; a fifth, of trail rows only, after the review), and a sixth — the final merge, after F4
+and F7 landed — makes F1's migrations `0059`/`0060`, after main's `0058_import`. The Opus 5.5
+review of 88898f6 (eight items, two material) is §17.5; its confirmation: "merge after F7".
 
 F1 gives the school what its sheet cannot hold: **who is taught together** (teaching groups
 drawn from the course enrolment and the sections, with dated membership), **a week that is
@@ -25,14 +25,14 @@ section; print, CSV, a phone calendar), and **cover** for an absent teacher.
 
 ## 1. Data model
 
-All in `packages/db/src/schema.ts`; migrations `0056_scheduling.sql` (generated after main's
-`0055_rework_messages_overdue_text`: every F1 table and column, the review round's and the
-rework's included) and `0057_scheduling_leavings.sql` (custom, idempotent: the leavings of
+All in `packages/db/src/schema.ts`; migrations `0059_scheduling.sql` (generated after main's
+`0058_import`: every F1 table and column, the review round's and the
+rework's included) and `0060_scheduling_leavings.sql` (custom, idempotent: the leavings of
 students away when it runs, kept in `student_leaving`). F1 never shipped, so its tables start
 empty and need no other backfill (the branch's earlier `0043` rebuilt group teachers for
 databases that had F1's first migration; none is kept). The branch's migrations were
-regenerated at each merge with main (0040 → 0041–0043 → 0050/0051 → 0055/0056 → 0056/0057, §14);
-F4 (two migrations) and F7 (one) land first, so F1's merge renumbers them once more.
+regenerated at each merge with main (0040 → 0041–0043 → 0050/0051 → 0055/0056 → 0056/0057 →
+0059/0060, §14), the last after F4's two and F7's one.
 
 | Table | What it holds | Rules |
 |---|---|---|
@@ -600,6 +600,31 @@ with `git merge-tree` (nothing in lead-env touched), the rework's side winning o
    under F6) into `eb823b2` → `bc471b3`: no conflict, no code; CI green on it (run 37818174482).
 5. After the review's fixes (`759c066`): `5b911d2` (the lead's trail rows) → `681e98c`: no conflict
    (`.audit/school-forms.tsv` only), no code; CI green on it (run 37834144754).
+6. **The final merge**: `384c5a2` (F4, F7 and A's follow-up on main; CI 37869862970) into
+   `011900e` (the handover-audit commit rides with it). Sixteen files in conflict, each resolved
+   by hand, main's side first where both add to a list:
+   - `app.ts`: the imports, the route doc and the chain — F4's exam routes and F7's import, then
+     F1's (the chain's closing `;` moved to the last route); `role-grants.ts`: the coordinator's
+     F4/F7 prefixes then F1's, the teacher's F4 rows then F1's; `authz-policy.tsv`: F7's block then
+     F1's; `05-object-access`: F1's import list with F4's `examWorld`.
+   - `academic.services.ts`: F7 moved `addSectionMembers` into `addSectionMembersInTx(tx, …)` (the
+     import places students in the family's transaction); F1's published-timetable guard (with its
+     confirmation code and `clashesAccepted`) and the school clock (`todayAtSchool`) moved into it.
+     The import's section placing is therefore checked against published timetables too (none exist
+     on day one).
+   - `enrolment.services.ts`: the contract note (F1's per-unit wording with F4's `teacherOf(…,
+     unitId?)`); F1's `offerDeliveries` beside F4's new `pickEnrolment`.
+   - `schema.ts`: both appended blocks after the same line; rebuilt as main's file with F1's block
+     after F4's and F7's (F1 changes nothing else in it).
+   - `audit.validations.ts` (entity types, labels, actions, labels: F4's and F7's then F1's),
+     `validations/index.ts` (F4's and F7's exports then F1's), `nav-shell.tsx` (F4's exam items, then
+     F1's timetable section), `i18n.tsx` (F4's dictionary before F1's, so a phrase F4 translates
+     keeps F4's Arabic), `RESERVATIONS.md` (F1's §2.12 bullet kept in its list, then F4's and F7's
+     additions), `FEATURES_PLAN.md` (main's status rows).
+   - The drizzle journal and the 0056/0057 snapshots: main's; F1's migrations regenerated as
+     `0059_scheduling` and `0060_scheduling_leavings` (proof: `resume/final-merge-migrations.txt`).
+   - Found by the type check, not by git: F4 and F1 both exported `PublishTimetable` from
+     `@repo/validations` (F4's for the exam timetable); F1's is now `PublishTimetableVersion`.
 
 ## 15. Progress log
 

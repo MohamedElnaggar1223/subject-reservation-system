@@ -1,0 +1,17 @@
+tip 05030fd7b5c37a7b9ecbd698fdf086290788fe4e
+main 2e96b3497c2ac0202d8140e0bb933b1211837b52
+tree 65ee42b7e78214013000b6e0420b03964f8c6006
+FEATURES_PLAN.md
+apps/api/src/services/settings.services.ts
+apps/api/test/08f-foundation-structure.test.ts
+apps/api/test/08t-rework-races.test.ts
+apps/web/app/(app)/settings/settings.client.tsx
+apps/web/lib/i18n.tsx
+packages/db/drizzle/meta/0050_snapshot.json
+packages/db/drizzle/meta/0051_snapshot.json
+packages/db/drizzle/meta/0052_snapshot.json
+packages/db/drizzle/meta/0053_snapshot.json
+packages/db/drizzle/meta/_journal.json
+packages/validations/src/audit/audit.validations.ts
+packages/validations/src/notification/notification.validations.ts
+packages/validations/src/settings/settings.ts

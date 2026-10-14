@@ -31,6 +31,7 @@ import {
   type MoveRegistrationsToSeriesType, type ListBoardSeriesQueryType,
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
+import { entriesFollowMoveInTx } from './exam-entry.services';
 import { schoolDate, entryDeadlineMessage } from './window.services';
 import { lineDeadlineSql, effectiveDeadlinesOf, deadlinePassedSentence, redateLines, redateSeriesLines } from './deadline.services';
 import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged } from './line-moves.services';
@@ -485,6 +486,10 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
         throw new SeriesError(`${passed.subjectName}'s deadline in its series has passed (${schoolDate(current.get(passed.id)!.at!)}): its entry stands`, 409);
       }
       const moving = regs.filter((r) => r.boardSeriesId !== target.id);
+      // F4's entries of the lines that move (after the lines, §2.1): a sent one refuses the move, the
+      // drafts are withdrawn with it and made again in the target series (the review of 426d565, item 2).
+      const sent = await entriesFollowMoveInTx(tx, moving.map((r) => r.id), 'the line moved to another series', actorId, ctx);
+      if (sent) throw new SeriesError(sent, 409);
       for (const r of moving) {
         // The same entry, in the target series: a sibling item of the line's offer (held above).
         const toItem = siblings.get(r.offerItemId);

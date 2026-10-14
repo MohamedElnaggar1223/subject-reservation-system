@@ -205,7 +205,7 @@ line under a live plan it answers the plan's last date first.
 2. ~~`pricing.*` registered as `pending`~~ — superseded by 23: live since A's priceLine reads them.
 3. **`refundFor`'s fallbacks**: no snapshot → the session's policy; a converted line → V3's
    windows on the whole price; the anchor order above.
-4. **"Sent"** = confirmed (or parked for its paper) and F4's `entrySentAt` or the line's
+4. **"Sent"** = confirmed (or parked for its paper) and F4's mark (`sentEntriesOf`: the earliest entry of the line marked sent) or the line's
    effective deadline passed; a line never confirmed is never sent (the lead's point 4).
 5. **Revocation**: `/revoke` keeps V3's bodiless shape; `/revocation { reason }` is the
    screen's (the typed client cannot send `/revoke`'s optional body); `/release` is a plan's
@@ -517,9 +517,11 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   when B writes it. The line inputs, consent, verification and the Statement page are B's.
 - **For F1**: `firstLessonFor(line)` in `refund.services.ts` (returns null) — the refund
   anchor once lessons exist.
-- **For F4**: `entrySentAt(lineId)` (null) — when the entry is sent, the board fee is kept;
-  `withdrawEntry(line, reason)` in `desk-drop.services.ts` (null) — the desk-drop's
-  withdrawal from the board.
+- **For F4**: `sentEntriesOf(lineId)` (F4 wired it; the stand-in `entrySentAt` is gone) — once an entry of the line is marked sent, the board fee is kept;
+  `withdrawEntry(line, reason)` in `desk-drop.services.ts` — the desk-drop's withdrawal from the
+  board (F4 wired it to `withdrawEntriesOfLineInTx`; after the review of 093dbd1 the family's drop
+  and swap, a request's approval, a payment's reversal and B's two system drops call it too, and
+  every drop prices its refund after the line's lock: EXAM_ENTRIES.md §7).
 
 ---
 
@@ -533,6 +535,24 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   deadlines, the 08q cases, the migrations 0047–0049 proved after B's.
 - ~~The Statement's charges~~ — done (decision 35).
 - `exception.value`'s drop; reminders per instalment (step D, §3.8).
+- **Provided by F4 on resuming (8 Oct 2026, `feature/exam-entries`; docs/features/EXAM_ENTRIES.md
+  §7)**: `chargesOfKind(kind, seriesId, executor?)` (`charge.services.ts`) — a series' accepted
+  charges of a kind (awaiting payment or paid) with their deadline; F4 enters a **paid** cash-in or
+  late cash-in as its award (`exam_entry.charge_id`; the lead, 8 Oct). The seam `sentEntriesOf(line)`
+  (`refund.services.ts`; the review of 093dbd1 removed the stand-in `entrySentAt`) lists the entries
+  made from the line that were marked sent, earliest first — the earliest one's time is when the
+  board fee became sent (withdrawn ones included: a partly sent line is a sent line, the lead, 8 Oct); `refundFor`'s quote and `previewRefund` carry `sentEntries` and a
+  `boardNote` naming the entries sent and when (or why the board fee comes back). The seam
+  `withdrawEntry(tx, line, reason, staff)` (`desk-drop.services.ts`) withdraws the line's live
+  entries in the desk-drop's own transaction (after the receipt and the line), each with its
+  `EXAM_ENTRY_WITHDRAWN` row; the outcome lists `entriesWithdrawn` and the notice the board note.
+  After the review of 54c225f (the lead's decision): `sentEntriesOf` counts only the entries of the
+  series the line is in now — "withdrawn included" narrowed to the line's own series, because a move
+  is the school's act and the old series' entry was withdrawn for it; a line moved and dropped
+  before anything is sent in its new series gets its board fee back.
+  After the review of 093dbd1: `deskDrop` prices with `refundFor(tx, …)` after the receipt and the
+  line are locked; `reversePayment` withdraws each reverted line's entries in its transaction (its answer
+  unchanged; a line paid again is derived again).
 
 ---
 

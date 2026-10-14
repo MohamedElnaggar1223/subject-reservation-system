@@ -63,6 +63,16 @@ export * from './catalogue/level-code'
 export * from './catalogue/board-series.validations'
 export * from './enrolment/enrolment.validations'
 /**
+ * F4 — exam-entry management: candidates, entries, entry lists, the exam
+ * timetable and exam days, results and certificates.
+ */
+export * from './exams/exam-entry.validations'
+/**
+ * F7 — the day-one import.
+ */
+export * from './import/import.validations'
+export * from './import/import-types'
+/**
  * F1 — scheduling: the timetable's rules and generator (pure, shared by the
  * API and the grid editor), and the inputs of its endpoints.
  */

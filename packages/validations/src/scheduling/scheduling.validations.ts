@@ -223,13 +223,13 @@ export const GenerateTimetable = z.object({
 });
 export type GenerateTimetableType = z.infer<typeof GenerateTimetable>;
 
-export const PublishTimetable = z.object({
+export const PublishTimetableVersion = z.object({
   effectiveFrom: DateOnlySchema,
   note: z.string().max(500).nullable().optional(),
   /** Publish although some lessons are not on the grid (they are not taught until a later version places them). */
   acceptUnplaced: z.boolean().optional(),
 });
-export type PublishTimetableType = z.infer<typeof PublishTimetable>;
+export type PublishTimetableVersionType = z.infer<typeof PublishTimetableVersion>;
 
 export const TIMETABLE_CSV_VIEWS = ['all', 'section', 'teacher', 'room', 'student'] as const;
 export const ExportCsvQuery = z.object({ view: z.enum(TIMETABLE_CSV_VIEWS).optional(), id: Id.optional() });
