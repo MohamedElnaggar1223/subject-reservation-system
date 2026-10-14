@@ -129,9 +129,9 @@ and reminders) launched 8 Oct 06:40Z** on `feature/rework-messages`; then step 4
 check done (8 Oct 08:04Z, main 9edefbb):** every flow driven from a bare template with no errors; the
 counts measured against RESERVATIONS_REWORK.md §11 (`.audit/school-forms-evidence/step4/`); seven
 observations queued under F6. **F4 and F7 resumed (08:20Z)** on the new model; F1 next, F2 after it,
-F8 last. **F4 landed (9 Oct 2026, 00:00Z, 2d95638)** with A's StudentsKeptChanging 409; F7 then F1 follow. **Step 3 complete (8 Oct 2026, 13:03Z):** D's branch landed at c2d7a78 after three Opus 5.5
+F8 last. **F4 landed (9 Oct 2026, 00:00Z, 2d95638)** with A's StudentsKeptChanging 409; **F7 landed (01:45Z, 384c5a2)**; F1's final merge next, then D's switch to F1's groups, B's desk display of the follow-up outcome, and F2. **Step 3 complete (8 Oct 2026, 13:03Z):** D's branch landed at c2d7a78 after three Opus 5.5
 passes ("confirmed: merge"); migrations 0050–0054. Landing order now F4 → F7 → F1 → F2 → F8, each
-renumbering its migrations after main's journal at its merge.
+renumbering its migrations after main's journal at its merge. **The weekly limit stopped F1 mid-merge (11 Oct 2026, 11:58Z);** the owner paused the agents. **F6a launched (11 Oct 2026):** after the owner's critique of the Session screen ("they would feel so lost") and the lead's analysis against every form, the session in the school's words (§1 F6a) goes first, before F1's final merge resumes; then D's switch, B's desk display, F2, F6, F8. **F6a built (11 Oct 2026, feature/session-words b9f3090, CI green)**; its Opus 5.5 review was stopped by the weekly limit and relaunched 14 Oct 20:20Z. **The owner's direction (14 Oct 2026):** only the reservation system and its complete cycle for now — everything outside it hidden, never removed, by one Opus 5.5 agent end to end (§1 F6b); and the standard for every screen quoted there: the forms' author is the admin, the forms' fillers are the families, the UI a flow where the next step is already in front of the user. Order: F6a's review and merge → F6b → F1's final merge → D's switch, B's desk display → F2 → F6 → F8. **F6a merged (14 Oct 2026, fd436de)** after its second Opus 5.5 pass ("confirmed: merge") and the lead's two drives. **F6b merged (15 Oct 2026, 5e550a1)** after the lead's read and drive of every role: the UI shows the reservation cycle only, behind one switch. Next: F1's final merge resumes on the moved main, then D's switch, B's desk display, F2, F6, F8.
 
 ## 1. The features and their full scope
 
@@ -477,7 +477,168 @@ forms with two Save buttons; "Dates not set" on a session is not a link to the B
 "Why it changes" while a Notes field sits below; the family's Reserve page should preselect the
 only child and the only open session; the desk's parent-consent tick shows for lines the family
 reserved itself; the Arabic hydration warning on every page (pre-existing; F1 traced it to `i18n.tsx`'s language initialiser, there since 2c3d27f of 30 May; it shows on /sign-in, /academic/years, /academic/rooms and /today too). Also
-from C: three hand-cast API responses in `desk.client.tsx` that predate the rework.
+from C: three hand-cast API responses in `desk.client.tsx` that predate the rework. **From F6a's review (14 Oct 2026):** F7's import review screen (`review-rows.tsx` about lines 407–410) still offers "First entry" on a one-paper line, which the plan now always makes a retake (the button selects while the line stays a retake) — hide it there; F4's Arabic refusal sentence reads "للمرشح the candidate" when the candidate's name is missing; Next's dev overlay shows "1 Issue" on the Arabic drawer pages (the same hydration warning). The Session screen's capabilities that F6a's form does not offer (adding or unticking an item, a labelled sitting per item, the exclusive group, fee keys, "required in a first entry", the carry-forward flag) are API-only until the owner says which the coordinator needs back (SESSION_WORDS §12, question 4).
+
+### F6a — The session in the school's words (the links sheet and the forms, before the UI audit)
+
+**Why (11 Oct 2026).** The owner, on the running system after the pause: "creating the sessions is
+still a bit confusing… how is that similar to what the current forms they use… they would feel so
+lost"; they asked for an analysis against every form before any code. The lead's analysis (the
+session log, 11 Oct 12:00Z; trail row 12:27:56Z): the model holds everything the 25 forms say —
+SCHOOL_FORMS.md §2.2–§2.5 map onto offers, items, teachers with a mode, availability and the prior
+series — but the Session screen speaks the model's language: availability, item, whole subject,
+exclusive group, series, "needs an earlier sitting carried forward", a drawer with two forms and two
+Save buttons, the deadlines on another page under another year's filter. Her forms say "All Papers",
+"One paper ONLY", "2nd entry only", "Carry forward on June", "ONLINE ONLY", "Retake (Self Study
+ONLY)". The counts of RESERVATIONS_REWORK.md §11 are met; the words and the places are not hers. This
+item fixes that before she sees the admin side again. **No model change**: presentation, one
+form-shaped endpoint, one preview read. The owner's "lets do it" (11 Oct 2026).
+
+**The rule.** Every word on the Session screen and the family's Reserve page is a word of the forms
+or of the links sheet (SCHOOL_FORMS.md §2.5, left column), in English and Arabic. The model's words
+— availability, item, offer, route, exclusive group, series id, fee key, "enters", "whole" — never
+appear on a staff or family screen; they stay in the API and the documents. The implementer's
+document carries the mapping table (each screen phrase → the model's field and value) and the
+reviewer checks every string against it.
+
+**Scope.**
+1. **The Subjects tab is the links sheet.** Only the subjects the school added or copied, grouped
+   O.L. and A.S./A.L. as the sheet is, one row per subject reading as its form would: subject ·
+   board · teachers (each with "ONLINE ONLY" or "External" where set) · the entry options as the
+   form phrases them ("All papers: first entry 100% · retake in school 100% · retake self study
+   50%"; "Paper 4 only (41/42): in school or self study"; "P1 (T1, online) · P2 (T1, online) · P3
+   (T1) · M1 (T2 / T1) · S1 (self study only)"; "A.S. · A.2. (carry forward) · A.L.") · course fee
+   ("EGP 12,000 · self study 50%: 6,000", the share from `pricing.selfStudyCoursePercent`) · board
+   fee ("not published yet" where provisional). A subject a copy brought across with no teacher
+   reads "Who teaches it?", not "Closed"; "Retake (Self Study ONLY)" and "Not offered this cycle"
+   where the school set them. The empty state of a session started empty offers "Copy from <last
+   session of this kind>" first and "Add subjects" second; "Add subject" lists the catalogue's
+   subjects not yet on the sheet and opens the same form as point 2.
+2. **One form per subject, in the form's order, one Save.** The drawer's two forms ("This cycle"
+   and the item cards) become the subject's form: (a) **Teachers this cycle** — the pool's names
+   with a tick each, "online only" and "external team" per teacher, "Show every teacher" kept;
+   (b) **Offered as** — "First entry and retakes" (open) · "Retakes only" (retake_only) · "Retake
+   (Self Study ONLY)" (self_study_only) · "Not offered this cycle" (closed); (c) **Course fee**,
+   with "Self study 50% School fees: EGP …" computed beside it; (d) **One paper only** — for an
+   IGCSE subject, each component the catalogue gives it (`withOnePaper`: Paper 4 (41/42), Theory
+   paper, 1H / 2H, Paper 1 / Paper 2) with "Not offered" · "Retake in school or self study" ·
+   "Retake self study only" and its course fee; when the catalogue has no components the form says
+   "Set this subject's papers on the Catalogue" with the link; (e) **Components** — for a Cambridge
+   A level: A.S. · A.2. (carry forward on an earlier June or November) · A.L., each offered or not,
+   each with its fee; for a Pearson IAL subject: one line per unit with the board's code (WBI11/01,
+   P1 …): taught by (teachers, online) · self study only · not this cycle, each with its fee and its
+   sitting (the session's months for the board); for Arabic A level (Edexcel): the two
+   qualifications, each with its teacher; (f) **Grade 10 core** (June only); (g) **Course starts**
+   (if not the session's); (h) **Notes**. "Replace teacher" and "Remove subject" stay as they are.
+   Underneath, one request `PUT /v1/sessions/:id/offers/:offerId/form` (admin, coordinator) applies
+   the whole form in one transaction through the existing services' logic (updateOffer, createItem,
+   updateItem, deleteItem) in RESERVATIONS.md §2.1's lock order, refusing what they refuse (an item
+   with live lines is not closed silently; a self-study-only subject at a course fee of 0 says why;
+   an open subject names who teaches it) and reporting every refusal in the form's words; applying
+   the same form twice changes nothing and writes no audit row. The old per-item endpoints stay
+   (F7 and the tests use them).
+3. **Dates where she expects them.** On the session's header, each series' line ("Cambridge June
+   2027: entries by 20 Feb, retakes by …", or "Dates not set") is a button that opens the dates
+   dialog in place — the Board Series page's form with its required reason, labelled "Reason",
+   writing through the existing endpoint — so the board's deadlines are set from the session.
+4. **Preview as the family's form.** One button per subject row, "Preview the family's form",
+   renders what a family sees for that subject on the Reserve page, in the form's order: the
+   subject with its teacher choice, the entry choice ("First entry, in school" · "Retake, in school"
+   · "Retake, self-study"…), the sitting it follows, the price; the refund policy sentence; the
+   declaration — read-only, in the viewer's language. It reuses the Reserve component's rows
+   (export them from `apps/web/components/reservations/reserve.tsx`; the family's page must not
+   change in behaviour). The data comes from a preview read of the family offers endpoint for staff
+   without a student: `GET /v1/registrations/offers?sessionId=&preview=true` (admin, coordinator; no
+   student: prices as a first entry in school and a retake self-study at the share, no eligibility,
+   no sittings, no held lines), with its authz row and a test that it never returns a student's
+   data. **This is the acceptance test:** the owner holds the preview next to the Google Form of
+   the same subject.
+5. **The family's Reserve page preselects the only child and the only open session** (queued
+   under F6; the same area). Nothing else on the family's page changes.
+6. **Arabic** for every new string in `apps/web/lib/i18n-sessions.ts` (and the reservations
+   dictionary where the preview needs it); right-to-left checked on every screen changed.
+
+**Not in scope.** The catalogue's contents (the components and units the one-paper and per-unit
+forms need are set on the Catalogue page; the form says where); the Fees tab's grid; the desk; the
+model; the UI audit's other findings.
+
+**Tests.** `08u-session-form.test.ts`: the form endpoint maps each of the forms' shapes to the right
+offer and items — an O.L. subject with teachers and a one-paper retake opened in school and self
+study with its fee; an IAL subject per unit with a teacher per unit and a unit self study only; a
+Cambridge A level's three routes; "Retake (Self Study ONLY)"; "Not offered this cycle" refused while
+an item has live lines, with the refusal's sentence; an open subject with no teacher refused —
+applying the same form twice changes nothing; the audit rows inside the transaction; the preview
+read for staff and its refusal for a parent; the authz rows for both endpoints; `check-types` on
+both apps. **The measurement,** in the forms' terms, against step 4's numbers
+(`.audit/school-forms-evidence/step4/measure-counts.json`): an O.L. subject set up open with a
+teacher stays at 3 inputs and 3 clicks or fewer; a one-paper retake opened costs at most 3 more
+inputs and no extra screen; the deadlines of a series cost no page change.
+
+**Review.** The reviewer (Opus 5.5) checks every screen string against SCHOOL_FORMS.md §2.5 and the
+mapping table, drives the preview of each of the six form shapes in English and Arabic, and reads
+the endpoint's transaction and lock order against RESERVATIONS.md §2.1.
+
+### F6b — The reservation cycle only: hide what is outside it (one agent, end to end)
+
+**Why (14 Oct 2026).** The owner, after F6a was built: "we are currently purely focusing and
+prioritizing the reservation system only and its complete cycle and that's what we should focus on
+and make our UI focus on. Meaning, if any items in the sidebar, any items that do not belong in this
+lifecycle should just be hidden for now and we will work on them later after we finalize and perfect
+the reservation system." One Opus 5.5 agent does this end to end; the owner is told when it is done.
+
+**The standard for every screen (the owner's words, 14 Oct 2026; it governs F6b, F6 and every screen
+of the cycle after them).** "The exact same person who created the forms is the one who will be the
+Admin, the parents/students who dealt with the form will be the people who use the system so our
+system should make the process much much more easy while staying being familiar and so easy to use,
+it should be like a flow, like every piece of the puzzle is falling together without any of them
+having to think about that much, like the UI and the flow should feel like 'That was exactly what I
+was going to do next and it's here in front of me', of course while maintaining a usable and good
+UI/UX without overwhelming the user, quite the opposite, it should be very simple, yet offer all the
+complexity needed, and connecting the 2 worlds through how flowy and smart the UI actually is."
+
+**The cycle** (what stays visible), as the school lives it: the admin sets up the cycle (the session:
+its sheet, the teachers it names, the subjects' papers on the Catalogue, the fees, the boards' dates;
+the settings behind them; the day-one import of the sheet) → families reserve (the app's Reserve
+page, or the desk on their behalf, with the onboarding of a new family) → they pay (the desk, the
+checkout, instalments, receipts, the wallet) → the school verifies declared sittings, lifts a rule
+for a family (exceptions), reminds and messages (payment lists, reminders), pushes a charge or the
+school fee → drops and refunds → money is known (the session's Money tab, the finance workbench,
+daily takings, the family's statement and payment detail) → the entries go to the board (the exam
+entries and entry lists derived from the lines, the series' deadlines). Everything else is outside
+it for now: the school's day (Today), sections, course enrolment, academic years, the calendar,
+bell schedules, rooms, teaching, candidates, forecasts, the exam timetable and days, invigilation,
+results, certificates, remarks and the remarks desk, results entry, reports, the audit log, the
+students' subject browse, and any dashboard that is not the cycle's next step.
+
+**Scope.**
+1. **Hide, never remove.** One list in one place (`apps/web/components/nav-shell.tsx` or a module it
+   reads) names what is outside the cycle, per role, behind one constant (`RESERVATION_CYCLE_ONLY`);
+   flipping it shows everything again. No page is deleted, no route removed, no API changed; every
+   hidden screen stays reachable by its URL. The agent writes the kept/hidden table per role
+   (admin, coordinator, finance admin, finance officer, teacher, gate, parent, student) in its
+   document with the reason for each line, and the sidebar's order follows the cycle's order.
+2. **The landing is the next step.** After sign-in and on the sidebar's first item, each role lands
+   on the cycle's current stage with the next action in front of them, from existing endpoints only:
+   the admin and the coordinator on the open (or next) session's sheet with what it still needs (a
+   subject with no teacher, a fee not published, a series' dates not set, sittings to verify) and
+   what families are doing (reserved, unpaid, overdue); finance on the desk with today's due and
+   collected; a parent on what is next for their children (reserve — the open session preselected —,
+   pay, a reminder due, the statement); a student on their reservations and requests. A role with
+   nothing in the cycle (teacher, gate) sees its notifications and profile and the sentence that
+   its screens come later. If a new summary endpoint is unavoidable it has its authz row and test;
+   prefer the endpoints that exist.
+3. **Links that lead outside the cycle** from a kept screen (a tab, a button, a "see also") are
+   hidden by the same constant; a link that is a step of the cycle stays. The Student 360, the desk
+   and the session keep every tab that belongs to the cycle.
+4. **Nothing else changes.** No wording, layout or behaviour change on the kept screens beyond
+   points 2 and 3; the F6 audit does the rest. Arabic for every new string; right-to-left checked.
+
+**Tests and proof.** `pnpm --filter web check-types` and `pnpm --filter @repo/api check-types`; the
+suite unchanged and green (no API change expected); a drive in headless Chrome of every role's
+sidebar and landing, in English and Arabic, before and after, with the screenshots in
+`.audit/reservation-focus-evidence/`; the kept/hidden table checked against the screenshots. F6b has
+no separate reviewer (the owner's instruction: one agent end to end); the lead reads the diff, runs
+the gates, drives every role and merges on a green CI run after F6a.
 
 ### F8 — The demo school and the walkthrough (last, after F6)
 
@@ -516,7 +677,7 @@ branch.
 |---|---|---|
 | F0a | the cohort (`user.cohortYear`); the grade as `gradeInAcademicYear(cohortYear, academicYearStart)` / `gradeToday(cohortYear)` and `academicYearStartOf(instant)`, `seriesAcademicYearStart(type, year)` (`@repo/validations`), and in SQL `gradeInYearSql` / `gradeTodaySql` / `gradeTodayExtras` (`@repo/db`, over the functions `school_grade`, `school_academic_year_start`, `school_series_academic_year_start`); `mayRegisterFor(studentId, sessionId)` and `expireIneligibleRegistrations(tx, scope, cause)` (eligibility.services); windows' `seriesYear`; academic years, terms, calendar entries and `getSchoolDay(date)`, bell schedules and periods, rooms, sections and memberships with `sectionOf(studentId, year?)`; roles `coordinator` / `teacher` / `gate` with `lib/role-grants.ts`; `teacher.userId` and `getTeachingFor(userId)`; the settings store (`SETTINGS` registry, `getSetting(key)`, `updateSetting`, `onSettingChanged`); uploads (`UPLOAD_PURPOSES`, `POST /v1/files/upload`, `GET /v1/files/:id/content`, `uploadForPurpose`, `getReadableFile`). Details: docs/features/FOUNDATION.md | all |
 | F0b | the catalogue: `exam_board`, `qualification`, `exam_unit` (own level), `qualification_unit` (the unit-to-award map), option codes, `subject.qualificationId` / `subject_unit` (what a registrable row enters), `getCatalogue()`, `findRegistrable(term)`, `deriveLevelCode(input, reading)` with the setting `catalogue.levelCodeReading`; board series (`board_series` with the entry deadline and the board's dates, `listBoardSeries`, `seriesDeadline`, `windowDeadlines`), the series a window feeds (`session_board_series`, `session_subject_series`) and `registration.boardSeriesId`; F4's `entryItemsFor(registrationIds)` / `entryItemsForWindow(sessionId)` and `teacherOf(studentId, subjectId, academicYearStart)`; F1's `getTeachingDemand(academicYearId)`; F7's `upsertEnrolments(tx, academicYearId, rows, actorId, { source: 'import', commit })` / `batchEnrol(…, 'import')`; course enrolment (`course_enrolment`, `checkEnrolments`). Details: docs/features/CATALOGUE.md §7 | F1, F4, F5, F7 |
-| F1 | teaching groups and dated membership (`groupMembersBetween(groupIds, from, to)`: section groups follow the section, the later membership wins a shared day, leaving wins); published timetable versions; `getScheduleFor({ studentId } \| { teacherId }, date)` → `DaySchedule` (lessons with period, times, group, subject, teacher with cover applied, room, status; why a day has none; lessons a short or exam-only day drops) and `getScheduleRange(target, from, to)`; `lessonAccess(viewer, lessonId, date)` and `classListFor(viewer, lessonId, date)` (who may act on a lesson that date — F3's register: its own teacher is the group's teacher **on that date**, a group's teacher being dated (`teachersOn`, `groupTeachersBetween`), or the cover teacher on the covered date — and its students, each with their section from `sectionOn(studentId, date)`, the one reading of which section on a date); the school's today from `todayAtSchool()`; F0a's calendar for a range, `getSchoolDays(from, to)`. On the rework (8 Oct): groups and members per enrolment key (a unit, else the subject) with `delivery` (online: no room; a provider's group has no lessons); `followEnrolments` behind `upsertEnrolments(..., { follow })` — a line's teacher, its change or its replacement moves the group, and a student it cannot place waits for the coordinator (`groupsWaiting`); `studentsOfGroup(groupId, date)` with `listGroups(academicYearId)` for step D's teaching-group audience; a change after publishing goes ahead only with the confirmation code of the clashes shown (`guardPublishedTimetable`). Details: docs/features/SCHEDULING.md §8 | F2, F3, D |
+| F1 | teaching groups and dated membership (`groupMembersBetween(groupIds, from, to)`: section groups follow the section, the later membership wins a shared day, leaving wins); published timetable versions; `getScheduleFor({ studentId } \| { teacherId }, date)` → `DaySchedule` (lessons with period, times, group, subject, teacher with cover applied, room, status; why a day has none; lessons a short or exam-only day drops) and `getScheduleRange(target, from, to)`; `lessonAccess(viewer, lessonId, date)` and `classListFor(viewer, lessonId, date)` (who may act on a lesson that date — F3's register: its own teacher is the group's teacher **on that date**, a group's teacher being dated (`teachersOn`, `groupTeachersBetween`), or the cover teacher on the covered date — and its students, each with their section from `sectionOn(studentId, date)`, the one reading of which section on a date); the school's today from `todayAtSchool()`; F0a's calendar for a range, `getSchoolDays(from, to)`. On the rework (8 Oct): groups and members per enrolment key (a unit, else the subject) with `delivery` (online: no room; a provider's group has no lessons); `followEnrolments` behind `upsertEnrolments(..., { follow })` — a line's teacher, its change or its replacement moves the group, and a student it cannot place waits for the coordinator (`groupsWaiting`); `studentsOfGroup(groupId, date)` with `listGroups(academicYearId)` for step D's teaching-group audience (D's list reads the course enrolments until F1 is on main and switches to these after: what to read and how, SCHEDULING.md §8); a change after publishing goes ahead only with the confirmation code of the clashes shown (`guardPublishedTimetable`). Details: docs/features/SCHEDULING.md §8 | F2, F3, D |
 | F4 | candidates, entries, results per unit and award, `getSittings(studentId)`, `getExamsFor(studentId, date)` | F2, F3, F5 |
 | F2 | leave requests and states; `getLeaveCoverage(studentId, date)` | F3 |
 | F3 | attendance; `getAttendanceSummary(studentId, range)` | Student 360, F6 |
@@ -652,6 +813,8 @@ API and web ports):
 | F3 Attendance | `feature/attendance` | `attendance` | 3031 / 3030 |
 | F7 Day-one import | `feature/import` | `import` | 3091 / 3090 |
 | F6 UI audit | `feature/ui-audit` | `ui` | 3071 / 3070 |
+| F6a The session in the school's words (before F6) | `feature/session-words` | `words` | 3151 / 3150 |
+| F6b The reservation cycle only (before F6; one agent end to end) | `feature/reservation-focus` | `focus` | 3161 / 3160 |
 | Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1); merged to main 8 Oct 2026 (b438976) | `feature/rework-sessions` | `rwa` | 3121 / 3120 |
 | Rework B — reservations (step 2); merged to main 8 Oct 2026 (88c8d5a) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
 | Rework C — money changes, charges, exceptions (step 2); merged to main 8 Oct 2026 (b76eae4) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
@@ -666,7 +829,9 @@ API and web ports):
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
-| F7 Day-one import | frozen 7 Oct at e58324b; **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4`; built and reviewed through four Opus 5.5 passes (the split of multi-paper rows, every one-paper wording of the school's forms, the course-fee rule, the lock order, a test-harness fix); **confirmed 20:02Z, lands after F4** with 0050_import regenerated | Opus 5.5 implementer and reviewer | | |
+| F7 Day-one import | frozen 7 Oct at e58324b; **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4`; built and reviewed through four Opus 5.5 passes (the split of multi-paper rows, every one-paper wording of the school's forms, the course-fee rule, the lock order, a test-harness fix); **merged to main 9 Oct 2026 01:45Z (384c5a2)** after four passes, 0050_import regenerated as 0058 | Opus 5.5 implementer and reviewer | | |
+| F6a The session in the school's words | yes — docs/features/SESSION_WORDS.md (built 11 Oct 2026 in worktree `.claude/worktrees/session-words` from main 1b6a216 after the owner's critique and the lead's analysis, trail row 12:27:56Z; the review stopped by the weekly limit 11 Oct, relaunched 14 Oct) | Opus 5.5, two passes: 'merge after fixes 1' (a paper added later not exclusive with All papers, plus seven smaller findings), then 'confirmed: merge' on a7a17d0; the lead's two drives clean | **14 Oct 2026, merge commit fd436de** (branch tip a7a17d0; CI 38640622417 green on the branch) | owner questions in SESSION_WORDS §12 (a first entry in self-study on a 'Retake (Self Study ONLY)' subject; November for IAL units in winter; Q-16; which API-only tools the coordinator needs back); the owner's acceptance test: the per-subject preview next to the Google Form |
+| F6b The reservation cycle only | yes — docs/features/RESERVATION_FOCUS.md (built 14 Oct 2026 in worktree `.claude/worktrees/reservation-focus` from main b6857cb; the switch `RESERVATION_CYCLE_ONLY` and one list per role in `apps/web/lib/reservation-focus.ts`; sidebars 41→24 admin, 26→14 coordinator, 16→13 and 12→9 finance, 6→3 teacher, 3→3 gate, 14→12 parent, 12→9 student; landings per role from existing endpoints; no API change) | none by the owner's instruction: one Opus 5.5 agent end to end; the lead read the diff, checked CI (38648083793 green on 1d04d02) and drove all eight roles in English and Arabic | **15 Oct 2026, merge commit 5e550a1** | owner questions in RESERVATION_FOCUS §8 (Candidates in the sidebar; families' statement of entry; Board Services, Subjects and History kept in doubt; the Student 360's enrolment block; Exam Deadlines' non-entry dates); deferred: a `?session=` link for two open sessions, the overdue state driven with the clock moved |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 

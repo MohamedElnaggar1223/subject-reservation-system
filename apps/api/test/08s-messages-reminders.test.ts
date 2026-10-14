@@ -730,12 +730,15 @@ describe('08s: messages and reminders', () => {
     const line = await reserveUnpaid(f, itemA);
     await step(cairoAt(shift(dueDay, -7), 9, 40));
     expect(await offsetsOf(line)).toEqual([-7]);
-    // Another session holds the line now; the step of the next minute must not wait for it.
+    // Another session holds the line now; the step of the next minute must not wait for it. A step
+    // that waited would block until the lock is released below, so the window only has to be
+    // longer than a step takes under load: 4 s was not (CI run 38632042568, 14 Oct 2026, the step
+    // finishing late on a loaded runner with nothing waited on), as 08t's waiter window was not at 5 s.
     const release = await holdRowLock('registration', line);
     try {
       const outcome = await Promise.race([
         step(cairoAt(shift(dueDay, -7), 9, 41)).then(() => 'finished'),
-        new Promise<string>((r) => setTimeout(() => r('waited on the line'), 4000)),
+        new Promise<string>((r) => setTimeout(() => r('waited on the line'), 20_000)),
       ]);
       expect(outcome).toBe('finished');
     } finally {

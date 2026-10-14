@@ -32,6 +32,8 @@ import { StudentAcademicPanel } from '~/components/student-academic-panel';
 import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
 import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
 import { StatementView } from '~/components/reservations/statement';
+import { RESERVATION_CYCLE_ONLY } from '~/lib/reservation-focus';
+import DeskToday from './desk-today.client';
 
 // ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
 
@@ -175,6 +177,9 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           {showOnboard ? 'Close Onboarding' : '+ New Family (Onboard)'}
         </Button>
       </div>
+
+      {/* F6b: finance lands here — today's money first (lib/reservation-focus.ts). */}
+      {RESERVATION_CYCLE_ONLY && <DeskToday />}
 
       {message && (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 flex justify-between">

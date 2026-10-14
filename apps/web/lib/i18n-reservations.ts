@@ -38,6 +38,8 @@ export const reservationsArabic: Record<string, string> = {
   '(payable once confirmed)': '(تُدفع حين تُؤكَّد)',
   'Paid per entry deadline:': 'يُدفع لكل موعد قيد:',
   '(retake deadline)': '(موعد الإعادة)',
+  'entered for': 'مُقيَّد في',
+  '(result on record)': '(النتيجة مسجلة)',
   'This line was paid while the answer was being given: open it again and answer again': 'دُفع هذا السطر أثناء إعطاء الإجابة: افتحه من جديد وأجب مرة أخرى',
   'The refund terms could not be loaded, so nothing can be reserved yet: reload the page to try again.': 'تعذّر تحميل شروط الاسترداد، فلا يمكن الحجز بعد: أعد تحميل الصفحة للمحاولة مرة أخرى.',
   'Loading the refund terms…': 'جارٍ تحميل شروط الاسترداد…',
@@ -258,6 +260,9 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^Collected EGP ([\d,.]+)( in (\d+) payments, one per entry deadline)?\.$/, (m) => `تم تحصيل ${m[1]} جنيه${m[3] ? ` في ${m[3]} دفعات، دفعة لكل موعد قيد` : ''}.`],
   [/^(\d+) on a provisional board fee: collected once the fee is confirmed\.$/, (m) => `${m[1]} على رسوم مجلس مؤقتة: تُحصَّل حين تُؤكَّد الرسوم.`],
   [/^Not collected — hand this money back: (.+)\.$/, (m) => `لم يُحصَّل — أعد هذا المبلغ: ${m[1]}.`],
+  // The Reserve page's school-fee notice (the year isolated left-to-right).
+  [/^The (\d{4}-\d{4}) school fee(?: \(EGP ([\d,.]+)\))? is paid before reserving\.$/,
+    (m) => `تُدفع المصاريف الدراسية \u2066${m[1]}\u2069${m[2] ? ` (${m[2]} جنيه)` : ''} قبل الحجز.`],
   // The pricing basis, on hover and under a price.
   [/^course ([\d,.]+) × ([\d.]+)% \+ board ([\d,.]+) × ([\d.]+)%( \(board fee provisional\))?$/, (m) =>
     `التدريس ${m[1]} × ${m[2]}% + المجلس ${m[3]} × ${m[4]}%${m[5] ? ' (رسوم المجلس مؤقتة)' : ''}`],

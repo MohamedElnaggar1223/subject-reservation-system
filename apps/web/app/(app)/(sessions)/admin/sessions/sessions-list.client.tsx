@@ -115,7 +115,7 @@ function SessionCard({ s, viewerRole }: { s: SessionRow; viewerRole: string }) {
       </div>
       {s.summary.lines > 0 && (
         <p className="mt-2 text-sm text-muted-foreground">
-          <span>{s.summary.lines}</span> <span>lines</span> · <span>{s.summary.paid}</span> <span>paid</span> · <span>{s.summary.unpaid}</span> <span>unpaid</span>
+          <span>{s.summary.lines}</span> <span>{s.summary.lines === 1 ? 'reservation' : 'reservations'}</span> · <span>{s.summary.paid}</span> <span>paid</span> · <span>{s.summary.unpaid}</span> <span>unpaid</span>
           {money && s.summary.outstanding > 0 && <> (<Money amount={s.summary.outstanding} /> <span>outstanding</span>)</>}
           {s.summary.overdue > 0 && <> · <Badge tone="danger"><span>{s.summary.overdue}</span>&nbsp;<span>overdue</span></Badge></>}
         </p>
@@ -181,7 +181,7 @@ function NewSessionModal({ sessions, onClose }: { sessions: SessionRow[]; onClos
           <Field label="Course starts" htmlFor="ns-course"><input id="ns-course" className={INPUT_CLASS} type="date" value={courseStartsOn} onChange={(e) => setCourseStartsOn(e.target.value)} required /></Field>
           <Field label="Payment due" htmlFor="ns-due"><input id="ns-due" className={INPUT_CLASS} type="datetime-local" value={paymentDueAt} onChange={(e) => setPaymentDueAt(e.target.value)} required /></Field>
         </div>
-        <Field label="Copy from" htmlFor="ns-copy" hint="Subjects, teachers, what can be entered and course fees come across; board fees come across provisional until the board publishes.">
+        <Field label="Copy from" htmlFor="ns-copy" hint="Subjects, teachers, their papers and course fees come across; board fees come across as not published yet, until the board publishes.">
           <select id="ns-copy" className={INPUT_CLASS} value={copyFrom || copyDefault || 'none'} onChange={(e) => setCopyFrom(e.target.value)}>
             <option value="none">Start empty</option>
             {sameKind.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

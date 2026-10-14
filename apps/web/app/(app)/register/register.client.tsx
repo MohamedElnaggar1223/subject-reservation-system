@@ -19,7 +19,7 @@ import { api } from '~/lib/hono';
 import { apiResponse, gradeLabel } from '@repo/validations';
 import { Notice } from '~/components/ui/tone';
 import { Reserve, type ReserveDone } from '~/components/reservations/reserve';
-import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 
 const fetchActive = () => apiResponse(api.v1.sessions.active.$get());
 const fetchUpcoming = () => apiResponse(api.v1.sessions.upcoming.$get());
@@ -40,7 +40,12 @@ export default function RegisterClient({ userId, userRole }: { userId: string; u
   const child = isParent ? children.find((c) => c.student.id === (childId ?? (children.length === 1 ? children[0]!.student.id : ''))) ?? null : null;
   const studentId = isParent ? child?.student.id ?? null : userId;
   const sessions: SessionRow[] = [...active, ...(isParent ? upcoming : [])];
-  const session = sessions.find((s) => s.id === (sessionId ?? (sessions.length === 1 ? sessions[0]!.id : ''))) ?? null;
+  // Preselected (F6a, point 5): the only session listed; else the only open one, even beside an
+  // upcoming one (preregistration); else, none being open, the only upcoming one.
+  const preselected = sessions.length === 1 ? sessions[0]!.id
+    : active.length === 1 ? active[0]!.id
+      : !active.length && isParent && upcoming.length === 1 ? upcoming[0]!.id : '';
+  const session = sessions.find((s) => s.id === (sessionId ?? preselected)) ?? null;
 
   // The school fee of the year comes first (D-H): said here, refused by the API too.
   const { data: fee } = useQuery({
@@ -113,7 +118,8 @@ export default function RegisterClient({ userId, userRole }: { userId: string; u
 
       {feeDue && (
         <Notice tone="warning" title="The school fee comes first">
-          <span>The</span> <span dir="ltr">{fee.academicYear}</span> <span>school fee</span>{fee.amount != null && <> (<Money amount={fee.amount} />)</>} <span>is paid before reserving.</span>{' '}
+          {/* One sentence, translated whole (word by word "The" stayed English in Arabic). */}
+          <span>{`The ${fee.academicYear} school fee${fee.amount != null ? ` (EGP ${Number(fee.amount).toLocaleString('en-US')})` : ''} is paid before reserving.`}</span>{' '}
           {isParent ? <Link href={`/school-fee${studentId ? `?studentId=${studentId}` : ''}` as never} className="font-semibold underline">Pay the school fee now →</Link> : <span>Ask your parent to pay it from their account.</span>}
         </Notice>
       )}

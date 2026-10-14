@@ -60,5 +60,8 @@ def trim(path):
 names = sys.argv[1:] or sorted(f for f in os.listdir(EV) if f.endswith('.log') and (
     f.startswith('suite-') or f.startswith('control-') or f in ('run1.log', 'run2-merge.log', 'baseline-27e3233.log')))
 for f in names:
+    # A log trimmed once keeps its header (commit, TZ, original size): trimming it again lost them.
+    if '# Trimmed under CLAUDE.md' in open(os.path.join(EV, f), errors='replace').read(4000):
+        continue
     before, after, red = trim(os.path.join(EV, f))
     print(f'{f}: {before} -> {after} bytes{" (red: failures kept)" if red else ""}')

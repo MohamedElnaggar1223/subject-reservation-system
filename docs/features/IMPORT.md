@@ -760,4 +760,5 @@ records it.
   0050_import regenerated as 0058_import after main's 0057, the same DDL, the order proven on a copy.
 - 00:13–00:39Z — on 8562e17: types green; the suite in local time, then with TZ=UTC, 34 files, 724
   passed, 1 todo each; every control with its own row: 54 red, C44 green as since 7003e74 (C60 covers it).
+- 00:52Z — pushed 9d8beed; CI 37865975222 green (724 passed, 1 todo); the servers up on the merged code.
 - Next: the lead merges feature/import into main.

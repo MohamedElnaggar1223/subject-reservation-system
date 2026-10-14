@@ -103,6 +103,8 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'POST /v1/sessions/:id/grade10/*',
     'GET /v1/board-fees',
     'GET /v1/registrations/offers',
+    // F6a: the Session screen's "Preview the family's form" (no student).
+    'GET /v1/registrations/offers/preview',
     // The reservations rework, step C: the policy registry and the exceptions they grant (the
     // handler refuses a money policy), "Check these" for theirs, the boards' services and their
     // deadlines (the fees are finance's).

@@ -21,6 +21,10 @@ import { apiResponse, gradeLabel, gradeStanding } from "@repo/validations";
 import { Notice } from "~/components/ui/tone";
 import SessionBanner from "./session-banner.client";
 import HomeSummaryCard from "./home-summary.client";
+import { RESERVATION_CYCLE_ONLY, leadsOutsideTheCycle } from "~/lib/reservation-focus";
+import CycleLanding from "./cycle-landing.client";
+import LaterLanding from "./later-landing.client";
+import FamilyNext from "./family-next.client";
 
 type ActiveSessionRow = {
   id: string;
@@ -43,12 +47,23 @@ export default async function Home(): Promise<JSX.Element> {
   if (role === 'finance_officer' || role === 'finance_admin') {
     redirect('/desk');
   }
-  // F0a: the coordinator and the gate start at the school's day; a teacher
-  // at their teaching.
-  if (role === 'coordinator' || role === 'gate') redirect('/today');
-  if (role === 'teacher') redirect('/teaching');
+  if (RESERVATION_CYCLE_ONLY) {
+    // F6b: the admin and the coordinator land on the cycle's next step; a teacher and the gate,
+    // whose screens come later, on their notifications and profile (lib/reservation-focus.ts).
+    if (role === 'admin' || role === 'coordinator') {
+      return <CycleLanding viewerRole={role} userName={session.user.name || session.user.email} />;
+    }
+    if (role === 'teacher' || role === 'gate') {
+      return <LaterLanding viewerRole={role} userName={session.user.name || session.user.email} />;
+    }
+  } else {
+    // F0a: the coordinator and the gate start at the school's day; a teacher
+    // at their teaching.
+    if (role === 'coordinator' || role === 'gate') redirect('/today');
+    if (role === 'teacher') redirect('/teaching');
 
-  if (isAdmin) redirect('/admin/sessions');
+    if (isAdmin) redirect('/admin/sessions');
+  }
 
   // SES-005: Fetch active session(s) so the dashboard shows an
   // open/closed banner with a live countdown for the current window.
@@ -201,7 +216,8 @@ export default async function Home(): Promise<JSX.Element> {
     },
   ];
 
-  const visibleLinks = links.filter((l) => l.visible);
+  // F6b: a link to a screen outside the reservation cycle (Browse Subjects) is hidden.
+  const visibleLinks = links.filter((l) => l.visible && !leadsOutsideTheCycle(l.href));
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
@@ -228,8 +244,11 @@ export default async function Home(): Promise<JSX.Element> {
       {/* SES-005: Active session status + countdown (hidden when no open window would take the student) */}
       {!registrationClosed && <SessionBanner sessions={activeSessions} />}
 
-      {/* "What do we owe / what's next" — actions before links */}
-      <HomeSummaryCard />
+      {/* "What do we owe / what's next" — actions before links. F6b: the cycle's next step for each
+          child (reserve, pay, the due date, the statement) in its place. */}
+      {RESERVATION_CYCLE_ONLY
+        ? <FamilyNext viewerRole={role === 'parent' ? 'parent' : 'student'} viewerId={session.user.id} mayReserve={!registrationClosed} />
+        : <HomeSummaryCard />}
 
       {/* Graduated Banner */}
       {isGraduated && (

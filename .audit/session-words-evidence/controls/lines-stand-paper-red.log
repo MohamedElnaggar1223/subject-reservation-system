@@ -1,0 +1,15 @@
+   ✓ 08u: the session in the school's words — one form per subject, the preview > an O.L. subject: its teachers this cycle (one online), and its Paper 4 retake opened in school or self-study with its own fee — one Save, each change audited 132ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > a paper the Catalogue gains after the subject is on the sheet: the form lists it and makes it once it is offered; the same form again makes nothing 113ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > an IAL subject per unit: a teacher per unit (P1 and P2 online), M1 with two, S1 self-study only, P4 not this cycle — the units keep their codes 124ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > two units moved to another sitting in one save carry their reservations, each line with its own audit row (the series move, every move at once)  660ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > a Cambridge A level's three routes: A.S. offered at its fee, A.2. carry forward self-study only, A.L. not this cycle 97ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > "Retake (Self Study ONLY)" at a course fee of 0 says why; an open subject nobody teaches is refused in the form's words; nothing is half-saved 37ms
+   × 08u: the session in the school's words — one form per subject, the preview > "Not offered this cycle" while reservations stand is refused with its sentence — the subject and a paper alike — and saved once the form says they stand 600ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+   ✓ 08u: the session in the school's words — one form per subject, the preview > the same form twice changes nothing and writes no audit row; a form whose audit row cannot be written changes nothing (the rows commit with the change) 49ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > "One paper ONLY" is always a retake: a first entry on a one-paper item is refused, and the family's form offers none  362ms
+   ✓ 08u: the session in the school's words — one form per subject, the preview > the preview: the family's form for admin and coordinator, with no student's data in it — refused to families and to finance  466ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 passed (10)
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > "Not offered this cycle" while reservations stand is refused with its sentence — the subject and a paper alike — and saved once the form says they stand
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }

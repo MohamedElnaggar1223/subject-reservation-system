@@ -1,0 +1,109 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 585371 bytes, 5051 lines.
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 26745ms
+   ✓ F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line 88ms
+   ✓ F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 42ms
+   ✓ F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 151ms
+   ✓ F4 on the reservations rework > carry forward from the line's verified prior sitting > the carry-forward period is the board's own column (exam_board), edited on the board rules and read by the line rules 32ms
+   ✓ F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 80ms
+   ✓ F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting here, verified without another centre, is carried forward with the school's centre and the candidate's number then 71ms
+   ✓ F4 on the reservations rework > carry forward from the line's verified prior sitting > a line with no prior sitting of its own keeps the suggest-and-confirm flow (exams.carryForward): an A Level after the AS here 121ms
+   ✓ F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 142ms
+   ✓ F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 87ms
+   ✓ F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > the board's results verify a declared sitting (step B's answer, by the importer); a sitting with no result is left to the coordinator 113ms
+   ✓ F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 42ms
+   ✓ F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > paid: derived as the award its line's item enters, with exam_entry.charge_id 67ms
+   ✓ F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in that names no line: the coordinator adds its award by hand, with the charge 90ms
+   ✓ F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in whose payment is reversed is flagged on its entry (cash_in_not_paid) 27ms
+   ✓ F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 133ms
+   ✓ F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry  335ms
+   ✓ F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 40ms
+   ✓ F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 24ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told 24ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a swap request the parent approves: the old line's draft is withdrawn with it; the new line is the one to enter 51ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > the family's direct swap: the old line's sent entry is withdrawn with it, the family told 42ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a payment reversal: the entry is withdrawn with the line; paid again, the next derivation makes it again 48ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > what staff set on an entry withdrawn with its line is carried to the entry made again after a second payment (the review of 54c225f, item 3)  357ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > an option chosen on an entry added by hand is staff's (the review of 54c225f, item 3) 260ms
+   ✓ F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > "mark as sent" refuses an entry whose line is no longer confirmed, naming it (the backstop should a path end a line and leave its entries) 13ms
+   ✓ F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop 275ms
+   ✓ F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval  329ms
+   ✓ F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap  320ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 58ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 98ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake verified after derivation: nothing changes and nothing is flagged 47ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed 33ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 55ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward 67ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected before derivation: entered as a first entry with no carry forward, the option left to choose 20ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 129ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake the candidate's history here shows stays one after the declaration is rejected: the history is its source (the review of 426d565, item 3)  376ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it  370ms
+   ✓ F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it  398ms
+   ✓ F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing 93ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 76ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2) 33ms
+   ✓ F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1) 80ms
+   ✓ F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 70ms
+   ✓ F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 33ms
+   ✓ F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent 18ms
+   ✓ F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 26ms
+   ✓ F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > the admin's move: a sent entry refuses it, naming the entry; a draft is withdrawn with its line and made again where the line goes  717ms
+   ✓ F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > an item's series change: refused while a line of it has a sent entry; once that is withdrawn, the lines move and the drafts go with them  716ms
+   ✓ F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > a subject's board change: refused while a line has a sent entry; once that is withdrawn, the lines move to the new board's series and the drafts are withdrawn  723ms
+   ✓ F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > a session's series correction: refused while a line has a sent entry; once that is withdrawn, the lines go to the corrected series and the drafts are withdrawn  734ms
+   ✓ F4 on the reservations rework > after a move (the review of 54c225f, items 1 and 3) > a sent entry withdrawn so its line could move: dropped in the new series before anything is sent there, the board fee comes back (item 1)  353ms
+   ✓ F4 on the reservations rework > after a move (the review of 54c225f, items 1 and 3) > what staff set on a draft withdrawn by the move is carried to the entry made in the new series (item 3)  340ms
+   ✓ F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > an entry by hand on a line not paid is refused 292ms
+   ✓ F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line  572ms
+   ✓ F4 on the reservations rework > step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5) > the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back 178ms
+ ❯ test/08x4-exam-entries-rework.test.ts:847:42
+ ❯ test/08x4-exam-entries-rework.test.ts:877:48
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator
+AssertionError: expected null to be 'verified' // Object.is equality
+
+- Expected:
+"verified"
+
++ Received:
+null
+
+ ❯ test/08x4-exam-entries-rework.test.ts:847:42
+    845|       const kr = await declare('kr');
+    846|       const ka = await declare('ka');
+    847|       expect((await lineOf(kr)).outcome).toBe('verified');
+       |                                          ^
+    848|       // The desk declared it (the review of 426d565, item 7): the adm…
+    849|       expect(await verifiedBy(kr)).toBe(w.officer.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2)
+AssertionError: expected null to be 'verified' // Object.is equality
+
+- Expected:
+"verified"
+
++ Received:
+null
+
+ ❯ test/08x4-exam-entries-rework.test.ts:877:48
+    875|         sessionId: w.sessionId, studentId: kf.kp!.studentId, lines: [r…
+    876|       } }));
+    877|       expect((await lineOf(line!.id)).outcome).toBe('verified');
+       |                                                ^
+    878|       expect(await verifiedBy(line!.id)).toBeNull();
+    879|       const a = await one<{ user_id: string | null; n: Record<string, …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+   Start at  03:55:26
+   Duration  28.42s (transform 632ms, setup 2ms, collect 226ms, tests 26.74s, environment 0ms, prepare 33ms)

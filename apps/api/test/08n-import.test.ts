@@ -1159,6 +1159,42 @@ describe('F7: the day-one import', () => {
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
+    it('a one-paper line is always a retake (F6a; the review of F6a, finding 3): neither the coordinator\'s "in school" answer for a self-study note with no sitting nor staff\'s "first" on the line makes it a first entry', async () => {
+      const cambridge = await seriesOfSession(sess, 'cambridge');
+      const subjectId = (await apiResponse(adm.api.v1.subjects.$post({ json: {
+        name: 'Imp Chemistry Retake', code: 'IMP-ONE-RTK', council: 'cambridge', qualificationLevel: 'as_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
+      } }))).id;
+      await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sess }, json: {
+        subjectId, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
+        items: [
+          { label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false, exclusiveGroup: 'entry' },
+          { label: 'Paper 4 only (retake)', kind: 'one_paper', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'retake_only', requiredInSeries: false, exclusiveGroup: 'entry' },
+        ],
+      } }));
+      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 500, provisional: false }] } }));
+      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
+      const id = await stage(adm, workbook([{ name: 'One paper retake', rows: [[`Nov. ${Y} Session`], header,
+        // The forms' one-paper retake in self-study with no series named (the subject is taught: the coordinator's rule applies).
+        ['Fourth Child', '11K', 'A.S.', 'Imp Chemistry Retake', '', '01075757575', `oneretake.child${D}`, 'Fourth Parent', `oneretake.parent${D}`, '01076767676', 'I confirm my registration', 'Yes', 'Retake Self Study 50% fees (One paper ONLY)'],
+      ] }]), 'one-paper-retake.xlsx', 'school_sheet');
+      expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: sess } }, selfStudyOnTaught: 'in_school', enrol: false, createSections: false })).status).toBe(200);
+      let r = rowAt(await fetchView(adm, id), 'One paper retake', 3);
+      // Before F6a's rule the answer made it a first entry in school, and the review refused it (registration_refused):
+      // now it stays a retake and asks for its sitting — never the advice to make it a first entry.
+      expect(r.plan.lines).toMatchObject([{ subjectName: 'Imp Chemistry Retake', itemLabel: 'Paper 4 only (retake)', found: 'paper', attempt: 'retake', priorSitting: null }]);
+      expect(r.problems.find((p) => p.code === 'retake_sitting_missing')).toEqual({
+        code: 'retake_sitting_missing', severity: 'error',
+        detail: '"Retake Self Study 50% fees (One paper ONLY)": one paper only is always a retake — name the sitting it follows on the line',
+      });
+      expect(r.problems.find((p) => p.code === 'registration_refused')).toBeUndefined();
+      // Staff choose "first" on the line and name the sitting: the line is the retake of that sitting, and nothing is refused.
+      await putRows(adm, id, { rowIds: [r.id], edits: { attempt: 'first', priorSitting: { month: 'june', year: Y } } });
+      r = rowAt(await fetchView(adm, id), 'One paper retake', 3);
+      expect(r.plan.lines).toMatchObject([{ itemLabel: 'Paper 4 only (retake)', attempt: 'retake', priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'line' } }]);
+      expect(r.problems.filter((p) => p.severity === 'error')).toEqual([]);
+      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
+    });
+
     it('a row of the A.S. level never lands on an IGCSE subject of the same name: unmapped, it is not offered until the session offers the A.S. one', async () => {
       const cambridge = await seriesOfSession(sess, 'cambridge');
       const mk = async (code: string, level: 'igcse' | 'as_level') => (await apiResponse(adm.api.v1.subjects.$post({ json: {

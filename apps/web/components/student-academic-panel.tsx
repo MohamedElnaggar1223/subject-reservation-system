@@ -45,6 +45,7 @@ import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, Notice, StandingBadge } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { StudentEnrolmentBlock } from '~/components/student-enrolment-block';
+import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
 
 // ─── Shared with the students and sections screens ───────────────────────────
 
@@ -354,10 +355,13 @@ export function StudentAcademicPanel({
             <span>Grade this year:</span> <span className="font-semibold">{r.gradeLabel}</span>
           </p>
           <p className="mt-1">
+            {/* F6b: sections are outside the reservation cycle for now (lib/reservation-focus.ts). */}
             {isAcademic ? (
-              <Link href={`/academic/sections?section=${r.section.sectionId}`} className="underline hover:no-underline">
-                Move them to a section of their grade
-              </Link>
+              !leadsOutsideTheCycle('/academic/sections') && (
+                <Link href={`/academic/sections?section=${r.section.sectionId}`} className="underline hover:no-underline">
+                  Move them to a section of their grade
+                </Link>
+              )
             ) : (
               <span>The coordinator moves them to a section of their grade.</span>
             )}
@@ -414,7 +418,7 @@ export function StudentAcademicPanel({
           {r.section ? (
             <>
               <p className="font-display text-2xl font-bold text-foreground">
-                {isAcademic ? (
+                {isAcademic && !leadsOutsideTheCycle('/academic/sections') ? (
                   <Link href={`/academic/sections?section=${r.section.sectionId}`} className="hover:underline">
                     {r.section.name}
                   </Link>

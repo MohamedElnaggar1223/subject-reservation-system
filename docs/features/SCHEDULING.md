@@ -11,8 +11,10 @@ logs, control logs, screenshots, scratch scripts) is `.audit/scheduling-evidence
 §10's F1 contract) and the second review round's flags: §17 says what changed, how each item was
 checked against main's code, the lock order, and the proof. Merged with main four times on the
 way (§14; a fifth, of trail rows only, after the review), and a sixth — the final merge, after F4
-and F7 landed — makes F1's migrations `0059`/`0060`, after main's `0058_import`. The Opus 5.5
-review of 88898f6 (eight items, two material) is §17.5; its confirmation: "merge after F7".
+and F7 landed — makes F1's migrations `0059`/`0060`, after main's `0058_import`; a seventh (15 Oct)
+brings main after F6a and F6b, and with it F1's screens are hidden behind F6b's switch like every
+screen outside the reservation cycle (§14, item 7). The Opus 5.5 review of 88898f6 (eight items, two
+material) is §17.5; its confirmation: "merge after F7".
 
 F1 gives the school what its sheet cannot hold: **who is taught together** (teaching groups
 drawn from the course enrolment and the sections, with dated membership), **a week that is
@@ -289,6 +291,23 @@ From `apps/api/src/services/schedule.services.ts` unless noted; types in
   date = today, executor)`** (`group.services.ts`) — the students in a group on a date by §2's
   rules — with `listGroups(academicYearId)` for D's picker. D reads the course enrolments
   (`getTeachingDemand`) until F1 is on main and switches to these then.
+  **D's switch, once F1 is on main** (what D's code reads today, at F1's final merge: the audience
+  `{ list: 'teaching_group', academicYearId, subjectId, unitId, teacherId }` resolved from the open
+  in-school `course_enrolment` rows of that key in `message-audience.services.ts`, and its picker from
+  `getTeachingDemand(year)` in `listOptions`, `message.services.ts`):
+  - the picker: `listGroups(academicYearId)` → `{ academicYear, asOf, groups }`, each group with `id`,
+    `name`, `kind` (`enrolment`, `section` or `manual`), `subject` `{ id, name, code }`, `unit` `{ id, code, shortCode,
+    title }` or null, `teacher` `{ id, name, kind }` or null ("no preference" groups wait for one),
+    `section` or null, `delivery`, `size` (its students on `asOf`, the year's default start: today
+    inside the year), `archived` and `providerTaught`; offer the groups not archived;
+  - the audience: a group id, resolved with `studentsOfGroup(groupId, todayAtSchool(), executor)` —
+    student ids sorted, read in D's own transaction through `executor`: a section's group follows the
+    section, a move made today goes to the later group, nobody after their last day (08s6, "step D's
+    contract"); the families of those students as D's `section` list does;
+  - the label: the group's subject, unit and teacher from `teaching_group` (its teacher today:
+    `teachersOn([groupId], date)` in `scheduling-shared.services.ts`);
+  - a saved audience of the old shape stays readable (its enrolment key): D decides whether to map it
+    to the key's groups or keep both shapes. F1 changes none of D's files.
 - **A change after publishing** (changed in round two) — `guardPublishedTimetable(tx, persons,
   from, { anyway, clashToken, cause, actorId }, change)` and, for a change that is not one
   function, `checkpointPublished(tx, persons, from)` then `.settle(opts)`: refused (409) with the
@@ -625,6 +644,38 @@ with `git merge-tree` (nothing in lead-env touched), the rework's side winning o
      `0059_scheduling` and `0060_scheduling_leavings` (proof: `resume/final-merge-migrations.txt`).
    - Found by the type check, not by git: F4 and F1 both exported `PublishTimetable` from
      `@repo/validations` (F4's for the exam timetable); F1's is now `PublishTimetableVersion`.
+   The weekly limit stopped the work right after the migrations (9 Oct 01:52Z), before any commit;
+   the worktree kept the result. **Committed 15 Oct as `b3e096f`** (parents `011900e`, `384c5a2`),
+   after checking that the worktree held exactly merge-tree's `06cea82b1b` (reproduced from the two
+   full ids) with the 21 files above resolved or edited, the two old migrations gone and the four new
+   files added — nothing else (474 other files, all git-ignored: builds, env files, scratch evidence).
+7. **After F6a and F6b**: `acaadc5` (F6a fd436de: the session in the school's words; F6b 5e550a1: the
+   reservation cycle only; the widened race window in 08s) into `b3e096f`. Merge base `384c5a2`; two
+   files in conflict, six more changed on both sides and merged by git (each read):
+   - `students/[id]/student.client.tsx`: the imports — F1's `WeekTimetable` and F6b's
+     `leadsOutsideTheCycle`, both; the rest merged (F6b's hidden Exams buttons, F1's week block).
+   - `i18n.tsx`: the imports, both; the dictionaries in main's order (the rework's, F4's, F6b's focus)
+     with F1's scheduling dictionary after F6b's. They share no phrase (115 and 339 entries), so no
+     Arabic changes either way.
+   - Merged by git and read: `FEATURES_PLAN.md`, `role-grants.ts` and `authz-policy.tsv` (F6a's two
+     rows, the form PUT and the preview GET, then F1's), `offer.services.ts` (F6a's form and its
+     shared bodies as main has them; F1's only change there, `replaceTeacher`'s students first and the
+     enrolment follow, intact), `nav-shell.tsx` (F6b's cycle sidebar and F1's items), `RESERVATIONS.md`.
+   - **F1 behind F6b's switch** (the owner's direction of 14 Oct, the lead's at this merge): F1's
+     screens are outside the reservation cycle. Git's clean merge of `nav-shell.tsx` would have put
+     the admin's and coordinator's Timetable items in an unnamed group at the end of the cycle's
+     sidebar and kept the families' Timetables / My Timetable, so `lib/reservation-focus.ts` now lists
+     `TIMETABLE_SCREENS` (`/timetable/versions` with the editor and print under it,
+     `/timetable/groups`, `/timetable/rules`, `/timetable/cover`, `/my-timetable`) for every role, and
+     RESERVATION_FOCUS.md §2 and §4 say so. The student record's week (a block of the timetable on a
+     kept screen, not a link) is not drawn while `timetableHidden()` — the implementer's call, for the
+     lead and the reviewer. No kept screen links to an F1 screen (the only hrefs are the sidebar's).
+     Hidden, never removed: every F1 screen opens by its URL, and the switch off gives F1's sidebars
+     back.
+   - Migrations: main's journal still ends at `0058_import` (1791504474468): F6a and F6b added none,
+     so `0059`/`0060` stand. Proven on a fresh copy of the template: 34 → main's folder at acaadc5
+     59, no F1 table → the branch's 61, the last two 1791510450087 and 1791510469146, the 14 F1
+     tables → again 61 (`final-merge/migrations.txt`); `drizzle-kit generate` finds no schema change.
 
 ## 15. Progress log
 

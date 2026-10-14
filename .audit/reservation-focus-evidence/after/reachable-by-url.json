@@ -1,0 +1,402 @@
+{
+  "admin": [
+    {
+      "path": "/admin/dashboard",
+      "status": 200,
+      "landed": "/admin/dashboard",
+      "heading": "Admin Dashboard",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/today",
+      "status": 200,
+      "landed": "/today",
+      "heading": "Today",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/sections",
+      "status": 200,
+      "landed": "/academic/sections",
+      "heading": "",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/enrolment",
+      "status": 200,
+      "landed": "/academic/enrolment",
+      "heading": "Course enrolment",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/years",
+      "status": 200,
+      "landed": "/academic/years",
+      "heading": "Academic years and terms",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/calendar",
+      "status": 200,
+      "landed": "/academic/calendar",
+      "heading": "School calendar",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/bells",
+      "status": 200,
+      "landed": "/academic/bells",
+      "heading": "Bell schedules",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/rooms",
+      "status": 200,
+      "landed": "/academic/rooms",
+      "heading": "Rooms",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/candidates",
+      "status": 200,
+      "landed": "/exams/candidates",
+      "heading": "Candidates",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/forecasts",
+      "status": 200,
+      "landed": "/exams/forecasts",
+      "heading": "Forecast grades",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/timetable",
+      "status": 200,
+      "landed": "/exams/timetable",
+      "heading": "Exam timetable",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/days",
+      "status": 200,
+      "landed": "/exams/days",
+      "heading": "Exam days",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/results",
+      "status": 200,
+      "landed": "/exams/results",
+      "heading": "Exam results",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/certificates",
+      "status": 200,
+      "landed": "/exams/certificates",
+      "heading": "Certificates",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/remarks-desk",
+      "status": 200,
+      "landed": "/remarks-desk",
+      "heading": "Remarks Desk",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/results-entry",
+      "status": 200,
+      "landed": "/results-entry",
+      "heading": "Results Entry",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/admin/reports",
+      "status": 200,
+      "landed": "/admin/reports",
+      "heading": "Reports",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/admin/audit",
+      "status": 200,
+      "landed": "/admin/audit",
+      "heading": "Audit Log",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "coordinator": [
+    {
+      "path": "/today",
+      "status": 200,
+      "landed": "/today",
+      "heading": "Today",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/sections",
+      "status": 200,
+      "landed": "/academic/sections",
+      "heading": "",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/enrolment",
+      "status": 200,
+      "landed": "/academic/enrolment",
+      "heading": "Course enrolment",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/years",
+      "status": 200,
+      "landed": "/academic/years",
+      "heading": "Academic years and terms",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/calendar",
+      "status": 200,
+      "landed": "/academic/calendar",
+      "heading": "School calendar",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/bells",
+      "status": 200,
+      "landed": "/academic/bells",
+      "heading": "Bell schedules",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/academic/rooms",
+      "status": 200,
+      "landed": "/academic/rooms",
+      "heading": "Rooms",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/candidates",
+      "status": 200,
+      "landed": "/exams/candidates",
+      "heading": "Candidates",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/forecasts",
+      "status": 200,
+      "landed": "/exams/forecasts",
+      "heading": "Forecast grades",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/timetable",
+      "status": 200,
+      "landed": "/exams/timetable",
+      "heading": "Exam timetable",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/days",
+      "status": 200,
+      "landed": "/exams/days",
+      "heading": "Exam days",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/results",
+      "status": 200,
+      "landed": "/exams/results",
+      "heading": "Exam results",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/certificates",
+      "status": 200,
+      "landed": "/exams/certificates",
+      "heading": "Certificates",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "finance_admin": [
+    {
+      "path": "/remarks-desk",
+      "status": 200,
+      "landed": "/remarks-desk",
+      "heading": "Remarks Desk",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/results-entry",
+      "status": 200,
+      "landed": "/results-entry",
+      "heading": "Results Entry",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/certificates",
+      "status": 200,
+      "landed": "/exams/certificates",
+      "heading": "Certificates",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "finance_officer": [
+    {
+      "path": "/remarks-desk",
+      "status": 200,
+      "landed": "/remarks-desk",
+      "heading": "Remarks Desk",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/results-entry",
+      "status": 200,
+      "landed": "/results-entry",
+      "heading": "Results Entry",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/certificates",
+      "status": 200,
+      "landed": "/exams/certificates",
+      "heading": "Certificates",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "teacher": [
+    {
+      "path": "/today",
+      "status": 200,
+      "landed": "/today",
+      "heading": "Today",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/teaching",
+      "status": 200,
+      "landed": "/teaching",
+      "heading": "My teaching",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/forecasts",
+      "status": 200,
+      "landed": "/exams/forecasts",
+      "heading": "Forecast grades",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/invigilation",
+      "status": 200,
+      "landed": "/exams/invigilation",
+      "heading": "My invigilation",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "gate": [
+    {
+      "path": "/today",
+      "status": 200,
+      "landed": "/today",
+      "heading": "Today",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "parent": [
+    {
+      "path": "/remarks",
+      "status": 200,
+      "landed": "/remarks",
+      "heading": "Remarks",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/my",
+      "status": 200,
+      "landed": "/exams/my",
+      "heading": "Exams",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/subjects",
+      "status": 200,
+      "landed": "/subjects",
+      "heading": "Available Subjects",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ],
+  "student": [
+    {
+      "path": "/subjects",
+      "status": 200,
+      "landed": "/subjects",
+      "heading": "Available Subjects",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/remarks",
+      "status": 200,
+      "landed": "/remarks",
+      "heading": "Remarks",
+      "notFound": false,
+      "inSidebar": false
+    },
+    {
+      "path": "/exams/my",
+      "status": 200,
+      "landed": "/exams/my",
+      "heading": "My exams",
+      "notFound": false,
+      "inSidebar": false
+    }
+  ]
+}

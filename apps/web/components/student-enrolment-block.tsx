@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiResponse } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { Badge } from '~/components/ui/tone';
+import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
 
 const fetchStudentYear = (studentId: string) =>
   apiResponse(api.v1.enrolments.student[':studentId'].$get({ param: { studentId }, query: {} }));
@@ -26,7 +27,8 @@ export function StudentEnrolmentBlock({ studentId, canEdit }: { studentId: strin
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subjects this year</h3>
-        {canEdit && (
+        {/* F6b: course enrolment is outside the reservation cycle for now (lib/reservation-focus.ts). */}
+        {canEdit && !leadsOutsideTheCycle('/academic/enrolment') && (
           <Link href={`/academic/enrolment?tab=student&student=${studentId}` as Route} className="text-xs font-medium underline hover:no-underline">
             Change the enrolment
           </Link>

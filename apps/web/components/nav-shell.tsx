@@ -9,6 +9,7 @@ import { api } from '~/lib/hono';
 import { apiResponse, ROLE_LABELS, isRole } from '@repo/validations';
 import { cn } from '~/lib/utils';
 import { useI18n, type TranslationKey } from '~/lib/i18n';
+import { RESERVATION_CYCLE_ONLY, cycleLandingFor, cycleStageOf, isOutsideTheCycle, CYCLE_STAGES } from '~/lib/reservation-focus';
 
 /* ─── Icons (inline SVGs to avoid deps) ─────────────────────────────────────── */
 
@@ -341,6 +342,50 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
   ];
 }
 
+/** The staff landing on "/" (F6b): the cycle's next step, where a dashboard or the day was. */
+const CYCLE_HOME_ITEM: NavItem = { labelKey: 'nav.home', href: '/', icon: 'dashboard' };
+
+/**
+ * F6b: the sidebar while the school works on the reservation cycle only (lib/reservation-focus.ts).
+ * The role's items as above, less what is outside the cycle for it; a family keeps its own groups,
+ * which already run in the cycle's order; staff get the landing first, then one group per stage of
+ * the cycle. Labels and icons are the items' own. With the switch off, the sidebar is as above.
+ */
+function getCycleNavSections(role: string | null | undefined, teaches = false): NavSection[] {
+  const sections = getNavSections(role, teaches);
+  if (!RESERVATION_CYCLE_ONLY) return sections;
+  const keep = (item: NavItem) => !isOutsideTheCycle(role, item.href);
+
+  if (role === 'parent' || role === 'student' || !role) {
+    return sections.map((s) => ({ ...s, items: s.items.filter(keep) })).filter((s) => s.items.length > 0);
+  }
+
+  const kept = new Map<string, NavItem>();
+  for (const item of sections.flatMap((s) => s.items)) if (keep(item) && !kept.has(item.href)) kept.set(item.href, item);
+  const landing = cycleLandingFor(role);
+  const first = kept.get(landing) ?? CYCLE_HOME_ITEM;
+  kept.delete(landing);
+
+  const out: NavSection[] = [{ items: [first] }];
+  for (const stage of CYCLE_STAGES) {
+    const items = [...kept.values()].filter((i) => cycleStageOf(role, i.href) === stage.titleKey);
+    items.sort((a, b) => order(a.href) - order(b.href));
+    if (items.length) out.push({ titleKey: stage.titleKey, items });
+  }
+  // An item no stage names keeps its place at the end rather than vanish (none today).
+  const placed = new Set(out.flatMap((s) => s.items.map((i) => i.href)));
+  const rest = [...kept.values()].filter((i) => !placed.has(i.href));
+  if (rest.length) out.push({ items: rest });
+  return out;
+}
+
+/** An item's place within its stage: the order CYCLE_STAGES lists it in. */
+function order(href: string): number {
+  const all = CYCLE_STAGES.flatMap((s) => s.hrefs);
+  const i = all.indexOf(href);
+  return i === -1 ? all.length : i;
+}
+
 /* ─── Nav Item Component ────────────────────────────────────────────────────── */
 
 function NavLink({
@@ -423,7 +468,7 @@ export default function NavShell({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { language, toggleLanguage, t } = useI18n();
-  const sections = getNavSections(userRole, teaches);
+  const sections = getCycleNavSections(userRole, teaches);
 
   // L-5: Unread notification badge. Refetches every 30s so the number
   // reflects mark-as-read actions and new notifications without a

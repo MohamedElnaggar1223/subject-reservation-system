@@ -1,0 +1,21 @@
+F1 final merge, second merge (main acaadc5): migration proof, 2026-10-14T23:11:40Z
+branch's last migrations: 0058_import.sql 0059_scheduling.sql 0060_scheduling_leavings.sql 
+main's last migration: 0058_import.sql
+template copy: 34 migrations applied; F1 tables: 0 of 14
+main's folder exit 0
+after main's folder (acaadc5): 59 migrations applied; F1 tables: 0 of 14
+branch's folder exit 0
+after the branch's folder: 61 migrations applied; F1 tables: 14 of 14
+the last three applied (created_at, hash prefix):
+1791510469146|40dcda787c95
+1791510450087|e7a63c6c3e01
+1791504474468|b62de6c6e4a3
+journal stamps: 0058_import 1791504474468, 0059_scheduling 1791510450087, 0060_scheduling_leavings 1791510469146
+again exit 0
+again: 61 migrations applied
+copy dropped: exit 0
+--- drizzle-kit, main's folder (tail)
+Using 'pg' driver for database querying
+[⣷] applying migrations...[⣯] applying migrations...[⣟] applying migrations...[⡿] applying migrations...[✓] migrations applied successfully!--- drizzle-kit, the branch's folder (tail)
+Using 'pg' driver for database querying
+[⣷] applying migrations...[✓] migrations applied successfully!

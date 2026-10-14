@@ -801,6 +801,36 @@ Added by F7 (the day-one import, 8 Oct; docs/features/IMPORT.md §4.5, §14):
   Add subject dialog shows the field empty for a catalogue row with no fee, never 0, and asks the
   reason when self-study only at 0, as the offer's drawer does.
 
+Added by F6a (the session in the school's words, 11 Oct 2026; docs/features/SESSION_WORDS.md §3–§4):
+
+- **`PUT /v1/sessions/:id/offers/:offerId/form`** (admin, coordinator) — one subject's whole form in one
+  transaction, `saveOfferForm(sessionId, offerId, OfferForm, actorId)` in `offer.services.ts`. Its locks
+  follow §2.1: the students of the lines a sitting change moves (`withStudentsFirst`), the session
+  `FOR SHARE`, the offer `FOR UPDATE`, its items `FOR UPDATE` in id order, then for every move at once the
+  series `FOR SHARE`, the target fee grids shared and fee rows `FOR SHARE` (`lockMoveFeeRows`), every moving
+  line `FOR UPDATE` in one statement in id order, then the lines' F4 entries. Only what differs is written;
+  the same form twice writes nothing. A close of a subject, paper, unit or qualification with live lines
+  is refused without `linesStand` (409, "… has N reservations: … Tick "Its N reservations stand" to save").
+  The services' bodies after their locks are shared with the old endpoints: `changeOfferInTx` (updateOffer),
+  `changeItemInTx` (updateItem), `createItemInTx` (createItem), `liveLinesByItem` (deleteItem's count) and
+  **`changeItemsSeries(tx, session, subject, moves[], …)`** — the series move for several items at once
+  (`changeItemSeries` is it with one move); any path moving several items' lines in one transaction uses it.
+- **`GET /v1/registrations/offers/preview?sessionId=`** (admin, coordinator) — `offersPreview(sessionId)` in
+  `offers-read.services.ts`, the family read (`offersForStudent`) with no student: no `eligibility`, no
+  `knownSittings`, no `held`, prices with no family's exception (`priceLine(…, { exceptionIds: [] })`).
+  The Reserve rows are exported (`OfferRows`, `ReservePreview` in `components/reservations/reserve.tsx`).
+- **A one-paper item is always a retake** (the lead, 11 Oct): `assertLineRules` refuses a first entry on a
+  `one_paper` item (a rule, no exception lifts it), the offers read lists none, and F7's import plans a
+  one-paper line as a retake whatever staff or the coordinator's answer say (the review of F6a, finding 3).
+- **A paper the form makes later joins the whole subject's exclusive group** (the review of F6a, finding 1):
+  a whole item with no group takes the paper's ('entry') through updateItem's logic, so the two are one or
+  the other for a family.
+- **`itemDisplayLabel(item)`** (`@repo/validations`) — the stored "Whole subject" of a whole item reads "All
+  papers" on every screen; the stored label (generateItems, `findItem`) is unchanged.
+- **`GET /sessions/:id/offers`** also answers `shares` (the pricing percentages), each item's
+  `qualification` (code, title, level) and each IGCSE offer's `papersToAdd` (withOnePaper's papers not yet
+  items); an item's own teachers come in their order.
+
 ## 3. As built (step 1)
 
 Commits on `feature/rework-sessions`: 7e83d60 (schema, migrations, services), d56ef27 (the F0b
