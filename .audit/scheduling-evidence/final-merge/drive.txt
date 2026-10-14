@@ -1,0 +1,124 @@
+F1 final merge: the drive on 895ed00 (web 3012 and API 3013 - 3010/3011 are held by processes this session did not start - database igcse_scheduling_final_dev: a fresh copy of igcse_template_dev migrated to the branch, 61 migrations; the school seeded through the API with placeholders only). Run 2026-10-14T23:31Z to 23:35Z.
+
+
+admin: landed on /; 24 sidebar items; F1 items: none
+  shot sidebar-admin-en.jpg 59 KB
+
+coordinator: landed on /; 14 sidebar items; F1 items: none
+  shot sidebar-coordinator-en.jpg 59 KB
+
+finance_admin: landed on /desk; 13 sidebar items; F1 items: none
+  shot sidebar-finance_admin-en.jpg 45 KB
+
+finance_officer: landed on /desk; 9 sidebar items; F1 items: none
+  shot sidebar-finance_officer-en.jpg 42 KB
+
+teacher: landed on /; 3 sidebar items; F1 items: none
+  shot sidebar-teacher-en.jpg 43 KB
+
+gate: landed on /; 3 sidebar items; F1 items: none
+  shot sidebar-gate-en.jpg 43 KB
+
+parent: landed on /; 12 sidebar items; F1 items: none
+  shot sidebar-parent-en.jpg 69 KB
+
+student: landed on /; 9 sidebar items; F1 items: none
+  shot sidebar-student-en.jpg 63 KB
+admin en /timetable/groups: http 200 → /timetable/groups; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Teaching groups | Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; a student is never in two groups of one subject, or of one unit.
+  shot admin-groups-en.jpg 96 KB
+admin en /timetable/versions: http 200 → /timetable/versions; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Timetables | Each term's drafts and published versions. The one in force is marked; earlier versions stay on record, so any past day can be read back.
+  shot admin-versions-en.jpg 75 KB
+admin en /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455: http 200 → /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1 (changes)
+  shot admin-editor-en.jpg 90 KB
+admin en /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1: http 200 → /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1
+  shot admin-published-en.jpg 101 KB
+admin en /timetable/rules: http 200 → /timetable/rules; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Timetable rules | When a teacher or a room cannot be used, a teacher's most periods a day and a week, and lessons kept on different days. The generator and every move obey them.
+  shot admin-rules-en.jpg 69 KB
+admin en /timetable/cover: http 200 → /timetable/cover; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Cover | Record who is away, see the lessons it leaves, and give each one a free teacher of the subject — or cancel it. The cover teacher and the class are told.
+  shot admin-cover-en.jpg 63 KB
+admin ar /timetable/groups: http 200 → /timetable/groups; dir rtl; arabic 56%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | مجموعات التدريس | من يدرس معًا، ومع من، وكم حصة أسبوعيًا. تُكوَّن من الالتحاق بالمقررات (الدراسة الذاتية لا تكوّن مجموعة) ومن الفصول؛ ولا يكون طالب في مجموعتين لمادة واحدة أو لوحدة واحدة.
+  shot admin-groups-ar.jpg 78 KB
+admin ar /timetable/versions: http 200 → /timetable/versions; dir rtl; arabic 89%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الجداول الدراسية | مسودات كل فصل دراسي ونسخه المنشورة. يُميَّز الجدول الساري؛ وتبقى النسخ السابقة في السجل، فيمكن الرجوع إلى أي يوم مضى.
+  shot admin-versions-ar.jpg 65 KB
+admin ar /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455: http 200 → /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455; dir rtl; arabic 40%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1 (changes)
+  shot admin-editor-ar.jpg 84 KB
+admin ar /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1: http 200 → /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1; dir rtl; arabic 53%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1
+  shot admin-published-ar.jpg 89 KB
+admin ar /timetable/rules: http 200 → /timetable/rules; dir rtl; arabic 67%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | قواعد الجدول | متى لا يمكن الاستعانة بمعلم أو قاعة، وأقصى حصص المعلم يوميًا وأسبوعيًا، والحصص التي تُفصل على أيام مختلفة. يلتزم بها التوليد وكل نقل.
+  shot admin-rules-ar.jpg 60 KB
+admin ar /timetable/cover: http 200 → /timetable/cover; dir rtl; arabic 75%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الحصص البديلة | سجّل من الغائب، واطّلع على الحصص التي يتركها، وأعطِ كل حصة معلمًا متاحًا للمادة — أو ألغها. ويُبلَّغ المعلم البديل والفصل.
+  shot admin-cover-ar.jpg 54 KB
+coordinator en /timetable/groups: http 200 → /timetable/groups; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Teaching groups | Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; a student is never in two groups of one subject, or of one unit.
+  shot coordinator-groups-en.jpg 96 KB
+coordinator en /timetable/versions: http 200 → /timetable/versions; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Timetables | Each term's drafts and published versions. The one in force is marked; earlier versions stay on record, so any past day can be read back.
+  shot coordinator-versions-en.jpg 76 KB
+coordinator en /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455: http 200 → /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1 (changes)
+  shot coordinator-editor-en.jpg 91 KB
+coordinator en /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1: http 200 → /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1
+  shot coordinator-published-en.jpg 102 KB
+coordinator en /timetable/rules: http 200 → /timetable/rules; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Timetable rules | When a teacher or a room cannot be used, a teacher's most periods a day and a week, and lessons kept on different days. The generator and every move obey them.
+  shot coordinator-rules-en.jpg 70 KB
+coordinator en /timetable/cover: http 200 → /timetable/cover; dir ltr; arabic 0%; Timetables | Teaching groups | Rules | Cover | Cover | Record who is away, see the lessons it leaves, and give each one a free teacher of the subject — or cancel it. The cover teacher and the class are told.
+  shot coordinator-cover-en.jpg 64 KB
+coordinator ar /timetable/groups: http 200 → /timetable/groups; dir rtl; arabic 56%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | مجموعات التدريس | من يدرس معًا، ومع من، وكم حصة أسبوعيًا. تُكوَّن من الالتحاق بالمقررات (الدراسة الذاتية لا تكوّن مجموعة) ومن الفصول؛ ولا يكون طالب في مجموعتين لمادة واحدة أو لوحدة واحدة.
+  shot coordinator-groups-ar.jpg 78 KB
+coordinator ar /timetable/versions: http 200 → /timetable/versions; dir rtl; arabic 89%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الجداول الدراسية | مسودات كل فصل دراسي ونسخه المنشورة. يُميَّز الجدول الساري؛ وتبقى النسخ السابقة في السجل، فيمكن الرجوع إلى أي يوم مضى.
+  shot coordinator-versions-ar.jpg 66 KB
+coordinator ar /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455: http 200 → /timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455; dir rtl; arabic 40%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1 (changes)
+  shot coordinator-editor-ar.jpg 85 KB
+coordinator ar /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1: http 200 → /timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1; dir rtl; arabic 53%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1
+  shot coordinator-published-ar.jpg 89 KB
+coordinator ar /timetable/rules: http 200 → /timetable/rules; dir rtl; arabic 67%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | قواعد الجدول | متى لا يمكن الاستعانة بمعلم أو قاعة، وأقصى حصص المعلم يوميًا وأسبوعيًا، والحصص التي تُفصل على أيام مختلفة. يلتزم بها التوليد وكل نقل.
+  shot coordinator-rules-ar.jpg 60 KB
+coordinator ar /timetable/cover: http 200 → /timetable/cover; dir rtl; arabic 75%; الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الحصص البديلة | سجّل من الغائب، واطّلع على الحصص التي يتركها، وأعطِ كل حصة معلمًا متاحًا للمادة — أو ألغها. ويُبلَّغ المعلم البديل والفصل.
+  shot coordinator-cover-ar.jpg 54 KB
+parent en /my-timetable: http 200 → /my-timetable; dir ltr; arabic 0%; Timetables | The week as it will run: holidays, short days and cover included. | Student Placeholder 1 | 11 October – 17 October 2026 | ‹ | This week
+  shot parent-my-timetable-en.jpg 74 KB
+parent ar /my-timetable: http 200 → /my-timetable; dir rtl; arabic 76%; الجداول الدراسية | الأسبوع كما سيجري: الإجازات والأيام القصيرة والحصص البديلة مضمّنة. | Student Placeholder 1 | 11 أكتوبر – 17 أكتوبر 2026 | ‹ | هذا الأسبوع
+  shot parent-my-timetable-ar.jpg 62 KB
+student en /my-timetable: http 200 → /my-timetable; dir ltr; arabic 0%; My timetable | The week as it will run: holidays, short days and cover included. | 11 October – 17 October 2026 | ‹ | This week | ›
+  shot student-my-timetable-en.jpg 71 KB
+student ar /my-timetable: http 200 → /my-timetable; dir rtl; arabic 79%; جدولي | الأسبوع كما سيجري: الإجازات والأيام القصيرة والحصص البديلة مضمّنة. | 11 أكتوبر – 17 أكتوبر 2026 | ‹ | هذا الأسبوع | ›
+  shot student-my-timetable-ar.jpg 58 KB
+  shot coordinator-cover-find-en.jpg 81 KB
+cover after assign: Timetables | Teaching groups | Rules | Cover | Cover | Record who is away, see the lessons it leaves, and give each one a free teacher of the subject — or cancel it. The cover teacher and the class are told. | By day | Log | Report | ‹ | Day | › | Today | Thursday 15 October 2026
+  shot coordinator-cover-assigned-en.jpg 64 KB
+student record: http 200; week section 0; F1 links 0; 'timetable' in text: false
+  shot admin-student-record-en.jpg 71 KB
+
+ERRORS: 
+admin@igcse.local pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/clien
+coordinator.f1@igcse.local pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/clien
+parent.f1d1@igcse.local pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/clien
+student.f1d1@igcse.local pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/clien
+
+--- After the cover (as the parent, /my-timetable, 23:33Z; after.mjs MODE=cover)
+parent week after the cover: Physics (drive) | Room 11A · Teacher E | Cover
+  shot parent-my-timetable-after-cover-en.jpg
+
+--- The switch off (the drive's copy of apps/web with RESERVATION_CYCLE_ONLY = false, then set back; after.mjs MODE=switch-off)
+admin (switch off): 45 sidebar items; F1 items: /timetable/versions, /timetable/groups, /timetable/rules, /timetable/cover
+coordinator (switch off): 30 sidebar items; F1 items: /timetable/versions, /timetable/groups, /timetable/rules, /timetable/cover
+parent (switch off): 15 sidebar items; F1 items: /my-timetable
+student (switch off): 13 sidebar items; F1 items: /my-timetable
+(with the switch on, above: 24, 14, 12 and 9, no F1 item; RESERVATION_FOCUS.md section 2's after counts)
+
+--- The hydration error (as the admin; hydration.mjs): Arabic only, on every page, F1's or not — main's I18nProvider (SCHEDULING.md 17.4), not F1's
+en /: no page error
+en /admin/sessions: no page error
+en /students: no page error
+en /timetable/groups: no page error
+en /timetable/cover: no page error
+ar /: Hydration failed because the server rendered text didn't match the client.
+ar /admin/sessions: Hydration failed because the server rendered text didn't match the client.
+ar /students: Hydration failed because the server rendered text didn't match the client.
+ar /timetable/groups: Hydration failed because the server rendered text didn't match the client.
+ar /timetable/cover: Hydration failed because the server rendered text didn't match the client.

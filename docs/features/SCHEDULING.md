@@ -676,6 +676,21 @@ with `git merge-tree` (nothing in lead-env touched), the rework's side winning o
      so `0059`/`0060` stand. Proven on a fresh copy of the template: 34 → main's folder at acaadc5
      59, no F1 table → the branch's 61, the last two 1791510450087 and 1791510469146, the 14 F1
      tables → again 61 (`final-merge/migrations.txt`); `drizzle-kit generate` finds no schema change.
+   - Committed as **`895ed00`** (parents `b3e096f`, `acaadc5`); gates on its tree: both check-types
+     clean, the suite 43 files, 832 passed, 1 todo in local time and with TZ=UTC; CI 38654337671 green.
+   - **Driven after the merge** (API 3013, web 3012 — 3011/3010 are held by servers this session did
+     not start; `igcse_scheduling_final_dev`, a fresh copy of the template migrated to the branch; a
+     placeholder school seeded through the API): with the switch on no sidebar of any role has an F1
+     item (F6b's after counts unchanged: 24, 14, 13, 9, 3, 3, 12, 9); every F1 screen opens by URL
+     and renders, in English and Arabic, as the admin and the coordinator (Teaching groups,
+     Timetables, a draft's editor, the published version, Rules, Cover) and as a parent and a student
+     (My timetable); Cover through the screen (Find cover ranks the free teacher of the subject first,
+     Assign; the parent's week then shows the cover); the student record shows no week and links to
+     no F1 screen; with the switch off (on the drive's copy only) F1's items come back (admin 45,
+     coordinator 30, parent 15, student 13). The only page error is the Arabic hydration error, on
+     every page in Arabic and none in English — main's `I18nProvider` (17.4), not this merge's.
+     Evidence: `.audit/scheduling-evidence/final-merge/` (`drive.txt`, `drive-report.json`, 44
+     screenshots).
 
 ## 15. Progress log
 
@@ -754,6 +769,24 @@ with `git merge-tree` (nothing in lead-env touched), the rework's side winning o
   19:26Z a race found timing out under load during a control (5 s), three clean runs, waits raised
   to 20 s; 19:42Z the suite green in local time and UTC (637 passed, 1 todo); 759c066.
 - 19:43Z — merged `5b911d2` (681e98c), pushed; 19:52Z CI green on 681e98c (run 37834144754).
+- 20:13Z — the reviewer's confirmation: "merge after F7"; 20:15Z the handover's audit row (its
+  item 5's note) with RV5c red, committed as `011900e` (not pushed until the final merge).
+- **9 Oct 2026** — 01:42Z the final merge of `384c5a2` (F4, F7) written into the worktree, sixteen
+  conflicts resolved; 01:52Z F1's migrations regenerated as 0059/0060 and proven; then the weekly
+  limit stopped the work before the commit. The owner paused the agents; F6a and F6b went first.
+- **15 Oct 2026** (the times are UTC, the evening of 14 Oct), resumed by a new Opus 5.5 implementer:
+- 23:04Z — the 9 Oct merge committed as it was left (`b3e096f`), after checking the worktree against
+  merge-tree's tree file for file.
+- 23:06–23:10Z — main `acaadc5` (F6a, F6b) merged: two conflicts, F1's screens on F6b's lists for
+  every role, the student record's week hidden with them; the six files git merged read.
+- 23:11Z — the migrations proven on a fresh copy of the template (61, 0059 and 0060 last).
+- 23:12Z — both check-types clean; 23:20Z and 23:27Z the suite green in local time and UTC (43 files,
+  832 passed, 1 todo).
+- 23:28Z — the merge committed (`895ed00`) and pushed; 23:44Z CI green on it (run 38654337671).
+- 23:29–23:35Z — driven on 3013/3012 (§14, item 7); servers stopped by PID, the drive's copy of the web
+  app removed.
+- Next: the reviewer's confirmation of the merge resolution, then the lead's merge; then D's switch to
+  `studentsOfGroup` and `listGroups` (§8).
 
 ## 16. The review round (Opus 5.5 review of 9569dd9; the lead's decisions applied)
 
