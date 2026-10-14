@@ -349,7 +349,7 @@ The Session screen (F6a's files) has no link that leads outside; nothing there w
 | `pnpm --filter @repo/api check-types` | green on e8f9619, 00cbbdf and **e225805** |
 | API suite, local time, `igcse_focus_test` | before the merge: 34 files, 725 passed, 1 todo — e8f9619 (`suite-local-e8f9619.log`); **on the merge e225805: 35 files, 737 passed, 1 todo** (`suite-local-e225805.log`; F6a's 08u is the 35th) |
 | API suite, `TZ=UTC` | before the merge: 34 files, 725 passed, 1 todo — e8f9619 (`suite-utc-e8f9619.log`); **on the merge e225805: 35 files, 737 passed, 1 todo** (`suite-utc-e225805.log`) |
-| CI (`.github/workflows/ci.yml`) | run 38637562968 green on bbd3708; run 38641932643 green on 00cbbdf (all four gates: evidence size, API type-check, web type-check, the suite) |
+| CI (`.github/workflows/ci.yml`) | run 38637562968 green on bbd3708; run 38641932643 green on 00cbbdf (all four gates: evidence size, API type-check, web type-check, the suite); **run 38646535313 green on 602f980, the commit on top of the merge with main** |
 | `useQuery<` count in `apps/web/app` | 19 (the limit is 35); a probe showed the home-summary, sessions and statement responses typed, not `any` |
 
 **The drive** (headless Chrome, `playwright-core` in `/tmp/rf/pw`, `channel: 'chrome'`; every role signs
