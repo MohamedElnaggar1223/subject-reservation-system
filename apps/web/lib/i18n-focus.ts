@@ -1,0 +1,139 @@
+/**
+ * Arabic for F6b, the reservation cycle only (docs/features/RESERVATION_FOCUS.md): the landings —
+ * the admin's and the coordinator's cycle (app/(app)/cycle-landing.client.tsx), the family's next
+ * step (family-next.client.tsx), the teacher's and the gate's (later-landing.client.tsx), the
+ * desk's "Today" (desk/desk-today.client.tsx) — and the sidebar's stage titles (the nav keys are in
+ * lib/i18n.tsx). Merged into the page translator in lib/i18n.tsx as the other screens' files are:
+ * exact English text → Arabic; a word the app already translates keeps its Arabic. Numbers, names
+ * and dates are their own text nodes, so every entry here is words only.
+ *
+ * Words, as the rest of the app has them: a session الجلسة, the links sheet الكشف (F6a), a board
+ * المجلس, an entry القيد, a declared sitting دورة مُصرَّح بها, the statement كشف الحساب, the school
+ * fee المصاريف الدراسية, the wallet المحفظة, the desk المكتب, the Money tab تبويب المال.
+ */
+
+export const focusArabic: Record<string, string> = {
+  // ── The admin's and the coordinator's landing ──
+  'The reservation cycle: where each session stands, and what comes next.': 'دورة الحجز: أين تقف كل جلسة، وما الخطوة التالية.',
+  'No session is open or being prepared.': 'لا توجد جلسة مفتوحة أو قيد الإعداد.',
+  'Start the next one: copy the last session of its kind and its subjects, teachers and course fees come across.':
+    'ابدأ الجلسة التالية: انسخ آخر جلسة من نوعها فتنتقل موادها ومعلموها ورسوم مقرراتها.',
+  'The admin starts the next session; it appears here with what its sheet still needs.':
+    'يبدأ المدير الجلسة التالية، وتظهر هنا مع ما ينقص كشفها.',
+  'Start the next session': 'ابدأ الجلسة التالية',
+  'Being prepared: not open to families yet.': 'قيد الإعداد: لم تُفتح للأسر بعد.',
+  'Families reserve from': 'تحجز الأسر من',
+  'Open: families reserve until': 'مفتوحة: تحجز الأسر حتى',
+  'Payment due': 'موعد الدفع',
+  'Closed to new reservations.': 'مغلقة أمام الحجوزات الجديدة.',
+  'The last session; the next one starts from it.': 'هذه آخر جلسة، ومنها تبدأ الجلسة التالية.',
+  'Open the sheet': 'افتح الكشف',
+  'What the sheet still needs': 'ما ينقص الكشف',
+  'Checking the sheet…': 'جارٍ فحص الكشف…',
+  'Nothing is missing: every subject has its teachers, its fees and its dates.': 'لا شيء ناقص: لكل مادة معلموها ورسومها ومواعيدها.',
+  'No subjects on the sheet yet.': 'لا مواد في الكشف بعد.',
+  'Add the subjects': 'أضف المواد',
+  'subject has no teacher: who teaches it?': 'مادة بلا معلم: من يدرّسها؟',
+  'subjects have no teacher: who teaches them?': 'مواد بلا معلم: من يدرّسها؟',
+  'Name the teachers': 'حدّد المعلمين',
+  'subject needs its papers set on the Catalogue': 'مادة تحتاج إلى تحديد أوراقها في الكتالوج',
+  'subjects need their papers set on the Catalogue': 'مواد تحتاج إلى تحديد أوراقها في الكتالوج',
+  'Open the Catalogue': 'افتح الكتالوج',
+  'subject has no board fee': 'مادة بلا رسم مجلس',
+  'subjects have no board fee': 'مواد بلا رسم مجلس',
+  'Set the fees': 'حدّد الرسوم',
+  'board fee not published yet': 'رسم مجلس لم يُنشر بعد',
+  'board fees not published yet': 'رسوم مجلس لم تُنشر بعد',
+  'Families can reserve these subjects, not pay for them, until the fee is confirmed.': 'تستطيع الأسر حجز هذه المواد لا دفعها حتى يُؤكَّد الرسم.',
+  'Confirm the fees': 'أكّد الرسوم',
+  'Set the dates': 'حدّد المواعيد',
+  'Sittings to verify': 'دورات مُصرَّح بها للتحقق',
+  'declared sitting to verify': 'دورة مُصرَّح بها للتحقق',
+  'declared sittings to verify': 'دورات مُصرَّح بها للتحقق',
+  'Verify them': 'تحقّق منها',
+  'What families are doing': 'ما تفعله الأسر',
+  'No family has reserved yet.': 'لم تحجز أي أسرة بعد.',
+  'Reserve for a family at the desk': 'احجز لأسرة من المكتب',
+  'reservation': 'حجز',
+  'reservations': 'حجوزات',
+  'Remind the overdue families': 'ذكّر الأسر المتأخرة',
+  'See who has not paid': 'اعرض من لم يدفع',
+  'Entries to the board': 'القيد لدى المجالس',
+  'entries by': 'القيد حتى',
+  'no entry deadline yet': 'لم يُحدَّد موعد القيد بعد',
+  'Part of this session could not be read. Open the sheet to see it.': 'تعذّرت قراءة جزء من هذه الجلسة. افتح الكشف لرؤيته.',
+
+  // ── The teacher's and the gate's landing ──
+  'Your screens come later': 'شاشاتك لاحقًا',
+  'The school is starting with reservations and fees. The gate’s screens — the day’s leave list and check-out — come after them.':
+    'تبدأ المدرسة بالحجوزات والرسوم. شاشات البوابة — قائمة الخروج اليومية وتسجيل الخروج — تأتي بعدها.',
+  'The school is starting with reservations and fees. Your teaching screens — your lessons, attendance and forecasts — come after them.':
+    'تبدأ المدرسة بالحجوزات والرسوم. شاشات التدريس — حصصك والحضور والدرجات المتوقعة — تأتي بعدها.',
+  'Until then, your notifications and your profile are here.': 'وحتى ذلك الحين، تجد هنا إشعاراتك وملفك الشخصي.',
+  'See every notification': 'اعرض كل الإشعارات',
+  'No notifications yet.': 'لا إشعارات بعد.',
+  'Manage your account information': 'إدارة معلومات حسابك',
+  'Open your profile': 'افتح ملفك الشخصي',
+
+  // ── The family's landing ──
+  'Start by linking your child': 'ابدأ بربط طفلك',
+  'You need a linked child before you can reserve subjects or pay fees. If your child already has an account, ask for the link; otherwise the school office sets both up for you in one visit.':
+    'تحتاج إلى طفل مرتبط قبل أن تحجز المواد أو تدفع الرسوم. إن كان لطفلك حساب فاطلب الربط، وإلا فمكتب المدرسة ينشئ الحسابين لك في زيارة واحدة.',
+  'Link my child': 'اربط طفلي',
+  'What comes next': 'الخطوة التالية',
+  'Nothing is waiting on you': 'لا شيء ينتظرك',
+  'Everything reserved is paid.': 'كل ما حُجز مدفوع.',
+  'No session is open for reservations right now. You will be told when the next one opens.': 'لا توجد جلسة مفتوحة للحجز الآن. سنخبرك حين تُفتح الجلسة التالية.',
+  'For each of your children, the next step of the reservation.': 'لكل طفل من أطفالك، الخطوة التالية في الحجز.',
+  'Your reservations and requests, and what each one needs.': 'حجوزاتك وطلباتك، وما يحتاجه كل منها.',
+  'The family statement': 'كشف حساب الأسرة',
+  'My statement': 'كشف حسابي',
+  'The school fee for': 'المصاريف الدراسية لعام',
+  'is not paid yet: reserving opens after it.': 'لم تُدفع بعد: يُفتح الحجز بعد دفعها.',
+  'Pay the school fee': 'ادفع المصاريف الدراسية',
+  'The school fee is not paid yet: ask your parent.': 'المصاريف الدراسية لم تُدفع بعد: اطلب من ولي أمرك.',
+  'opens on': 'تُفتح في',
+  '; you can preregister now.': '، ويمكنك التسجيل المسبق الآن.',
+  'is open for reservations until': 'مفتوحة للحجز حتى',
+  'Preregister': 'سجّل مسبقًا',
+  'Reserve subjects': 'احجز المواد',
+  'subject is waiting for your approval': 'مادة تنتظر موافقتك',
+  'subjects are waiting for your approval': 'مواد تنتظر موافقتك',
+  'subject is waiting for your parent’s approval': 'مادة تنتظر موافقة ولي أمرك',
+  'subjects are waiting for your parent’s approval': 'مواد تنتظر موافقة ولي أمرك',
+  'to pay': 'للدفع',
+  'overdue since': 'متأخرة منذ',
+  'due by': 'مستحقة حتى',
+  'Payable once the board publishes its fee.': 'تُدفع حين ينشر المجلس رسمه.',
+  'Pay now': 'ادفع الآن',
+  'See the statement': 'اعرض كشف الحساب',
+  'Ask your parent: see the statement': 'اطلب من ولي أمرك، واعرض كشف الحساب',
+  'subject reserved and paid': 'مادة محجوزة ومدفوعة',
+  'subjects reserved and paid': 'مواد محجوزة ومدفوعة',
+  'Add a subject': 'أضف مادة',
+  'Reserve another subject': 'احجز مادة أخرى',
+  'receipt to bring back to the school to release the refund': 'إيصال يُعاد إلى المدرسة لصرف الاسترداد',
+  'receipts to bring back to the school to release the refund': 'إيصالات تُعاد إلى المدرسة لصرف الاسترداد',
+  'drop or swap request to review': 'طلب حذف أو تبديل للمراجعة',
+  'drop or swap requests to review': 'طلبات حذف أو تبديل للمراجعة',
+  'drop or swap request waiting': 'طلب حذف أو تبديل قيد الانتظار',
+  'drop or swap requests waiting': 'طلبات حذف أو تبديل قيد الانتظار',
+  'My requests': 'طلباتي',
+  'In the wallet:': 'في المحفظة:',
+  'available': 'متاح',
+
+  // ── The desk's "Today" ──
+  'Today at the desk': 'اليوم في المكتب',
+  'Part of today could not be read.': 'تعذّرت قراءة جزء من بيانات اليوم.',
+  'Collected today': 'المُحصَّل اليوم',
+  'Daily takings': 'إيرادات اليوم',
+  'Due today': 'المستحق اليوم',
+  'item due today': 'بند مستحق اليوم',
+  'items due today': 'بنود مستحقة اليوم',
+  'Open the Money tab': 'افتح تبويب المال',
+  'item past its due date': 'بند تجاوز موعد استحقاقه',
+  'items past their due date': 'بنود تجاوزت موعد استحقاقها',
+  'Remind them': 'ذكّرهم',
+  'due today': 'مستحق اليوم',
+  'Charges and instalments included:': 'تشمل الرسوم الأخرى والأقساط:',
+};

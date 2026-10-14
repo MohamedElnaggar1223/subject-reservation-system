@@ -36,6 +36,7 @@ import { SeriesDeadlineStatus } from './entries-shared';
 import { DerivePanel } from './derive.client';
 import { AddEntryPanel } from './add-entry.client';
 import { EntriesTable } from './entries-table.client';
+import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
 
 export default function EntriesClient(): React.JSX.Element {
   const { series, chosen, choose, isLoading } = useSeriesChoice();
@@ -58,9 +59,12 @@ export default function EntriesClient(): React.JSX.Element {
               <Button asChild variant="outline" size="sm">
                 <Link href={`/exams/entry-lists?series=${chosen.id}` as Route}>The board&apos;s entry list</Link>
               </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/exams/forecasts?series=${chosen.id}` as Route}>Forecast grades</Link>
-              </Button>
+              {/* F6b: forecast grades are outside the reservation cycle for now (lib/reservation-focus.ts). */}
+              {!leadsOutsideTheCycle('/exams/forecasts') && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/exams/forecasts?series=${chosen.id}` as Route}>Forecast grades</Link>
+                </Button>
+              )}
             </div>
           )}
         </div>

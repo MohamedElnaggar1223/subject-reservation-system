@@ -8,8 +8,12 @@ import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import AuthLayout from "~/components/auth-layout"
 import { getSignInError, getNetworkError } from "~/lib/auth-errors"
+import { RESERVATION_CYCLE_ONLY, cycleLandingFor } from "~/lib/reservation-focus"
 
 function roleRedirect(role?: string | null): string {
+  // F6b: while the school works on the reservation cycle only, every role lands on the cycle's
+  // next step (lib/reservation-focus.ts); with the switch off, as before.
+  if (RESERVATION_CYCLE_ONLY) return cycleLandingFor(role);
   switch (role) {
     case 'admin':   return '/admin/dashboard';
     case 'student': return '/register';
