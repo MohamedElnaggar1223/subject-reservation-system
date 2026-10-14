@@ -348,6 +348,9 @@ family's form previewed from the row instead of built.
 | web check-types | 0252b82, and again on the push | green | session log |
 | API suite, local time (Africa/Cairo) | 0252b82 | 35 files, 735 passed, 1 todo | `.audit/session-words-evidence/suite-local-0252b82.log` |
 | API suite, `TZ=UTC` | 0252b82 | 35 files, 735 passed, 1 todo | `suite-utc-0252b82.log` |
+| API and web check-types, the review round | 717475e | green | session log |
+| API suite, local time, the review round | 717475e | 35 files, 737 passed, 1 todo | `suite-local-717475e.log` |
+| API suite, `TZ=UTC`, the review round | 717475e | 35 files, 737 passed, 1 todo | `suite-utc-717475e.log` |
 | `useQuery<` generics in apps/web/app | — | 19 (ceiling 35) | — |
 
 The commit after 0252b82 changes only the web (a unit's sitting sent only when changed; the sheet's
@@ -448,4 +451,5 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
   offered by the form; ticking it unticks All papers on the family's page; "Correct the sitting", the Fees
   copy dialog, "Subject · papers", in EN and AR); the dates measured like for like (5 inputs, 2 clicks, no
   page change); findings 2 and 8 in §8, §10, §11, §12 and measure-counts.json.
-- Next: the gates on the round's commit, push, CI; the reviewer confirms the fix diff.
+- 21:09Z / 21:14Z — the suite green in local time and with TZ=UTC on 717475e (737 passed each).
+- Next: push, CI; the reviewer confirms the fix diff.
