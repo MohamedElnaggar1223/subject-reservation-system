@@ -1,0 +1,840 @@
+{
+  "admin": {
+    "email": "admin@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 24,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Set up",
+        "label": "Sessions",
+        "href": "/admin/sessions"
+      },
+      {
+        "section": "Set up",
+        "label": "Exam Catalogue",
+        "href": "/exams/catalogue"
+      },
+      {
+        "section": "Set up",
+        "label": "Subjects",
+        "href": "/admin/subjects"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Series",
+        "href": "/exams/series"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Services",
+        "href": "/exams/services"
+      },
+      {
+        "section": "Set up",
+        "label": "School Fees",
+        "href": "/admin/school-fees"
+      },
+      {
+        "section": "Set up",
+        "label": "Settings",
+        "href": "/settings"
+      },
+      {
+        "section": "Set up",
+        "label": "Day-one Import",
+        "href": "/imports"
+      },
+      {
+        "section": "Set up",
+        "label": "Team",
+        "href": "/admin/team"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "The Desk",
+        "href": "/desk"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Students",
+        "href": "/students"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Charges",
+        "href": "/charges"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Payments",
+        "href": "/admin/payments"
+      },
+      {
+        "section": "Follow up",
+        "label": "Exceptions",
+        "href": "/admin/exceptions"
+      },
+      {
+        "section": "Follow up",
+        "label": "Messages",
+        "href": "/admin/messages"
+      },
+      {
+        "section": "Follow up",
+        "label": "Escrow",
+        "href": "/admin/escrow"
+      },
+      {
+        "section": "Money",
+        "label": "Finance Workbench",
+        "href": "/finance"
+      },
+      {
+        "section": "Money",
+        "label": "Daily Takings",
+        "href": "/takings"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Exam Deadlines",
+        "href": "/exams/deadlines"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Exam Entries",
+        "href": "/exams/entries"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Entry Lists",
+        "href": "/exams/entry-lists"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "الجلسات",
+      "دليل الامتحانات",
+      "المواد",
+      "دورات المجالس",
+      "خدمات المجالس",
+      "المصاريف الدراسية",
+      "الإعدادات",
+      "استيراد بدء التشغيل",
+      "الفريق",
+      "المكتب",
+      "الطلاب",
+      "الرسوم الأخرى",
+      "المدفوعات",
+      "الاستثناءات",
+      "الرسائل",
+      "الرصيد",
+      "مكتب المالية",
+      "إيرادات اليوم",
+      "مواعيد الامتحانات",
+      "قيود الامتحانات",
+      "قوائم القيد",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-admin-landing-en.jpg",
+      "after-merge-admin-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "coordinator": {
+    "email": "coordinator.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 14,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Set up",
+        "label": "Sessions",
+        "href": "/admin/sessions"
+      },
+      {
+        "section": "Set up",
+        "label": "Exam Catalogue",
+        "href": "/exams/catalogue"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Series",
+        "href": "/exams/series"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Services",
+        "href": "/exams/services"
+      },
+      {
+        "section": "Set up",
+        "label": "Settings",
+        "href": "/settings"
+      },
+      {
+        "section": "Set up",
+        "label": "Day-one Import",
+        "href": "/imports"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Students",
+        "href": "/students"
+      },
+      {
+        "section": "Follow up",
+        "label": "Exceptions",
+        "href": "/admin/exceptions"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Exam Deadlines",
+        "href": "/exams/deadlines"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Exam Entries",
+        "href": "/exams/entries"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Entry Lists",
+        "href": "/exams/entry-lists"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "الجلسات",
+      "دليل الامتحانات",
+      "دورات المجالس",
+      "خدمات المجالس",
+      "الإعدادات",
+      "استيراد بدء التشغيل",
+      "الطلاب",
+      "الاستثناءات",
+      "مواعيد الامتحانات",
+      "قيود الامتحانات",
+      "قوائم القيد",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-coordinator-landing-en.jpg",
+      "after-merge-coordinator-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "finance_admin": {
+    "email": "finadmin.rana@igcse.local",
+    "landingAfterSignIn": "/desk",
+    "sidebarFirstItem": "/desk",
+    "firstItemResolvesTo": null,
+    "count": 13,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "The Desk",
+        "href": "/desk"
+      },
+      {
+        "section": "Set up",
+        "label": "Sessions",
+        "href": "/admin/sessions"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Services",
+        "href": "/exams/services"
+      },
+      {
+        "section": "Set up",
+        "label": "School Fees",
+        "href": "/admin/school-fees"
+      },
+      {
+        "section": "Set up",
+        "label": "Settings",
+        "href": "/settings"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Students",
+        "href": "/students"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Charges",
+        "href": "/charges"
+      },
+      {
+        "section": "Follow up",
+        "label": "Exceptions",
+        "href": "/admin/exceptions"
+      },
+      {
+        "section": "Follow up",
+        "label": "Messages",
+        "href": "/admin/messages"
+      },
+      {
+        "section": "Money",
+        "label": "Finance Workbench",
+        "href": "/finance"
+      },
+      {
+        "section": "Money",
+        "label": "Daily Takings",
+        "href": "/takings"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "المكتب",
+      "الجلسات",
+      "خدمات المجالس",
+      "المصاريف الدراسية",
+      "الإعدادات",
+      "الطلاب",
+      "الرسوم الأخرى",
+      "الاستثناءات",
+      "الرسائل",
+      "مكتب المالية",
+      "إيرادات اليوم",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-finance_admin-landing-en.jpg",
+      "after-merge-finance_admin-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "finance_officer": {
+    "email": "officer.mona@igcse.local",
+    "landingAfterSignIn": "/desk",
+    "sidebarFirstItem": "/desk",
+    "firstItemResolvesTo": null,
+    "count": 9,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "The Desk",
+        "href": "/desk"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Students",
+        "href": "/students"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Charges",
+        "href": "/charges"
+      },
+      {
+        "section": "Follow up",
+        "label": "Sessions",
+        "href": "/admin/sessions"
+      },
+      {
+        "section": "Follow up",
+        "label": "Messages",
+        "href": "/admin/messages"
+      },
+      {
+        "section": "Money",
+        "label": "Finance Workbench",
+        "href": "/finance"
+      },
+      {
+        "section": "Money",
+        "label": "Daily Takings",
+        "href": "/takings"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "المكتب",
+      "الطلاب",
+      "الرسوم الأخرى",
+      "الجلسات",
+      "الرسائل",
+      "مكتب المالية",
+      "إيرادات اليوم",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-finance_officer-landing-en.jpg",
+      "after-merge-finance_officer-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "teacher": {
+    "email": "teacher.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 3,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-teacher-landing-en.jpg",
+      "after-merge-teacher-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "gate": {
+    "email": "gate.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 3,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-gate-landing-en.jpg",
+      "after-merge-gate-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "parent": {
+    "email": "parent.hany@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 12,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Registration",
+        "label": "Approvals",
+        "href": "/approvals"
+      },
+      {
+        "section": "Financial",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Financial",
+        "label": "School Fee",
+        "href": "/school-fee"
+      },
+      {
+        "section": "Financial",
+        "label": "Charges & Instalments",
+        "href": "/charges-due"
+      },
+      {
+        "section": "Financial",
+        "label": "Escrow Balance",
+        "href": "/escrow"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Children",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "السجل",
+      "الموافقات",
+      "كشف الحساب",
+      "المصاريف الدراسية",
+      "الرسوم والأقساط",
+      "رصيد الحساب",
+      "الأبناء المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-parent-landing-en.jpg",
+      "after-merge-parent-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "student": {
+    "email": "student.salma@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 9,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Requests",
+        "label": "Pending Requests",
+        "href": "/pending-requests"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Parents",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "كشف الحساب",
+      "السجل",
+      "الطلبات المعلقة",
+      "أولياء الأمور المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-student-landing-en.jpg",
+      "after-merge-student-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "parent2": {
+    "email": "parent.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 12,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Registration",
+        "label": "Approvals",
+        "href": "/approvals"
+      },
+      {
+        "section": "Financial",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Financial",
+        "label": "School Fee",
+        "href": "/school-fee"
+      },
+      {
+        "section": "Financial",
+        "label": "Charges & Instalments",
+        "href": "/charges-due"
+      },
+      {
+        "section": "Financial",
+        "label": "Escrow Balance",
+        "href": "/escrow"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Children",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "السجل",
+      "الموافقات",
+      "كشف الحساب",
+      "المصاريف الدراسية",
+      "الرسوم والأقساط",
+      "رصيد الحساب",
+      "الأبناء المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-parent2-landing-en.jpg",
+      "after-merge-parent2-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "student2": {
+    "email": "student.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 9,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Requests",
+        "label": "Pending Requests",
+        "href": "/pending-requests"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Parents",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "كشف الحساب",
+      "السجل",
+      "الطلبات المعلقة",
+      "أولياء الأمور المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "after-merge-student2-landing-en.jpg",
+      "after-merge-student2-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  }
+}

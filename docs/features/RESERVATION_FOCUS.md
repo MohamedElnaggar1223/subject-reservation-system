@@ -1,7 +1,7 @@
 # F6b — The reservation cycle only: hide what is outside it
 
 **Spec:** FEATURES_PLAN.md §1 "F6b" (14 Oct 2026). **Branch:** `feature/reservation-focus` (worktree
-`.claude/worktrees/reservation-focus`), from main b6857cb. **Databases:** `igcse_focus_dev` (a copy of
+`.claude/worktrees/reservation-focus`), from main b6857cb; main e16e8e0 (F6a) merged in at e225805. **Databases:** `igcse_focus_dev` (a copy of
 `igcse_template_dev`), `igcse_focus_test`. **Ports:** API 3161, web 3160. **Built by:** one Opus 5.5
 agent end to end (the owner's instruction); the lead reads the diff, runs the gates, drives every role
 and merges after F6a. **Trail:** `.audit/reservation-focus.tsv`. **Evidence:**
@@ -345,10 +345,10 @@ The Session screen (F6a's files) has no link that leads outside; nothing there w
 
 | Gate | Result |
 |---|---|
-| `pnpm --filter web check-types` | green in the worktree (e8f9619, and after) |
-| `pnpm --filter @repo/api check-types` | green (e8f9619) |
-| API suite, local time, `igcse_focus_test` | 34 files, 725 passed, 1 todo — e8f9619 (`suite-local-e8f9619.log`) |
-| API suite, `TZ=UTC` | 34 files, 725 passed, 1 todo — e8f9619 (`suite-utc-e8f9619.log`) |
+| `pnpm --filter web check-types` | green on e8f9619, 00cbbdf and **the merge e225805** |
+| `pnpm --filter @repo/api check-types` | green on e8f9619, 00cbbdf and **e225805** |
+| API suite, local time, `igcse_focus_test` | before the merge: 34 files, 725 passed, 1 todo — e8f9619 (`suite-local-e8f9619.log`); **on the merge e225805: 35 files, 737 passed, 1 todo** (`suite-local-e225805.log`; F6a's 08u is the 35th) |
+| API suite, `TZ=UTC` | before the merge: 34 files, 725 passed, 1 todo — e8f9619 (`suite-utc-e8f9619.log`); **on the merge e225805: 35 files, 737 passed, 1 todo** (`suite-utc-e225805.log`) |
 | CI (`.github/workflows/ci.yml`) | run 38637562968 green on bbd3708; run 38641932643 green on 00cbbdf (all four gates: evidence size, API type-check, web type-check, the suite) |
 | `useQuery<` count in `apps/web/app` | 19 (the limit is 35); a probe showed the home-summary, sessions and statement responses typed, not `any` |
 
@@ -393,13 +393,15 @@ number appears in this branch.
   uses.
 - **Board Services, Subjects, History, My Exams' statement of entry, Candidates** — kept or hidden as §2
   says, each with a question below; nothing else on those screens was changed.
-- **Merging main.** F6a was not on main when this was done (main 362b589 carries only the plan's F6b
-  text, a trail and an 08s timing change); the lead merges `origin/main` after F6a (the brief).
-  `git merge-tree --write-tree` shows no conflict between this branch and `origin/feature/session-words`
-  (b9f3090), nor `origin/main` (362b589). After the merge: F6a's Session screen keeps the `#subjects`,
-  `#fees`, `#money`, `#verify` tabs the landing links to, and its header's dates dialog is where "Set the
-  dates" lands; F6a's i18n-sessions.ts also translates "reservation(s)" and "entries by" the same way as
-  this branch (whichever merges first keeps its Arabic; both say the same).
+- **Merging main — done.** F6a landed on main (fd436de, main e16e8e0) at the end of this work; on the
+  coordinator's word `origin/main` was merged into the branch as its own commit **e225805** (plumbing
+  from lead-env, `/tmp/rf/merge.py`). No conflict: this branch touches none of F6a's files. After the
+  merge, driven: every role's sidebar and landing identical to the pre-merge after drive
+  (`after-merge/`), §4's link check again clean (`after-merge/links-on-kept-screens.json`), and the
+  landing's links into F6a's Session screen open the tab they name (`#subjects`, `#fees`, `#money`,
+  `#verify`), its header's series line being the dates button "Set the dates" leads to. F6a's
+  i18n-sessions.ts translates "reservation(s)" and "entries by" as this branch does; the sessions
+  dictionary is merged into the translator before this branch's, so its Arabic is used — the same words.
 
 ---
 
@@ -444,7 +446,15 @@ number appears in this branch.
   green on 00cbbdf; no file under `apps/api` or `packages` differs from b6857cb, so the suite's runs on
   e8f9619 stand for the branch; CI on each push (runs superseded by a newer push are cancelled by the
   workflow's concurrency rule).
-- Dev servers left running for the lead's drive: API on 3161 (pnpm pid 84853, node 84876), web on 3160
+- 21:51Z — CI 38641932643 green on 00cbbdf recorded (ccc0d28; its own run 38643458655 green).
+- 22:02Z — F6a on main (the coordinator's message): `origin/main` e16e8e0 merged as e225805, no conflict;
+  db, validations and storage rebuilt; both type-checks green on the merge; the suite in local time green
+  on it (35 files, 737 passed, 1 todo); the API dev server restarted on the merged code; every role
+  driven again (`after-merge/`, identical sidebars and landings), the link check again clean, the
+  Session screen's tabs and dates button reached from the landing's links; 22:16Z — the suite with
+  `TZ=UTC` green on the merge (35 files, 737 passed, 1 todo). Then this document, the evidence and the
+  trail committed on top of the merge and pushed; the CI run on that push is the merge's.
+- Dev servers left running for the lead's drive: API on 3161 (pnpm pid 34702, node 34724), web on 3160
   (pnpm pid 84878, node 84888), database `igcse_focus_dev` with June 2028 closed and the placeholder
   family.
 - Next if interrupted: the final commit of this document and the evidence, push, CI; F6a's merge is the
