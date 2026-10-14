@@ -76,8 +76,9 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
       </div>
     );
   }
-  // Non-fatal: the quick links below still render.
-  if (home.isError || !home.data) return null;
+  // Non-fatal: the quick links below still render. Without the statement the card could offer to
+  // reserve what is already reserved, so it waits for both.
+  if (home.isError || !home.data || statement.isError) return null;
 
   const children = home.data.children;
   if (isParent && children.length === 0) {
