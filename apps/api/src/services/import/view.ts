@@ -886,7 +886,11 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const carriedRead = settings.carryForward === 'result' && d.carryForwardFrom ? readSeries(d.carryForwardFrom) : null;
     const carried = carriedRead ? { month: carriedRead.type, year: carriedRead.year, from: 'carry_forward' as const } : null;
     const legacy = legacySitting(w, sid, t);
-    const saysRetake = e.attempt === 'retake' || (e.attempt !== 'first' && (d.noteRetake || d.noteOnePaper || t.itemKind === 'one_paper'));
+    // The forms' "One paper ONLY" is always a retake (F6a, the lead's decision of 11 Oct 2026: assertLineRules
+    // refuses a first entry on a one-paper item): a one-paper line is planned as a retake whatever the
+    // coordinator's answer or staff's choice on the line says (the review of F6a, finding 3).
+    const onePaper = t.itemKind === 'one_paper';
+    const saysRetake = onePaper || e.attempt === 'retake' || (e.attempt !== 'first' && (d.noteRetake || d.noteOnePaper));
     const declared = (p: { month: Series['type']; year: number; from: 'line' | 'note' | 'carry_forward' }) => ({ ...p, source: 'declared_by_desk' as const });
     const legacyPrior = legacy ? { month: legacy.type, year: legacy.year, source: 'legacy' as const, from: 'history' as const } : null;
     let attempt: 'first' | 'retake' = 'first';
@@ -898,7 +902,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       // the self-study share without the exception, and be entered with the board as a re-sit.
       const p = named ? declared(named) : legacyPrior ?? (noted ? declared(noted) : carried ? declared(carried) : null);
       prior = p;
-    } else if (e.attempt === 'first') {
+    } else if (e.attempt === 'first' && !onePaper) {
       attempt = 'first';
     } else {
       const p = named ? declared(named) : legacyPrior ?? (noted ? declared(noted) : t.needsPriorSeries && carried ? declared(carried) : null);
@@ -910,9 +914,12 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       out.refusals.push(`${seriesText({ type: prior.month, year: prior.year })} is not a sitting of ${t.seriesName ?? 'the item’s board'} before this one: name another sitting on the line`);
     }
     if (attempt === 'retake' && !prior) {
-      if (out.mode === 'self_study' && !c.selfStudyOnly && rule) {
+      if (!onePaper && out.mode === 'self_study' && !c.selfStudyOnly && rule) {
         // The coordinator's answer (or staff's on the line) settles a self-study note with no sitting.
         attempt = 'first';
+      } else if (onePaper) {
+        // One paper is never a first entry: the sitting it follows is the only way on.
+        pushOnce(w, { code: 'retake_sitting_missing', severity: 'error', detail: `${d.feeNote ? `"${d.feeNote}"` : 'one paper only'}: one paper only is always a retake — name the sitting it follows on the line` });
       } else {
         pushOnce(w, { code: 'retake_sitting_missing', severity: 'error', detail: `${d.feeNote ? `"${d.feeNote}"` : 'a retake'}: name the sitting it follows on the line, or make it a first entry` });
       }

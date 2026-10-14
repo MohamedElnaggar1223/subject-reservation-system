@@ -314,6 +314,14 @@ export const sessionsArabic: Record<string, string> = {
   // ── F6a: the session in the school's words (docs/features/SESSION_WORDS.md; the mapping table §2) ──
   // The links sheet.
   'Entry options': 'خيارات القيد',
+  'Subject · papers': 'المادة · الأوراق',
+  'Correct the sitting': 'تصحيح الدورة',
+  'The sitting decides the academic year every reservation is judged by. The subjects go to the same sitting of the new year with their reservations; a reservation whose student may no longer sit it expires, and its checkout closes.':
+    'تحدد الدورة العام الدراسي الذي يُحكم به على كل حجز. تنتقل المواد إلى الدورة نفسها من العام الجديد مع حجوزاتها؛ والحجز الذي لم يعد طالبه يستطيع تقديمه ينتهي، ويُغلق دفعه.',
+  'No subject on this sheet reads a fee from this sitting yet.': 'لا مادة في هذا الكشف تقرأ رسومًا من هذه الدورة بعد.',
+  'Copy fees from an earlier sitting': 'نسخ الرسوم من دورة سابقة',
+  'Every row comes across provisional (the rows this sitting has are kept): families can reserve, not pay, until the board publishes and you confirm.':
+    'يُنقل كل صف مؤقتًا (وتبقى صفوف هذه الدورة كما هي): يمكن للأسر الحجز لا الدفع حتى ينشر المجلس وتؤكد أنت.',
   'Reservations': 'الحجوزات',
   'reservation': 'حجز',
   'reservations': 'حجوزات',
@@ -370,7 +378,6 @@ export const sessionsArabic: Record<string, string> = {
   "A retake of one paper carries the other papers from the sitting the family names. Its course fee, when empty, is the subject's.":
     'إعادة ورقة واحدة ترحّل باقي الأوراق من الدورة التي تسميها الأسرة. ورسوم تدريسها، إن تُركت فارغة، هي رسوم المادة.',
   'Its papers, if the Catalogue gives it any, are set once it is added.': 'تُحدَّد أوراقها، إن أعطاها الكتالوج أوراقًا، بعد إضافتها.',
-  'Not offered': 'غير معروضة',
   'Retake in school or self study': 'إعادة في المدرسة أو دراسة ذاتية',
   'Retake self study only': 'إعادة دراسة ذاتية فقط',
   'How this paper is offered': 'كيف تُعرض هذه الورقة',
@@ -473,6 +480,18 @@ export function translateSessionsText(text: string): string | null {
     [/^(.+) has (\d+) reservations?: (?:it stands|they stand) when it is not offered this cycle, and no new one is taken\. Tick "Its (?:reservation stands|\d+ reservations stand)" to save$/,
       (m) => `${m[1]} لها ${m[2]} ${Number(m[2]) === 1 ? 'حجز' : 'حجوزات'}: ${Number(m[2]) === 1 ? 'يبقى' : 'تبقى'} حين لا تُعرض هذه الدورة، ولا يُقبل حجز جديد. ضع علامة "${Number(m[2]) === 1 ? 'يبقى حجزها' : `تبقى ${m[2]} حجوزات لها`}" للحفظ`],
     [/^(.+) is a retake of one paper: it takes no first entry$/, (m) => `${m[1]} إعادة ورقة واحدة: لا تقبل قيدًا أول`],
+    // The import's advice on a one-paper line with no sitting (F6a review, finding 3): never a first entry.
+    [/^"(.+)": one paper only is always a retake — name the sitting it follows on the line$/, (m) => `"${m[1]}": الورقة الواحدة إعادة دائمًا — سمِّ الدورة التي تتبعها في السطر`],
+    [/^one paper only: one paper only is always a retake — name the sitting it follows on the line$/, () => 'ورقة واحدة فقط: الورقة الواحدة إعادة دائمًا — سمِّ الدورة التي تتبعها في السطر'],
+    // The moves the form's sitting change may refuse (the review of F6a, finding 4).
+    [/^(.+) has reservations past their deadline in the sitting it is entered in \((.+)\): their entries stand$/,
+      (m) => `${m[1]} لها حجوزات تجاوزت موعدها في الدورة المقيدة فيها (${m[2]}): تبقى قيودها كما هي`],
+    [/^A reservation cannot move to (.+): the board's (entry|retake) deadline there \((.+)\) has passed$/,
+      (m) => `لا يمكن نقل حجز إلى ${m[1]}: انقضى موعد ${m[2] === 'retake' ? 'الإعادات' : 'القيد'} لدى المجلس فيها (${m[3]})`],
+    [/^A reservation cannot move to (.+): its exams start on (.+) and it has no entry deadline$/,
+      (m) => `لا يمكن نقل حجز إلى ${m[1]}: تبدأ امتحاناتها في ${m[2]} ولا موعد قيد لها`],
+    [/^(.+) for (.+) has already gone to the board in (.+): withdraw its entries first$/,
+      (m) => `${m[1]} للمرشح ${m[2]} أُرسل إلى المجلس في ${m[3]}: اسحب قيوده أولًا`],
     // generateItems' label for a one-paper retake ("Paper 4 only (retake)"): the paper's name is data.
     [/^(Paper \S+|Theory paper|\S+) only \(retake\)$/, (m) => `${m[1]} فقط (إعادة)`],
     [/^(January|June|October|November) is not a sitting of this session$/, (m) => `${MONTHS_AR[m[1]!]} ليست دورة من دورات هذه الجلسة`],

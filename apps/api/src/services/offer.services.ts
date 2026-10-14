@@ -21,14 +21,14 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  IGCSE_NEVER_MONTHS, IGCSE_NEVER_MESSAGE, SERIES_MONTH_LABELS, sessionSeriesMonths,
+  IGCSE_NEVER_MONTHS, IGCSE_NEVER_MESSAGE, SERIES_MONTH_LABELS, sessionSeriesMonths, itemDisplayLabel,
   type CreateOfferType, type UpdateOfferType, type OfferItemInputType, type UpdateOfferItemType, type ReplaceOfferTeacherType,
   type OfferTeacherInputType, type FeeKeyInputType, type Availability, type SeriesMonth, type OfferFormType,
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { entriesFollowMoveInTx } from './exam-entry.services';
 import { boardSeriesName, seriesRuleSentence, openCheckoutsSpanningDeadlines } from './series.services';
-import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence, redateLines } from './deadline.services';
+import { effectiveDeadlineFor, effectiveDeadlinesOf, redateLines } from './deadline.services';
 import { itemBoardFees } from './pricing.services';
 import { schoolDate } from './window.services';
 import { getSetting } from './settings.services';
@@ -667,11 +667,12 @@ async function changeItemsSeries(
     const m = moveOf.get(l.offerItemId)!;
     const d = current.get(l.id)!;
     if (d.at && d.at <= now) {
-      throw new OfferError(`${m.item.label} has lines past their deadline in the series it is entered in (${schoolDate(d.at)}): its entries stand`, 409);
+      // In the form's words (the review of F6a, finding 4): reservations and sittings, not lines and series.
+      throw new OfferError(`${itemDisplayLabel(m.item)} has reservations past their deadline in the sitting it is entered in (${schoolDate(d.at)}): their entries stand`, 409);
     }
     const there = await effectiveDeadlineFor(tx, { boardSeriesId: m.targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId, declarationRejected: l.declarationRejected });
     if (there.at && there.at <= now) {
-      throw new OfferError(`${boardSeriesName(names, targets.get(m.item.id)!)} is past a line's deadline: ${deadlinePassedSentence(there, schoolDate)}`, 409);
+      throw new OfferError(movePastDeadline(boardSeriesName(names, targets.get(m.item.id)!), there), 409);
     }
   }
   // F4's entries of the lines (after the lines, §2.1): a sent one refuses the change, the drafts are
@@ -703,6 +704,14 @@ async function changeItemsSeries(
   await redateLines(tx, lines.map((l) => l.id), actorId, 'its item moved to another series');
   await detachUnusedSeries(tx, session.id);
   return { lines, repriced };
+}
+
+/** A reservation that cannot move to a sitting whose deadline for it has passed (the form's words). */
+function movePastDeadline(sitting: string, d: { at: Date | null; kind: string | null }) {
+  const when = d.at ? schoolDate(d.at) : '';
+  if (d.kind === 'retake') return `A reservation cannot move to ${sitting}: the board's retake deadline there (${when}) has passed`;
+  if (d.kind === 'exams_start') return `A reservation cannot move to ${sitting}: its exams start on ${when} and it has no entry deadline`;
+  return `A reservation cannot move to ${sitting}: the board's entry deadline there (${when}) has passed`;
 }
 
 /** A rule or a missing fee refusing a move, as the screen's refusal (409). */
@@ -805,7 +814,10 @@ export function linesStandRefusal(name: string, live: number) {
  */
 export async function saveOfferForm(sessionId: string, offerId: string, form: OfferFormType, actorId: string, ctx?: AuditContext) {
   const ids = form.items.map((i) => i.itemId).filter((x): x is string => !!x);
-  if (new Set(ids).size !== ids.length) throw new OfferError('A paper or unit is named twice in the form');
+  const paperUnitIds = form.items.map((i) => i.paperUnitId).filter((x): x is string => !!x);
+  if (new Set(ids).size !== ids.length || new Set(paperUnitIds).size !== paperUnitIds.length) {
+    throw new OfferError('A paper or unit is named twice in the form');
+  }
   try {
     const out = await withStudentsFirst((extra) => db.transaction(async (tx) => {
       // 1. The students of the lines a sitting change would move, read before the locks and checked
@@ -901,14 +913,27 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
       if (papers.length) {
         const drafts = (await generateItems(tx, subjectRow.id)).filter((d) => d.kind === 'one_paper' && d.enters.kind === 'units');
         const units = await tx.select().from(sessionOfferItemUnit).where(inArray(sessionOfferItemUnit.itemId, items.map((i) => i.id).concat('__none__')));
+        // "All papers" and "Paper N only" are one or the other (withOnePaper's group): a whole item made
+        // before the Catalogue gave the subject papers has no group, so it joins the paper's — through
+        // updateItem's logic, with its audit row — before the first paper is made.
+        const wholes = items.filter((i) => i.kind === 'whole');
+        const group = wholes.find((w) => w.exclusiveGroup)?.exclusiveGroup ?? 'entry';
+        let grouped = false;
         for (const f of papers) {
           const draft = drafts.find((d) => d.enters.kind === 'units' && d.enters.unitIds.length === 1 && d.enters.unitIds[0] === f.paperUnitId);
           if (!draft) throw new OfferError("That paper is not one of this subject's papers on the Catalogue", 404);
           // Already on the sheet (the same form sent twice): nothing to make.
           const has = items.find((i) => i.kind === 'one_paper' && units.filter((u) => u.itemId === i.id).map((u) => u.unitId).join() === f.paperUnitId);
           if (has || f.availability === 'closed') continue;
-          await createItemInTx(tx, session, offer, subjectRow, { ...draft, availability: f.availability, courseFee: f.courseFee },
-            { offerId, label: draft.label, kind: draft.kind, enters: draft.enters, availability: f.availability, courseFee: f.courseFee, via: 'form' }, actorId, ctx);
+          if (!grouped) {
+            for (const w of wholes.filter((x) => !x.exclusiveGroup)) {
+              await changeItemInTx(tx, offer, w, { exclusiveGroup: group, reason: 'A paper of the subject is offered on its own: all papers or that paper, not both' }, 0, actorId, ctx);
+              done.itemsChanged++;
+            }
+            grouped = true;
+          }
+          await createItemInTx(tx, session, offer, subjectRow, { ...draft, exclusiveGroup: group, availability: f.availability, courseFee: f.courseFee },
+            { offerId, label: draft.label, kind: draft.kind, enters: draft.enters, availability: f.availability, courseFee: f.courseFee, exclusiveGroup: group, via: 'form' }, actorId, ctx);
           done.itemsCreated++;
         }
       }

@@ -1,0 +1,13 @@
+ ❯ test/08u-session-form.test.ts (11 tests | 2 failed) 4644ms
+   × 08u: the session in the school's words — one form per subject, the preview > an O.L. subject: its teachers this cycle (one online), and its Paper 4 retake opened in school or self-study with its own fee — one Save, each change audited 106ms
+     → expected { offer: true, itemsChanged: 2, …(3) } to match object { changed: true, offer: true, …(3) }
+   × 08u: the session in the school's words — one form per subject, the preview > a full form as the screen builds it — units with their teachers and sittings, two qualifications with theirs — saved again as it stands changes nothing and writes no audit row (the review of F6a, finding 7) 137ms
+     → expected { offer: false, itemsChanged: 2, …(3) } to deeply equal { Object (offer, itemsChanged, ...) }
+ Test Files  1 failed (1)
+      Tests  2 failed | 9 passed (11)
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > an O.L. subject: its teachers this cycle (one online), and its Paper 4 retake opened in school or self-study with its own fee — one Save, each change audited
+AssertionError: expected { offer: true, itemsChanged: 2, …(3) } to match object { changed: true, offer: true, …(3) }
+ ❯ test/08u-session-form.test.ts:115:15
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > a full form as the screen builds it — units with their teachers and sittings, two qualifications with theirs — saved again as it stands changes nothing and writes no audit row (the review of F6a, finding 7)
+AssertionError: expected { offer: false, itemsChanged: 2, …(3) } to deeply equal { Object (offer, itemsChanged, ...) }
+ ❯ test/08u-session-form.test.ts:434:75

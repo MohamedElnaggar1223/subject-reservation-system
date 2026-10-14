@@ -330,7 +330,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
           <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 text-start font-medium">Subject · what is entered</th>
+              <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
               <th className="px-3 py-2 text-start font-medium">Teacher</th>
               <th className="px-3 py-2 text-start font-medium">Entry</th>
               <th className="px-3 py-2 text-end font-medium">Price</th>
@@ -532,7 +532,7 @@ export function ReservePreview({ offer, sittings, terms }: { offer: Offer; sitti
           <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 text-start font-medium">Subject · what is entered</th>
+              <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
               <th className="px-3 py-2 text-start font-medium">Teacher</th>
               <th className="px-3 py-2 text-start font-medium">Entry</th>
               <th className="px-3 py-2 text-end font-medium">Price</th>

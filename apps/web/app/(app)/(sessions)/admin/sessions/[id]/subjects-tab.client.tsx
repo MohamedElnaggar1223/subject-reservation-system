@@ -52,7 +52,7 @@ const OFFERED_AS: { value: Availability; label: string; hint: string }[] = [
 /** (d) One paper only: a paper's availability (a one-paper item takes retakes only). */
 function paperChoices(current: string): { value: Availability; label: string }[] {
   return [
-    { value: 'closed', label: 'Not offered' },
+    { value: 'closed', label: 'Not offered this cycle' },
     { value: current === 'open' ? 'open' : 'retake_only', label: 'Retake in school or self study' },
     { value: 'self_study_only', label: 'Retake self study only' },
   ];
@@ -63,7 +63,7 @@ function routeChoices(current: string): { value: Availability; label: string }[]
     { value: 'open', label: 'Offered' },
     ...(current === 'retake_only' ? [{ value: 'retake_only' as const, label: 'Retakes only' }] : []),
     { value: 'self_study_only', label: 'Self study only' },
-    { value: 'closed', label: 'Not offered' },
+    { value: 'closed', label: 'Not offered this cycle' },
   ];
 }
 /** (e) An IAL unit: taught by its teachers, self study only, or not this cycle. */
@@ -80,11 +80,14 @@ const WARNING_LABEL: Record<string, string> = {
   no_teacher: 'Who teaches it?', no_fee: 'Board fee not set', series_without_dates: 'Dates not set', unmapped: "Set its papers on the Catalogue",
 };
 
-/** A paper's name as the forms write it: "Paper 4 (0610/41)". */
-function paperName(i: ItemRow): { name: string; code: string | null } {
+/**
+ * A paper's name as the forms write it: "Paper 4" with its code "0610/41". A paper item entering no unit
+ * (made by hand before F6a) is named by its own label, which already says "… only (retake)" (`full`).
+ */
+function paperName(i: ItemRow): { name: string; code: string | null; full: boolean } {
   const u = i.units[0];
-  if (!u) return { name: itemDisplayLabel(i), code: null };
-  return u.shortCode ? { name: u.shortCode, code: u.code } : { name: u.code, code: null };
+  if (!u) return { name: itemDisplayLabel(i), code: null, full: true };
+  return u.shortCode ? { name: u.shortCode, code: u.code, full: false } : { name: u.code, code: null, full: false };
 }
 /** A Cambridge route as the forms write it: A.S. · A.2. (carry forward) · A.L. */
 function routeWord(i: ItemRow, long = false): string {
@@ -250,7 +253,7 @@ function FormPhrases({ o, shares }: { o: OfferRow; shares: Shares }) {
     const n = paperName(p);
     parts.push(
       <span key={p.id}>
-        <bdi data-i18n-skip="true">{n.name}</bdi> <span>only</span>{n.code && <> <span className="font-mono text-xs text-muted-foreground">(<bdi data-i18n-skip="true">{n.code}</bdi>)</span></>}:{' '}
+        {n.full ? <span>{n.name}</span> : <><bdi data-i18n-skip="true">{n.name}</bdi> <span>only</span></>}{n.code && <> <span className="font-mono text-xs text-muted-foreground">(<bdi data-i18n-skip="true">{n.code}</bdi>)</span></>}:{' '}
         <span>{p.availability === 'self_study_only' || o.availability === 'self_study_only' ? 'self study only' : 'in school or self study'}</span>
       </span>,
     );
@@ -613,14 +616,14 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPrev
                 const n = paperName(p);
                 const st = f.items[p.id]!;
                 return (
-                  <PaperLine key={p.id} name={n.name} code={n.code} reservations={p.lines.live} value={st.availability} choices={paperChoices(p.availability)}
+                  <PaperLine key={p.id} name={n.name} full={n.full} code={n.code} reservations={p.lines.live} value={st.availability} choices={paperChoices(p.availability)}
                     fee={st.courseFee} subjectFee={fee} ro={ro} onChoice={(availability) => setItem(p.id, { availability })} onFee={(courseFee) => setItem(p.id, { courseFee })} />
                 );
               })}
               {offer.papersToAdd.map((p) => {
                 const st = f.papers[p.unitId]!;
                 return (
-                  <PaperLine key={p.unitId} name={p.shortCode ?? p.code} code={p.shortCode ? p.code : null} reservations={0} value={st.availability} choices={paperChoices('closed')}
+                  <PaperLine key={p.unitId} name={p.shortCode ?? p.code} full={false} code={p.shortCode ? p.code : null} reservations={0} value={st.availability} choices={paperChoices('closed')}
                     fee={st.courseFee} subjectFee={fee} ro={ro} onChoice={(availability) => set({ papers: { ...f.papers, [p.unitId]: { ...st, availability } } })}
                     onFee={(courseFee) => set({ papers: { ...f.papers, [p.unitId]: { ...st, courseFee } } })} />
                 );
@@ -781,14 +784,14 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPrev
 }
 
 /** A paper of "One paper only": not offered, a retake in school or self study, or a retake in self study only, with its fee. */
-function PaperLine({ name, code, reservations, value, choices, fee, subjectFee, ro, onChoice, onFee }: {
-  name: string; code: string | null; reservations: number; value: Availability; choices: { value: Availability; label: string }[];
+function PaperLine({ name, full, code, reservations, value, choices, fee, subjectFee, ro, onChoice, onFee }: {
+  name: string; full: boolean; code: string | null; reservations: number; value: Availability; choices: { value: Availability; label: string }[];
   fee: string; subjectFee: number | null; ro: boolean; onChoice: (v: Availability) => void; onFee: (v: string) => void;
 }) {
   return (
     <div className="grid grid-cols-[1fr_14rem_9rem] items-center gap-3 rounded-lg border border-border p-3 text-sm">
       <span>
-        <span className="font-medium"><bdi data-i18n-skip="true">{name}</bdi> <span>only</span></span>
+        <span className="font-medium">{full ? <span>{name}</span> : <><bdi data-i18n-skip="true">{name}</bdi> <span>only</span></>}</span>
         {code && <> <span className="font-mono text-xs text-muted-foreground">(<bdi data-i18n-skip="true">{code}</bdi>)</span></>}
         {reservations > 0 && <> · <span className="text-xs text-muted-foreground"><span>{reservations}</span> <span>reserved</span></span></>}
       </span>

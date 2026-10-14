@@ -132,7 +132,7 @@ function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
           <Button variant="outline" onClick={() => setEditing(true)}>Edit</Button>
           {s.status === 'draft' && <Button variant="outline" onClick={() => setOpening(true)}>Open now</Button>}
           {s.status === 'active' && <Button variant="outline" onClick={() => setClosing(true)}>Close</Button>}
-          <Button variant="ghost" onClick={() => setCorrecting(true)}>Correct the series</Button>
+          <Button variant="ghost" onClick={() => setCorrecting(true)}>Correct the sitting</Button>
         </div>
       )}
       {correcting && <CorrectSeries s={s} onClose={() => setCorrecting(false)} />}
@@ -276,9 +276,9 @@ function CorrectSeries({ s, onClose }: { s: SessionDetail; onClose: () => void }
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }); onClose(); },
   });
   return (
-    <Modal title="Correct the series" onClose={onClose}>
+    <Modal title="Correct the sitting" onClose={onClose}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); go.mutate(); }}>
-        <p className="text-sm text-muted-foreground">The series decides the academic year every line is judged by. The subjects go to the same series of the new year with their lines; a line whose student may no longer sit it expires, and its checkout closes.</p>
+        <p className="text-sm text-muted-foreground">The sitting decides the academic year every reservation is judged by. The subjects go to the same sitting of the new year with their reservations; a reservation whose student may no longer sit it expires, and its checkout closes.</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Type" htmlFor="cs-type">

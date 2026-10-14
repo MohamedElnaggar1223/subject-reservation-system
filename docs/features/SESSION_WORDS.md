@@ -85,9 +85,10 @@ plan carries, which has no item kind; they keep it (deferred, §11).
 | Not offered this cycle | غير معروضة هذه الدورة | `availability: 'closed'` (not offered when adding a subject) |
 | (c) Course fee (EGP); Self Study 50% School fees: EGP … | رسوم التدريس (جنيه)؛ دراسة ذاتية 50% من رسوم المدرسة | `courseFee`; the share shown is `pricing.selfStudyCoursePercent` (read only) |
 | Why the course fee is 0 | (existing) | `zeroFeeReason` (MO-9) |
-| (d) One paper only; a paper: Not offered / Retake in school or self study / Retake self study only; its course fee | ورقة واحدة فقط؛ غير معروضة / إعادة في المدرسة أو دراسة ذاتية / إعادة دراسة ذاتية فقط؛ رسوم تدريسها | `items[]: { itemId, availability: 'closed' / 'retake_only' / 'self_study_only', courseFee }` for a `one_paper` item; for a paper the Catalogue gives but the sheet does not have yet, `{ paperUnitId, … }` (made with withOnePaper's draft when offered); an empty fee is `null` (the subject's) |
+| (d) One paper only; a paper: Not offered this cycle / Retake in school or self study / Retake self study only; its course fee | ورقة واحدة فقط؛ غير معروضة هذه الدورة / إعادة في المدرسة أو دراسة ذاتية / إعادة دراسة ذاتية فقط؛ رسوم تدريسها | `items[]: { itemId, availability: 'closed' / 'retake_only' / 'self_study_only', courseFee }` for a `one_paper` item; for a paper the Catalogue gives but the sheet does not have yet, `{ paperUnitId, … }` (made with withOnePaper's draft when offered, in one group with the whole subject, which joins that group if it had none — §3); an empty fee is `null` (the subject's) |
+| A paper's name: "Paper 4 only (0610/41)"; a paper entering no unit: its own label ("… only (retake)") | — (data; "only" فقط) | the paper's unit `short_code` and `code`; with no unit, `itemDisplayLabel` of the item (never "… only (retake) only") |
 | Set this subject's papers on the Catalogue | حدّد أوراق هذه المادة في الكتالوج | an IGCSE subject with no `one_paper` item and none in `papersToAdd`: a link to `/exams/catalogue` |
-| (e) Components: A.S. / A.2. (carry forward on an earlier June or November) / A.L.; Offered / Self study only / Not offered | المكوّنات؛ معروضة / دراسة ذاتية فقط / غير معروضة | `route` items: `availability: 'open' / 'self_study_only' / 'closed'` (and "Retakes only" shown only when the item is `retake_only` already) |
+| (e) Components: A.S. / A.2. (carry forward on an earlier June or November) / A.L.; Offered / Self study only / Not offered this cycle | المكوّنات؛ معروضة / دراسة ذاتية فقط / غير معروضة هذه الدورة | `route` items: `availability: 'open' / 'self_study_only' / 'closed'` (and "Retakes only" shown only when the item is `retake_only` already) |
 | Units: P1 (WMA11); Taught by / Self study only / Not this cycle; Its teachers (none ticked: the subject's); its course fee; Sitting | الوحدات؛ يدرّسها / دراسة ذاتية فقط / ليست هذه الدورة؛ معلموها؛ الدورة | `unit` items: `availability: 'open' / 'self_study_only' / 'closed'`; `teachers[]` (empty: the offer's); `seriesMonth`: one of the session's months the board sits (`sessionSeriesMonths`; IGCSE never October or January) → the board's unlabelled series of that month (`findOrCreateSeries`) |
 | Reason (a unit moved with its reservations) | السبب | `reason` (kept on each moved line's and item's audit row) |
 | Qualifications: each with "Its teacher (the family chooses the qualification with the teacher)" | المؤهلات | `qualification` items and the whole item beside them: `availability`, `teachers[]`, `courseFee` |
@@ -109,12 +110,21 @@ plan carries, which has no item kind; they keep it (deferred, §11).
 | Paper 4 only (retake) (generated label, in Arabic) | Paper 4 فقط (إعادة) | generateItems' one-paper label (a rule in `i18n-sessions.ts`; the paper's name is data) |
 | reservation / reservations (the Sessions list, the drawer's subtitle) | حجز / حجوزات | live lines |
 | No sittings yet / A sitting appears here once a subject on the sheet is entered in it. (Fees tab's empty state, not its grid) | لا دورات بعد… | no attached series |
+| Subject · papers (the Reserve rows' column: the family's page, the desk's card, the preview) | المادة · الأوراق | the offer's subject and its items (was "Subject · what is entered") |
+| Correct the sitting; "The sitting decides the academic year every reservation is judged by. The subjects go to the same sitting of the new year with their reservations; …" | تصحيح الدورة؛ تحدد الدورة العام الدراسي… | `PUT /sessions/:id/series` (`session_type`, `series_year`; was "Correct the series") |
+| No subject on this sheet reads a fee from this sitting yet. (a Fees grid with no row read) | لا مادة في هذا الكشف تقرأ رسومًا من هذه الدورة بعد. | a series with no fee key of the session's items (was "…of this session reads a fee from this series yet.") |
+| Copy fees from an earlier sitting; "Every row comes across provisional (the rows this sitting has are kept): …" | نسخ الرسوم من دورة سابقة… | `POST /board-fees/:seriesId/copy` (was "…an earlier series") |
+| "<paper or unit> has reservations past their deadline in the sitting it is entered in (<date>): their entries stand" | … لها حجوزات تجاوزت موعدها في الدورة المقيدة فيها… | a move refused: a live line of the item past its effective deadline where it is (was "…has lines past their deadline in the series…") |
+| "A reservation cannot move to <sitting>: the board's entry / retake deadline there (<date>) has passed"; "…: its exams start on <date> and it has no entry deadline" | لا يمكن نقل حجز إلى …: انقضى موعد القيد / الإعادات… | a move refused: a line's effective deadline in the target series (was "<series> is past a line's deadline: …") |
+| "<code> <title> for <candidate> has already gone to the board in <sitting>: withdraw its entries first" (F4's sentence, unchanged in English) | … للمرشح … أُرسل إلى المجلس في …: اسحب قيوده أولًا | a move refused: an F4 entry of a moving line already sent |
 
 Words removed from the Session screen by F6a: "Availability", "What can be entered", "Add an item",
 "Kind", "What it enters", "Only one of the group", "Needs an earlier sitting carried forward",
 "Required in a first entry", "Its board fee is the qualification's", "Series" (the item's select),
 "Untick", "Save item", "live lines", "Items with the same group cannot be reserved together", "Whole
-subject" (displayed), "item" in the Replace teacher, Remove subject, Copy and Fees sentences.
+subject" (displayed), "item" in the Replace teacher, Remove subject, Copy and Fees sentences; in the
+review round "series" on the header's correction and in the Fees tab's two sentences, "lines" in the move
+refusals, "Subject · what is entered" on the Reserve rows.
 
 ---
 
@@ -168,7 +178,18 @@ with their mode — an external team named for the first time is a change; cours
 grade-10 core, course start, notes trimmed), each item's (availability, fee, its own teachers when the
 form shows them, its sitting by month and year — a labelled series of the same month is kept), and a
 catalogue paper already made is not made again. A form that changes nothing writes nothing and no audit
-row (`changed: false`). Every write's audit row is written inside the transaction (`logAction(..., tx)`):
+row (`changed: false`) — a full form as the screen builds it included (08u, the review's finding 7).
+
+**A paper made later joins the whole subject's group** (the review of F6a, finding 1, a blocker). A
+paper the Catalogue gains after the subject is on the sheet is made with withOnePaper's draft, in the
+exclusive group 'entry'; the whole item made when the Catalogue had no papers had no group (the template's
+17 IGCSE subjects are so), so a family could reserve "All papers" and "Paper N only" for one sitting — two
+charges, two entries. When the form makes the first such paper, every whole item of the subject with no
+group joins the paper's group ('entry', or the whole item's own if one has a group) through
+`changeItemInTx` (updateItem's logic: `OFFER_ITEM_UPDATED` with the reason "A paper of the subject is
+offered on its own: all papers or that paper, not both"); the paper is then made in that group. The
+Reserve page's untick and assertLineRules' group check both fire (08u test 2; the drive's
+`review-05-family-physics-*`: ticking Paper 4 unticks All papers). Every write's audit row is written inside the transaction (`logAction(..., tx)`):
 a refused audit row rolls the whole form back.
 
 **Refusals, in the form's words.** What the services refuse, as they say it ("Who teaches …?", "… is
@@ -177,9 +198,13 @@ a move's deadline, entry and checkout refusals); and the form's own:
 `"<subject> has N reservation(s): it stands / they stand when it is not offered this cycle, and no new
 one is taken. Tick "Its reservation stands" / "Its N reservations stand" to save"` (409) for a subject,
 paper, unit or qualification set to not offered while it has live lines without `linesStand`; "A paper
-or unit is named twice in the form"; "That paper or unit is not under this subject" (404); "That paper
+or unit is named twice in the form" (an item id or a catalogue paper's unit id named twice: finding 6); "That paper or unit is not under this subject" (404); "That paper
 is not one of this subject's papers on the Catalogue" (404); "<Month> is not a sitting of this
-session". Each has its Arabic in `i18n-sessions.ts`.
+session"; a sitting change refused by the move, in the form's words since the review (finding 4): "<paper or
+unit> has reservations past their deadline in the sitting it is entered in (<date>): their entries stand",
+"A reservation cannot move to <sitting>: the board's entry / retake deadline there (<date>) has passed" (or
+"…: its exams start on <date> and it has no entry deadline"), and F4's "… has already gone to the board in
+…: withdraw its entries first". Each has its Arabic in `i18n-sessions.ts`.
 
 **The one-paper rule** (the lead's decision of 11 Oct, answer 3). "One paper ONLY" on the forms is
 always a retake: `assertLineRules` refuses a first entry on a `one_paper` item ("<subject> — <paper> is
@@ -187,7 +212,13 @@ a retake of one paper: it takes no first entry"; a rule, not a gate: no exceptio
 offers read lists no first entry for one. With it, "Retake self study only" on a paper is exactly
 `self_study_only`. Before writing it the scenarios were searched: 08p asserts a first entry on a
 retake-only paper is refused ("takes retakes only", reached first, unchanged); no scenario reserves a
-first entry on a one-paper item.
+first entry on a one-paper item. **F7's import plans the same** (the review's finding 3; `import/view.ts`,
+the one import file changed): a one-paper line is always planned as a retake — staff's "first" on the line
+does not change it, and the coordinator's answer no longer turns a self-study one-paper row with no sitting
+into a first entry; such a row asks for its sitting ("\"<note>\": one paper only is always a retake — name
+the sitting it follows on the line", code `retake_sitting_missing`, Arabic in `i18n-sessions.ts`) instead
+of advising "…or make it a first entry". The school's June rows ("(Paper 41/42 ONLY) From June/November
+2026") name their sitting and are unaffected.
 
 **listOffers (GET /sessions/:id/offers) gains** `shares` (the three percentages the sheet shows),
 per item its `qualification` (code, title, level) and per IGCSE offer `papersToAdd` (withOnePaper's
@@ -231,18 +262,22 @@ The desk's Reserve card is the same component: its rows show "All papers" too; n
 
 ## 6. Tests
 
-`apps/api/test/08u-session-form.test.ts` (10 scenarios): an O.L. subject's teachers (one online) and
+`apps/api/test/08u-session-form.test.ts` (11 scenarios): an O.L. subject's teachers (one online) and
 Paper 4 opened in school or self study at its fee, one save with an audit row for the subject and one for
 the paper, then the preview's prices (a paper: retakes only); a paper the Catalogue gains after the
-subject is on the sheet, made by the form once offered, the same form again making nothing; an IAL
+subject is on the sheet, made by the form once offered, the same form again making nothing, the same paper
+named twice refused, and the whole subject joining the paper's group so that assertLineRules refuses "All
+papers" and the paper together for one student (each alone passes); an IAL
 subject per unit (a teacher per unit, two online, M1 with two, S1 self study only, P4 not this cycle) and
 its preview; two units moved to January in one save with three reservations, every line and item with its
-own audit row; a Cambridge A level's three routes; "Retake (Self Study ONLY)" at 0 refused without a
+own audit row, and a unit whose reservation is past its deadline refused in the form's words; a Cambridge
+A level's three routes; "Retake (Self Study ONLY)" at 0 refused without a
 reason, an open subject nobody teaches refused, nothing half-saved; "Not offered this cycle" refused with
 its sentence for a subject (2 reservations) and a paper (1), then saved with `linesStand`, the lines
 standing; the same form twice (with an external team, the grade-10 core, a course start and notes)
 changing nothing and writing no audit row, and a refused item audit row rolling back the subject's change
-and its row; a first entry on a one-paper item refused and the family's read listing retakes only; the
+and its row; a full form as the screen builds it (units with their teachers and sittings, two
+qualifications with theirs) saved as it stands changing nothing and writing no audit row; a first entry on a one-paper item refused and the family's read listing retakes only; the
 preview for admin and coordinator with no student's data (a family with a 50% discount and a line in the
 same subject), refused 403 to a parent, a student and both finance roles, 404 for no session. The authz
 matrix (04) has both rows.
@@ -250,7 +285,11 @@ matrix (04) has both rows.
 **Controls** (`.audit/session-words-evidence/controls/`, `controls.py`): each guard undone once, 08u red,
 put back: the one-paper rule in assertLineRules; the one-paper rule in the read; the linesStand refusal
 for a subject; for a paper; the form's diff; the subject's audit row in the transaction; each moved
-line's audit row; the preview's role gate; the coordinator's grant. Then 08u green.
+line's audit row; the preview's role gate; the coordinator's grant. Then 08u green. The review round
+(`controls2.py`): the whole item joining the paper's group (08u test 2 red at the pair: the rules let both
+through), the import's one-paper retake (08n-import's new case red), the paper named twice (08u red: 200,
+made twice), the item-level diff (08u red in two scenarios, the full-form case among them). Then 08u and
+08n-import green. `08n-import.test.ts` gains the case "a one-paper line is always a retake".
 
 ## 7. The catalogue set-up for the six shapes (dev data; never a migration or a seed)
 
@@ -288,8 +327,12 @@ options, no units and no teachers. On `igcse_words_dev`, through the API as the 
 |---|---|---|---|
 | An O.L. subject set up open with a teacher | ≤ 3 inputs, ≤ 3 clicks | 3 inputs, 3 clicks | **3 inputs, 2 clicks** (every teacher listed at once for an empty pool) |
 | A one-paper retake opened | ≤ 3 more inputs, no extra screen | (a separate item card and Save) | **2 more inputs, 1 more click, no extra screen** |
-| A series' deadlines | no page change | 6 inputs, 2 clicks on the Board Series page under its year filter | **3 inputs, 2 clicks, no page change** |
+| A series' deadlines | no page change | 6 inputs (the year filter and five fields: entry deadline, retakes until, exams start, exams end, the reason), 2 clicks, on another page | **met: no page change**. Like for like, the same five fields: **5 inputs, 2 clicks** (14 Oct). The 11 Oct run typed two dates and the reason (3 inputs) and is not comparable |
 | The family reserves (point 5) | the only child and open session preselected | 2 answers by hand | **preselected** (2 answers saved) |
+
+The dates, honestly (the review's finding 8): the dialog is the Board Series page's own `DatesForm`, so
+the same fields cost the same inputs; what the header saves is the page change and the academic-year
+filter (one input), not the typing.
 
 The Excel version (UX_AUDIT §4): a row typed on the links sheet (subject, board, teachers, the form
 link) and a Google Form copied and edited per subject (about 12 questions, the series and paper options
@@ -323,7 +366,9 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
   green; every line its own audit row).
 - **A unit's sitting is chosen by month**: the session's months the board sits; the board's unlabelled
   series of that month is found or made (`findOrCreateSeries`, as an item's default series is); a
-  labelled series of the same month is kept. A labelled target is the item endpoint's.
+  labelled series of the same month is kept. A labelled target (a board's second calendar in one month)
+  has **no screen behind it** since F6a: only the item endpoint (`PUT …/items/:itemId` with `boardSeriesId`)
+  reaches one (§11).
 - **"Add subject" is two steps of one form**: the subject is created by `POST /offers` (createOffer, the
   catalogue's items generated), then the same form stays open for its papers, routes and units, which
   exist only once the subject does. A taught O.L. subject needs nothing more.
@@ -339,6 +384,17 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
 
 ## 11. Deferred, and why
 
+- **What the screens no longer offer** (the review's finding 2): the old drawer's item cards went with
+  F6a, so these are **API-only now** (`POST/PUT/DELETE /v1/sessions/:id/offers/:offerId/items…`): "Add an
+  item" (an item of any kind, entering an award, an option, units or the subject row), "Untick" (removing
+  an item, or closing it when it has history), placing an item in a **labelled** series, an item's
+  **exclusive group**, its **fee keys** (which fee rows it reads), "Required in a first entry"
+  (`requiredInSeries`) and "Needs an earlier sitting carried forward" (`needsPriorSeries`, set by the
+  catalogue's option or by withOnePaper). The state finding 1 found (a whole item with no group beside a
+  paper in 'entry') **could not have been repaired by hand on any screen** after F6a — only the item
+  endpoint could set the group; F6a now prevents it when the form makes the paper, and a paper made
+  otherwise (the endpoint, an older drawer) is not regrouped by a later save. Which of these the school
+  needs back on a screen is §12's question 4.
 - **Adding a second qualification under a subject from the form** (Arabic A Level, Edexcel): the form shows
   and edits the qualifications and their teachers; making the second one is the item endpoint's
   (`setup-sessions.mjs`). A words-version waits for Q-16 (does the family or the teacher choose?).
@@ -363,6 +419,10 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
    October and January)? Default: every month the board sits.
 3. **A second qualification under one subject** (Arabic A Level): who chooses — the family or the teacher
    (Q-16)? Default: the family, through the teacher (the form's sentence).
+4. **The tools the old drawer had** (§11): adding an item of any kind, removing one, a labelled sitting,
+   which items are one-or-the-other, which fee rows an item reads, an item required in a first entry.
+   Does the coordinator need any of them on a screen, or is the catalogue's generation (and the form's
+   papers) enough? Default: API-only, the coordinator asks the lead.
 
 ## 13. Progress log
 
@@ -381,5 +441,11 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
   "Entry options" (no "offers" on the screen); the sheet re-shot in EN and AR.
 - 13:53Z — commit 9646092 pushed (feature/session-words: 4659d59, 0252b82, 9646092 on main 1b6a216).
 - 14:06Z — CI run 38144972830 green on 9646092 (gate 0, both type-checks, the suite: 35 files).
-- Next: the lead's review and the reviewer (Opus 5.5); the owner's acceptance test (the preview beside
-  the Google Form of the same subject).
+- 14 Oct 20:43Z — the Opus 5.5 review: "merge after fixes 1"; eight findings.
+- 20:51Z–20:57Z — findings 1 (the blocker), 6, 3, 4, 5 and 7 fixed with their scenarios; their controls
+  red, then green (trail rows each).
+- 20:58Z–21:02Z — the round's screens re-driven (Physics given its papers on the Catalogue and its Paper 4
+  offered by the form; ticking it unticks All papers on the family's page; "Correct the sitting", the Fees
+  copy dialog, "Subject · papers", in EN and AR); the dates measured like for like (5 inputs, 2 clicks, no
+  page change); findings 2 and 8 in §8, §10, §11, §12 and measure-counts.json.
+- Next: the gates on the round's commit, push, CI; the reviewer confirms the fix diff.

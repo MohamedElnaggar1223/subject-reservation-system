@@ -788,7 +788,11 @@ Added by F6a (the session in the school's words, 11 Oct 2026; docs/features/SESS
   `knownSittings`, no `held`, prices with no family's exception (`priceLine(…, { exceptionIds: [] })`).
   The Reserve rows are exported (`OfferRows`, `ReservePreview` in `components/reservations/reserve.tsx`).
 - **A one-paper item is always a retake** (the lead, 11 Oct): `assertLineRules` refuses a first entry on a
-  `one_paper` item (a rule, no exception lifts it) and the offers read lists none.
+  `one_paper` item (a rule, no exception lifts it), the offers read lists none, and F7's import plans a
+  one-paper line as a retake whatever staff or the coordinator's answer say (the review of F6a, finding 3).
+- **A paper the form makes later joins the whole subject's exclusive group** (the review of F6a, finding 1):
+  a whole item with no group takes the paper's ('entry') through updateItem's logic, so the two are one or
+  the other for a family.
 - **`itemDisplayLabel(item)`** (`@repo/validations`) — the stored "Whole subject" of a whole item reads "All
   papers" on every screen; the stored label (generateItems, `findItem`) is unchanged.
 - **`GET /sessions/:id/offers`** also answers `shares` (the pricing percentages), each item's

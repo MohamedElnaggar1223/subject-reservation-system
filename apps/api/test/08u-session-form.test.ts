@@ -148,12 +148,39 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].units.$put({ param: { id: q }, json: { units: [{ unitId: h1, requirement: 'required' }] } }));
     o = await offerRow(june, made.id);
     expect(o.papersToAdd).toEqual([{ unitId: h1, label: 'Paper 1H only (retake)', code: `U1H-${RUN}`.toUpperCase(), shortCode: 'Paper 1H' }]);
+    // The same paper named twice in one request (the screen never sends it; the API may be called so): refused, nothing made.
+    expect(await refused(save(coordinator, june, made.id, { ...asIs(o), items: [h1, h1].map((paperUnitId) => ({ paperUnitId, availability: 'retake_only' as const, courseFee: 2500 })) })))
+      .toEqual({ status: 400, error: 'A paper or unit is named twice in the form' });
+    expect((await offerRow(june, made.id)).items).toHaveLength(1);
     // "Retake self study only" at EGP 2,500: the paper is made, retakes in self-study only, read for the qualification's fee (Q-13).
     const form = { ...asIs(o), items: [{ paperUnitId: h1, availability: 'self_study_only' as const, courseFee: 2500 }] };
-    expect(await apiResponse(save(coordinator, june, made.id, form))).toMatchObject({ changed: true, offer: false, itemsCreated: 1 });
+    const madePaper = await apiResponse(save(coordinator, june, made.id, form));
+    expect(madePaper).toMatchObject({ changed: true, offer: false, itemsCreated: 1 });
     o = await offerRow(june, made.id);
     const paper = o.items.find((i) => i.kind === 'one_paper')!;
+    const whole = o.items.find((i) => i.kind === 'whole')!;
     expect([paper.label, paper.availability, paper.courseFee, paper.exclusiveGroup, paper.units.map((u) => u.unitId)]).toEqual(['Paper 1H only (retake)', 'self_study_only', 2500, 'entry', [h1]]);
+    const prior = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'november', year: Y, label: `u08-p2-${RUN}` } })))!.id;
+    const f = await onboard(officer, `u08-p2-${RUN}`, 11);
+    const { db } = await import('@repo/db');
+    const { assertLineRules } = await import('../src/services/line-rules.services');
+    const { assertMayRegisterForInTx } = await import('../src/services/eligibility.services');
+    const allPapers = { offerItemId: whole.id, attempt: 'first' as const, mode: 'in_school' as const, priorSittingSeriesId: null };
+    const onePaper = { offerItemId: paper.id, attempt: 'retake' as const, mode: 'self_study' as const, priorSittingSeriesId: prior, priorSittingSource: 'declared_by_desk' };
+    const rules = (lines: (typeof allPapers | typeof onePaper)[]) => db.transaction(async (tx) => {
+      const eligibility = await assertMayRegisterForInTx(tx, f.studentId, june);
+      await assertLineRules(tx, { studentId: f.studentId, sessionId: june, eligibility }, lines);
+      throw new Error('rolled back: the rules passed');
+    });
+    await expect(rules([allPapers])).rejects.toThrow('rolled back: the rules passed');
+    await expect(rules([onePaper])).rejects.toThrow('rolled back: the rules passed');
+    await expect(rules([allPapers, onePaper])).rejects.toThrow(`Mathematics O.L. (08u ${RUN}) — Paper 1H only (retake) and Mathematics O.L. (08u ${RUN}) cannot be reserved together`);
+    // The review of F6a, finding 1: "All papers", made when the Catalogue had no papers, had no group; it
+    // joins the paper's, with its audit row — so a family cannot reserve both for one sitting.
+    expect(whole.exclusiveGroup).toBe('entry');
+    expect(await one(`select new_data->>'exclusiveGroup' as g from audit_log where action = 'OFFER_ITEM_UPDATED' and entity_id = $1`, [whole.id])).toEqual({ g: 'entry' });
+    expect(madePaper.itemsChanged).toBe(1);
+
     expect(await sql(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1`, [paper.id])).toEqual([{ key_kind: 'qualification', key_id: q }]);
     expect(await one(`select action, new_data->>'via' as via from audit_log where entity_id = $1`, [paper.id])).toEqual({ action: 'OFFER_ITEM_CREATED', via: 'form' });
     expect(o.papersToAdd).toEqual([]);
@@ -240,6 +267,23 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     }
     expect(await sql(`select entity_id as e, new_data->>'linesMoved' as n from audit_log where action = 'OFFER_ITEM_SERIES_CHANGED' and entity_id in $1 order by entity_id`, [[i1, i2]]))
       .toEqual([{ e: i1, n: '1' }, { e: i2, n: '2' }].sort((a, b) => a.e.localeCompare(b.e)));
+
+    // The review of F6a, finding 4: a unit whose reservation is past its deadline where it is does not move —
+    // refused in the form's words (reservations, the sitting), with its Arabic in i18n-sessions.ts.
+    const u3 = await unit('pearson_edexcel', 'UMV3', 'Unit 3', 'as', 'unit');
+    await fee(oct, 'unit', u3, 4790);
+    const i3 = (await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items.$post({ param: { id: winter, offerId: made.id }, json: unitItem('Unit 3', u3) })))!.id;
+    const [l3] = await reserve(fa.studentId, winter, [{ offerItemId: i3, attempt: 'first', mode: 'in_school', teacherId: t1 }]);
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [oct]);
+    try {
+      const o3 = await offerRow(winter, made.id);
+      expect(await refused(save(coordinator, winter, made.id, { ...asIs(o3), items: [{ itemId: i3, availability: 'open', courseFee: null, seriesMonth: 'january' }] }))).toEqual({
+        status: 409, error: expect.stringMatching(/^Unit 3 has reservations past their deadline in the sitting it is entered in \(.+\): their entries stand$/),
+      });
+    } finally {
+      await sql(`update board_series set entry_deadline = now() + interval '60 days' where id = $1`, [oct]);
+    }
+    expect(await one(`select board_series_id as s from registration where id = $1`, [l3!.id])).toEqual({ s: oct });
   });
 
   it("a Cambridge A level's three routes: A.S. offered at its fee, A.2. carry forward self-study only, A.L. not this cycle", async () => {
@@ -337,6 +381,63 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     await apiResponse(save(coordinator, june, made.id, { ...asIs(o), availability: 'closed', linesStand: true }));
     expect(await one(`select availability from session_offer where id = $1`, [made.id])).toEqual({ availability: 'closed' });
     expect(await sql(`select status from registration where id in $1`, [[lw!.id, lp!.id]])).toEqual([{ status: 'pending_payment' }, { status: 'pending_payment' }]);
+  });
+
+  it('a full form as the screen builds it — units with their teachers and sittings, two qualifications with theirs — saved again as it stands changes nothing and writes no audit row (the review of F6a, finding 7)', async () => {
+    // What the screen sends on Save (subjects-tab.client.tsx body()): every paper, route, unit and qualification
+    // row it shows, with its availability and fee; a unit's and a qualification's own teachers; here a unit's
+    // sitting too, as it stands (the screen sends it only when changed: this is the stricter form).
+    const screenForm = (o: Awaited<ReturnType<typeof offerRow>>): FormJson => {
+      const withQualifications = o.items.some((i) => i.kind === 'qualification');
+      return {
+        ...asIs(o),
+        items: o.items
+          .filter((i) => ['one_paper', 'route', 'unit', 'qualification'].includes(i.kind) || (i.kind === 'whole' && withQualifications))
+          .map((i) => ({
+            itemId: i.id, availability: i.availability as FormJson['availability'], courseFee: i.courseFee,
+            ...(i.kind === 'unit' || i.kind === 'qualification' || i.kind === 'whole' ? { teachers: i.teachers.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' })) } : {}),
+            ...(i.kind === 'unit' && i.series ? { seriesMonth: i.series.month as 'october' | 'november' | 'january' | 'june' } : {}),
+          })),
+      };
+    };
+    // An IAL subject of two units in the winter session: Unit 1 taught online by Teacher One, Unit 2 self-study only in January.
+    const [f1, f2] = [await unit('pearson_edexcel', 'UFF1', 'Unit 1', 'as', 'unit'), await unit('pearson_edexcel', 'UFF2', 'Unit 2', 'as', 'unit')];
+    const ial = await subject(adm, `U08-FF-${RUN}`, `Full form IAL (08u ${RUN})`, { course: 3000, registration: 4790 }, { council: 'pearson_edexcel', qualificationLevel: 'a_level' });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ial }, json: { boardCode: 'pearson_edexcel', qualificationId: null, unitIds: [f1, f2], reason: '08u: the parent row' } }));
+    const madeIal = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: winter }, json: { subjectId: ial, courseFee: 3000, teachers: [{ teacherId: t2, mode: 'in_school' }] } })))!;
+    let o = await offerRow(winter, madeIal.id);
+    const [it1, it2] = o.items as [typeof o.items[number], typeof o.items[number]];
+    await apiResponse(save(coordinator, winter, madeIal.id, { ...asIs(o), items: [
+      { itemId: it1.id, availability: 'open', courseFee: 3500, teachers: [{ teacherId: t1, mode: 'online' }], seriesMonth: 'october' },
+      { itemId: it2.id, availability: 'self_study_only', courseFee: 1500, teachers: [], seriesMonth: 'january' },
+    ] }));
+    o = await offerRow(winter, madeIal.id);
+    expect(o.items.map((i) => [i.label, i.availability, i.courseFee, i.teachers.map((t) => t.mode), i.series?.month])).toEqual([
+      ['Unit 1', 'open', 3500, ['online'], 'october'], ['Unit 2', 'self_study_only', 1500, [], 'january'],
+    ]);
+    // Two qualifications under one subject (Arabic A Level, Edexcel), each with its teacher, made through the item endpoint.
+    const qi = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({ json: { boardCode: 'pearson_edexcel', code: `UYA-${RUN}`, title: `Arabic IAL (08u ${RUN})`, level: 'a_level', suite: 'International A Level', subjectArea: 'Arabic', entryMethod: 'units_cash_in' } })))!.id;
+    const qg = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({ json: { boardCode: 'pearson_edexcel', code: `UGA-${RUN}`, title: `Arabic GCE (08u ${RUN})`, level: 'a_level', suite: 'GCE A Level', subjectArea: 'Arabic', entryMethod: 'qualification' } })))!.id;
+    const ar = await subject(adm, `U08-ARA-${RUN}`, `Arabic A.L. (08u ${RUN})`, { course: 9000, registration: 8950 }, { council: 'pearson_edexcel', qualificationLevel: 'a_level' });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ar }, json: { boardCode: 'pearson_edexcel', qualificationId: qi, unitIds: [], reason: '08u: the IAL award' } }));
+    const madeAr = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: winter }, json: { subjectId: ar, courseFee: 9000, teachers: [{ teacherId: t1, mode: 'in_school' }, { teacherId: t2, mode: 'in_school' }] } })))!;
+    const wholeAr = madeAr.items[0]!;
+    await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: winter, offerId: madeAr.id, itemId: wholeAr }, json: { label: 'Arabic IAL', exclusiveGroup: 'qualification', teachers: [{ teacherId: t1, mode: 'in_school' }] } }));
+    await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items.$post({ param: { id: winter, offerId: madeAr.id }, json: {
+      label: 'Arabic GCE', kind: 'qualification', enters: { kind: 'award', qualificationId: qg }, availability: 'open', requiredInSeries: false,
+      exclusiveGroup: 'qualification', teachers: [{ teacherId: t2, mode: 'in_school' }],
+    } }));
+    // Both forms sent as they stand: nothing changes, no audit row, for the subjects or any of their rows.
+    for (const offerId of [madeIal.id, madeAr.id]) {
+      const now = await offerRow(winter, offerId);
+      const ids = [offerId, ...now.items.map((i) => i.id)];
+      const before = await auditCount(ids);
+      const form = screenForm(now);
+      expect(form.items?.length).toBe(2);
+      expect(await apiResponse(save(coordinator, winter, offerId, form))).toEqual({ offer: false, itemsChanged: 0, itemsCreated: 0, linesMoved: 0, changed: false });
+      expect(await auditCount(ids)).toBe(before);
+      expect(await offerRow(winter, offerId)).toEqual(now);
+    }
   });
 
   it('the same form twice changes nothing and writes no audit row; a form whose audit row cannot be written changes nothing (the rows commit with the change)', async () => {
