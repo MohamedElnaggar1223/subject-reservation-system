@@ -1,0 +1,6 @@
+API suite, local time, TEST_DB_NAME=igcse_focus_test, worktree at commit e8f9619 (no API or package change on the branch)
+ Test Files  34 passed (34)
+      Tests  725 passed | 1 todo (726)
+   Start at  00:15:51
+   Duration  334.58s (transform 1.20s, setup 44ms, collect 4.31s, tests 324.95s, environment 2ms, prepare 970ms)
+exit 0
