@@ -26,6 +26,8 @@ import { Badge, Notice } from '~/components/ui/tone';
 import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-state';
 import { fetchTeachers, useCatalogue, MONTH_LABEL } from '~/app/(app)/exams/exams-shared';
 import { ReservePreview, useRefundTerms } from '~/components/reservations/reserve';
+import { ClassFollowNotice } from '~/components/reservations/class-follow';
+import { followSentences, type FollowSentence } from '~/lib/groups-followed';
 import {
   fetchOffers, fetchAddable, fetchSessions, fetchPreview, offersKey, previewKey, SESSIONS_KEY, Money, Modal, Drawer, Field, INPUT_CLASS, TEXTAREA_CLASS,
   ErrorLine, errorText, CopySummary, type SessionDetail, type OfferRow, type ItemRow, type AddableRow, type OffersData,
@@ -435,14 +437,17 @@ function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onP
           setVersion((v) => v + 1);
           if (createdId) onCreated(createdId);
         }}
+        // A teacher replaced: the form is made again from the offer as it is now (the review of d3f62cf,
+        // item 2) — kept, its old ticks would send the teacher who left back with the next Save.
+        onReplaced={() => setVersion((v) => v + 1)}
         onPreview={onPreview} onRemoved={onClose} />
     </Drawer>
   );
 }
 
-function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPreview, onRemoved }: {
+function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onReplaced, onPreview, onRemoved }: {
   session: SessionDetail; shares: Shares; offer: OfferRow | null; addable: AddableRow | null; canEdit: boolean;
-  onSaved: (message: string, createdId?: string) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
+  onSaved: (message: string, createdId?: string) => void; onReplaced: () => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: catalogue } = useCatalogue();
@@ -766,7 +771,7 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPrev
           <Button type="submit" disabled={invalid || save.isPending}>{save.isPending ? 'Saving…' : offer ? 'Save' : 'Add subject'}</Button>
         </div>
       )}
-      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} />}
+      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} onReplaced={onReplaced} />}
       {removing && offer && (
         <Modal title="Remove this subject" onClose={() => setRemoving(false)}>
           <div className="space-y-4">
@@ -803,39 +808,57 @@ function PaperLine({ name, full, code, reservations, value, choices, fee, subjec
   );
 }
 
-function ReplaceTeacher({ session, offer, onClose }: { session: SessionDetail; offer: OfferRow; onClose: () => void }) {
+function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: SessionDetail; offer: OfferRow; onClose: () => void; onReplaced: () => void }) {
   const queryClient = useQueryClient();
   const { data: teachers } = useQuery({ queryKey: ['teachers'], queryFn: fetchTeachers });
   const [from, setFrom] = useState(offer.teachers[0]?.teacherId ?? '');
   const [to, setTo] = useState('');
   const [reason, setReason] = useState('');
+  // What happened to this year's classes (F1's follow-up, `groupsFollowed`): said before closing.
+  const [classSaid, setClassSaid] = useState<FollowSentence[] | null>(null);
   const go = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
       param: { id: session.id, offerId: offer.id }, json: { fromTeacherId: from, toTeacherId: to, reason: reason.trim() },
     })),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: offersKey(session.id) }); onClose(); },
+    onSuccess: async (r) => {
+      await queryClient.invalidateQueries({ queryKey: offersKey(session.id) });
+      const said = followSentences(r.groupsFollowed, { one: false, teacherName: (id) => (teachers ?? []).find((t) => t.id === id)?.name });
+      if (said.length) setClassSaid(said);
+      else { onClose(); onReplaced(); }
+    },
   });
+  // Closed after a replacement: the subject's form behind is made again from the offer as it is now.
+  const close = () => { onClose(); if (go.isSuccess) onReplaced(); };
   return (
-    <Modal title="Replace a teacher" onClose={onClose}>
+    <Modal title="Replace a teacher" onClose={close}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{"Every reservation, paper and this year's class of the teacher who leaves moves to the other, audited."}</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
-        <Field label="Who leaves" htmlFor="rt-from">
-          <select id="rt-from" className={INPUT_CLASS} value={from} onChange={(e) => setFrom(e.target.value)}>
-            {offer.teachers.map((t) => <option key={t.teacherId} value={t.teacherId} data-i18n-skip="true">{t.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Who takes over" htmlFor="rt-to">
-          <select id="rt-to" className={INPUT_CLASS} value={to} onChange={(e) => setTo(e.target.value)}>
-            <option value="">Choose…</option>
-            {(teachers ?? []).filter((t) => t.id !== from && t.isActive !== false).map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Reason" htmlFor="rt-why"><input id="rt-why" className={INPUT_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="button" onClick={() => go.mutate()} disabled={!to || reason.trim().length < 5 || go.isPending}>Replace</Button>
-        </div>
+        {classSaid ? (
+          <>
+            <ClassFollowNotice sentences={classSaid} />
+            <div className="flex justify-end"><Button type="button" onClick={close}>Close</Button></div>
+          </>
+        ) : (
+        <>
+          <Field label="Who leaves" htmlFor="rt-from">
+            <select id="rt-from" className={INPUT_CLASS} value={from} onChange={(e) => setFrom(e.target.value)}>
+              {offer.teachers.map((t) => <option key={t.teacherId} value={t.teacherId} data-i18n-skip="true">{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Who takes over" htmlFor="rt-to">
+            <select id="rt-to" className={INPUT_CLASS} value={to} onChange={(e) => setTo(e.target.value)}>
+              <option value="">Choose…</option>
+              {(teachers ?? []).filter((t) => t.id !== from && t.isActive !== false).map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Reason" htmlFor="rt-why"><input id="rt-why" className={INPUT_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" onClick={() => go.mutate()} disabled={!to || reason.trim().length < 5 || go.isPending}>Replace</Button>
+          </div>
+        </>
+        )}
       </div>
     </Modal>
   );

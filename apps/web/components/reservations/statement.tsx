@@ -23,6 +23,8 @@ import { Badge, type Tone } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, Modal, Field, INPUT_CLASS, TEXTAREA_CLASS, ErrorLine, errorText } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { fetchReserveOffers } from './reserve';
+import { ClassFollowNotice } from './class-follow';
+import { followSentences, type FollowSentence } from '~/lib/groups-followed';
 
 export const fetchStatement = (q: { studentId?: string; familyId?: string }) => apiResponse(api.v1.statement.$get({ query: q }));
 export type StatementData = Awaited<ReturnType<typeof fetchStatement>>;
@@ -288,20 +290,30 @@ function TeacherModal({ line, onClose }: { line: StatementLine; onClose: () => v
   const [choice, setChoice] = useState<string>(line.mode === 'self_study' ? 'self' : line.teacherId ?? '');
   const [reason, setReason] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
+  // What happened to the student's class (F1's follow-up, `groupsFollowed`): shown before closing.
+  const [classSaid, setClassSaid] = useState<FollowSentence[] | null>(null);
   const m = useMutation({
     mutationFn: () => changeTeacher(line.id, choice === 'self'
       ? { teacherId: null, mode: 'self_study', reason }
       : { teacherId: choice || null, reason }),
-    onSuccess: () => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['statement'] });
       qc.invalidateQueries({ queryKey: ['desk'] });
-      onClose();
+      const said = followSentences(r.groupsFollowed, { one: true, teacherName: (id) => teachers.find((t) => t.id === id)?.name });
+      if (said.length) setClassSaid(said);
+      else onClose();
     },
     onError: (e) => setFailure(errorText(e)),
   });
   return (
     <Modal title="Change the teacher" onClose={onClose}>
-      {isLoading ? <LoadingState /> : (
+      {isLoading ? <LoadingState /> : classSaid ? (
+        <div className="space-y-4">
+          <p className="text-sm text-foreground"><bdi data-i18n-skip="true">{line.label}</bdi></p>
+          <ClassFollowNotice sentences={classSaid} />
+          <div className="flex justify-end"><Button onClick={onClose}>Close</Button></div>
+        </div>
+      ) : (
         <div className="space-y-4">
           <p className="text-sm text-foreground"><bdi data-i18n-skip="true">{line.label}</bdi></p>
           <Field label="Teacher" htmlFor="line-teacher">

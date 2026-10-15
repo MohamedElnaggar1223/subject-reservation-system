@@ -4,6 +4,15 @@ import {
   admin, staff, onboard, subject, refused, one, sql, notified, notificationsFor, holdRowLock, lockWaiters, pauseAtAudits, waitFor, type Client,
 } from './helpers';
 import { setClockForTests } from '../src/lib/clock';
+// B's desk display of the follow-up (docs/features/CYCLE_FOLLOWUPS.md §2): the screens' sentences and their Arabic.
+import { followSentences } from '../../web/lib/groups-followed';
+import { translateReservationsText } from '../../web/lib/i18n-reservations';
+import { translateSchedulingText } from '../../web/lib/i18n-scheduling';
+import { translateExamsText } from '../../web/lib/i18n-exams';
+import { translateCatalogueText } from '../../web/lib/i18n-catalogue';
+import { translateImportText } from '../../web/lib/i18n-import';
+import { translateSessionsText } from '../../web/lib/i18n-sessions';
+import { translateMoneyText } from '../../web/lib/i18n-money';
 
 /**
  * F1 on the reservations rework's model (RESERVATIONS_REWORK.md §9's F1 list, §10's F1 row;
@@ -1072,5 +1081,104 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     expect(went).toMatchObject({ studentsMoved: 1, clashesAccepted: [expect.stringMatching(new RegExp(`^Student rw-4-${RUN} would be in Biology W`))] });
     const listed = (await apiResponse(coordinator.api.v1.timetables.clashes.$get({ query: { academicYearId: yearId } }))).find((c) => c.person === `Student rw-4-${RUN}`)!;
     expect(listed).toMatchObject({ kind: 'students_busy', cause: expect.stringMatching(/^Rolled into /), stillHappens: true });
+  });
+
+  // ─── B's desk display of the follow-up (docs/features/CYCLE_FOLLOWUPS.md §2) ─────────────────
+
+  it("the desk's sentence for each outcome of a teacher change, and the Session screen's for a replacement, in English and Arabic: moves, waits with no class of the new teacher, refused for a clash in the published timetable with the API's reason, the whole class handed over, self-study, nothing to say; counted for a replacement", async () => {
+    clockAt(D1);
+    const iso = (n: string) => `⁨${n}⁩`;
+    const names = new Map<string, string>();
+    const say = (g: Parameters<typeof followSentences>[0], one = true) => followSentences(g, { one, teacherName: (id) => names.get(id) });
+    const arabic = (s: { text: string; reason: string | null }) => ({ text: translateReservationsText(s.text), reason: s.reason ? translateSchedulingText(s.reason) : null });
+    const texts: string[] = [];
+    const desk = async (lineId: string, teacherId: string | null, mode?: 'self_study') => {
+      const r = await apiResponse(putTeacher(officer, lineId, { teacherId, ...(mode ? { mode } : {}), reason: 'the family asked at the desk' }));
+      texts.push(...say(r.groupsFollowed).map((s) => s.text));
+      return r;
+    };
+    const named = async (fx: RaceFix, tag: string) => { for (const k of ['x', 'y', 'z'] as const) names.set(fx[k], `Race ${tag} ${k.toUpperCase()} ${RUN}`); return fx; };
+
+    // Three students in X's class; Y has a class, Z will not.
+    const ds = await named(await raceSubject('DS', 3), 'DS');
+    // Moves: X's class keeps students taught by X, and Y has a class of the subject.
+    const moved = await desk(ds.line[0]!, ds.y);
+    expect(say(moved.groupsFollowed)).toEqual([{ text: 'The student moves to the class Race DS — Y.', reason: null, tone: 'success' }]);
+    expect(arabic(say(moved.groupsFollowed)[0]!)).toEqual({ text: `ينتقل الطالب إلى فصل ${iso('Race DS — Y')}.`, reason: null });
+    // Waits: Z's only class is retired today, so Z has none of the subject.
+    await apiResponse(coordinator.api.v1.scheduling.groups[':id'].archive.$post({ param: { id: ds.gz }, json: { archivedOn: D1, reason: 'not needed this year' } }));
+    const waits = await desk(ds.line[1]!, ds.z);
+    expect(waits.groupsFollowed!.waiting).toEqual([expect.objectContaining({ kind: 'no_group', groupName: 'Race DS — X' })]);
+    expect(say(waits.groupsFollowed)).toEqual([{ text: `Race DS Z ${RUN} has no class of this subject yet: the student stays in Race DS — X and waits to be placed.`, reason: null, tone: 'warning' }]);
+    expect(arabic(say(waits.groupsFollowed)[0]!)).toEqual({ text: `ليس لدى ${iso(`Race DS Z ${RUN}`)} فصل في هذه المادة بعد: يبقى الطالب في ${iso('Race DS — X')} وينتظر توزيعه.`, reason: null });
+    // A teacher the screen cannot name is "the new teacher".
+    expect(followSentences(waits.groupsFollowed, { one: true, teacherName: () => undefined })[0]!.text).toBe('The new teacher has no class of this subject yet: the student stays in Race DS — X and waits to be placed.');
+    expect(translateReservationsText('The new teacher has no class of this subject yet: the student stays in Race DS — X and waits to be placed.'))
+      .toBe(`ليس لدى المعلم الجديد فصل في هذه المادة بعد: يبقى الطالب في ${iso('Race DS — X')} وينتظر توزيعه.`);
+    // The whole class: the last student taught by X goes to Z too — every member of X's class now has Z.
+    const whole = await desk(ds.line[2]!, ds.z);
+    expect(say(whole.groupsFollowed)).toEqual([{ text: `The whole class Race DS — X goes to Race DS Z ${RUN}: the student stays in it.`, reason: null, tone: 'success' }]);
+    expect(arabic(say(whole.groupsFollowed)[0]!)).toEqual({ text: `ينتقل فصل ${iso('Race DS — X')} كله إلى ${iso(`Race DS Z ${RUN}`)}: ويبقى الطالب فيه.`, reason: null });
+
+    // Refused: Y's class meets on Wednesday at period 2 in a version published from D1, when the student
+    // has a homeroom lesson; X's class keeps another student taught by X, so it is the student who would move.
+    const dc = await named(await raceSubject('DC', 2), 'DC');
+    await apiResponse(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: dc.gy }, json: { weeklyPeriods: 1 } }));
+    const homeTeacher = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `DC homeroom teacher ${RUN}` } })))!.id;
+    await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: yearId, name: `DC homeroom ${RUN}`, teacherId: homeTeacher, weeklyPeriods: 1, doublePeriods: 0, studentIds: [dc.st[0]!] } }));
+    const current = (await apiResponse(coordinator.api.v1.timetables.$get({ query: { termId } }))).find((v) => v.inForce)!.id;
+    const v = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'RW — desk sentence', copyFromId: current } }))).id;
+    // The version in force carries the hall's clash the roll-over went ahead with: this one moves the hall to a free slot.
+    await place(v, 'Hall 11RW', 2, 4);
+    await place(v, 'Race DC — Y', 3, 2);
+    await place(v, `DC homeroom ${RUN}`, 3, 2);
+    await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: v }, json: { effectiveFrom: D1, acceptUnplaced: true } }));
+    const clash = await desk(dc.line[0]!, dc.y);
+    const why = clash.groupsFollowed!.waiting[0]!.why;
+    expect(clash.groupsFollowed!.waiting).toEqual([expect.objectContaining({ kind: 'refused', groupName: 'Race DC — X' })]);
+    expect(why).toMatch(new RegExp(`^It would clash in the published timetable: Student rr-DC0-${RUN} would be in .+ at Wednesday period 2 from `));
+    expect(say(clash.groupsFollowed)).toEqual([{ text: 'The move was refused: the student stays in Race DC — X.', reason: why, tone: 'warning' }]);
+    const clashAr = arabic(say(clash.groupsFollowed)[0]!);
+    expect(clashAr.text).toBe(`رُفض النقل: يبقى الطالب في ${iso('Race DC — X')}.`);
+    expect(clashAr.reason).toMatch(/^سيتعارض في الجدول المنشور: /);
+    expect(clashAr.reason).toContain('يوم الأربعاء في الحصة 2');
+
+    // Nothing to say: a student in no class of the subject (the change still made).
+    const lone = await onboard(officer, `rr-DCl-${RUN}`, 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: lone.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+    const loneLine = (await reserve(lone.studentId, june, [{ offerItemId: dc.item, attempt: 'retake', mode: 'in_school', teacherId: dc.x, priorSittingSeriesId: priorS, priorSittingSource: 'declared_by_desk' }]))[0]!.id;
+    await apiResponse(coordinator.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: [lone.studentId], subjectMap: [], exclude: [], commit: true } }));
+    const nothing = await desk(loneLine, dc.z);
+    expect(nothing.groupsFollowed).toMatchObject({ left: [], moved: [], groupsGiven: [], waiting: [] });
+    expect(say(nothing.groupsFollowed)).toEqual([]);
+    // Self-study: in Z's class now, the retake taken alone leaves it after today.
+    await apiResponse(addTo(dc.gz, lone.studentId));
+    const alone = await desk(loneLine, null, 'self_study');
+    expect(say(alone.groupsFollowed)).toEqual([{ text: 'The student leaves the class Race DC — Z after today: self-study from now.', reason: null, tone: 'success' }]);
+    expect(arabic(say(alone.groupsFollowed)[0]!)).toEqual({ text: `يغادر الطالب فصل ${iso('Race DC — Z')} بعد اليوم: دراسة ذاتية من الآن.`, reason: null });
+
+    // The Session screen's Replace a teacher (A's), counted: the whole class handed over …
+    const dr = await named(await raceSubject('DR', 2), 'DR');
+    const handed = await apiResponse(replaceOn(dr));
+    const handedSaid = followSentences(handed.groupsFollowed, { one: false, teacherName: (id) => names.get(id) });
+    expect(handedSaid).toEqual([{ text: `The whole class Race DR — X goes to Race DR Y ${RUN}.`, reason: null, tone: 'success' }]);
+    expect(arabic(handedSaid[0]!)).toEqual({ text: `ينتقل فصل ${iso('Race DR — X')} كله إلى ${iso(`Race DR Y ${RUN}`)}.`, reason: null });
+    // … or two students moved, X's class keeping a third taught by X through no line of this offer.
+    const dm = await named(await raceSubject('DM', 2), 'DM');
+    const third = await onboard(officer, `rr-DM2-${RUN}`, 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: third.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+    await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: third.studentId, subjectId: dm.sub, teacherId: dm.x, mode: 'in_school' } }));
+    await apiResponse(addTo(dm.gx, third.studentId));
+    const two = await apiResponse(replaceOn(dm));
+    const twoSaid = followSentences(two.groupsFollowed, { one: false, teacherName: (id) => names.get(id) });
+    expect(twoSaid).toEqual([{ text: '2 students move to the class Race DM — Y.', reason: null, tone: 'success' }]);
+    expect(arabic(twoSaid[0]!)).toEqual({ text: `ينتقل طالبان إلى فصل ${iso('Race DM — Y')}.`, reason: null });
+    texts.push(...handedSaid.map((s) => s.text), ...twoSaid.map((s) => s.text));
+
+    // On the page the rework's rules come after F4's, F0b's, F7's, A's and C's (lib/i18n.tsx): none of them takes these sentences.
+    expect(texts).toHaveLength(7);
+    for (const t of texts) {
+      expect([translateExamsText(t), translateCatalogueText(t), translateImportText(t), translateSessionsText(t), translateMoneyText(t, () => null)]).toEqual([null, null, null, null, null]);
+    }
   });
 });

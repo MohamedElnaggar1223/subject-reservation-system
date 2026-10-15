@@ -289,25 +289,33 @@ From `apps/api/src/services/schedule.services.ts` unless noted; types in
   groups follow once; one `TEACHING_GROUP_TEACHER_ASSIGNED` row.
 - **For step D's teaching-group audience** (RESERVATIONS_MESSAGES.md §2): **`studentsOfGroup(groupId,
   date = today, executor)`** (`group.services.ts`) — the students in a group on a date by §2's
-  rules — with `listGroups(academicYearId)` for D's picker. D reads the course enrolments
-  (`getTeachingDemand`) until F1 is on main and switches to these then.
-  **D's switch, once F1 is on main** (what D's code reads today, at F1's final merge: the audience
-  `{ list: 'teaching_group', academicYearId, subjectId, unitId, teacherId }` resolved from the open
-  in-school `course_enrolment` rows of that key in `message-audience.services.ts`, and its picker from
-  `getTeachingDemand(year)` in `listOptions`, `message.services.ts`):
+  rules — with `listGroups(academicYearId)` for D's picker. D read the course enrolments
+  (`getTeachingDemand`) until F1 was on main and has switched to these (15 Oct 2026,
+  docs/features/CYCLE_FOLLOWUPS.md §1).
+  **D's switch, done** (before it, at F1's final merge, D read the audience `{ list: 'teaching_group',
+  academicYearId, subjectId, unitId, teacherId }` from the open in-school `course_enrolment` rows of that
+  key, and its picker from `getTeachingDemand(year)`; now the audience is `{ list: 'teaching_group', groupId,
+  who }` in `message-audience.services.ts`, and the picker `teachingGroupOptions` in `message.services.ts`):
   - the picker: `listGroups(academicYearId)` → `{ academicYear, asOf, groups }`, each group with `id`,
     `name`, `kind` (`enrolment`, `section` or `manual`), `subject` `{ id, name, code }`, `unit` `{ id, code, shortCode,
     title }` or null, `teacher` `{ id, name, kind }` or null ("no preference" groups wait for one),
     `section` or null, `delivery`, `size` (its students on `asOf`, the year's default start: today
     inside the year), `archived` and `providerTaught`; offer the groups not archived;
-  - the audience: a group id, resolved with `studentsOfGroup(groupId, todayAtSchool(), executor)` —
+  - the audience: a group id, resolved with `studentsOfGroup(groupId, day, executor)` where `day` is
+    `teachingGroupDay` (`message-audience.services.ts`): `todayAtSchool()`, **or the year's first day while
+    today is before it** — a departure from the literal `todayAtSchool()` decided by the coordinator after
+    the review of d3f62cf (item 1): from 1 July the picker offers the coming year's groups, whose members
+    start on its first day, so read on today every class was nobody all summer. The picker counts `size` on
+    the same day (`asOf`), and the label's teacher is the group's teacher that day —
     student ids sorted, read in D's own transaction through `executor`: a section's group follows the
     section, a move made today goes to the later group, nobody after their last day (08s6, "step D's
     contract"); the families of those students as D's `section` list does;
   - the label: the group's subject, unit and teacher from `teaching_group` (its teacher today:
     `teachersOn([groupId], date)` in `scheduling-shared.services.ts`);
-  - a saved audience of the old shape stays readable (its enrolment key): D decides whether to map it
-    to the key's groups or keep both shapes. F1 changes none of D's files.
+  - a saved audience of the old shape stays readable (its enrolment key): D keeps both shapes — the old
+    one resolved as it was written, never written again (CYCLE_FOLLOWUPS.md §1.3). F1 changes none of D's
+    files; D's switch added `kind` (`no_group` | `refused`) to `FollowOutcome.waiting` for the desk's
+    sentence (CYCLE_FOLLOWUPS.md §2.1).
 - **A change after publishing** (changed in round two) — `guardPublishedTimetable(tx, persons,
   from, { anyway, clashToken, cause, actorId }, change)` and, for a change that is not one
   function, `checkpointPublished(tx, persons, from)` then `.settle(opts)`: refused (409) with the

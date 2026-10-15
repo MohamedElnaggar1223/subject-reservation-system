@@ -5,6 +5,7 @@ import { messagesArabic } from '../../web/lib/i18n-messages';
 import {
   admin, staff, onboard, refused, one, sql, money, app, waitFor, pauseAtAudits, lockWaiters, holdRowLock, notificationsFor, CONSENT, type Client,
 } from './helpers';
+import { setClockForTests } from '../src/lib/clock';
 
 /**
  * 08s — messages and reminders (RESERVATIONS_REWORK.md §3.8, §4.8, §8; docs/features/RESERVATIONS_MESSAGES.md).
@@ -950,5 +951,173 @@ describe('08s: messages and reminders', () => {
     expect(reminders).toHaveLength(2);
     const missing = reminders.flatMap((d) => [d.label, d.description]).filter((en) => !messagesArabic[en]);
     expect(missing).toEqual([]);
+  });
+
+  // ─── A teaching group: F1's groups (D's switch, docs/features/CYCLE_FOLLOWUPS.md §1) ─────────────
+
+  describe("a teaching group is one of F1's groups, its students those in it on the school's day", () => {
+    // A year of this file's own, far ahead (no other suite uses +33), with the school put on a day inside it.
+    const TY = academicYearStartOf() + 33;
+    const TODAY = `${TY}-10-14`;
+    const plus = (date: string, n: number) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    let yearId: string;
+    let groupId: string;
+    let groupName: string;
+    let retiredId: string;
+    const f: Record<string, Family> = {};
+    const teacherName = `Teacher D (08s ${RUN})`;
+    /** Who a message reached: its recipients' emails, sorted. */
+    const reached = async (messageId: string) => (await sql<{ email: string }>(
+      `select distinct u.email from message_delivery d join "user" u on u.id = d.recipient_id where d.message_id = $1 order by u.email`, [messageId])).map((r) => r.email);
+    const family = (...k: string[]) => k.flatMap((x) => [f[x]!.parent.email, f[x]!.student.email]).sort();
+
+    beforeAll(async () => {
+      setClockForTests(new Date(`${TODAY}T09:00:00Z`));
+      yearId = (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: TY, startsOn: `${TY}-09-06`, endsOn: `${TY + 1}-06-25` } }))).id;
+      for (const k of ['a', 'b', 'c', 'd', 'e']) {
+        f[k] = await onboard(officer, `s08-tg${k}-${RUN}`, 11);
+        // Grade 11 in that year (a group takes students of grades 10–12 that year).
+        await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f[k]!.studentId }, json: { cohortYear: TY - 1, reason: 'the teaching-group scenario year' } }));
+      }
+      // The class: A, B and C from the year's first day; B left it yesterday; D joined it today; E joins tomorrow.
+      groupName = `Biology 11 (08s ${RUN})`;
+      groupId = (await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: {
+        academicYearId: yearId, name: groupName, subjectId: subjA, teacherId, weeklyPeriods: 0, doublePeriods: 0,
+        studentIds: [f.a!.studentId, f.b!.studentId, f.c!.studentId], startsOn: `${TY}-09-06`,
+      } }))).id;
+      await apiResponse(coordinator.api.v1.scheduling.groups[':id'].members.end.$post({ param: { id: groupId }, json: { studentIds: [f.b!.studentId], endedOn: plus(TODAY, -1), reason: 'moved to the other class' } }));
+      await apiResponse(coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: groupId }, json: { studentIds: [f.d!.studentId], startsOn: TODAY } }));
+      await apiResponse(coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: groupId }, json: { studentIds: [f.e!.studentId], startsOn: plus(TODAY, 1) } }));
+      // A class retired before today is not offered.
+      retiredId = (await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: yearId, name: `Retired class (08s ${RUN})`, subjectId: subjA, teacherId, weeklyPeriods: 0, doublePeriods: 0 } }))).id;
+      await apiResponse(coordinator.api.v1.scheduling.groups[':id'].archive.$post({ param: { id: retiredId }, json: { archivedOn: plus(TODAY, -1), reason: 'merged into the other class' } }));
+    }, 120_000);
+    afterAll(() => setClockForTests(null));
+
+    it("the picker lists the year's live groups from F1; the audience is the group on the school's day — a member who left before today is not written to, one who joined today is; the resolve, the send and the step's scheduled message reach the same people", async () => {
+      // The picker (GET /v1/messages/lists): F1's groups of the school's year today, the retired one left out.
+      const lists = await apiResponse(adm.api.v1.messages.lists.$get({ query: {} }));
+      const mine = lists.teachingGroups.filter((g) => g.name.includes(`(08s ${RUN})`));
+      expect(mine).toEqual([{
+        id: groupId, name: groupName, kind: 'manual', label: `${groupName} · ${subjAName} · ${teacherName}`,
+        subject: { id: subjA, name: subjAName }, unit: null, teacher: { id: teacherId, name: teacherName }, size: 3, asOf: TODAY,
+      }]);
+      const definition = { kind: 'batch' as const, list: 'teaching_group' as const, groupId, who: 'families' as const };
+      // The resolve: A and C (in it since the year began), D (joined today); not B (left yesterday), not E (joins tomorrow).
+      const r = await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }));
+      expect(r.label).toBe(`${groupName}: ${subjAName} with ${teacherName} — Parents and students`);
+      expect(r.people).toBe(6);
+      expect(r.sample.map((m) => m.name).sort()).toEqual(['a', 'c', 'd'].flatMap((k) => [`Parent s08-tg${k}-${RUN}`, `Student s08-tg${k}-${RUN}`]).sort());
+      expect(r.fills).toEqual(['guardian', 'student']);
+      // The school's day, not the server's: at 22:30Z the day before, it is already today in Cairo (01:30) —
+      // the same members, whichever zone the suite runs in; a reading of the server's own date would find
+      // yesterday's class (B in it, D not yet) in the TZ=UTC run (the review of d3f62cf, item 3).
+      setClockForTests(new Date(`${plus(TODAY, -1)}T22:30:00Z`));
+      try {
+        const night = await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }));
+        expect([night.people, night.sample.map((m) => m.name).sort()]).toEqual([6, r.sample.map((m) => m.name).sort()]);
+      } finally {
+        setClockForTests(new Date(`${TODAY}T09:00:00Z`));
+      }
+      // The send, now: the same six people.
+      const text = { title: 'Biology field trip', body: 'Dear {guardian}, the Biology class visits the museum on Thursday with {student}.', language: 'en' as const, channels: ['in_app' as const] };
+      const sent = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { definition }, ...text } }));
+      expect(sent).toMatchObject({ status: 'sent', people: 6 });
+      expect(await reached(sent.id)).toEqual(family('a', 'c', 'd'));
+      expect(await notificationsFor(f.a!.parent.email, 'SCHOOL_MESSAGE')).toEqual([{ type: 'SCHOOL_MESSAGE', title: 'Biology field trip', body: `Dear Parent s08-tga-${RUN}, the Biology class visits the museum on Thursday with Student s08-tga-${RUN}.` }]);
+      expect(await notificationsFor(f.b!.parent.email, 'SCHOOL_MESSAGE')).toEqual([]);
+      expect(await notificationsFor(f.b!.student.email, 'SCHOOL_MESSAGE')).toEqual([]);
+      expect(await notificationsFor(f.e!.parent.email, 'SCHOOL_MESSAGE')).toEqual([]);
+      // The log names the audience as the resolve did; the audience it went to is kept as a copy.
+      expect((await apiResponse(adm.api.v1.messages.$get({ query: { limit: '50' } }))).find((m) => m.id === sent.id)!.audience).toEqual({ kind: 'batch', label: r.label });
+      expect(await one(`select a.definition, a.resolved_count from message m join message_audience a on a.id = m.audience_id where m.id = $1`, [sent.id]))
+        .toEqual({ definition, resolved_count: 6 });
+      // The scheduler's step resolves a scheduled one at its time, in its own transaction: the same six.
+      const when = new Date(Date.now() + 2 * 3_600_000);
+      const later = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { definition }, ...text, title: 'Biology field trip: the bus', scheduledAt: when } }));
+      expect(later).toMatchObject({ status: 'scheduled', people: 6 });
+      await step(new Date(when.getTime() + 1000));
+      expect(await one(`select status, recipient_count from message where id = $1`, [later.id])).toEqual({ status: 'sent', recipient_count: 6 });
+      expect(await reached(later.id)).toEqual(family('a', 'c', 'd'));
+      // C leaves the class (last day yesterday): the next resolve and the next scheduled message leave C out.
+      await apiResponse(coordinator.api.v1.scheduling.groups[':id'].members.end.$post({ param: { id: groupId }, json: { studentIds: [f.c!.studentId], endedOn: plus(TODAY, -1), reason: 'moved to the other class' } }));
+      expect((await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }))).people).toBe(4);
+      const third = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { definition }, ...text, title: 'Biology field trip: the time', scheduledAt: when } }));
+      await step(new Date(when.getTime() + 2000));
+      expect(await reached(third.id)).toEqual(family('a', 'd'));
+      // To the students only: the group's students alone; the finance desk does not write to a class.
+      expect((await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: { ...definition, who: 'students' } } } }))).people).toBe(2);
+      expect(await refused(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } })))
+        .toEqual({ status: 403, error: "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge" });
+      // A group that does not exist is said so.
+      expect(await refused(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: { ...definition, groupId: 'no-such-group' } } } })))
+        .toEqual({ status: 404, error: 'Teaching group not found' });
+    });
+
+    it('an audience saved before the switch (an enrolment key: subject, unit, teacher) keeps working: listed, resolved, sent now and by the step by its saved id, named as before; the old shape is not taken as a new definition', async () => {
+      // A and C are enrolled in the subject with the teacher this year (in school).
+      for (const k of ['a', 'c']) {
+        await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: f[k]!.studentId, subjectId: subjA, teacherId, mode: 'in_school' } }));
+      }
+      // The row D's composer wrote before the switch (8 Oct): the shape it kept for a teaching group.
+      const legacy = { kind: 'batch', list: 'teaching_group', academicYearId: yearId, subjectId: subjA, unitId: null, teacherId, who: 'parents' };
+      const savedId = `aud-legacy-tg-${RUN}`;
+      await sql(`insert into message_audience (id, kind, definition, name, saved, created_by) values ($1, 'batch', $2::jsonb, $3, true, $4)`,
+        [savedId, JSON.stringify(legacy), `Biology parents (08s ${RUN})`, adm.id]);
+      const label = `${subjAName} with ${teacherName} — Parents`;
+      const saved = (await apiResponse(adm.api.v1.messages.audiences.$get())).find((a) => a.id === savedId);
+      expect(saved).toEqual({ id: savedId, name: `Biology parents (08s ${RUN})`, kind: 'batch', definition: legacy, label });
+      const r = await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { savedId } } }));
+      expect(r).toMatchObject({ label, people: 2 });
+      const text = { title: 'Biology results evening', body: 'Dear {guardian}, the Biology results evening is on Monday.', language: 'en' as const, channels: ['in_app' as const] };
+      const sent = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { savedId }, ...text } }));
+      expect(sent).toMatchObject({ status: 'sent', people: 2 });
+      expect(await reached(sent.id)).toEqual([f.a!.parent.email, f.c!.parent.email].sort());
+      // Its message keeps the old shape as its own copy, and the log names it as before.
+      expect((await one<{ definition: unknown }>(`select a.definition from message m join message_audience a on a.id = m.audience_id where m.id = $1`, [sent.id])).definition).toEqual(legacy);
+      expect((await apiResponse(adm.api.v1.messages.$get({ query: { limit: '50' } }))).find((m) => m.id === sent.id)!.audience).toEqual({ kind: 'batch', label });
+      // Scheduled by its saved id: the step reads the old shape and sends it.
+      const when = new Date(Date.now() + 3 * 3_600_000);
+      const later = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { savedId }, ...text, title: 'Biology results evening: the room', scheduledAt: when } }));
+      await step(new Date(when.getTime() + 1000));
+      expect(await one(`select status, recipient_count from message where id = $1`, [later.id])).toEqual({ status: 'sent', recipient_count: 2 });
+      expect(await reached(later.id)).toEqual([f.a!.parent.email, f.c!.parent.email].sort());
+      // A scheduled one in the old shape can still be cancelled (its audience read to judge who may).
+      const cancelMe = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { savedId }, ...text, title: 'Biology results evening: cancelled', scheduledAt: when } }));
+      expect(await apiResponse(adm.api.v1.messages[':id'].cancel.$post({ param: { id: cancelMe.id }, json: { reason: 'sent by mistake' } }))).toEqual({ id: cancelMe.id, status: 'cancelled' });
+      // A new message names a group: the old shape is not taken as a definition.
+      const old = await refused(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: legacy as never } } }));
+      expect(old.status).toBe(400);
+    });
+
+    it("between 1 July and the year's first day the picker offers the coming year's classes, counted on that first day, and a class resolves to its members that day — the resolve, the send and the step's scheduled message alike (the review of d3f62cf, item 1)", async () => {
+      const SUMMER = `${TY}-08-20`;
+      const FIRST = `${TY}-09-06`;
+      setClockForTests(new Date(`${SUMMER}T09:00:00Z`));
+      try {
+        // On the year's first day the class was A, B and C (B and C left it in October, D and E joined then);
+        // the class retired in October was still live on the first day.
+        const lists = await apiResponse(adm.api.v1.messages.lists.$get({ query: {} }));
+        expect(lists.teachingGroups.filter((g) => g.name.includes(`(08s ${RUN})`)).map((g) => [g.id, g.size, g.asOf]))
+          .toEqual([[groupId, 3, FIRST], [retiredId, 0, FIRST]]);
+        const definition = { kind: 'batch' as const, list: 'teaching_group' as const, groupId, who: 'students' as const };
+        const students = ['a', 'b', 'c'].map((k) => f[k]!.student.email).sort();
+        const r = await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }));
+        expect([r.people, r.sample.map((m) => m.name).sort()]).toEqual([3, ['a', 'b', 'c'].map((k) => `Student s08-tg${k}-${RUN}`)]);
+        const text = { title: 'Biology: the first week', body: 'The Biology class starts on the first school day of the year.', language: 'en' as const, channels: ['in_app' as const] };
+        // "Send now" is not refused as an empty audience: it reaches the three.
+        const sent = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { definition }, ...text } }));
+        expect(sent).toMatchObject({ status: 'sent', people: 3 });
+        expect(await reached(sent.id)).toEqual(students);
+        // A scheduled one is sent by the step to the three, not marked sent to nobody.
+        const when = new Date(Date.now() + 4 * 3_600_000);
+        const later = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { definition }, ...text, title: 'Biology: the books', scheduledAt: when } }));
+        await step(new Date(when.getTime() + 1000));
+        expect(await one(`select status, recipient_count from message where id = $1`, [later.id])).toEqual({ status: 'sent', recipient_count: 3 });
+        expect(await reached(later.id)).toEqual(students);
+      } finally {
+        setClockForTests(new Date(`${TODAY}T09:00:00Z`));
+      }
+    });
   });
 });

@@ -80,13 +80,24 @@ export const SessionUnpaidList = z.object({
 });
 export const SectionList = z.object({ kind: z.literal('batch'), list: z.literal('section'), sectionId: id, who: Who.default('families') });
 /**
- * A teaching group as F1's contract names it (docs/features/RESERVATIONS.md §10, getTeachingDemand):
- * the open in-school course enrolments of one subject (and unit) with one teacher in a year.
+ * A teaching group: one of F1's groups (docs/features/SCHEDULING.md §8, "the contract for D"),
+ * its students those in the group on the school's day (`studentsOfGroup`): a student who left the
+ * group is not written to, one who joined is (docs/features/CYCLE_FOLLOWUPS.md §1).
  */
 export const TeachingGroupList = z.object({
+  kind: z.literal('batch'), list: z.literal('teaching_group'), groupId: id, who: Who.default('families'),
+});
+/**
+ * A teaching group as it was saved before F1's groups were on main (step D, 8 Oct 2026): the open
+ * in-school course enrolments of one subject (and unit) with one teacher in a year. Never written
+ * again — the composer and the API take a group now — but an audience saved, or a message
+ * scheduled, in this shape is read and resolved as it was written (CYCLE_FOLLOWUPS.md §1.3).
+ */
+export const LegacyTeachingGroupList = z.object({
   kind: z.literal('batch'), list: z.literal('teaching_group'),
   academicYearId: id, subjectId: id, unitId: id.nullable(), teacherId: id.nullable(), who: Who.default('families'),
 });
+export type LegacyTeachingGroupListType = z.infer<typeof LegacyTeachingGroupList>;
 export const OfferReserversList = z.object({
   kind: z.literal('batch'), list: z.literal('offer_reservers'), offerId: id,
   /** Live lines (waiting or paid), only the unpaid, or only the paid. */
@@ -120,6 +131,13 @@ export function isPaymentList(def: { kind: string; list?: string; unpaidOnly?: b
 export const AudienceDefinition = z.union([BroadcastDefinition, BatchDefinition, DirectDefinition])
   .refine((d) => d.kind !== 'broadcast' || d.grade == null || ['families', 'parents', 'students'].includes(d.group), 'A grade narrows parents, students or families only');
 export type AudienceDefinitionType = z.infer<typeof AudienceDefinition>;
+/**
+ * An audience as a row keeps it (`message_audience.definition`): any definition the API takes now,
+ * or a teaching group saved before the switch to F1's groups (its enrolment key). Read with this;
+ * written only with AudienceDefinition.
+ */
+export const StoredAudienceDefinition = z.union([AudienceDefinition, LegacyTeachingGroupList]);
+export type StoredAudienceDefinitionType = z.infer<typeof StoredAudienceDefinition>;
 export type BroadcastDefinitionType = z.infer<typeof BroadcastDefinition>;
 export type BatchDefinitionType = z.infer<typeof BatchDefinition>;
 

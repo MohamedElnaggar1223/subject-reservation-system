@@ -1,0 +1,48 @@
+# The full API suite on 2bfc74c (feature/cycle-followups) with TZ=UTC: TZ=UTC TEST_DB_NAME=igcse_followups_test pnpm --filter @repo/api test - each file's line and the summary.
+ ✓ test/00-harness.test.ts (5 tests) 2575ms
+ ✓ test/01-desk.test.ts (8 tests) 1478ms
+ ✓ test/02-money.test.ts (4 tests) 1526ms
+ ✓ test/03-v3-flows.test.ts (6 tests | 1 skipped) 1921ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 7129ms
+ ✓ test/05-object-access.test.ts (19 tests) 7689ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3442ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1612ms
+ ✓ test/08-money-rules.test.ts (51 tests) 10231ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 10229ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 5703ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 6940ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5357ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 4899ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8474ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2356ms
+ ✓ test/08i-board-series.test.ts (10 tests) 3871ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3738ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4431ms
+ ✓ test/08l-board-change.test.ts (7 tests) 2793ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 5182ms
+ ✓ test/08n-import.test.ts (69 tests) 13916ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 20675ms
+ ✓ test/08o-reservation-lines.test.ts (24 tests) 15851ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 7397ms
+ ✓ test/08q-charges.test.ts (46 tests) 23258ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 7808ms
+ ✓ test/08s-messages-reminders.test.ts (38 tests) 47777ms
+ ✓ test/08s0-scheduling-engine.test.ts (4 tests) 6435ms
+ ✓ test/08s1-scheduling.test.ts (13 tests) 6535ms
+ ✓ test/08s2-scheduling-generator.test.ts (7 tests) 27309ms
+ ✓ test/08s3-scheduling-cover.test.ts (6 tests) 3896ms
+ ✓ test/08s4-scheduling-races.test.ts (6 tests) 3392ms
+ ✓ test/08s5-scheduling-review.test.ts (8 tests) 4913ms
+ ✓ test/08s6-scheduling-rework.test.ts (40 tests) 28452ms
+ ✓ test/08t-rework-races.test.ts (45 tests) 42895ms
+ ✓ test/08u-session-form.test.ts (11 tests) 4447ms
+ ✓ test/08x1-exam-entries.test.ts (17 tests) 3486ms
+ ✓ test/08x2-exam-days-results.test.ts (14 tests) 3524ms
+ ✓ test/08x3-exam-races.test.ts (8 tests) 4022ms
+ ✓ test/08x4-exam-entries-rework.test.ts (56 tests) 26582ms
+ ✓ test/09-money-invariants.test.ts (61 tests) 1164ms
+ ✓ test/09b-scheduling-invariants.test.ts (11 tests) 503ms
+ Test Files  43 passed (43)
+      Tests  835 passed | 1 todo (836)
+   Start at  01:59:05
+   Duration  417.56s (transform 1.42s, setup 52ms, collect 5.44s, tests 405.81s, environment 3ms, prepare 1.18s)

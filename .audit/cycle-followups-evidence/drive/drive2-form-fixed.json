@@ -1,0 +1,18 @@
+{
+  "read": {
+    "before": {
+      "Teacher A": true,
+      "Teacher B": null,
+      "Teacher C": true,
+      "Teacher D": true
+    },
+    "said": "The whole class Biology 11 — Teacher D goes to Teacher B.",
+    "after": {
+      "Teacher A": true,
+      "Teacher B": true,
+      "Teacher C": null,
+      "Teacher D": true
+    }
+  },
+  "errors": []
+}

@@ -3,7 +3,10 @@
  * grade is today's, a session's unpaid families are those the Money tab shows now. Every list is
  * read from what the system already holds, through the owners' own readers where one exists: A's
  * Money tab (`getSessionMoney`), C's charges (`listCharges`, `chargeRules` for what can be paid),
- * F1's teaching demand as F0b keeps it (course enrolments per subject, unit and teacher).
+ * F1's teaching groups (`studentsOfGroup`: who is in the group on the school's day). A teaching
+ * group saved before F1's groups were on main names an enrolment key instead (subject, unit,
+ * teacher) and is resolved as it was written: the open in-school course enrolments of that key
+ * (docs/features/CYCLE_FOLLOWUPS.md §1).
  *
  * A list about money (a session's unpaid lines and charges, the holders of a charge) is resolved
  * per child: each delivery is about one student and carries what that student owes, so a parent of
@@ -11,12 +14,15 @@
  * children in the list named.
  */
 
-import { db, sql, user, parentStudentLink, registrationSession, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
+import { db, sql, user, parentStudentLink, registrationSession, teachingGroup, academicYear, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
 import {
   STAFF_ROLES, ROLES, broadcastLabel, isPaymentList, anchorDay, BATCH_LIST_LABELS, WHO_LABELS, CHARGE_KIND_LABELS,
-  type AudienceDefinitionType, type AudienceWho, type MessageVariable, type BatchList,
+  type StoredAudienceDefinitionType, type AudienceWho, type MessageVariable, type BatchList,
 } from '@repo/validations';
 import { getSessionMoney } from './session-money.services';
+import { studentsOfGroup } from './group.services';
+import { teachersOn } from './scheduling-shared.services';
+import { todayAtSchool } from '../lib/clock';
 import { listCharges } from './charge.services';
 import { getSetting } from './settings.services';
 import { payableLines, payableCharges, chargeOpenSql, studentPresent } from './payable-now.services';
@@ -73,13 +79,13 @@ const FINANCE = [ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN] as string[];
  * the holders of a paid charge (with the school fee that is nearly every family: the review of
  * 5c2f2bf, item 2).
  */
-export function mayUseAudience(viewer: Viewer, def: AudienceDefinitionType): boolean {
+export function mayUseAudience(viewer: Viewer, def: StoredAudienceDefinitionType): boolean {
   if (viewer.role === ROLES.ADMIN) return true;
   if (FINANCE.includes(viewer.role ?? '')) return isPaymentList(def);
   return false;
 }
 
-export function assertMayUseAudience(viewer: Viewer, def: AudienceDefinitionType) {
+export function assertMayUseAudience(viewer: Viewer, def: StoredAudienceDefinitionType) {
   if (!mayUseAudience(viewer, def)) throw new AudienceError(FINANCE_LISTS_ONLY, 403);
 }
 
@@ -283,7 +289,7 @@ const daysOverdue = (due: Date, now: Date) => (due.getTime() < now.getTime() ? M
  * student: what is overdue, all of it (allOverdue); otherwise the items of the first day they owe
  * anything (firstDayOwed).
  */
-async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'session_unpaid' }>, now: Date) {
+async function sessionUnpaid(executor: Executor, def: Extract<StoredAudienceDefinitionType, { list: 'session_unpaid' }>, now: Date) {
   const owed = new Map<string, OwedPart[]>();
   const [session] = await executor.select({ id: registrationSession.id, name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, def.sessionId));
   if (!session) throw new AudienceError('Session not found', 404);
@@ -325,7 +331,7 @@ async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinition
  * The holders of a charge kind: of a charge still owed (the step's predicates, then C's rules), or —
  * the admin only — of any live one, awaiting payment or paid.
  */
-async function chargeHolders(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'charge_holders' }>, now: Date) {
+async function chargeHolders(executor: Executor, def: Extract<StoredAudienceDefinitionType, { list: 'charge_holders' }>, now: Date) {
   const owed = new Map<string, OwedPart[]>();
   const rows = await executor.execute(sql`
     select c.id, c.student_id as "studentId", c.amount, c.due_at as "dueAt", c.description, r.session_id as "sessionId", s.name as "sessionName"
@@ -351,6 +357,29 @@ async function studentsOf(executor: Executor, query: ReturnType<typeof sql>) {
   return new Map((r.rows as { id: string }[]).map((x) => [x.id, null as Owed | null]));
 }
 
+// ─── A teaching group's day ──────────────────────────────────────────────────
+
+/**
+ * The day a teaching group is read on as an audience, and the day the picker counts its students
+ * on: the school's today (`todayAtSchool()`), or the year's first day while today is before it.
+ * From 1 July the picker offers the coming year's groups (`academicYearStartOf`), whose members
+ * start on the year's first day: read on today, every class would be nobody all summer — "Send now"
+ * refused, a scheduled message sent to no one (the review of d3f62cf, item 1; the coordinator's
+ * decision, a departure from SCHEDULING.md §8's literal `todayAtSchool()`, recorded there and in
+ * docs/features/CYCLE_FOLLOWUPS.md §1.1). The resolve, the send and the scheduler's step all read
+ * it here, through `resolveAudience`; the picker through `teachingGroupDayOf`.
+ */
+export function teachingGroupDay(yearStartsOn: string, today: string = todayAtSchool()): string {
+  return today < yearStartsOn ? yearStartsOn : today;
+}
+
+/** A group's day (above), from its year; null when the group does not exist. */
+async function groupDay(executor: Executor, groupId: string): Promise<string | null> {
+  const [g] = await executor.select({ startsOn: academicYear.startsOn }).from(teachingGroup)
+    .innerJoin(academicYear, eq(academicYear.id, teachingGroup.academicYearId)).where(eq(teachingGroup.id, groupId));
+  return g ? teachingGroupDay(g.startsOn) : null;
+}
+
 // ─── Resolve ─────────────────────────────────────────────────────────────────
 
 async function sessionInfo(executor: Executor, id: string | null | undefined) {
@@ -362,7 +391,7 @@ async function sessionInfo(executor: Executor, id: string | null | undefined) {
 }
 
 /** The words a log row and the picker use for an audience. */
-export async function audienceLabel(executor: Executor, def: AudienceDefinitionType): Promise<string> {
+export async function audienceLabel(executor: Executor, def: StoredAudienceDefinitionType): Promise<string> {
   if (def.kind === 'broadcast') return broadcastLabel({ group: def.group, grade: def.grade ?? null });
   if (def.kind === 'direct') return def.userIds.length === 1 ? 'One person' : `${def.userIds.length} people`;
   const who = WHO_LABELS[def.who];
@@ -376,6 +405,21 @@ export async function audienceLabel(executor: Executor, def: AudienceDefinitionT
       return `Section ${(r.rows[0] as { name?: string } | undefined)?.name ?? ''} — ${who}`;
     }
     case 'teaching_group': {
+      if ('groupId' in def) {
+        // F1's group: its name, then its subject (and unit) and its teacher today (SCHEDULING.md §8).
+        const r = await executor.execute(sql`select g.name, g.teacher_id as "teacherId", s.name as subject, coalesce(u.short_code, u.code) as unit
+          from teaching_group g left join subject s on s.id = g.subject_id left join exam_unit u on u.id = g.unit_id where g.id = ${def.groupId}`);
+        const g = r.rows[0] as { name: string; teacherId: string | null; subject: string | null; unit: string | null } | undefined;
+        if (!g) return `A teaching group — ${who}`;
+        // Its teacher on the group's day (the day its students are read on).
+        const day = (await groupDay(executor, def.groupId))!;
+        const onDay = await teachersOn([def.groupId], day, executor);
+        const teacherId = onDay.has(def.groupId) ? onDay.get(def.groupId)! : g.teacherId;
+        const [t] = teacherId ? (await executor.execute(sql`select name from teacher where id = ${teacherId}`)).rows as { name: string }[] : [];
+        const subject = g.subject ? `: ${g.subject}${g.unit ? ` ${g.unit}` : ''}` : '';
+        return `${g.name}${subject} with ${t?.name ?? 'no teacher yet'} — ${who}`;
+      }
+      // Saved before the switch: the enrolment key, named as it was then.
       const r = await executor.execute(sql`select s.name as subject, u.code as unit, t.name as teacher from subject s
         left join exam_unit u on u.id = ${def.unitId} left join teacher t on t.id = ${def.teacherId} where s.id = ${def.subjectId}`);
       const g = r.rows[0] as { subject?: string; unit?: string | null; teacher?: string | null } | undefined;
@@ -396,7 +440,7 @@ export async function audienceLabel(executor: Executor, def: AudienceDefinitionT
  * Resolve an audience to its members now. `context.sessionId` names the session {session} and
  * {closes} read when the list does not name one.
  */
-export async function resolveAudience(def: AudienceDefinitionType, context: { sessionId?: string | null } = {}, executor: Executor = db, now: Date = new Date()): Promise<ResolvedAudience> {
+export async function resolveAudience(def: StoredAudienceDefinitionType, context: { sessionId?: string | null } = {}, executor: Executor = db, now: Date = new Date()): Promise<ResolvedAudience> {
   let members: AudienceMember[];
   let sessionId: string | null = context.sessionId ?? null;
   if (def.kind === 'broadcast') {
@@ -419,11 +463,25 @@ export async function resolveAudience(def: AudienceDefinitionType, context: { se
         members = await families(executor, await studentsOf(executor, sql`select m.student_id as id from section_membership m join "user" u on u.id = m.student_id
           where m.section_id = ${def.sectionId} and m.ended_on is null order by u.name`), def.who, false);
         break;
-      case 'teaching_group':
+      case 'teaching_group': {
+        if ('groupId' in def) {
+          // F1's group on its day (teachingGroupDay: today, or the year's first day before the year
+          // begins), by SCHEDULING.md §2's rules — a move that day goes to the later group, nobody
+          // after their last day, a section's group follows the section — read in the caller's
+          // transaction: the resolve, the send and the scheduler's step read it alike.
+          const day = await groupDay(executor, def.groupId);
+          if (!day) throw new AudienceError('Teaching group not found', 404);
+          const ids = await studentsOfGroup(def.groupId, day, executor);
+          const byName = ids.length ? await executor.select({ id: user.id }).from(user).where(inArray(user.id, ids)).orderBy(user.name) : [];
+          members = await families(executor, new Map(byName.map((r) => [r.id, null as Owed | null])), def.who, false);
+          break;
+        }
+        // Saved before the switch: the open in-school course enrolments of the key, as it was written.
         members = await families(executor, await studentsOf(executor, sql`select e.student_id as id from course_enrolment e join "user" u on u.id = e.student_id
           where e.academic_year_id = ${def.academicYearId} and e.subject_id = ${def.subjectId} and e.ended_on is null and e.mode = 'in_school'
             and e.unit_id is not distinct from ${def.unitId} and e.teacher_id is not distinct from ${def.teacherId} order by u.name`), def.who, false);
         break;
+      }
       case 'offer_reservers': {
         const [o] = (await executor.execute(sql`select session_id from session_offer where id = ${def.offerId}`)).rows as { session_id: string }[];
         if (!o) throw new AudienceError('Subject offer not found', 404);

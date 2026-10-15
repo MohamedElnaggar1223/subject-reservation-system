@@ -425,7 +425,7 @@ right.
   sent entries as known sittings — §3.1. F4's own: a declared sitting with a real grade on record
   is verified at declaration inside `reserveLines` and the To verify tab checks the awaiting
   ones.)*
-- **F1's follow-up outcome on the desk (`groupsFollowed`)**: waits for F1 (the lead).
+- *(Done 15 Oct 2026, after F1 landed: F1's follow-up outcome on the desk (`groupsFollowed`) — the teacher change says what happened to the student's class in one sentence, English and Arabic: moved to the new teacher's class, waiting with no class of the new teacher yet, refused with the API's reason (a clash in the published timetable), the whole class handed over, self-study; the Session screen's Replace a teacher the same, counted. docs/features/CYCLE_FOLLOWUPS.md §2.)*
 - **`refundFor`** is C's; `refundForSystemDrop` is the seam (§3.5).
 - **The statement's charges** are C's (`charges: []`).
 - **Remind** on the Money tab and the coordinator's "declared retakes to verify" reminder rule are

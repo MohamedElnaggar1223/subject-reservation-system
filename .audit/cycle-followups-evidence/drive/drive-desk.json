@@ -1,0 +1,30 @@
+{
+  "read": {
+    "desk-a-moves": {
+      "en": "The student moves to the class Biology 11 — Teacher B.",
+      "ar": "ينتقل الطالب إلى فصل ⁨Biology 11 — Teacher B⁩.",
+      "dir": "rtl"
+    },
+    "desk-b-no-class": {
+      "en": "Teacher C has no class of this subject yet: the student stays in Biology 11 — Teacher A and waits to be placed.",
+      "ar": "ليس لدى ⁨Teacher C⁩ فصل في هذه المادة بعد: يبقى الطالب في ⁨Biology 11 — Teacher A⁩ وينتظر توزيعه.",
+      "dir": "rtl"
+    },
+    "desk-c-refused-clash": {
+      "en": "The move was refused: the student stays in Biology 11 — Teacher A. It would clash in the published timetable: Student FU-5 would be in Biology 11 — Teacher B and Homeroom 11 — Teacher H at Wednesday period 2 from Wednesday, 21 October 2026 (Term 1 — first)",
+      "ar": "رُفض النقل: يبقى الطالب في ⁨Biology 11 — Teacher A⁩. سيتعارض في الجدول المنشور: ⁨Student FU-5⁩ سيكون في ⁨Biology 11⁩ — ⁨Teacher B⁩ و⁨Homeroom 11⁩ — ⁨Teacher H⁩ يوم الأربعاء في الحصة 2 بدءًا من الأربعاء, 21 أكتوبر 2026 (⁨Term 1⁩ — ⁨first⁩)",
+      "dir": "rtl"
+    },
+    "desk-d-whole-class": {
+      "en": "The whole class Biology 11 — Teacher D goes to Teacher C: the student stays in it.",
+      "ar": "ينتقل فصل ⁨Biology 11 — Teacher D⁩ كله إلى ⁨Teacher C⁩: ويبقى الطالب فيه.",
+      "dir": "rtl"
+    },
+    "desk-e-self-study": {
+      "en": "The student leaves the class Biology 11 — Teacher A after today: self-study from now.",
+      "ar": "يغادر الطالب فصل ⁨Biology 11 — Teacher A⁩ بعد اليوم: دراسة ذاتية من الآن.",
+      "dir": "rtl"
+    }
+  },
+  "errors": []
+}
