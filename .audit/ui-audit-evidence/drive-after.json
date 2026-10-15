@@ -6,7 +6,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1997,
+  "settledMs": 1999,
   "apiRequests": 9,
   "api": [
    "GET /v1/sessions",
@@ -35,7 +35,7 @@
   "path": "/admin/sessions",
   "finalUrl": "/admin/sessions",
   "status": 200,
-  "settledMs": 2315,
+  "settledMs": 2356,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -47,7 +47,7 @@
   },
   "axe": [],
   "shot": "s05-sessions/after-en.jpg",
-  "bytes": 91807
+  "bytes": 91456
  },
  "s06-session-subjects:en": {
   "id": "s06-session-subjects",
@@ -56,7 +56,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "status": 200,
-  "settledMs": 2627,
+  "settledMs": 2739,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -79,7 +79,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
   "status": 200,
-  "settledMs": 2007,
+  "settledMs": 2015,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -102,7 +102,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "status": 200,
-  "settledMs": 2018,
+  "settledMs": 2007,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -126,7 +126,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
   "status": 200,
-  "settledMs": 2000,
+  "settledMs": 2024,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -149,7 +149,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
   "status": 200,
-  "settledMs": 1962,
+  "settledMs": 1983,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -163,7 +163,7 @@
   },
   "axe": [],
   "shot": "s10-session-verify/after-en.jpg",
-  "bytes": 65257
+  "bytes": 65240
  },
  "s12-session-draft:en": {
   "id": "s12-session-draft",
@@ -172,7 +172,7 @@
   "path": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
   "finalUrl": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
   "status": 200,
-  "settledMs": 1972,
+  "settledMs": 1993,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375",
@@ -196,7 +196,7 @@
   "path": "/exams/catalogue",
   "finalUrl": "/exams/catalogue",
   "status": 200,
-  "settledMs": 2206,
+  "settledMs": 2266,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -217,7 +217,7 @@
   "path": "/admin/subjects",
   "finalUrl": "/admin/subjects",
   "status": 200,
-  "settledMs": 2139,
+  "settledMs": 2193,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -238,7 +238,7 @@
   "path": "/exams/series",
   "finalUrl": "/exams/series",
   "status": 200,
-  "settledMs": 2126,
+  "settledMs": 2159,
   "apiRequests": 4,
   "api": [
    "GET /v1/board-series/inferred",
@@ -253,7 +253,7 @@
   },
   "axe": [],
   "shot": "s15-series/after-en.jpg",
-  "bytes": 70854
+  "bytes": 70794
  },
  "s16-services:en": {
   "id": "s16-services",
@@ -262,7 +262,7 @@
   "path": "/exams/services",
   "finalUrl": "/exams/services",
   "status": 200,
-  "settledMs": 2132,
+  "settledMs": 2199,
   "apiRequests": 3,
   "api": [
    "GET /v1/board-services",
@@ -285,7 +285,7 @@
   "path": "/admin/school-fees",
   "finalUrl": "/admin/school-fees",
   "status": 200,
-  "settledMs": 2151,
+  "settledMs": 2197,
   "apiRequests": 5,
   "api": [
    "GET /v1/receipts/refund-windows",
@@ -310,7 +310,7 @@
   "path": "/settings",
   "finalUrl": "/settings",
   "status": 200,
-  "settledMs": 2088,
+  "settledMs": 2209,
   "apiRequests": 2,
   "api": [
    "GET /v1/settings",
@@ -332,7 +332,7 @@
   "path": "/imports",
   "finalUrl": "/imports",
   "status": 200,
-  "settledMs": 2107,
+  "settledMs": 2142,
   "apiRequests": 2,
   "api": [
    "GET /v1/imports",
@@ -345,7 +345,7 @@
   },
   "axe": [],
   "shot": "s19-imports/after-en.jpg",
-  "bytes": 64242
+  "bytes": 69276
  },
  "s20-team:en": {
   "id": "s20-team",
@@ -354,7 +354,7 @@
   "path": "/admin/team",
   "finalUrl": "/admin/team",
   "status": 200,
-  "settledMs": 2075,
+  "settledMs": 2122,
   "apiRequests": 3,
   "api": [
    "GET /v1/users",
@@ -377,7 +377,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1975,
+  "settledMs": 1985,
   "apiRequests": 9,
   "api": [
    "GET /v1/sessions",
@@ -406,7 +406,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "status": 200,
-  "settledMs": 1987,
+  "settledMs": 2003,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -429,7 +429,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1900,
+  "settledMs": 1924,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -451,7 +451,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1901,
+  "settledMs": 1927,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -473,7 +473,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1992,
+  "settledMs": 2055,
   "apiRequests": 9,
   "api": [
    "GET /v1/sessions",
@@ -502,7 +502,7 @@
   "path": "/admin/sessions",
   "finalUrl": "/admin/sessions",
   "status": 200,
-  "settledMs": 1973,
+  "settledMs": 1988,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -514,7 +514,7 @@
   },
   "axe": [],
   "shot": "s05-sessions/after-ar.jpg",
-  "bytes": 78001
+  "bytes": 77867
  },
  "s06-session-subjects:ar": {
   "id": "s06-session-subjects",
@@ -523,7 +523,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "status": 200,
-  "settledMs": 1988,
+  "settledMs": 2047,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -546,7 +546,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
   "status": 200,
-  "settledMs": 1992,
+  "settledMs": 2047,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -569,7 +569,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "status": 200,
-  "settledMs": 2016,
+  "settledMs": 2044,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -593,7 +593,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
   "status": 200,
-  "settledMs": 2007,
+  "settledMs": 2059,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -616,7 +616,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
   "status": 200,
-  "settledMs": 1965,
+  "settledMs": 2019,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -630,7 +630,7 @@
   },
   "axe": [],
   "shot": "s10-session-verify/after-ar.jpg",
-  "bytes": 54807
+  "bytes": 54811
  },
  "s12-session-draft:ar": {
   "id": "s12-session-draft",
@@ -639,7 +639,7 @@
   "path": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
   "finalUrl": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
   "status": 200,
-  "settledMs": 2001,
+  "settledMs": 2011,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375",
@@ -663,7 +663,7 @@
   "path": "/exams/catalogue",
   "finalUrl": "/exams/catalogue",
   "status": 200,
-  "settledMs": 1996,
+  "settledMs": 1955,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -684,7 +684,7 @@
   "path": "/admin/subjects",
   "finalUrl": "/admin/subjects",
   "status": 200,
-  "settledMs": 1942,
+  "settledMs": 2034,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -705,7 +705,7 @@
   "path": "/exams/series",
   "finalUrl": "/exams/series",
   "status": 200,
-  "settledMs": 1929,
+  "settledMs": 1966,
   "apiRequests": 4,
   "api": [
    "GET /v1/board-series/inferred",
@@ -720,7 +720,7 @@
   },
   "axe": [],
   "shot": "s15-series/after-ar.jpg",
-  "bytes": 61490
+  "bytes": 61454
  },
  "s16-services:ar": {
   "id": "s16-services",
@@ -729,7 +729,7 @@
   "path": "/exams/services",
   "finalUrl": "/exams/services",
   "status": 200,
-  "settledMs": 1969,
+  "settledMs": 1960,
   "apiRequests": 3,
   "api": [
    "GET /v1/board-services",
@@ -752,7 +752,7 @@
   "path": "/admin/school-fees",
   "finalUrl": "/admin/school-fees",
   "status": 200,
-  "settledMs": 1941,
+  "settledMs": 2021,
   "apiRequests": 5,
   "api": [
    "GET /v1/receipts/refund-windows",
@@ -777,7 +777,7 @@
   "path": "/settings",
   "finalUrl": "/settings",
   "status": 200,
-  "settledMs": 1921,
+  "settledMs": 1992,
   "apiRequests": 2,
   "api": [
    "GET /v1/settings",
@@ -799,7 +799,7 @@
   "path": "/imports",
   "finalUrl": "/imports",
   "status": 200,
-  "settledMs": 1934,
+  "settledMs": 1971,
   "apiRequests": 2,
   "api": [
    "GET /v1/imports",
@@ -812,7 +812,7 @@
   },
   "axe": [],
   "shot": "s19-imports/after-ar.jpg",
-  "bytes": 53472
+  "bytes": 56593
  },
  "s20-team:ar": {
   "id": "s20-team",
@@ -821,7 +821,7 @@
   "path": "/admin/team",
   "finalUrl": "/admin/team",
   "status": 200,
-  "settledMs": 1969,
+  "settledMs": 1962,
   "apiRequests": 3,
   "api": [
    "GET /v1/users",
@@ -844,7 +844,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1980,
+  "settledMs": 2033,
   "apiRequests": 9,
   "api": [
    "GET /v1/sessions",
@@ -873,7 +873,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
   "status": 200,
-  "settledMs": 2003,
+  "settledMs": 2094,
   "apiRequests": 3,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -896,7 +896,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1901,
+  "settledMs": 1923,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -918,7 +918,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1912,
+  "settledMs": 1923,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -940,7 +940,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 1956,
+  "settledMs": 1951,
   "apiRequests": 5,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -956,7 +956,7 @@
   },
   "axe": [],
   "shot": "s30-desk-officer/after-en.jpg",
-  "bytes": 38547
+  "bytes": 37944
  },
  "s31-desk-student:en": {
   "id": "s31-desk-student",
@@ -965,7 +965,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 5234,
+  "settledMs": 5180,
   "apiRequests": 8,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -983,7 +983,7 @@
   },
   "axe": [],
   "shot": "s31-desk-student/after-en.jpg",
-  "bytes": 92715
+  "bytes": 92239
  },
  "s35-desk-reserve-new-family:en": {
   "id": "s35-desk-reserve-new-family",
@@ -992,7 +992,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 6837,
+  "settledMs": 6751,
   "apiRequests": 10,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1012,7 +1012,7 @@
   },
   "axe": [],
   "shot": "s35-desk-reserve-new-family/after-en.jpg",
-  "bytes": 146799
+  "bytes": 146326
  },
  "s36-desk-from-record:en": {
   "id": "s36-desk-from-record",
@@ -1021,7 +1021,7 @@
   "path": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "finalUrl": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "status": 200,
-  "settledMs": 2020,
+  "settledMs": 1965,
   "apiRequests": 7,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1038,7 +1038,7 @@
   },
   "axe": [],
   "shot": "s36-desk-from-record/after-en.jpg",
-  "bytes": 92867
+  "bytes": 92370
  },
  "s32-desk-admin:en": {
   "id": "s32-desk-admin",
@@ -1047,7 +1047,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 1972,
+  "settledMs": 2231,
   "apiRequests": 5,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1063,7 +1063,7 @@
   },
   "axe": [],
   "shot": "s32-desk-admin/after-en.jpg",
-  "bytes": 40673
+  "bytes": 40132
  },
  "s33-students:en": {
   "id": "s33-students",
@@ -1072,7 +1072,7 @@
   "path": "/students",
   "finalUrl": "/students",
   "status": 200,
-  "settledMs": 2395,
+  "settledMs": 2321,
   "apiRequests": 3,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1095,7 +1095,7 @@
   "path": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "finalUrl": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "status": 200,
-  "settledMs": 2491,
+  "settledMs": 2522,
   "apiRequests": 3,
   "api": [
    "GET /v1/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
@@ -1118,7 +1118,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 1951,
+  "settledMs": 1987,
   "apiRequests": 5,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1134,7 +1134,7 @@
   },
   "axe": [],
   "shot": "s30-desk-officer/after-ar.jpg",
-  "bytes": 33756
+  "bytes": 33182
  },
  "s31-desk-student:ar": {
   "id": "s31-desk-student",
@@ -1143,7 +1143,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 5289,
+  "settledMs": 5236,
   "apiRequests": 8,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1161,7 +1161,7 @@
   },
   "axe": [],
   "shot": "s31-desk-student/after-ar.jpg",
-  "bytes": 82067
+  "bytes": 81536
  },
  "s35-desk-reserve-new-family:ar": {
   "id": "s35-desk-reserve-new-family",
@@ -1170,7 +1170,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 6872,
+  "settledMs": 6834,
   "apiRequests": 10,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1190,7 +1190,7 @@
   },
   "axe": [],
   "shot": "s35-desk-reserve-new-family/after-ar.jpg",
-  "bytes": 130970
+  "bytes": 130440
  },
  "s36-desk-from-record:ar": {
   "id": "s36-desk-from-record",
@@ -1199,7 +1199,7 @@
   "path": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "finalUrl": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "status": 200,
-  "settledMs": 2058,
+  "settledMs": 2070,
   "apiRequests": 7,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1216,7 +1216,7 @@
   },
   "axe": [],
   "shot": "s36-desk-from-record/after-ar.jpg",
-  "bytes": 82178
+  "bytes": 81636
  },
  "s32-desk-admin:ar": {
   "id": "s32-desk-admin",
@@ -1225,7 +1225,7 @@
   "path": "/desk",
   "finalUrl": "/desk",
   "status": 200,
-  "settledMs": 1972,
+  "settledMs": 2011,
   "apiRequests": 5,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1241,7 +1241,7 @@
   },
   "axe": [],
   "shot": "s32-desk-admin/after-ar.jpg",
-  "bytes": 35946
+  "bytes": 35351
  },
  "s33-students:ar": {
   "id": "s33-students",
@@ -1250,7 +1250,7 @@
   "path": "/students",
   "finalUrl": "/students",
   "status": 200,
-  "settledMs": 2134,
+  "settledMs": 1978,
   "apiRequests": 3,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1273,7 +1273,7 @@
   "path": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "finalUrl": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "status": 200,
-  "settledMs": 2443,
+  "settledMs": 2010,
   "apiRequests": 3,
   "api": [
    "GET /v1/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
@@ -1296,7 +1296,7 @@
   "path": "/charges",
   "finalUrl": "/charges",
   "status": 200,
-  "settledMs": 2620,
+  "settledMs": 2174,
   "apiRequests": 2,
   "api": [
    "GET /v1/charges",
@@ -1318,7 +1318,7 @@
   "path": "/admin/exceptions",
   "finalUrl": "/admin/exceptions",
   "status": 200,
-  "settledMs": 2167,
+  "settledMs": 2251,
   "apiRequests": 7,
   "api": [
    "GET /v1/policies",
@@ -1345,7 +1345,7 @@
   "path": "/finance",
   "finalUrl": "/finance",
   "status": 200,
-  "settledMs": 2688,
+  "settledMs": 2189,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1366,7 +1366,7 @@
   "path": "/admin/payments",
   "finalUrl": "/admin/payments",
   "status": 200,
-  "settledMs": 1943,
+  "settledMs": 2166,
   "apiRequests": 2,
   "api": [
    "GET /v1/payments/pending-manual",
@@ -1388,7 +1388,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 2398,
+  "settledMs": 2172,
   "apiRequests": 4,
   "api": [
    "GET /v1/messages/audiences",
@@ -1412,7 +1412,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 4382,
+  "settledMs": 4283,
   "apiRequests": 5,
   "api": [
    "GET /v1/messages/audiences",
@@ -1437,7 +1437,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 4340,
+  "settledMs": 4318,
   "apiRequests": 6,
   "api": [
    "GET /v1/messages/audiences",
@@ -1463,7 +1463,7 @@
   "path": "/admin/escrow",
   "finalUrl": "/admin/escrow",
   "status": 200,
-  "settledMs": 2371,
+  "settledMs": 2151,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1484,7 +1484,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 1928,
+  "settledMs": 1939,
   "apiRequests": 4,
   "api": [
    "GET /v1/messages/audiences",
@@ -1499,7 +1499,7 @@
   },
   "axe": [],
   "shot": "s43d-messages-officer/after-en.jpg",
-  "bytes": 56653
+  "bytes": 56658
  },
  "s46-takings:en": {
   "id": "s46-takings",
@@ -1508,7 +1508,7 @@
   "path": "/takings",
   "finalUrl": "/takings",
   "status": 200,
-  "settledMs": 2386,
+  "settledMs": 2211,
   "apiRequests": 2,
   "api": [
    "GET /v1/payments/daily-takings",
@@ -1521,7 +1521,7 @@
   },
   "axe": [],
   "shot": "s46-takings/after-en.jpg",
-  "bytes": 62228
+  "bytes": 28053
  },
  "s47-session-money-officer:en": {
   "id": "s47-session-money-officer",
@@ -1530,7 +1530,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "status": 200,
-  "settledMs": 2493,
+  "settledMs": 2003,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -1554,7 +1554,7 @@
   "path": "/admin/sessions",
   "finalUrl": "/admin/sessions",
   "status": 200,
-  "settledMs": 2991,
+  "settledMs": 1951,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1566,7 +1566,7 @@
   },
   "axe": [],
   "shot": "s48-sessions-officer/after-en.jpg",
-  "bytes": 86950
+  "bytes": 86945
  },
  "s40-charges:ar": {
   "id": "s40-charges",
@@ -1575,7 +1575,7 @@
   "path": "/charges",
   "finalUrl": "/charges",
   "status": 200,
-  "settledMs": 1955,
+  "settledMs": 1979,
   "apiRequests": 2,
   "api": [
    "GET /v1/charges",
@@ -1597,7 +1597,7 @@
   "path": "/admin/exceptions",
   "finalUrl": "/admin/exceptions",
   "status": 200,
-  "settledMs": 2088,
+  "settledMs": 2008,
   "apiRequests": 7,
   "api": [
    "GET /v1/policies",
@@ -1624,7 +1624,7 @@
   "path": "/finance",
   "finalUrl": "/finance",
   "status": 200,
-  "settledMs": 1951,
+  "settledMs": 1976,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1645,7 +1645,7 @@
   "path": "/admin/payments",
   "finalUrl": "/admin/payments",
   "status": 200,
-  "settledMs": 1947,
+  "settledMs": 1967,
   "apiRequests": 2,
   "api": [
    "GET /v1/payments/pending-manual",
@@ -1667,7 +1667,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 1981,
+  "settledMs": 1964,
   "apiRequests": 4,
   "api": [
    "GET /v1/messages/audiences",
@@ -1691,7 +1691,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 4422,
+  "settledMs": 4331,
   "apiRequests": 5,
   "api": [
    "GET /v1/messages/audiences",
@@ -1716,7 +1716,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 4483,
+  "settledMs": 4340,
   "apiRequests": 6,
   "api": [
    "GET /v1/messages/audiences",
@@ -1742,7 +1742,7 @@
   "path": "/admin/escrow",
   "finalUrl": "/admin/escrow",
   "status": 200,
-  "settledMs": 1952,
+  "settledMs": 2056,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1763,7 +1763,7 @@
   "path": "/admin/messages",
   "finalUrl": "/admin/messages",
   "status": 200,
-  "settledMs": 1978,
+  "settledMs": 1958,
   "apiRequests": 4,
   "api": [
    "GET /v1/messages/audiences",
@@ -1800,7 +1800,7 @@
   },
   "axe": [],
   "shot": "s46-takings/after-ar.jpg",
-  "bytes": 59301
+  "bytes": 27074
  },
  "s47-session-money-officer:ar": {
   "id": "s47-session-money-officer",
@@ -1809,7 +1809,7 @@
   "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
   "status": 200,
-  "settledMs": 2045,
+  "settledMs": 2030,
   "apiRequests": 4,
   "api": [
    "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
@@ -1833,7 +1833,7 @@
   "path": "/admin/sessions",
   "finalUrl": "/admin/sessions",
   "status": 200,
-  "settledMs": 2083,
+  "settledMs": 1973,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1845,7 +1845,7 @@
   },
   "axe": [],
   "shot": "s48-sessions-officer/after-ar.jpg",
-  "bytes": 74239
+  "bytes": 74315
  },
  "s50-deadlines:en": {
   "id": "s50-deadlines",
@@ -1854,7 +1854,7 @@
   "path": "/exams/deadlines",
   "finalUrl": "/exams/deadlines",
   "status": 200,
-  "settledMs": 2411,
+  "settledMs": 2277,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1867,7 +1867,7 @@
   },
   "axe": [],
   "shot": "s50-deadlines/after-en.jpg",
-  "bytes": 120229
+  "bytes": 120139
  },
  "s51-entries:en": {
   "id": "s51-entries",
@@ -1876,7 +1876,7 @@
   "path": "/exams/entries",
   "finalUrl": "/exams/entries",
   "status": 200,
-  "settledMs": 2484,
+  "settledMs": 2260,
   "apiRequests": 6,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1891,7 +1891,7 @@
   },
   "axe": [],
   "shot": "s51-entries/after-en.jpg",
-  "bytes": 85960
+  "bytes": 85950
  },
  "s52-entry-lists:en": {
   "id": "s52-entry-lists",
@@ -1900,7 +1900,7 @@
   "path": "/exams/entry-lists",
   "finalUrl": "/exams/entry-lists",
   "status": 200,
-  "settledMs": 2378,
+  "settledMs": 2344,
   "apiRequests": 6,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1915,7 +1915,7 @@
   },
   "axe": [],
   "shot": "s52-entry-lists/after-en.jpg",
-  "bytes": 147471
+  "bytes": 147443
  },
  "s55-notifications-staff:en": {
   "id": "s55-notifications-staff",
@@ -1924,7 +1924,7 @@
   "path": "/notifications",
   "finalUrl": "/notifications",
   "status": 200,
-  "settledMs": 2357,
+  "settledMs": 2144,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -1946,7 +1946,7 @@
   "path": "/profile",
   "finalUrl": "/profile",
   "status": 200,
-  "settledMs": 2156,
+  "settledMs": 2089,
   "apiRequests": 2,
   "api": [
    "GET /v1/users/me",
@@ -1968,7 +1968,7 @@
   "path": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
   "finalUrl": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
   "status": 200,
-  "settledMs": 1962,
+  "settledMs": 2392,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -1989,7 +1989,7 @@
   "path": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "finalUrl": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "status": 200,
-  "settledMs": 4070,
+  "settledMs": 2390,
   "apiRequests": 2,
   "api": [
    "GET /v1/statement",
@@ -2011,7 +2011,7 @@
   "path": "/exams/deadlines",
   "finalUrl": "/exams/deadlines",
   "status": 200,
-  "settledMs": 2104,
+  "settledMs": 2083,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -2024,7 +2024,7 @@
   },
   "axe": [],
   "shot": "s50-deadlines/after-ar.jpg",
-  "bytes": 95687
+  "bytes": 95639
  },
  "s51-entries:ar": {
   "id": "s51-entries",
@@ -2033,7 +2033,7 @@
   "path": "/exams/entries",
   "finalUrl": "/exams/entries",
   "status": 200,
-  "settledMs": 2144,
+  "settledMs": 2084,
   "apiRequests": 6,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -2048,7 +2048,7 @@
   },
   "axe": [],
   "shot": "s51-entries/after-ar.jpg",
-  "bytes": 65218
+  "bytes": 65243
  },
  "s52-entry-lists:ar": {
   "id": "s52-entry-lists",
@@ -2057,7 +2057,7 @@
   "path": "/exams/entry-lists",
   "finalUrl": "/exams/entry-lists",
   "status": 200,
-  "settledMs": 2015,
+  "settledMs": 2130,
   "apiRequests": 6,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -2072,7 +2072,7 @@
   },
   "axe": [],
   "shot": "s52-entry-lists/after-ar.jpg",
-  "bytes": 105588
+  "bytes": 105589
  },
  "s55-notifications-staff:ar": {
   "id": "s55-notifications-staff",
@@ -2081,7 +2081,7 @@
   "path": "/notifications",
   "finalUrl": "/notifications",
   "status": 200,
-  "settledMs": 1966,
+  "settledMs": 1974,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -2103,7 +2103,7 @@
   "path": "/profile",
   "finalUrl": "/profile",
   "status": 200,
-  "settledMs": 1958,
+  "settledMs": 1982,
   "apiRequests": 2,
   "api": [
    "GET /v1/users/me",
@@ -2125,7 +2125,7 @@
   "path": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
   "finalUrl": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
   "status": 200,
-  "settledMs": 1977,
+  "settledMs": 1971,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2146,7 +2146,7 @@
   "path": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "finalUrl": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
   "status": 200,
-  "settledMs": 2005,
+  "settledMs": 1951,
   "apiRequests": 2,
   "api": [
    "GET /v1/statement",
@@ -2168,7 +2168,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1964,
+  "settledMs": 1991,
   "apiRequests": 8,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2194,7 +2194,7 @@
   "path": "/register",
   "finalUrl": "/register",
   "status": 200,
-  "settledMs": 2602,
+  "settledMs": 2340,
   "apiRequests": 5,
   "api": [
    "GET /v1/registrations/offers",
@@ -2219,7 +2219,7 @@
   "path": "/registrations",
   "finalUrl": "/registrations",
   "status": 200,
-  "settledMs": 4333,
+  "settledMs": 2217,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2240,7 +2240,7 @@
   "path": "/statement",
   "finalUrl": "/statement",
   "status": 200,
-  "settledMs": 2651,
+  "settledMs": 2183,
   "apiRequests": 3,
   "api": [
    "GET /v1/statement",
@@ -2263,7 +2263,7 @@
   "path": "/charges-due",
   "finalUrl": "/charges-due",
   "status": 200,
-  "settledMs": 2414,
+  "settledMs": 2147,
   "apiRequests": 2,
   "api": [
    "GET /v1/charges",
@@ -2285,7 +2285,7 @@
   "path": "/links",
   "finalUrl": "/links",
   "status": 200,
-  "settledMs": 2307,
+  "settledMs": 2118,
   "apiRequests": 4,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -2309,7 +2309,7 @@
   "path": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
   "finalUrl": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
   "status": 200,
-  "settledMs": 2494,
+  "settledMs": 2195,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2330,7 +2330,7 @@
   "path": "/notifications",
   "finalUrl": "/notifications",
   "status": 200,
-  "settledMs": 2466,
+  "settledMs": 1958,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -2352,7 +2352,7 @@
   "path": "/profile",
   "finalUrl": "/profile",
   "status": 200,
-  "settledMs": 2324,
+  "settledMs": 1922,
   "apiRequests": 2,
   "api": [
    "GET /v1/users/me",
@@ -2374,7 +2374,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 2004,
+  "settledMs": 1982,
   "apiRequests": 8,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2400,7 +2400,7 @@
   "path": "/school-fee",
   "finalUrl": "/school-fee",
   "status": 200,
-  "settledMs": 2459,
+  "settledMs": 2145,
   "apiRequests": 3,
   "api": [
    "GET /v1/links/children",
@@ -2423,7 +2423,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1968,
+  "settledMs": 1990,
   "apiRequests": 11,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2449,7 +2449,7 @@
   "path": "/registrations/history",
   "finalUrl": "/registrations/history",
   "status": 200,
-  "settledMs": 2480,
+  "settledMs": 2161,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2470,7 +2470,7 @@
   "path": "/approvals",
   "finalUrl": "/approvals",
   "status": 200,
-  "settledMs": 2370,
+  "settledMs": 2140,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2491,7 +2491,7 @@
   "path": "/escrow",
   "finalUrl": "/escrow",
   "status": 200,
-  "settledMs": 2528,
+  "settledMs": 2153,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2512,7 +2512,7 @@
   "path": "/escrow/withdraw",
   "finalUrl": "/escrow/withdraw",
   "status": 200,
-  "settledMs": 2479,
+  "settledMs": 2170,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2533,7 +2533,7 @@
   "path": "/escrow/transfer",
   "finalUrl": "/escrow/transfer",
   "status": 200,
-  "settledMs": 4980,
+  "settledMs": 2119,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2554,7 +2554,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1970,
+  "settledMs": 1976,
   "apiRequests": 8,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2580,7 +2580,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1972,
+  "settledMs": 1988,
   "apiRequests": 5,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2605,7 +2605,7 @@
   "path": "/register",
   "finalUrl": "/register",
   "status": 200,
-  "settledMs": 2196,
+  "settledMs": 2126,
   "apiRequests": 4,
   "api": [
    "GET /v1/registrations/offers",
@@ -2629,7 +2629,7 @@
   "path": "/pending-requests",
   "finalUrl": "/pending-requests",
   "status": 200,
-  "settledMs": 2969,
+  "settledMs": 2260,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2650,7 +2650,7 @@
   "path": "/statement",
   "finalUrl": "/statement",
   "status": 200,
-  "settledMs": 1968,
+  "settledMs": 1947,
   "apiRequests": 2,
   "api": [
    "GET /v1/statement",
@@ -2672,7 +2672,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1972,
+  "settledMs": 1975,
   "apiRequests": 8,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2689,7 +2689,7 @@
   },
   "axe": [],
   "shot": "f01-home-parent-b/after-ar.jpg",
-  "bytes": 29004
+  "bytes": 28455
  },
  "f06-register-parent:ar": {
   "id": "f06-register-parent",
@@ -2698,7 +2698,7 @@
   "path": "/register",
   "finalUrl": "/register",
   "status": 200,
-  "settledMs": 2178,
+  "settledMs": 2149,
   "apiRequests": 5,
   "api": [
    "GET /v1/registrations/offers",
@@ -2723,7 +2723,7 @@
   "path": "/registrations",
   "finalUrl": "/registrations",
   "status": 200,
-  "settledMs": 2067,
+  "settledMs": 2010,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2744,7 +2744,7 @@
   "path": "/statement",
   "finalUrl": "/statement",
   "status": 200,
-  "settledMs": 2038,
+  "settledMs": 1960,
   "apiRequests": 3,
   "api": [
    "GET /v1/statement",
@@ -2767,7 +2767,7 @@
   "path": "/charges-due",
   "finalUrl": "/charges-due",
   "status": 200,
-  "settledMs": 1962,
+  "settledMs": 1957,
   "apiRequests": 2,
   "api": [
    "GET /v1/charges",
@@ -2789,7 +2789,7 @@
   "path": "/links",
   "finalUrl": "/links",
   "status": 200,
-  "settledMs": 1979,
+  "settledMs": 1962,
   "apiRequests": 4,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -2813,7 +2813,7 @@
   "path": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
   "finalUrl": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
   "status": 200,
-  "settledMs": 1992,
+  "settledMs": 1979,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2834,7 +2834,7 @@
   "path": "/notifications",
   "finalUrl": "/notifications",
   "status": 200,
-  "settledMs": 1987,
+  "settledMs": 1945,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications",
@@ -2856,7 +2856,7 @@
   "path": "/profile",
   "finalUrl": "/profile",
   "status": 200,
-  "settledMs": 1945,
+  "settledMs": 1928,
   "apiRequests": 2,
   "api": [
    "GET /v1/users/me",
@@ -2878,7 +2878,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1996,
+  "settledMs": 1970,
   "apiRequests": 8,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2895,7 +2895,7 @@
   },
   "axe": [],
   "shot": "f02-home-parent-d/after-ar.jpg",
-  "bytes": 32029
+  "bytes": 31472
  },
  "f12-school-fee:ar": {
   "id": "f12-school-fee",
@@ -2904,7 +2904,7 @@
   "path": "/school-fee",
   "finalUrl": "/school-fee",
   "status": 200,
-  "settledMs": 1975,
+  "settledMs": 1962,
   "apiRequests": 3,
   "api": [
    "GET /v1/links/children",
@@ -2927,7 +2927,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1996,
+  "settledMs": 1958,
   "apiRequests": 11,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -2944,7 +2944,7 @@
   },
   "axe": [],
   "shot": "f03-home-parent-c/after-ar.jpg",
-  "bytes": 31063
+  "bytes": 30496
  },
  "f09-history:ar": {
   "id": "f09-history",
@@ -2953,7 +2953,7 @@
   "path": "/registrations/history",
   "finalUrl": "/registrations/history",
   "status": 200,
-  "settledMs": 1956,
+  "settledMs": 1957,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2974,7 +2974,7 @@
   "path": "/approvals",
   "finalUrl": "/approvals",
   "status": 200,
-  "settledMs": 1967,
+  "settledMs": 1958,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -2995,7 +2995,7 @@
   "path": "/escrow",
   "finalUrl": "/escrow",
   "status": 200,
-  "settledMs": 1994,
+  "settledMs": 1960,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -3016,7 +3016,7 @@
   "path": "/escrow/withdraw",
   "finalUrl": "/escrow/withdraw",
   "status": 200,
-  "settledMs": 1981,
+  "settledMs": 1932,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -3037,7 +3037,7 @@
   "path": "/escrow/transfer",
   "finalUrl": "/escrow/transfer",
   "status": 200,
-  "settledMs": 1979,
+  "settledMs": 1996,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -3058,7 +3058,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 2026,
+  "settledMs": 1973,
   "apiRequests": 8,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -3075,7 +3075,7 @@
   },
   "axe": [],
   "shot": "f04-home-parent-a/after-ar.jpg",
-  "bytes": 29032
+  "bytes": 28485
  },
  "f05-home-student-c1:ar": {
   "id": "f05-home-student-c1",
@@ -3084,7 +3084,7 @@
   "path": "/",
   "finalUrl": "/",
   "status": 200,
-  "settledMs": 1983,
+  "settledMs": 1982,
   "apiRequests": 5,
   "api": [
    "GET /v1/users/me/home-summary",
@@ -3109,7 +3109,7 @@
   "path": "/register",
   "finalUrl": "/register",
   "status": 200,
-  "settledMs": 2188,
+  "settledMs": 2181,
   "apiRequests": 4,
   "api": [
    "GET /v1/registrations/offers",
@@ -3133,7 +3133,7 @@
   "path": "/pending-requests",
   "finalUrl": "/pending-requests",
   "status": 200,
-  "settledMs": 1974,
+  "settledMs": 1950,
   "apiRequests": 1,
   "api": [
    "GET /v1/notifications/unread-count"
@@ -3154,7 +3154,7 @@
   "path": "/statement",
   "finalUrl": "/statement",
   "status": 200,
-  "settledMs": 1945,
+  "settledMs": 1943,
   "apiRequests": 2,
   "api": [
    "GET /v1/statement",
@@ -3176,7 +3176,7 @@
   "path": "/register",
   "finalUrl": "/register",
   "status": 200,
-  "settledMs": 3857,
+  "settledMs": 3802,
   "apiRequests": 5,
   "api": [
    "GET /v1/registrations/offers",
@@ -3201,7 +3201,7 @@
   "path": "/register",
   "finalUrl": "/register",
   "status": 200,
-  "settledMs": 3887,
+  "settledMs": 3825,
   "apiRequests": 5,
   "api": [
    "GET /v1/registrations/offers",
@@ -3226,7 +3226,7 @@
   "path": "/sign-in",
   "finalUrl": "/sign-in",
   "status": 200,
-  "settledMs": 3052,
+  "settledMs": 1897,
   "apiRequests": 1,
   "api": [
    "GET /api/auth/get-session"
@@ -3247,7 +3247,7 @@
   "path": "/unauthorized",
   "finalUrl": "/unauthorized",
   "status": 200,
-  "settledMs": 2441,
+  "settledMs": 2009,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3266,7 +3266,7 @@
   "path": "/sign-in",
   "finalUrl": "/sign-in",
   "status": 200,
-  "settledMs": 1899,
+  "settledMs": 1900,
   "apiRequests": 1,
   "api": [
    "GET /api/auth/get-session"
@@ -3287,7 +3287,7 @@
   "path": "/sign-up",
   "finalUrl": "/sign-up",
   "status": 200,
-  "settledMs": 3131,
+  "settledMs": 2406,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3306,7 +3306,7 @@
   "path": "/sign-up/parent",
   "finalUrl": "/sign-up/parent",
   "status": 200,
-  "settledMs": 2225,
+  "settledMs": 2092,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3316,7 +3316,7 @@
   },
   "axe": [],
   "shot": "a04-sign-up-parent/after-en.jpg",
-  "bytes": 27818
+  "bytes": 27820
  },
  "a05-sign-up-student:en": {
   "id": "a05-sign-up-student",
@@ -3325,7 +3325,7 @@
   "path": "/sign-up/student",
   "finalUrl": "/sign-up/student",
   "status": 200,
-  "settledMs": 2131,
+  "settledMs": 2094,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3344,7 +3344,7 @@
   "path": "/forgot-password",
   "finalUrl": "/forgot-password",
   "status": 200,
-  "settledMs": 2137,
+  "settledMs": 2002,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3363,7 +3363,7 @@
   "path": "/verify-email",
   "finalUrl": "/verify-email",
   "status": 200,
-  "settledMs": 2038,
+  "settledMs": 2094,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3382,7 +3382,7 @@
   "path": "/sign-in",
   "finalUrl": "/sign-in",
   "status": 200,
-  "settledMs": 1936,
+  "settledMs": 1908,
   "apiRequests": 1,
   "api": [
    "GET /api/auth/get-session"
@@ -3403,7 +3403,7 @@
   "path": "/unauthorized",
   "finalUrl": "/unauthorized",
   "status": 200,
-  "settledMs": 1855,
+  "settledMs": 1845,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3422,7 +3422,7 @@
   "path": "/sign-in",
   "finalUrl": "/sign-in",
   "status": 200,
-  "settledMs": 1901,
+  "settledMs": 1904,
   "apiRequests": 1,
   "api": [
    "GET /api/auth/get-session"
@@ -3443,7 +3443,7 @@
   "path": "/sign-up",
   "finalUrl": "/sign-up",
   "status": 200,
-  "settledMs": 1863,
+  "settledMs": 1886,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3462,7 +3462,7 @@
   "path": "/sign-up/parent",
   "finalUrl": "/sign-up/parent",
   "status": 200,
-  "settledMs": 1893,
+  "settledMs": 1902,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3481,7 +3481,7 @@
   "path": "/sign-up/student",
   "finalUrl": "/sign-up/student",
   "status": 200,
-  "settledMs": 1879,
+  "settledMs": 1859,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3500,7 +3500,7 @@
   "path": "/forgot-password",
   "finalUrl": "/forgot-password",
   "status": 200,
-  "settledMs": 1876,
+  "settledMs": 1849,
   "apiRequests": 0,
   "api": [],
   "errors": [],
@@ -3519,7 +3519,7 @@
   "path": "/verify-email",
   "finalUrl": "/verify-email",
   "status": 200,
-  "settledMs": 1851,
+  "settledMs": 1857,
   "apiRequests": 0,
   "api": [],
   "errors": [],

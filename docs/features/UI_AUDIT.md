@@ -632,6 +632,32 @@ F6's own:
 
 ## 10. Proof
 
+All on **0b71cb4** (`feature/ui-audit`), the last commit carrying code; what follows it is this document, the
+trail and the evidence.
+
+| Gate | Result | Evidence |
+|---|---|---|
+| `pnpm --filter @repo/api check-types` (source and tests) | green, in the ui-audit worktree | trail 21:39:43Z; CI |
+| `pnpm --filter web check-types` | green, in the ui-audit worktree | trail 21:39:43Z; CI |
+| `pnpm --filter @repo/api test`, local time (Africa/Cairo) | 43 files, **839 passed**, 1 todo (main d6c6715: 836; F6 added three scenarios) | `gates/suite-local-0b71cb4.txt` |
+| the same with `TZ=UTC` | 43 files, **839 passed**, 1 todo | `gates/suite-utc-0b71cb4.txt` |
+| CI (`.github/workflows/ci.yml`) | **green, run 38810433498** (gate 0, both type-checks, the suite) | `gh run list --branch feature/ui-audit` |
+| `useQuery<…>` generics in `apps/web` | **15** (19 on main; the limit 35) | `grep -rn "useQuery<" apps/web` |
+| The after drive, every screen of §1, EN and AR | 154 records: **0 axe violations, 0 console errors** (hydration included) | `drive-after.json`; trail 21:38:47Z |
+| Before and after screenshots | 76 screens with all four (`before-en`, `before-ar`, `after-en`, `after-ar`), each under 300 KB; two after-only: f06b (Reserve with rows ticked, added to show the stacked rows) and s36 (the desk opened from the student record — before, the link opened the empty desk of s30) | `.audit/ui-audit-evidence/<screen>/` |
+
+**Controls** — each guard undone once, its proof red, restored green:
+
+| Change | Proof | Red when undone |
+|---|---|---|
+| The desk's `familyConsentNeeded` (§3.12) | 08o: a school's grade-10 line true, a family's own reservation false | the flag forced false: "expected [[pending_payment, false]] to deeply equal [[pending_payment, true]]" (trail 05:30:48Z) |
+| The translator waits for React (§4.1) | `/students` in Arabic, four loads | the check disabled: four hydration errors (trail 05:40:04Z) |
+| The Sent log's send-time words (§3.17) | 08s: a class sent to today, another teacher from tomorrow | the log reading today's words: red (trail 20:04:13Z) |
+| Exam Deadlines lists only sittings ahead (§3.21) | 08x2: a past sitting not listed, one ahead listed | the filter dropped: "expected [true, true] to deeply equal [false, true]" (trail 20:26:19Z) |
+| The import review on a one-paper line (§4.2) | the row editor on a staged import | the old file in place: "First entry · Retake · As the sheet says" (`s19b-…/before-*.jpg`) |
+| The session helper's 401 (§3.32) | the sign-up pages' console | before: "[session] getSession failed: Unauthorized" on a03–a05 (`drive-before.json`); after: none |
+| Reduced motion (§3.0) | `drive/motion-check.mjs` | without the preference `fade-up`, with it `none` (the stylesheet served first stale: the dev server restarted) |
+
 ## 11. Progress log (UTC)
 
 - 15 Oct 04:36Z — setup: worktree installed and built, `igcse_ui_dev` from the template and migrated (61),
@@ -687,4 +713,8 @@ F6's own:
   dev, before and after; RESERVATION_FOCUS §4's row for the notifications' `/my-timetable`; the
   reduced-motion rule (none existed; the web server restarted for the stylesheet, my PIDs 28901/28905/28911
   stopped, now pnpm pid 83122); §4–§9 written. Type-checks green in the worktree; `useQuery<` generics 15.
-- Next: commit; the full suite in local time and in UTC; the whole after drive once more; CI.
+- 21:30Z — committed (0b71cb4) and pushed.
+- 21:31–21:38Z — the whole after drive once more on 0b71cb4: 154 records, none with an axe violation or a
+  console error.
+- 21:31–21:47Z — the full suite in local time (finished 21:39:43Z) and with `TZ=UTC` (21:47:26Z): 839 passed,
+  1 todo, both. CI run 38810433498 green on 0b71cb4 (21:48Z). §10 written.
