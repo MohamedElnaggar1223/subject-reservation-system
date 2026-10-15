@@ -917,8 +917,12 @@ export type FollowOutcome = {
   moved: { studentId: string; fromGroupId: string; toGroupId: string; toGroupName: string }[];
   /** Every member now has the new teacher: the group's teacher changed (dated). */
   groupsGiven: { groupId: string; groupName: string; teacherId: string | null }[];
-  /** Stayed where they are — no group of the new teacher, or the move would clash: the coordinator sees them (`groupsWaiting`). */
-  waiting: { studentId: string; groupId: string; groupName: string; teacherId: string | null; why: string }[];
+  /**
+   * Stayed where they are — no group of the new teacher, or the move would clash: the coordinator sees them (`groupsWaiting`).
+   * `kind` says which (the desk's sentence, docs/features/CYCLE_FOLLOWUPS.md §2): `no_group`, none of the new teacher's
+   * yet; `refused`, the move (or the whole group's change) was refused, `why` giving the reason.
+   */
+  waiting: { studentId: string; groupId: string; groupName: string; teacherId: string | null; why: string; kind: 'no_group' | 'refused' }[];
   /** Cover a group's new teacher made no longer holding (told after the commit: `groupFollowNotices`). */
   coversLost: string[];
 };
@@ -1086,7 +1090,7 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
         .sort((a, b) => (sizes.get(a.id) ?? 0) - (sizes.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
       if (!target) {
         const [t] = to ? await tx.select({ name: teacher.name }).from(teacher).where(eq(teacher.id, to)) : [];
-        out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: to, why: wholeWhy ?? `No group of ${t?.name ?? 'no teacher'} for this subject yet` });
+        out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: to, why: wholeWhy ?? `No group of ${t?.name ?? 'no teacher'} for this subject yet`, kind: wholeWhy ? 'refused' : 'no_group' });
         continue;
       }
       const done = await attempt(tx, async (sp) => {
@@ -1102,7 +1106,7 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
         out.moved.push({ studentId: c.studentId, fromGroupId: g.id, toGroupId: target.id, toGroupName: target.name });
         sizes.set(target.id, (sizes.get(target.id) ?? 0) + 1);
       } else {
-        out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: to, why: done.why });
+        out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: to, why: done.why, kind: 'refused' });
       }
     }
   }

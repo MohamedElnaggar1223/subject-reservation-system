@@ -26,6 +26,8 @@ import { Badge, Notice } from '~/components/ui/tone';
 import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-state';
 import { fetchTeachers, useCatalogue, MONTH_LABEL } from '~/app/(app)/exams/exams-shared';
 import { ReservePreview, useRefundTerms } from '~/components/reservations/reserve';
+import { ClassFollowNotice } from '~/components/reservations/class-follow';
+import { followSentences, type FollowSentence } from '~/lib/groups-followed';
 import {
   fetchOffers, fetchAddable, fetchSessions, fetchPreview, offersKey, previewKey, SESSIONS_KEY, Money, Modal, Drawer, Field, INPUT_CLASS, TEXTAREA_CLASS,
   ErrorLine, errorText, CopySummary, type SessionDetail, type OfferRow, type ItemRow, type AddableRow, type OffersData,
@@ -809,33 +811,49 @@ function ReplaceTeacher({ session, offer, onClose }: { session: SessionDetail; o
   const [from, setFrom] = useState(offer.teachers[0]?.teacherId ?? '');
   const [to, setTo] = useState('');
   const [reason, setReason] = useState('');
+  // What happened to this year's classes (F1's follow-up, `groupsFollowed`): said before closing.
+  const [classSaid, setClassSaid] = useState<FollowSentence[] | null>(null);
   const go = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
       param: { id: session.id, offerId: offer.id }, json: { fromTeacherId: from, toTeacherId: to, reason: reason.trim() },
     })),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: offersKey(session.id) }); onClose(); },
+    onSuccess: async (r) => {
+      await queryClient.invalidateQueries({ queryKey: offersKey(session.id) });
+      const said = followSentences(r.groupsFollowed, { one: false, teacherName: (id) => (teachers ?? []).find((t) => t.id === id)?.name });
+      if (said.length) setClassSaid(said);
+      else onClose();
+    },
   });
   return (
     <Modal title="Replace a teacher" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{"Every reservation, paper and this year's class of the teacher who leaves moves to the other, audited."}</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
-        <Field label="Who leaves" htmlFor="rt-from">
-          <select id="rt-from" className={INPUT_CLASS} value={from} onChange={(e) => setFrom(e.target.value)}>
-            {offer.teachers.map((t) => <option key={t.teacherId} value={t.teacherId} data-i18n-skip="true">{t.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Who takes over" htmlFor="rt-to">
-          <select id="rt-to" className={INPUT_CLASS} value={to} onChange={(e) => setTo(e.target.value)}>
-            <option value="">Choose…</option>
-            {(teachers ?? []).filter((t) => t.id !== from && t.isActive !== false).map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Reason" htmlFor="rt-why"><input id="rt-why" className={INPUT_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="button" onClick={() => go.mutate()} disabled={!to || reason.trim().length < 5 || go.isPending}>Replace</Button>
-        </div>
+        {classSaid ? (
+          <>
+            <ClassFollowNotice sentences={classSaid} />
+            <div className="flex justify-end"><Button type="button" onClick={onClose}>Close</Button></div>
+          </>
+        ) : (
+        <>
+          <Field label="Who leaves" htmlFor="rt-from">
+            <select id="rt-from" className={INPUT_CLASS} value={from} onChange={(e) => setFrom(e.target.value)}>
+              {offer.teachers.map((t) => <option key={t.teacherId} value={t.teacherId} data-i18n-skip="true">{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Who takes over" htmlFor="rt-to">
+            <select id="rt-to" className={INPUT_CLASS} value={to} onChange={(e) => setTo(e.target.value)}>
+              <option value="">Choose…</option>
+              {(teachers ?? []).filter((t) => t.id !== from && t.isActive !== false).map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Reason" htmlFor="rt-why"><input id="rt-why" className={INPUT_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" onClick={() => go.mutate()} disabled={!to || reason.trim().length < 5 || go.isPending}>Replace</Button>
+          </div>
+        </>
+        )}
       </div>
     </Modal>
   );

@@ -1,0 +1,80 @@
+# Control C2 (CYCLE_FOLLOWUPS.md section 5): the desk sentence's refusal branch undone - followSentences (apps/web/lib/groups-followed.ts) treated a refused move as 'no class of the new teacher yet' (if (false && row.kind === 'refused')).
+# Run: TEST_DB_NAME=igcse_followups_test vitest run test/08s6-scheduling-rework.test.ts (red: the clash refusal reads as a missing class, without the API's reason).
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > the desk's sentence for each outcome of a teacher change, and the Session screen's for a replacement, in English and Arabic: moves, waits with no class of the new teacher, refused for a clash in the published timetable with the API's reason, the whole class handed over, self-study, nothing to say; counted for a replacement
+AssertionError: expected [ { …(3) } ] to deeply equal [ { …(3) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "reason": "It would clash in the published timetable: Student rr-DC0-pcpw would be in DC homeroom pcpw and Race DC — Y at Wednesday period 2 from Wednesday, 21 October 2054 (RW — desk sentence)",
+-     "text": "The move was refused: the student stays in Race DC — X.",
++     "reason": null,
++     "text": "Race DC Y pcpw has no class of this subject yet: the student stays in Race DC — X and waits to be placed.",
+      "tone": "warning",
+    },
+  ]
+
+ ❯ test/08s6-scheduling-rework.test.ts:1140:39
+    1138|     expect(clash.groupsFollowed!.waiting).toEqual([expect.objectContai…
+    1139|     expect(why).toMatch(new RegExp(`^It would clash in the published t…
+    1140|     expect(say(clash.groupsFollowed)).toEqual([{ text: 'The move was r…
+       |                                       ^
+    1141|     const clashAr = arabic(say(clash.groupsFollowed)[0]!);
+    1142|     expect(clashAr.text).toBe(`رُفض النقل: يبقى الطالب في ${iso('Race …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 passed (40)
+   Start at  04:23:21
+   Duration  28.35s (transform 839ms, setup 2ms, collect 337ms, tests 26.10s, environment 0ms, prepare 30ms)
+
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > getTeachingDemand groups per subject, unit and teacher with the offer’s delivery and the teacher’s kind; "no preference" is a demand with no teacher 8ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > forming makes a group per unit and teacher; an online group is timetabled without a room; a provider’s group asks for no lessons and gets none  440ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a line's teacher changed at the desk reaches the group of its unit: the student moves to the new teacher's P1 group from today, their P2 group stays 71ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher 59ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > "no preference" assigned later on Teaching groups: listed with the teachers its line may take; a teacher the line may not take is refused by name; then the line, the enrolment and the group take the teacher 112ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > with no group of the new teacher the student stays where they are and is listed; the coordinator makes the group and Moves them (guarded) 88ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 95ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > self-study now: the student leaves the group after today (a retake taken outside school, price unchanged) 29ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > checkEnrolments per unit: a unit line against its unit’s enrolment; a subject held whole and by its units at once is flagged with the fix 49ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change dated inside a draft’s time is a clash from that day: the grid shows it, publishing refuses it, the generator keeps the two apart  348ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it 142ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away) 75ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher's timetable rules changed: the cover they give at a period they can no longer teach is judged again and goes, and they are told 158ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change and a publication at once, publishing first: the change sees the new version and is refused with the clash  366ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change and a publication at once, the change first: the publication sees the change and is refused with the clash  403ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > two teacher changes giving one teacher two lessons at once in a published timetable: the second waits for the first and is refused 274ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > forming takes the students it adds first: a student added to another group while forming is held waits, then is moved — no second open group, no refusal 271ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused  350ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over  372ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a line’s teacher changed at the desk while the coordinator adds the same student elsewhere, the change first: the student moves to the new teacher’s group, then the add moves them on — one after the other, one open group  970ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the desk change then finds the student alone in Z’s group, now with Y, and gives that group to Y  917ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > forming reads its students again under their locks: a student moved into a group while forming waited stays there — no refusal, no second group  520ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a second generation of a draft while one runs is refused; a request cancelled while the generator runs writes nothing  377ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher takes the students of its lines first: the coordinator adding one of them elsewhere while it is under way waits, then moves the student — the replacement first  935ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the replacement waits for it, then finds the student in Z’s group and gives each group, all its members now with Y, to Y  938ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s leaving of one of its students, the replacement first: the leaving waits, then ends the enrolment and the membership the replacement moved and expires the line — no deadlock  957ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > … the leaving first: the replacement waits for the student, then finds the leaver’s line expired and moves the other alone  952ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s cohort correction of one of its students, the replacement first: the correction waits, then expires the line now taught by Y — no deadlock  918ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > … the correction first: the replacement waits, then finds the line expired; the other student moves to Y’s group (X’s group still has a student enrolled with X)  958ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > F0b’s enrolment change takes its student first: the coordinator adding the student elsewhere meanwhile waits, then moves them — the change first  995ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the enrolment change waits, then finds the student alone in Z’s group with Y, and gives that group to Y  964ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > A line reserved for a new student while the replacement waited for its students: the replacement runs again with that student locked first — it never holds a line whose student it has not locked  1276ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error  861ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > step D’s contract, studentsOfGroup(groupId, date): who is in a group on a date by §2’s rules — a move that day goes to the later group, a leaver is out after their last day, a section’s group follows the section 10ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item  336ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms  451ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike  400ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting  528ms
+   ✓ F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 245ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > the desk's sentence for each outcome of a teacher change, and the Session screen's for a replacement, in English and Arabic: moves, waits with no class of the new teacher, refused for a clash in the published timetable with the API's reason, the whole class handed over, self-study, nothing to say; counted for a replacement 1885ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 passed (40)
+   Start at  04:23:21
+   Duration  28.35s (transform 839ms, setup 2ms, collect 337ms, tests 26.10s, environment 0ms, prepare 30ms)

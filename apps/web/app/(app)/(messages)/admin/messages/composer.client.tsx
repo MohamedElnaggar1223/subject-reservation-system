@@ -39,7 +39,7 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
   const [list, setList] = useState<BatchList>('session_unpaid');
   const [sessionId, setSessionId] = useState('');
   const [sectionId, setSectionId] = useState('');
-  const [groupKey, setGroupKey] = useState('');
+  const [groupId, setGroupId] = useState('');
   const [offerId, setOfferId] = useState('');
   const [chargeKind, setChargeKind] = useState<ChargeKind>('school_fee_push');
   const [academicYear, setAcademicYear] = useState('');
@@ -54,14 +54,12 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
     switch (list) {
       case 'session_unpaid': return sessionId ? { kind: 'batch', list, sessionId, include: 'both', filter: 'unpaid', who } : null;
       case 'section': return sectionId ? { kind: 'batch', list, sectionId, who } : null;
-      case 'teaching_group': {
-        const g = lists.data?.teachingGroups.find((x) => `${x.subjectId}|${x.unitId ?? ''}|${x.teacherId ?? ''}` === groupKey);
-        return g ? { kind: 'batch', list, academicYearId: g.academicYearId, subjectId: g.subjectId, unitId: g.unitId, teacherId: g.teacherId, who } : null;
-      }
+      // One of F1's groups: its students on the school's day, resolved by the API (CYCLE_FOLLOWUPS.md §1).
+      case 'teaching_group': return groupId ? { kind: 'batch', list, groupId, who } : null;
       case 'offer_reservers': return offerId ? { kind: 'batch', list, offerId, lines: 'live', who } : null;
       case 'charge_holders': return { kind: 'batch', list, chargeKind, unpaidOnly: true, ...(chargeKind === 'school_fee_push' && academicYear ? { academicYear } : {}), who };
     }
-  }, [kind, list, sessionId, sectionId, groupKey, offerId, chargeKind, academicYear, who, people, lists.data]);
+  }, [kind, list, sessionId, sectionId, groupId, offerId, chargeKind, academicYear, who, people]);
   const audience: AudienceInputType | null = kind === 'broadcast' ? (savedId ? { savedId } : null) : definition ? { definition } : null;
   const audienceKey = JSON.stringify(audience);
   const resolved = useQuery({
@@ -177,7 +175,7 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
             <div className="space-y-3">
               {savedBatches.length > 0 && (
                 <p className="text-xs text-muted-foreground"><span>Saved lists:</span>{' '}
-                  {savedBatches.map((a) => <button key={a.id} type="button" className="me-2 underline" onClick={() => { const d = a.definition as AudienceDefinitionType; if (d.kind === 'batch') { setList(d.list); if ('sessionId' in d) setSessionId(d.sessionId ?? ''); if ('sectionId' in d) setSectionId(d.sectionId ?? ''); setWho(d.who); } }}>{a.name}</button>)}
+                  {savedBatches.map((a) => <button key={a.id} type="button" className="me-2 underline" onClick={() => { const d = a.definition; if (d.kind === 'batch') { setList(d.list); if ('sessionId' in d) setSessionId(d.sessionId ?? ''); if ('sectionId' in d) setSectionId(d.sectionId ?? ''); if ('groupId' in d) setGroupId(d.groupId); setWho(d.who); } }}>{a.name}</button>)}
                 </p>
               )}
               <div className="grid gap-3 sm:grid-cols-2">
@@ -218,12 +216,9 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
                 {list === 'teaching_group' && (
                   <label className="space-y-1 text-sm">
                     <span className="font-medium text-foreground">Teaching group</span>
-                    <select className={INPUT_CLASS} value={groupKey} onChange={(e) => setGroupKey(e.target.value)}>
-                      <option value="">Choose a group</option>
-                      {(lists.data?.teachingGroups ?? []).map((g) => {
-                        const k = `${g.subjectId}|${g.unitId ?? ''}|${g.teacherId ?? ''}`;
-                        return <option key={k} value={k} data-i18n-skip="true">{g.label}</option>;
-                      })}
+                    <select className={INPUT_CLASS} value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+                      <option value="">{lists.data && !lists.data.teachingGroups.length ? 'No teaching groups yet' : 'Choose a group'}</option>
+                      {(lists.data?.teachingGroups ?? []).map((g) => <option key={g.id} value={g.id} data-i18n-skip="true">{g.label}</option>)}
                     </select>
                   </label>
                 )}

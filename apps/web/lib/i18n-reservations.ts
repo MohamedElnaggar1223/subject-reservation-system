@@ -289,7 +289,50 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^That teacher does not teach (.+) this cycle: choose one of the subject's teachers on the session$/, (m) => `هذا المعلم لا يدرّس ${m[1]} هذه الدورة: اختر أحد معلمي المادة في الجلسة`],
   [/^Nobody teaches (.+) this cycle: it can only be self-study$/, (m) => `لا أحد يدرّس ${m[1]} هذه الدورة: لا تكون إلا دراسة ذاتية`],
   [/^This line is no longer reserved: its teacher cannot be changed$/, () => 'لم يعد هذا السطر محجوزًا: لا يمكن تغيير معلمه'],
+  // What happened to the student's class after a teacher change (lib/groups-followed.ts; the desk's
+  // teacher change and the Session screen's Replace a teacher). A class is فصل, as the replacement's
+  // own sentence says it; the class's and the teacher's names are data, kept left-to-right.
+  [/^The student moves to the class (.+)\.$/, (m) => `ينتقل الطالب إلى فصل ${iso(m[1]!)}.`],
+  [/^(\d+) students? moves? to the class (.+)\.$/, (m) => `ينتقل ${studentsAr(Number(m[1]))} إلى فصل ${iso(m[2]!)}.`],
+  [/^The whole class (.+) goes to (.+): the student stays in it\.$/, (m) => `ينتقل فصل ${iso(m[1]!)} كله إلى ${teacherAr(m[2]!)}: ويبقى الطالب فيه.`],
+  [/^The whole class (.+) waits for a teacher: the student stays in it\.$/, (m) => `ينتظر فصل ${iso(m[1]!)} كله معلمًا: ويبقى الطالب فيه.`],
+  [/^The whole class (.+) waits for a teacher\.$/, (m) => `ينتظر فصل ${iso(m[1]!)} كله معلمًا.`],
+  [/^The whole class (.+) goes to (.+)\.$/, (m) => `ينتقل فصل ${iso(m[1]!)} كله إلى ${teacherAr(m[2]!)}.`],
+  [/^The student leaves the class (.+) after today: self-study from now\.$/, (m) => `يغادر الطالب فصل ${iso(m[1]!)} بعد اليوم: دراسة ذاتية من الآن.`],
+  [/^(\d+) students? leaves? the class (.+) after today: self-study from now\.$/, (m) => `يغادر ${studentsAr(Number(m[1]))} فصل ${iso(m[2]!)} بعد اليوم: دراسة ذاتية من الآن.`],
+  [/^No class of this subject is without a teacher yet: the student stays in (.+) and waits to be placed\.$/,
+    (m) => `لا فصل في هذه المادة بلا معلم بعد: يبقى الطالب في ${iso(m[1]!)} وينتظر توزيعه.`],
+  [/^No class of this subject is without a teacher yet: (\d+) students? stays? in (.+) and waits? to be placed\.$/,
+    (m) => `لا فصل في هذه المادة بلا معلم بعد: يبقى ${studentsAr(Number(m[1]))} في ${iso(m[2]!)} و${waitAr(Number(m[1]))}.`],
+  [/^(.+) has no class of this subject yet: the student stays in (.+) and waits to be placed\.$/,
+    (m) => `ليس لدى ${teacherAr(m[1]!)} فصل في هذه المادة بعد: يبقى الطالب في ${iso(m[2]!)} وينتظر توزيعه.`],
+  [/^(.+) has no class of this subject yet: (\d+) students? stays? in (.+) and waits? to be placed\.$/,
+    (m) => `ليس لدى ${teacherAr(m[1]!)} فصل في هذه المادة بعد: يبقى ${studentsAr(Number(m[2]))} في ${iso(m[3]!)} و${waitAr(Number(m[2]))}.`],
+  [/^The move was refused: the student stays in (.+)\.$/, (m) => `رُفض النقل: يبقى الطالب في ${iso(m[1]!)}.`],
+  [/^The move was refused: (\d+) students? stays? in (.+)\.$/, (m) => `رُفض النقل: يبقى ${studentsAr(Number(m[1]))} في ${iso(m[2]!)}.`],
 ];
+
+/** A name inside an Arabic sentence, isolated so it stays one left-to-right unit. */
+function iso(name: string): string {
+  return `\u2068${name}\u2069`;
+}
+/** A teacher as the class sentences name one: a name (data), or the new teacher the screen could not name. */
+function teacherAr(name: string): string {
+  return name === 'The new teacher' ? 'المعلم الجديد' : iso(name);
+}
+/** A count of students with its noun (1, 2, 3–10, 11–99, hundreds), as D's counts agree with their number. */
+function studentsAr(n: number): string {
+  if (n === 1) return 'طالب واحد';
+  if (n === 2) return 'طالبان';
+  const r = n % 100;
+  if (r >= 3 && r <= 10) return `${n} طلاب`;
+  if (r >= 11 && r <= 99) return `${n} طالبًا`;
+  return `${n} طالب`;
+}
+/** "and wait(s) to be placed", the verb agreeing with the count (one, two, more). */
+function waitAr(n: number): string {
+  return n === 1 ? 'ينتظر توزيعه' : n === 2 ? 'ينتظران توزيعهما' : 'ينتظرون توزيعهم';
+}
 
 /** Sentences of these screens that carry a name, a number or a date. */
 export function translateReservationsText(text: string): string | null {

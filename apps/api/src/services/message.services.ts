@@ -14,13 +14,13 @@
 
 import { randomUUID } from 'crypto';
 import {
-  db, sql, message, messageAudience, messageDelivery, messageTemplate, notification, user, reminderRule,
+  db, sql, message, messageAudience, messageDelivery, messageTemplate, notification, user, reminderRule, teacher,
   eq, and, lte, inArray, desc, asc,
 } from '@repo/db';
 import {
-  AudienceDefinition, isPaymentList, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList, messageOverdueItem,
+  StoredAudienceDefinition, isPaymentList, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList, messageOverdueItem,
   MESSAGE_VARIABLE_LABELS, REMINDER_KIND_LABELS, academicYearStartOf, NOTHING_TO_SEND,
-  type AudienceDefinitionType, type CreateMessageType, type MessageTexts, type MessageVars, type MessageVariable, type MessageLanguage,
+  type StoredAudienceDefinitionType, type CreateMessageType, type MessageTexts, type MessageVars, type MessageVariable, type MessageLanguage,
   type MessageLanguageChoice, type NotificationType, type SaveTemplateType, type ReminderKind,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -30,7 +30,9 @@ import {
   resolveAudience, assertMayUseAudience, mayUseAudience, audienceLabel, AudienceError,
   type AudienceMember, type ResolvedAudience, type Viewer,
 } from './message-audience.services';
-import { getTeachingDemand } from './enrolment.services';
+import { listGroups } from './group.services';
+import { teachersOn } from './scheduling-shared.services';
+import { now as schoolNow, todayAtSchool } from '../lib/clock';
 import { payableAcademicYears } from './school-fee.services';
 import { logger } from '../lib/logger';
 
@@ -135,7 +137,7 @@ export async function deliverInTx(
 }
 
 /** The notification type a staff message's in-app rows carry: a broadcast as before, a money list as a reminder, else a message. */
-function notificationTypeOf(def: AudienceDefinitionType): NotificationType {
+function notificationTypeOf(def: StoredAudienceDefinitionType): NotificationType {
   if (def.kind === 'broadcast') return 'BULK_ANNOUNCEMENT';
   // A payment list only: the holders of a paid charge are not being asked to pay (the review of 5c2f2bf, item 2).
   if (isPaymentList(def)) return 'PAYMENT_REMINDER';
@@ -144,11 +146,15 @@ function notificationTypeOf(def: AudienceDefinitionType): NotificationType {
 
 // ─── Sending ─────────────────────────────────────────────────────────────────
 
-async function audienceOf(executor: Executor, input: CreateMessageType['audience']): Promise<{ def: AudienceDefinitionType; savedId: string | null }> {
+/**
+ * The audience of a request: a definition (the shapes the API takes now), or a saved one read as its
+ * row keeps it — a teaching group saved before the switch to F1's groups included (its enrolment key).
+ */
+async function audienceOf(executor: Executor, input: CreateMessageType['audience']): Promise<{ def: StoredAudienceDefinitionType; savedId: string | null }> {
   if ('savedId' in input) {
     const [a] = await executor.select().from(messageAudience).where(and(eq(messageAudience.id, input.savedId), eq(messageAudience.saved, true)));
     if (!a) throw new MessageError('Saved audience not found', 404);
-    const parsed = AudienceDefinition.safeParse(a.definition);
+    const parsed = StoredAudienceDefinition.safeParse(a.definition);
     if (!parsed.success) throw new MessageError('This saved audience can no longer be resolved', 409);
     return { def: parsed.data, savedId: a.id };
   }
@@ -224,7 +230,7 @@ export async function cancelMessage(id: string, viewer: Viewer, reason: string, 
     const [m] = await tx.select().from(message).where(eq(message.id, id)).for('update');
     if (!m) throw new MessageError('Message not found', 404);
     const [a] = await tx.select().from(messageAudience).where(eq(messageAudience.id, m.audienceId));
-    const def = AudienceDefinition.safeParse(a?.definition);
+    const def = StoredAudienceDefinition.safeParse(a?.definition);
     if (!def.success || !mayUseAudience(viewer, def.data)) throw new MessageError('Only the admin may cancel this message', 403);
     if (m.status !== 'scheduled') throw new MessageError(`This message was already ${m.status}: only a scheduled message can be cancelled`, 409);
     const now = new Date();
@@ -249,7 +255,7 @@ export async function dispatchScheduledMessages(now: Date = new Date()) {
         const [m] = await tx.select().from(message).where(and(eq(message.id, id), eq(message.status, 'scheduled'))).for('update', { skipLocked: true });
         if (!m || !m.scheduledAt || m.scheduledAt > now) return false;
         const [a] = await tx.select().from(messageAudience).where(eq(messageAudience.id, m.audienceId));
-        const def = AudienceDefinition.parse(a!.definition);
+        const def = StoredAudienceDefinition.parse(a!.definition);
         const texts = await textsOf(tx, m);
         const ctxSession = (m.context as { sessionId?: string | null } | null)?.sessionId ?? null;
         const resolved = await resolveAudience(def, { sessionId: ctxSession }, tx, now);
@@ -344,7 +350,7 @@ async function describeAudience(executor: Executor, a: { kind: string; definitio
       visible: viewer.role === ROLES.ADMIN || (viewer.role !== null && PAYMENT_REMINDERS.includes(reminderKind as ReminderKind)),
     };
   }
-  const parsed = AudienceDefinition.safeParse(a.definition);
+  const parsed = StoredAudienceDefinition.safeParse(a.definition);
   if (!parsed.success) return { label: a.name ?? 'An audience', visible: viewer.role === ROLES.ADMIN };
   return { label: await audienceLabel(executor, parsed.data), visible: mayUseAudience(viewer, parsed.data) };
 }
@@ -428,7 +434,7 @@ export async function listSavedAudiences(viewer: Viewer) {
   const rows = await db.select().from(messageAudience).where(eq(messageAudience.saved, true)).orderBy(asc(messageAudience.createdAt));
   const out = [];
   for (const r of rows) {
-    const def = AudienceDefinition.safeParse(r.definition);
+    const def = StoredAudienceDefinition.safeParse(r.definition);
     if (!def.success || !mayUseAudience(viewer, def.data)) continue;
     out.push({ id: r.id, name: r.name!, kind: r.kind, definition: def.data, label: await audienceLabel(db, def.data) });
   }
@@ -466,18 +472,42 @@ export async function listOptions(viewer: Viewer, q: { sessionId?: string }) {
   const chargeKinds = CHARGE_KINDS.map((k) => ({ value: k, label: CHARGE_KIND_LABELS[k] }));
   const schoolFeeYears = payableAcademicYears();
   if (!admin) return { sessions, chargeKinds, schoolFeeYears, sections: [], offers: [], teachingGroups: [] };
-  const start = academicYearStartOf(new Date());
+  // The school's year today (the clock F1 reads: the same day the audience is resolved on).
+  const start = academicYearStartOf(schoolNow());
   const sections = (await db.execute(sql`
     select s.id, s.name, s.grade, (select count(*)::int from section_membership m where m.section_id = s.id and m.ended_on is null) as students
     from section s join academic_year y on y.id = s.academic_year_id where y.start_year = ${start} order by s.grade, s.name`)).rows as { id: string; name: string; grade: number; students: number }[];
   const offers = q.sessionId ? (await db.execute(sql`
     select o.id, sub.name as subject, sub.code from session_offer o join subject sub on sub.id = o.subject_id where o.session_id = ${q.sessionId} order by sub.name`)).rows as { id: string; subject: string; code: string }[] : [];
   const [year] = (await db.execute(sql`select id from academic_year where start_year = ${start}`)).rows as { id: string }[];
-  const teachingGroups = year ? (await getTeachingDemand(year.id)).map((g) => ({
-    academicYearId: year.id, subjectId: g.subjectId, unitId: g.unitId, teacherId: g.teacherId,
-    label: `${g.subjectName}${g.unitCode ? ` ${g.unitCode}` : ''} — ${g.teacherName ?? 'no teacher yet'}`, students: g.students.length,
-  })) : [];
+  const teachingGroups = year ? await teachingGroupOptions(year.id) : [];
   return { sessions, chargeKinds, schoolFeeYears, sections, offers, teachingGroups };
+}
+
+/**
+ * The picker's teaching groups (SCHEDULING.md §8, the contract for D): F1's groups of the year
+ * (`listGroups`), those not archived, each named as the coordinator named it — with its subject and
+ * its teacher today after the name when the name does not already say them ("Group 3 · Biology ·
+ * Teacher A"; a formed group's own name, "Biology — Teacher A", is enough). `size` is the group's
+ * students on `asOf`, the day the audience is resolved on while the year runs.
+ */
+async function teachingGroupOptions(academicYearId: string) {
+  const { asOf, groups } = await listGroups(academicYearId);
+  const live = groups.filter((g) => !g.archived);
+  const today = await teachersOn(live.map((g) => g.id), todayAtSchool());
+  const teacherIds = [...new Set(live.map((g) => (today.has(g.id) ? today.get(g.id)! : g.teacherId)).filter((t): t is string => !!t))];
+  const names = new Map((teacherIds.length ? await db.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds)) : []).map((t) => [t.id, t.name]));
+  return live.map((g) => {
+    const teacherId = today.has(g.id) ? today.get(g.id)! : g.teacherId;
+    const teacherName = teacherId ? names.get(teacherId) ?? null : null;
+    const subject = g.subject ? `${g.subject.name}${g.unit ? ` ${g.unit.shortCode ?? g.unit.code}` : ''}` : null;
+    const extra = [subject && !g.name.includes(g.subject!.name) ? subject : null, teacherName && !g.name.includes(teacherName) ? teacherName : null].filter(Boolean);
+    return {
+      id: g.id, name: g.name, kind: g.kind, label: [g.name, ...extra].join(' · '),
+      subject: g.subject ? { id: g.subject.id, name: g.subject.name } : null, unit: g.unit ? { id: g.unit.id, code: g.unit.code, shortCode: g.unit.shortCode } : null,
+      teacher: teacherId ? { id: teacherId, name: teacherName } : null, size: g.size, asOf,
+    };
+  });
 }
 
 // ─── Templates ───────────────────────────────────────────────────────────────
