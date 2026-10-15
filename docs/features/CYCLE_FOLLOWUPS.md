@@ -248,9 +248,18 @@ Each restored from a kept copy (`grep CONTROL` 0) and its file green again in th
 
 ---
 
-## 6. Gates
+## 6. Gates (in the cycle-followups worktree)
 
-(Filled at the end, naming the commit.)
+| Gate | Commit | Result | Kept |
+|---|---|---|---|
+| `pnpm --filter @repo/api check-types` (source and tests) | 2bfc74c | clean | — |
+| `pnpm --filter web check-types` | 2bfc74c | clean | — |
+| the suite, local time (+0300), `TEST_DB_NAME=igcse_followups_test` | 2bfc74c | 43 files, **835 passed**, 1 todo (main 6108fa3: 832 and 1 todo; the three new scenarios) | `suite/2bfc74c-local.log` |
+| the suite, `TZ=UTC` | 2bfc74c | 43 files, **835 passed**, 1 todo | `suite/2bfc74c-utc.log` |
+| CI (`gates`) | 594fb6a, 2bfc74c | green: runs 38665662013, 38667940887 | — |
+
+The same suite on 594fb6a in local time (835 passed) is kept as `suite/594fb6a-local.log`; 2bfc74c differs from
+it in one line of code (the picker's label) and the documents. `useQuery<` in `apps/web/app`: 19, unchanged.
 
 ---
 
@@ -332,4 +341,7 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
   its unit), so it is not counted; the gates run again on the final commit.
 - 01:42–01:48 — the servers started (API PID 16285, later 16638; web 16295), the dev data set up, the drive
   (§4); the database copied again from the template once (§4, found 1).
-- 01:50 — this document, B's and D's documents marked done.
+- 01:50 — this document, B's and D's documents marked done; 2bfc74c committed and pushed (01:51); the servers
+  stopped by their PIDs.
+- 01:52–02:08 — the gates on 2bfc74c: the suite in local time (01:52) and with TZ=UTC (01:59), 835 passed each;
+  CI green (run 38667940887).
