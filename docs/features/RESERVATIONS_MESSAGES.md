@@ -433,8 +433,12 @@ amount and the date filled in.
     the reason (the owner, 7 Oct; DISCOVERY.md: no business account).
 14. **The composer keeps the audience and channels after a send**: today's form reset between two
     announcements to the same people was the memory load §15 recorded.
-15. **Teaching groups from F1's contract** (`getTeachingDemand`): F1's table is not on main; when it
-    lands, the list reads it instead, with the same definition fields.
+15. **Teaching groups from F1's contract.** Until F1 was on main the list read the course enrolments
+    (`getTeachingDemand`: a subject, unit and teacher). Since 15 Oct 2026 (docs/features/CYCLE_FOLLOWUPS.md §1)
+    a teaching group is one of F1's groups, named by its id (`{ list: 'teaching_group', groupId, who }`), its
+    students those in it on the group's day (today, or the year's first day before the year begins); an
+    audience saved, or a message scheduled, in the old shape (the enrolment key) is still read and resolved as
+    it was written, and the API takes only the new shape as a definition.
 16. **Two endpoints beyond §5**: cancel (the old queue could cancel) and lists (the picker's
     options).
 17. **Reminders are off when the system is installed** (the lead, 8 Oct): the setting's default is
@@ -483,7 +487,7 @@ amount and the date filled in.
   When the app keeps one, `renderMessage` takes it per recipient.
 - **Reminders on the statement** — the claims carry the student; the statement does not list them
   yet.
-- **F1's teaching groups** — read from the enrolments until F1's table lands.
+- *(Done 15 Oct 2026: F1's teaching groups — a teaching group is one of F1's groups; docs/features/CYCLE_FOLLOWUPS.md §1.)*
 - **The walkthrough (F8)** — still shows the old `/admin/notifications` page until it is regenerated.
 - **`scheduled_announcement`** — kept one release (§7 step 3), then dropped by a later migration.
 - **An idempotency key on `POST /v1/messages`** (deferred by the lead after the review of

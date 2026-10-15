@@ -23,11 +23,11 @@ migrations), API 3171, web 3170. The progress log is the last section.
 | | Before (step D, 8 Oct) | Now |
 |---|---|---|
 | Definition | `{ kind: 'batch', list: 'teaching_group', academicYearId, subjectId, unitId, teacherId, who }` — an enrolment key | `{ kind: 'batch', list: 'teaching_group', groupId, who }` — one of F1's groups (`TeachingGroupList`, `packages/validations/src/message/message.validations.ts`) |
-| Its students | the open in-school `course_enrolment` rows of the key | **`studentsOfGroup(groupId, todayAtSchool(), executor)`** (`group.services.ts`): who is in the group on the school's day by SCHEDULING.md §2 — a student who left the group (last day before today) is not written to, one who joined (from today or before) is, one joining tomorrow is not; a move made today goes to the later group; nobody after their last day at the school; a section's group follows the section. Then D's `families()` as for a section: the students and/or their approved parents, left and barred students out |
+| Its students | the open in-school `course_enrolment` rows of the key | **`studentsOfGroup(groupId, day, executor)`** (`group.services.ts`), `day` the group's day (below: today, or the year's first day before the year begins): who is in the group that day by SCHEDULING.md §2 — a student who left the group (last day before today) is not written to, one who joined (from today or before) is, one joining tomorrow is not; a move made today goes to the later group; nobody after their last day at the school; a section's group follows the section. Then D's `families()` as for a section: the students and/or their approved parents, left and barred students out |
 | Read in | the caller's executor | the caller's executor: the resolve endpoint and the send read with `db`, the scheduler step's dispatch of a scheduled message inside its own transaction (`tx`) |
 | Order | by name | by name (the ids `studentsOfGroup` gives, read back ordered by name, so the sample and the preview's first recipient are the first by name as before) |
 | A group that does not exist | — | 404 "Teaching group not found" |
-| Label (the summary, the log, the deliveries) | "Biology P1 with Teacher A — Parents" | "**Biology 11 — Teacher A: Biology with Teacher A — Parents**": the group's name, its subject (and unit, its short code), its teacher **today** (`teachersOn([groupId], todayAtSchool())`, else `teaching_group.teacher_id`), "no teacher yet" when none; a group with no subject reads "Homeroom 11 with Teacher H — Students". D's Arabic rule for "… with … — …" translates it unchanged |
+| Label (the summary, the log, the deliveries) | "Biology P1 with Teacher A — Parents" | "**Biology 11 — Teacher A: Biology with Teacher A — Parents**": the group's name, its subject (and unit, its short code), its teacher **on the group's day** (`teachersOn([groupId], day)`, else `teaching_group.teacher_id`), "no teacher yet" when none; a group with no subject reads "Homeroom 11 with Teacher H — Students". D's Arabic rule for "… with … — …" translates it unchanged |
 | Who may send | the admin (not a payment list) | unchanged: the admin; finance is refused (403, D's sentence) |
 
 `resolveAudience` (`message-audience.services.ts`) is the one place every path goes through — the resolve
@@ -35,25 +35,39 @@ endpoint (`previewAudience`), the send (`createMessage`), and the scheduler step
 (`dispatchScheduledMessages`, step D's part 1) — so the three cannot disagree: 08s sends one now and two
 scheduled, and asserts each reached exactly the people the resolve counted at that moment (§3).
 
-**The day.** The group is read as of `todayAtSchool()` (F1's clock, `apps/api/src/lib/clock.ts`), as the
-contract says, not as of the `now` instant the money lists take: outside a test run the two are the same
-Cairo day; in a test run the clock may be put inside a far-ahead year so a scenario can stand inside a term
-(08s does: its year is the start year + 33).
+**The day** (`teachingGroupDay`, `message-audience.services.ts`). A group is read on the school's today
+(`todayAtSchool()`, F1's clock, `apps/api/src/lib/clock.ts`) — **or on its year's first day while today is
+before it.** This is the coordinator's decision after the Opus 5.5 review of d3f62cf (item 1), a departure
+from SCHEDULING.md §8's literal `todayAtSchool()` (recorded there): the picker switches to the coming year
+on 1 July (`academicYearStartOf`) and its members start on that year's first day, so read on today every
+class resolved to nobody all summer — "Send now" refused as an empty audience, a scheduled message marked
+sent to 0. The resolve, the send and the scheduler's step read the day in one place (`resolveAudience`), and
+the picker counts each group on the same day (§1.2). It is the school's day in Cairo, never the server's:
+outside a test run the clock is the real time; a test run may put it inside a far-ahead year so a scenario can
+stand inside a term (08s does: its year is the start year + 33), and 08s resolves once at 22:30Z the day
+before (01:30 in Cairo) expecting the same members, which a reading of the server's own date fails in the
+TZ=UTC run (control C4).
 
 ### 1.2 The picker (`GET /v1/messages/lists`, `teachingGroups`)
 
 From **`listGroups(academicYearId)`** (`group.services.ts`) for the school's year today (the year whose
 start is `academicYearStartOf(now())` — F1's clock, so the picker and the resolve stand on the same day;
-outside a test run, the real date as before). Only the groups not archived. Each row: `id`, `name`, `kind`,
-`label`, `subject` `{ id, name }`, `unit` `{ id, code, shortCode }` or null, `teacher` `{ id, name }` (today's)
-or null, `size` (its students on `asOf`) and `asOf` (the year's default start: today inside the year).
+outside a test run, the real date as before). `asOf` is the group's day (§1.1: today, or the year's first day
+before the year begins), and everything the picker says is as of that day: the groups not retired by then,
+each row's `size` (its students that day — the count the resolve, the send and the step find; since the
+review of d3f62cf counted here, not taken from `listGroups`' own `size`) and `teacher`. Each row: `id`,
+`name`, `kind`, `label`, `subject` `{ id, name }`, `unit` `{ id, code, shortCode }` or null, `teacher`
+`{ id, name }` or null, `size`, `asOf`.
 
 The **label** is the group's own name, with its subject (and unit) and today's teacher after it only when
 the name does not already say them: a formed group "Biology 11 — Teacher A" reads as it is; a hand-named
 "Group 3" reads "Group 3 · Biology · Teacher A"; "Maths" taught per unit reads "Maths · Maths P1 · Teacher A". The composer (`composer.client.tsx`) keeps the group's id as the definition;
 with no group in the year the select says "No teaching groups yet" (F1's words, already in Arabic). The
-"Saved lists" quick-fill puts a saved group's id back in the picker; its cast to the input type is gone (the
-saved audience's definition is the API's own type).
+"Saved lists" quick-fill puts a saved group's id back in the picker, and clears the picker for a saved list
+that names no group (an old-shape one, the review of d3f62cf item 4: kept, the picker showed and resolved
+whichever class was picked before); its cast to the input type is gone (the saved audience's definition is
+the API's own type). **An old-shape saved list sends through its saved id only** (the API's `{ savedId }`);
+the composer cannot rebuild one as a definition.
 
 ### 1.3 Stored audiences of the old shape: both shapes are read
 
@@ -138,8 +152,12 @@ their number as D's do — طالب واحد، طالبان، 3–10 طلاب، 
   the existing `Notice`: success, or warning when a student waits) and a **Close**; with nothing to say it
   closes as before. The statement and the desk refresh as before.
 - **The Session screen** — a subject's form, **Replace teacher** → "Replace a teacher"
-  (`subjects-tab.client.tsx`, `ReplaceTeacher`): only the dialog's result changes — after Replace, the
-  sentence(s) and **Close** in place of the fields; with nothing to say it closes as before.
+  (`subjects-tab.client.tsx`, `ReplaceTeacher`): after Replace, the sentence(s) and **Close** in place of
+  the fields; with nothing to say it closes as before. **Once a replacement closes** (its Close, its ×, or at
+  once with nothing to say) the subject's form behind it is made again from the offer as it is now — the
+  drawer's form version is bumped (`onReplaced`), as a Save bumps it (the review of d3f62cf, item 2: kept, the
+  form's ticks still named the teacher who left, and a Save from it, which replaces the offer's whole teacher
+  set, would have sent them back and dropped the new one). Cancel without a replacement keeps the form's edits.
 
 The outcome's type is derived from the RPC client (`GroupsFollowed`: the `PUT /registrations/:id/teacher`
 answer's `groupsFollowed`, through `hc<AppType>` and `apiResponse`'s inference) — no hand-typed response, no
@@ -172,6 +190,12 @@ and **no assertion was changed** (old and new: none).
      words, resolved (2 parents), sent by its saved id (the message keeps the old shape as its copy; the log
      names it as before), scheduled and sent by the step, a scheduled one cancelled; the old shape sent as a
      definition refused (400).
+  3. *Between 1 July and the year's first day* (the review of d3f62cf, item 1): the clock on 20 August of the
+     scenario year; the picker lists the year's classes counted on the first day (the class 3, the class
+     retired in October still live then, 0; `asOf` the first day); the class resolves to its three students of
+     that day (A, B, C), "Send now" reaches them, a scheduled one is sent by the step to the same three.
+  And in scenario 1, one resolve with the clock at 22:30Z the day before (01:30 in Cairo): the same members
+  (item 3).
 - **08s6-scheduling-rework** — one scenario at its end, "the desk's sentence for each outcome …": F1's race
   subjects (three teachers on an offer, students reserved with X), every change through the real endpoints as
   the desk and the coordinator call them, and the sentence read through `followSentences` with its Arabic
@@ -230,10 +254,14 @@ No page error and no failed request in any of the three runs (`errors: []` in ea
    isolates F1's rule puts around Latin runs stop at the dash, so "Biology 11 — Teacher B" is isolated as two
    runs; it reads, but less cleanly than B's sentences (whose names are isolated whole). F1's dictionary;
    for F6.
-3. *The Session screen's form behind Replace a teacher keeps its ticks*: after a replacement, the subject's
-   form still shows the old teacher ticked until it is closed and opened again (its local state is not
-   reset when the offers reload); a Save from that stale form would send the old teacher back. F6a's form,
-   unchanged here; for F6 (the lead's call whether it is worth closing the form after a replacement).
+3. *The Session screen's form behind Replace a teacher kept its ticks* — fixed in the review round (§2.3) and
+   driven: Replace Teacher C → Teacher B, Close: the form shows Teacher B ticked and Teacher C gone; with the
+   fix undone, Replace Teacher D → Teacher C left Teacher D ticked and C not (`drive/drive2-form-*.json`,
+   `drive/shots/r2-*-form-*`). The old-shape saved list's quick-fill likewise (§1.2): with the fix the class
+   picker reads "Choose a group" after the saved list is clicked; undone, it kept Biology 11 — Teacher B and
+   resolved it (`drive/drive2-quickfill-*.json`, `drive/shots/r2-*-quickfill-*`). The second drive ran on
+   the same dev copy, which by then also carried the lead's own checks (a "lead check" change of FU-3's
+   teacher at 02:45Z).
 
 ---
 
@@ -243,6 +271,11 @@ No page error and no failed request in any of the three runs (`errors: []` in ea
 |---|---|---|---|
 | C1 | the date check: the audience read every membership row of the group (`select distinct student_id from teaching_group_member where group_id = …`) in place of `studentsOfGroup(groupId, todayAtSchool(), executor)` | 08s, the picker/members scenario: "expected 10 to be 6" (B, who left yesterday, and E, who joins tomorrow, written to with their parents) | `controls/c1-left-member-date-check.log` |
 | C2 | the desk sentence's refusal branch: a refused move read as "no class of the new teacher yet" | 08s6, the desk sentence scenario: the clash refusal read "Race DC Y … has no class of this subject yet: …", with no reason | `controls/c2-desk-refusal-branch.log` |
+
+| C3 | the group's day: the resolve back on `todayAtSchool()` in the summer too | 08s, the summer case: `[0, []]` for three students | `controls/c3-summer-day.log` |
+| C4 | the school's day: the group's day read from the server's own date (the clock's instant in the process's zone) | 08s with `TZ=UTC`: the 22:30Z resolve finds yesterday's class (B in it); the same run in local time (+0300) passes, as the review predicted | `controls/c4-school-day-not-server-date.log` |
+| C5 | the subject's form not made again after a replacement | the drive: after Replace Teacher D → Teacher C and Close, the form still shows D ticked and C not | `drive/drive2-form-control.json`, `drive/shots/r2-control-form-*` |
+| C6 | the quick-fill's reset (the group kept unless the saved list names one) | the drive: after the old-shape saved list is clicked, the picker still holds Biology 11 — Teacher B and resolves it | `drive/drive2-quickfill-control.json`, `drive/shots/r2-control-quickfill-*` |
 
 Each restored from a kept copy (`grep CONTROL` 0) and its file green again in the full runs (§6).
 
@@ -268,7 +301,9 @@ it in one line of code (the picker's label) and the documents. `useQuery<` in `a
 1. **Both shapes read, the old one resolved as written** (§1.3), rather than converted to the key's groups:
    with F1's screens hidden in the cycle a school may have no groups, and a converted audience would reach
    nobody silently. New audiences are written in the new shape only.
-2. **The group on `todayAtSchool()`** (the contract), the same day the picker's year and `asOf` stand on.
+2. **The group on its day: today, or its year's first day before the year begins** (the coordinator's
+   decision after the review of d3f62cf, item 1, replacing the contract's literal `todayAtSchool()`), the same
+   day the picker counts on, read in one function for the resolve, the send and the step.
 3. **The picker lists only live groups** (not archived), every kind (enrolment, section, manual; a provider's
    too: a message to its students is a message like any other).
 4. **The label keeps D's "… with … — …" form** with the group's name in front, so D's Arabic rule reads it and
@@ -294,10 +329,11 @@ it in one line of code (the picker's label) and the documents. `useQuery<` in `a
 - `apps/api/test/08s6-scheduling-rework.test.ts` (F1's suite): one scenario added at its end; no existing one
   touched.
 - `docs/features/RESERVATIONS_MESSAGES.md` §2 (the F1 row) and `docs/features/RESERVATIONS_LINES.md` §9 (the
-  deferred item): marked done, pointing here — nothing else in other features' documents, as the brief says.
-  D's document still says the old reading in three places the brief left alone: §3.2's "a teaching group
-  (§2)", decision 15 and §5's "F1's teaching groups — read from the enrolments until F1's table lands"; the
-  lead may want them pointed here.
+  deferred item): marked done, pointing here. In the review round, by the coordinator's leave:
+  RESERVATIONS_MESSAGES.md decision 15 and §5's line, and SCHEDULING.md §8's "D's switch" (what D reads now,
+  the group's day and its departure from `todayAtSchool()`, both shapes kept, `waiting.kind`).
+- `subjects-tab.client.tsx` again in the review round: the drawer's form made again after a replacement
+  (`onReplaced`).
 
 Not changed: the model (no migration), F6b's switch and its lists, F1's screens, any money path,
 `FEATURES_PLAN.md`.
@@ -309,19 +345,31 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
 - **A year picker for teaching groups** — the picker offers the school's year today, as the sections list
   does; a message to next year's classes before the year starts would need one (and the group read on that
   year's first day). Not asked for.
-- **Groups in the composer's "Saved lists" quick-fill for an old-shape audience** — clicking one sets the list
-  and the recipients but cannot pick a group (it names none); sending it by its saved id still works through
-  the API. The composer has no "send a saved batch by id" control (it never had).
+- **Sending an old-shape saved list from the composer** — clicking one sets the list and the recipients and
+  clears the class picker (it names no group); it sends through its saved id only, which the API takes and the
+  composer has no control for (it never had one for a saved batch).
+
+**The review's low findings not fixed** (the review of d3f62cf; recorded at the coordinator's direction):
+
+- *The Sent log names a class by its teacher on the group's day when the log is read*, not at send time: a
+  class whose teacher changed since reads with the new teacher. The audit row (`MESSAGE_SENT`) keeps the words
+  of the send.
+- *F1's Arabic clash reason* isolates English names only up to the em dash and keeps an English comma in the
+  date (§4, found 2); F6 fixes it in `i18n-scheduling.ts`.
+- *Sending an old-shape definition* is refused with the validator's generic 400 (no sentence of its own); the
+  composer cannot produce one.
+- *`listOptions` reads the sections' year from the school clock* too (the line moved from `new Date()` to
+  `now()` for the groups): the same outside a test run.
 
 ---
 
 ## 10. Questions for the owner
 
-1. **"Class" or "group" on the desk** — the sentences say "class" (فصل), as the Session screen's Replace teacher
-   already does in both languages; F1's own screens say "teaching group" (مجموعة تدريس), and in Arabic فصل is
-   also the word for a section — on the Messages screen's list, "A section" is فصل and "A teaching group" is
-   مجموعة تدريس. With the class's name right after it the desk's sentence is not ambiguous, but the cycle's
-   screens would read more evenly with one word. Which does the school use? (Default kept: "class", فصل.)
+1. **The words for a section and for a class, in Arabic** — the Messages screen shows "A section" as فصل (C's
+   dictionary, merged first, overriding D's قسم), while the desk and Replace a teacher use فصل for a teaching
+   group ("class", as F6a's Replace teacher already said it), and F1's own screens call a teaching group
+   مجموعة تدريس. Which word does the school use for each — a section (11A) and a subject's class (Biology with
+   Teacher A)? (Defaults kept: "class" / فصل on the desk and Replace a teacher; the Messages screen as it is.)
 
 ---
 

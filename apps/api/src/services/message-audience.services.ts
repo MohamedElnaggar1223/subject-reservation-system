@@ -14,7 +14,7 @@
  * children in the list named.
  */
 
-import { db, sql, user, parentStudentLink, registrationSession, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
+import { db, sql, user, parentStudentLink, registrationSession, teachingGroup, academicYear, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
 import {
   STAFF_ROLES, ROLES, broadcastLabel, isPaymentList, anchorDay, BATCH_LIST_LABELS, WHO_LABELS, CHARGE_KIND_LABELS,
   type StoredAudienceDefinitionType, type AudienceWho, type MessageVariable, type BatchList,
@@ -357,6 +357,29 @@ async function studentsOf(executor: Executor, query: ReturnType<typeof sql>) {
   return new Map((r.rows as { id: string }[]).map((x) => [x.id, null as Owed | null]));
 }
 
+// ─── A teaching group's day ──────────────────────────────────────────────────
+
+/**
+ * The day a teaching group is read on as an audience, and the day the picker counts its students
+ * on: the school's today (`todayAtSchool()`), or the year's first day while today is before it.
+ * From 1 July the picker offers the coming year's groups (`academicYearStartOf`), whose members
+ * start on the year's first day: read on today, every class would be nobody all summer — "Send now"
+ * refused, a scheduled message sent to no one (the review of d3f62cf, item 1; the coordinator's
+ * decision, a departure from SCHEDULING.md §8's literal `todayAtSchool()`, recorded there and in
+ * docs/features/CYCLE_FOLLOWUPS.md §1.1). The resolve, the send and the scheduler's step all read
+ * it here, through `resolveAudience`; the picker through `teachingGroupDayOf`.
+ */
+export function teachingGroupDay(yearStartsOn: string, today: string = todayAtSchool()): string {
+  return today < yearStartsOn ? yearStartsOn : today;
+}
+
+/** A group's day (above), from its year; null when the group does not exist. */
+async function groupDay(executor: Executor, groupId: string): Promise<string | null> {
+  const [g] = await executor.select({ startsOn: academicYear.startsOn }).from(teachingGroup)
+    .innerJoin(academicYear, eq(academicYear.id, teachingGroup.academicYearId)).where(eq(teachingGroup.id, groupId));
+  return g ? teachingGroupDay(g.startsOn) : null;
+}
+
 // ─── Resolve ─────────────────────────────────────────────────────────────────
 
 async function sessionInfo(executor: Executor, id: string | null | undefined) {
@@ -388,8 +411,10 @@ export async function audienceLabel(executor: Executor, def: StoredAudienceDefin
           from teaching_group g left join subject s on s.id = g.subject_id left join exam_unit u on u.id = g.unit_id where g.id = ${def.groupId}`);
         const g = r.rows[0] as { name: string; teacherId: string | null; subject: string | null; unit: string | null } | undefined;
         if (!g) return `A teaching group — ${who}`;
-        const today = await teachersOn([def.groupId], todayAtSchool(), executor);
-        const teacherId = today.has(def.groupId) ? today.get(def.groupId)! : g.teacherId;
+        // Its teacher on the group's day (the day its students are read on).
+        const day = (await groupDay(executor, def.groupId))!;
+        const onDay = await teachersOn([def.groupId], day, executor);
+        const teacherId = onDay.has(def.groupId) ? onDay.get(def.groupId)! : g.teacherId;
         const [t] = teacherId ? (await executor.execute(sql`select name from teacher where id = ${teacherId}`)).rows as { name: string }[] : [];
         const subject = g.subject ? `: ${g.subject}${g.unit ? ` ${g.unit}` : ''}` : '';
         return `${g.name}${subject} with ${t?.name ?? 'no teacher yet'} — ${who}`;
@@ -440,12 +465,13 @@ export async function resolveAudience(def: StoredAudienceDefinitionType, context
         break;
       case 'teaching_group': {
         if ('groupId' in def) {
-          // F1's group on the school's day (§2 of SCHEDULING.md: a move that day goes to the later
-          // group, nobody after their last day, a section's group follows the section), read in the
-          // caller's transaction: the resolve, the send and the scheduler's step read it alike.
-          const [g] = (await executor.execute(sql`select id from teaching_group where id = ${def.groupId}`)).rows as { id: string }[];
-          if (!g) throw new AudienceError('Teaching group not found', 404);
-          const ids = await studentsOfGroup(def.groupId, todayAtSchool(), executor);
+          // F1's group on its day (teachingGroupDay: today, or the year's first day before the year
+          // begins), by SCHEDULING.md §2's rules — a move that day goes to the later group, nobody
+          // after their last day, a section's group follows the section — read in the caller's
+          // transaction: the resolve, the send and the scheduler's step read it alike.
+          const day = await groupDay(executor, def.groupId);
+          if (!day) throw new AudienceError('Teaching group not found', 404);
+          const ids = await studentsOfGroup(def.groupId, day, executor);
           const byName = ids.length ? await executor.select({ id: user.id }).from(user).where(inArray(user.id, ids)).orderBy(user.name) : [];
           members = await families(executor, new Map(byName.map((r) => [r.id, null as Owed | null])), def.who, false);
           break;

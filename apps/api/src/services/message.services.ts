@@ -27,12 +27,12 @@ import { logAction, type AuditContext } from './audit.services';
 import { sendMessageEmail } from '../integrations/email';
 import { clientMessage } from '../lib/response';
 import {
-  resolveAudience, assertMayUseAudience, mayUseAudience, audienceLabel, AudienceError,
+  resolveAudience, assertMayUseAudience, mayUseAudience, audienceLabel, AudienceError, teachingGroupDay,
   type AudienceMember, type ResolvedAudience, type Viewer,
 } from './message-audience.services';
 import { listGroups } from './group.services';
-import { teachersOn } from './scheduling-shared.services';
-import { now as schoolNow, todayAtSchool } from '../lib/clock';
+import { teachersOn, groupMembersBetween } from './scheduling-shared.services';
+import { now as schoolNow } from '../lib/clock';
 import { payableAcademicYears } from './school-fee.services';
 import { logger } from '../lib/logger';
 
@@ -487,14 +487,20 @@ export async function listOptions(viewer: Viewer, q: { sessionId?: string }) {
 /**
  * The picker's teaching groups (SCHEDULING.md §8, the contract for D): F1's groups of the year
  * (`listGroups`), those not archived, each named as the coordinator named it — with its subject and
- * its teacher today after the name when the name does not already say them ("Group 3 · Biology ·
- * Teacher A"; a formed group's own name, "Biology — Teacher A", is enough). `size` is the group's
- * students on `asOf`, the day the audience is resolved on while the year runs.
+ * its teacher after the name when the name does not already say them ("Group 3 · Biology ·
+ * Teacher A"; a formed group's own name, "Biology — Teacher A", is enough). `asOf` is the day the
+ * audience is resolved on (`teachingGroupDay`: today, or the year's first day before the year
+ * begins) and `size` the group's students that day, so the count the picker shows is the count the
+ * resolve, the send and the scheduler's step find.
  */
 async function teachingGroupOptions(academicYearId: string) {
-  const { asOf, groups } = await listGroups(academicYearId);
-  const live = groups.filter((g) => !g.archived);
-  const today = await teachersOn(live.map((g) => g.id), todayAtSchool());
+  const { academicYear: y, groups } = await listGroups(academicYearId);
+  const asOf = teachingGroupDay(y.startsOn);
+  // Live on that day: a group retired by then is not offered.
+  const live = groups.filter((g) => !(g.archivedOn && g.archivedOn <= asOf));
+  const sizeOf = new Map<string, number>();
+  for (const m of await groupMembersBetween(live.map((g) => g.id), asOf, asOf)) sizeOf.set(m.groupId, (sizeOf.get(m.groupId) ?? 0) + 1);
+  const today = await teachersOn(live.map((g) => g.id), asOf);
   const teacherIds = [...new Set(live.map((g) => (today.has(g.id) ? today.get(g.id)! : g.teacherId)).filter((t): t is string => !!t))];
   const names = new Map((teacherIds.length ? await db.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds)) : []).map((t) => [t.id, t.name]));
   return live.map((g) => {
@@ -505,7 +511,7 @@ async function teachingGroupOptions(academicYearId: string) {
     return {
       id: g.id, name: g.name, kind: g.kind, label: [g.name, ...extra].join(' · '),
       subject: g.subject ? { id: g.subject.id, name: g.subject.name } : null, unit: g.unit ? { id: g.unit.id, code: g.unit.code, shortCode: g.unit.shortCode } : null,
-      teacher: teacherId ? { id: teacherId, name: teacherName } : null, size: g.size, asOf,
+      teacher: teacherId ? { id: teacherId, name: teacherName } : null, size: sizeOf.get(g.id) ?? 0, asOf,
     };
   });
 }

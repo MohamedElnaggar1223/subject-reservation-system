@@ -175,7 +175,7 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
             <div className="space-y-3">
               {savedBatches.length > 0 && (
                 <p className="text-xs text-muted-foreground"><span>Saved lists:</span>{' '}
-                  {savedBatches.map((a) => <button key={a.id} type="button" className="me-2 underline" onClick={() => { const d = a.definition; if (d.kind === 'batch') { setList(d.list); if ('sessionId' in d) setSessionId(d.sessionId ?? ''); if ('sectionId' in d) setSectionId(d.sectionId ?? ''); if ('groupId' in d) setGroupId(d.groupId); setWho(d.who); } }}>{a.name}</button>)}
+                  {savedBatches.map((a) => <button key={a.id} type="button" className="me-2 underline" onClick={() => { const d = a.definition; if (d.kind === 'batch') { setList(d.list); if ('sessionId' in d) setSessionId(d.sessionId ?? ''); if ('sectionId' in d) setSectionId(d.sectionId ?? ''); setGroupId('groupId' in d ? d.groupId : ''); setWho(d.who); } }}>{a.name}</button>)}
                 </p>
               )}
               <div className="grid gap-3 sm:grid-cols-2">

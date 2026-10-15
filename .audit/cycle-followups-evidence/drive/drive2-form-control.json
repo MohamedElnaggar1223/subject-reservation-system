@@ -1,0 +1,18 @@
+{
+  "read": {
+    "before": {
+      "Teacher A": true,
+      "Teacher B": true,
+      "Teacher C": null,
+      "Teacher D": true
+    },
+    "said": "Teacher C has no class of this subject yet: 1 student stays in Biology 11 — Teacher A and waits to be placed.",
+    "after": {
+      "Teacher A": true,
+      "Teacher B": true,
+      "Teacher C": false,
+      "Teacher D": true
+    }
+  },
+  "errors": []
+}

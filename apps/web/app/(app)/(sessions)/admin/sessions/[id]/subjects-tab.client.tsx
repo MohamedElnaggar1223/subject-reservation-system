@@ -437,14 +437,17 @@ function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onP
           setVersion((v) => v + 1);
           if (createdId) onCreated(createdId);
         }}
+        // A teacher replaced: the form is made again from the offer as it is now (the review of d3f62cf,
+        // item 2) — kept, its old ticks would send the teacher who left back with the next Save.
+        onReplaced={() => setVersion((v) => v + 1)}
         onPreview={onPreview} onRemoved={onClose} />
     </Drawer>
   );
 }
 
-function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPreview, onRemoved }: {
+function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onReplaced, onPreview, onRemoved }: {
   session: SessionDetail; shares: Shares; offer: OfferRow | null; addable: AddableRow | null; canEdit: boolean;
-  onSaved: (message: string, createdId?: string) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
+  onSaved: (message: string, createdId?: string) => void; onReplaced: () => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: catalogue } = useCatalogue();
@@ -768,7 +771,7 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPrev
           <Button type="submit" disabled={invalid || save.isPending}>{save.isPending ? 'Saving…' : offer ? 'Save' : 'Add subject'}</Button>
         </div>
       )}
-      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} />}
+      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} onReplaced={onReplaced} />}
       {removing && offer && (
         <Modal title="Remove this subject" onClose={() => setRemoving(false)}>
           <div className="space-y-4">
@@ -805,7 +808,7 @@ function PaperLine({ name, full, code, reservations, value, choices, fee, subjec
   );
 }
 
-function ReplaceTeacher({ session, offer, onClose }: { session: SessionDetail; offer: OfferRow; onClose: () => void }) {
+function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: SessionDetail; offer: OfferRow; onClose: () => void; onReplaced: () => void }) {
   const queryClient = useQueryClient();
   const { data: teachers } = useQuery({ queryKey: ['teachers'], queryFn: fetchTeachers });
   const [from, setFrom] = useState(offer.teachers[0]?.teacherId ?? '');
@@ -821,18 +824,20 @@ function ReplaceTeacher({ session, offer, onClose }: { session: SessionDetail; o
       await queryClient.invalidateQueries({ queryKey: offersKey(session.id) });
       const said = followSentences(r.groupsFollowed, { one: false, teacherName: (id) => (teachers ?? []).find((t) => t.id === id)?.name });
       if (said.length) setClassSaid(said);
-      else onClose();
+      else { onClose(); onReplaced(); }
     },
   });
+  // Closed after a replacement: the subject's form behind is made again from the offer as it is now.
+  const close = () => { onClose(); if (go.isSuccess) onReplaced(); };
   return (
-    <Modal title="Replace a teacher" onClose={onClose}>
+    <Modal title="Replace a teacher" onClose={close}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{"Every reservation, paper and this year's class of the teacher who leaves moves to the other, audited."}</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
         {classSaid ? (
           <>
             <ClassFollowNotice sentences={classSaid} />
-            <div className="flex justify-end"><Button type="button" onClick={onClose}>Close</Button></div>
+            <div className="flex justify-end"><Button type="button" onClick={close}>Close</Button></div>
           </>
         ) : (
         <>
