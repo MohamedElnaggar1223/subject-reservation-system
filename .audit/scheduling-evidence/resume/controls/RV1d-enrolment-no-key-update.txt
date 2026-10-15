@@ -1,0 +1,4 @@
+Control RV1d-enrolment-no-key-update: apps/api/src/services/enrolment.services.ts — the guard undone (".orderBy(asc(courseEnrolment.id)).for('no key update')).map((e) => [e.id, e]));" -> ".orderBy(asc(courseEnrolment.id)).for('update')).map((e) => [e.id, e]));"); ran test/08s6 at 2026-10-08T19:17:44+00:00 on igcse_scheduling_ctl_test
+
+ Test Files  1 passed (1)
+      Tests  39 passed (39)

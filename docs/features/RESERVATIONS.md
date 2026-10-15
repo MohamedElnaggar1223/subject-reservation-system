@@ -263,6 +263,24 @@ student and then an existing payment: a reservation, a grant or revocation, the 
 paths take the student and then lines, charges or new rows; a payment is locked first by every path
 that locks one (confirmation, reversal, failure, the deadline sweeps).
 
+**The student first on F1's paths too; then teaching groups and members, in id order, after the
+lines and enrolments** (F1 on the rework, 8 Oct; corrected after the review of 88898f6;
+docs/features/SCHEDULING.md §17.3). A line's teacher change, A's replace-teacher and the enrolment's
+own change hand the enrolments they change to F1's `followEnrolments` in the same transaction
+(`upsertEnrolments`' `follow`, §2.12). Each takes its students first: B's change as above; A's
+replace-teacher the students of its lines `FOR NO KEY UPDATE` in id order before the session and the
+offer, re-reading its lines after the offer lock and running again with a newcomer locked first
+(`lib/student-locks.ts`, as an item's series change does); F0b's enrolment change and end the
+enrolment's student before the enrolment. Enrolments are locked `FOR NO KEY UPDATE` (only their
+teacher, mode or end changes). After them the follow-up takes the teaching groups `FOR UPDATE` in id
+order, then their member rows; a change that could put someone in two lessons at once in a published
+timetable then takes the running terms `FOR SHARE` and the teachers concerned `FOR NO KEY UPDATE`
+(a line or enrolment naming the teacher, written first, holds it `FOR KEY SHARE`), each in id order,
+before the covers it judges again. A first version of this paragraph let A's replace-teacher skip
+the students ("lines before students"): that was wrong — it deadlocked against an add of a student
+into a group, against F0a's leaving and cohort correction (which take the student, then the lines),
+and two follow-ups deadlocked on one teacher; 08s6 forces each race in both orders.
+
 ### 2.2 Creating lines — `insertLines` (`apps/api/src/services/line.services.ts`)
 
 ```ts
@@ -689,6 +707,20 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
 - **Replace teacher moves the enrolment per unit** *(changed)*: each replaced line's enrolment in
   each unit its item enters (or in the subject for an item entering none), not the student's other
   units of the subject taught through another session (§2.11).
+- **The teaching group follows a line's teacher** *(changed, F1 on the rework, the lead's decision
+  of 8 Oct)*: `changeLineTeacher` (now `changeLineTeacherTx` inside a transaction it is given),
+  A's `replaceTeacher` (which now locks the students of its lines first, §2.1) and F0b's
+  `updateEnrolment` (its student first) change the enrolment through
+  `upsertEnrolments(..., { follow: true })` — an open enrolment of the same key with another
+  teacher or mode is updated (`ENROLMENT_UPDATED`) — and F1's `followEnrolments` moves the group
+  in the same transaction: self-study leaves it; a group whose every member now has the new
+  teacher takes that teacher (dated); otherwise the student moves to that teacher's group of the
+  subject or unit; with none, or a move that would clash in a published timetable, the student
+  waits for the coordinator. The change itself never fails for a timetable reason; its response
+  adds `groupsFollowed` (with each waiting student's reason), and the caller tells lost cover
+  after the commit (`groupFollowNotices`). `lineEnrolmentUnits` gives a line's enrolment keys (a
+  converted line whose student holds the subject whole goes through the subject's own row).
+  Details: docs/features/SCHEDULING.md §8.
 - **Provided by F4 on resuming (8 Oct 2026, `feature/exam-entries`; docs/features/EXAM_ENTRIES.md
   §7)** — the §10 F4 row's contracts that were not on main under their names:
   `lineItemsFor(registrationIds, executor?)` (`line.services.ts`): per line what its **item** enters

@@ -37,6 +37,7 @@ import { lockFeeGrids } from '../lib/fee-grid-lock';
 import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
+import { upsertEnrolments, lineEnrolmentUnits, groupFollowNotices, type EnrolmentRowInput } from './enrolment.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -953,9 +954,19 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
  * A teacher who leaves: every item and offer naming them, every live in-school line of the offer
  * naming them, and this academic year's open enrolments of those students in the subject move to
  * the other teacher, audited.
+ *
+ * The students of those lines are locked first (RESERVATIONS.md §2.1; lib/student-locks.ts): the
+ * enrolments and teaching groups that follow are the students' (a leaving, a cohort correction, a
+ * move into a group hold the student first), so this change takes them before the session, the
+ * offer and the lines. A line made for a new student while it waited runs it again with that
+ * student locked first.
  */
 export async function replaceTeacher(sessionId: string, offerId: string, data: ReplaceOfferTeacherType, actorId: string, ctx?: AuditContext) {
-  return db.transaction(async (tx) => {
+  return withStudentsFirst((extra) => db.transaction(async (tx) => {
+    const seen = await tx.selectDistinct({ id: registration.studentId }).from(registration)
+      .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
+      .where(and(eq(sessionOfferItem.offerId, offerId), eq(registration.teacherId, data.fromTeacherId), inArray(registration.status, [...LIVE])));
+    const locked = await lockStudents(tx, [...seen.map((x) => x.id), ...extra]);
     const session = await sessionForChange(tx, sessionId);
     const { offer } = await offerForChange(tx, sessionId, offerId);
     if (data.fromTeacherId === data.toTeacherId) throw new OfferError('Choose another teacher to replace them with');
@@ -973,6 +984,8 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
           .where(and(inArray(registration.offerItemId, itemIds), eq(registration.teacherId, data.fromTeacherId), inArray(registration.status, [...LIVE])))
           .orderBy(registration.id).for('update')
       : [];
+    // A line committed while this change waited for the offer: its student was not locked first.
+    assertStudentsLocked(locked, lines.map((l) => l.studentId));
     if (!onOffer.length && !onItems.length && !lines.length) throw new OfferError('That teacher does not teach this subject in this session', 404);
     await tx.insert(subjectTeacher).values({ id: randomUUID(), subjectId: offer.subjectId, teacherId: to.id }).onConflictDoNothing();
     for (const t of onOffer) {
@@ -993,10 +1006,15 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
     }
     // The enrolment follows (§10), per what each replaced line is taught as (§2.11): this year's open
     // enrolment of the student in each unit its item enters, or in the subject for an item entering
-    // no units — not the student's other units of the subject, taught through another session.
+    // no units — not the student's other units of the subject, taught through another session; for a
+    // converted item entering all the subject's units over an enrolment from before the rework (no
+    // unit), the subject's own row (`lineEnrolmentUnits`). Through F0b's upsertEnrolments with
+    // `follow` (F1, RESERVATIONS_REWORK.md §10): each moved enrolment audited, and the teaching
+    // groups follow in this transaction — a group whose every member moves takes the new teacher.
     const ay = await tx.execute(sql`select id from academic_year where start_year = school_series_academic_year_start(${session.sessionType}, ${session.seriesYear})`);
     const yearId = (ay.rows[0] as { id: string } | undefined)?.id;
     let enrolmentsMoved = 0;
+    let groupsFollowed: Awaited<ReturnType<typeof upsertEnrolments>>['groupsFollowed'] = null;
     if (yearId && lines.length) {
       const unitItems = items.filter((i) => i.entersKind === 'units').map((i) => i.id);
       const unitsOf = new Map<string, string[]>();
@@ -1006,28 +1024,36 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
         }
       }
       const done = new Set<string>();
+      const rows: EnrolmentRowInput[] = [];
       for (const l of lines) {
         const units = unitsOf.get(l.offerItemId) ?? [];
         const key = `${l.studentId}|${units.join(',')}`;
         if (done.has(key)) continue;
         done.add(key);
-        const open = and(eq(courseEnrolment.academicYearId, yearId), eq(courseEnrolment.subjectId, offer.subjectId), eq(courseEnrolment.teacherId, data.fromTeacherId),
-          isNull(courseEnrolment.endedOn), eq(courseEnrolment.studentId, l.studentId));
-        // The student's enrolment in those units where they have one; else the subject's own row —
-        // an enrolment from before the rework (unit_id null) under a converted item entering all
-        // the subject's units (0042), or an item entering none (the review of 40c1447..af33662).
-        let moved = units.length
-          ? await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now }).where(and(open, inArray(courseEnrolment.unitId, units))).returning({ id: courseEnrolment.id })
-          : [];
-        if (!moved.length) {
-          moved = await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now }).where(and(open, isNull(courseEnrolment.unitId))).returning({ id: courseEnrolment.id });
+        const keys = await lineEnrolmentUnits(tx, yearId, l.studentId, offer.subjectId, units);
+        const open = await tx.select().from(courseEnrolment).where(and(
+          eq(courseEnrolment.academicYearId, yearId), eq(courseEnrolment.subjectId, offer.subjectId), eq(courseEnrolment.teacherId, data.fromTeacherId),
+          isNull(courseEnrolment.endedOn), eq(courseEnrolment.studentId, l.studentId),
+          keys.includes(null) ? isNull(courseEnrolment.unitId) : inArray(courseEnrolment.unitId, keys.filter((k): k is string => !!k)),
+        ));
+        for (const e of open) {
+          rows.push({ studentId: e.studentId, subjectId: e.subjectId, unitId: e.unitId, teacherId: to.id, mode: e.mode as 'in_school' | 'self_study', sourceRef: `replace-teacher:${offerId}` });
         }
-        enrolmentsMoved += moved.length;
+      }
+      if (rows.length) {
+        // The students are held already (taken first, above): upsertEnrolments' own lock on them is theirs again.
+        const r = await upsertEnrolments(tx, yearId, rows, actorId, { source: 'registrations', commit: true, ctx, follow: true, reason: data.reason });
+        enrolmentsMoved = r.updated;
+        groupsFollowed = r.groupsFollowed;
       }
     }
     await logAction(actorId, 'SESSION_OFFER_TEACHER_REPLACED', 'session_offer', offerId, { teacherId: data.fromTeacherId },
       { teacherId: to.id, reason: data.reason, items: onItems.length, lines: lines.length, enrolments: enrolmentsMoved }, ctx, tx);
-    return { lines: lines.length, items: onItems.length, enrolments: enrolmentsMoved };
+    return { lines: lines.length, items: onItems.length, enrolments: enrolmentsMoved, groupsFollowed };
+  })).then(async (r) => {
+    // After the commit: the cover a group's new teacher made no longer holding is told (F1).
+    await groupFollowNotices(r.groupsFollowed);
+    return r;
   });
 }
 

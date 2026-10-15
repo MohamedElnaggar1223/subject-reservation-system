@@ -1,0 +1,9 @@
+Control RV5b-handover-delivery: apps/api/src/services/group.services.ts — the guard undone ('if (delivery !== g.delivery) {' -> 'if (false && delivery !== g.delivery) {'); ran test/08s6 at 2026-10-08T19:20:11+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms 456ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms
+    AssertionError: expected { delivery: 'in_school', …(3) } to deeply equal { delivery: 'online', …(3) }
+    - Expected
+    + Received

@@ -1,0 +1,7 @@
+Final code, full suite, TZ=UTC, igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  619 passed | 1 todo (620)
+   Duration  363.05s (transform 1.23s, setup 58ms, collect 4.75s, tests 351.86s, environment 3ms, prepare 1.21s)
+exit=0
+(✓ lines in the log: 322)

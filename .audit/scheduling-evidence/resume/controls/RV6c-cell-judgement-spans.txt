@@ -1,0 +1,9 @@
+Control RV6c-cell-judgement-spans: packages/validations/src/scheduling/engine.ts — the guard undone ('for (const ld of ix.loadsOf.get(g.id) ?? []) {' -> 'for (const ld of (ix.loadsOf.get(g.id) ?? []).filter((x) => x.from === null)) {'); ran test/08s0 at 2026-10-08T19:21:19+00:00 on igcse_scheduling_ctl_test
+
+   × F1: the editor engine and the generator’s explanations > a teacher who takes a group later in the term: their unavailability and limits judged for it from that day — the cell judgement equals the full evaluation, and the generator places within them 1191ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+ FAIL  test/08s0-scheduling-engine.test.ts > F1: the editor engine and the generator’s explanations > a teacher who takes a group later in the term: their unavailability and limits judged for it from that day — the cell judgement equals the full evaluation, and the generator places within them
+    AssertionError: expected [ …(142) ] to deeply equal []
+    - Expected
+    + Received

@@ -1,0 +1,9 @@
+Control RV5c-handover-audit: apps/api/src/services/group.services.ts — the guard undone ('...(goesOnline ? { roomId: null, roomType: null, roomFeatures: [], draftLessonRoomsCleared } : {}),' -> ''); ran test/08s6 at 2026-10-08T20:14:35+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms 445ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms
+    AssertionError: expected { before: 'in_school', …(6) } to deeply equal { before: 'in_school', …(6) }
+    - Expected
+    + Received

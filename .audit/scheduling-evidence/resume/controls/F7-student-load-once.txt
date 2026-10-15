@@ -1,0 +1,9 @@
+Control F7-student-load-once: packages/validations/src/scheduling/generator.ts — the guard undone ('if (input.studentPeriods) for (const [st, n] of Object.entries(input.studentPeriods)) studentNeeds.set(st, n);\n  else groups' -> 'if (input.studentPeriods && false) for (const [st, n] of Object.entries(input.studentPeriods)) studentNeeds.set(st, n);\n  else groups'); ran test/08s0 at 2026-10-08T13:52:14+00:00 on igcse_scheduling_ctl_test
+
+   × F1: the editor engine and the generator’s explanations > a student who changed sets during the term is counted once for the load: no "impossible" from periods they never have at once (round two, flag 7) 9ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+ FAIL  test/08s0-scheduling-engine.test.ts > F1: the editor engine and the generator’s explanations > a student who changed sets during the term is counted once for the load: no "impossible" from periods they never have at once (round two, flag 7)
+    AssertionError: expected 'impossible' to be 'not_fitted' // Object.is equality
+    Expected: "not_fitted"
+    Received: "impossible"

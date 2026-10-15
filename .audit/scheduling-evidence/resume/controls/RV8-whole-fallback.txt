@@ -1,0 +1,9 @@
+Control RV8-whole-fallback: apps/api/src/services/group.services.ts — the guard undone ('wholeWhy = done.why;' -> 'wholeWhy = done.why;\n      for (const c of mine) out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: c.after.teacherId, why:'); ran test/08s6 at 2026-10-08T19:21:29+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting 692ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting
+    AssertionError: expected { left: [], moved: [], …(3) } to match object { groupsGiven: [], …(2) }
+    (2 matching properties omitted from actual)
+    - Expected

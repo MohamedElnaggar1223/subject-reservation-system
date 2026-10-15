@@ -1,0 +1,45 @@
+Control RW4-provider-no-cards: apps/api/src/services/group.services.ts — the guard undone ('|| (g.teacherId && providerIds.has(g.teacherId)) ? [] :' -> '? [] :'); ran test/08s6 test/09b at 2026-10-08T13:56:19+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > forming makes a group per unit and teacher; an online group is timetabled without a room; a provider’s group asks for no lessons and gets none 151ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher 50ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 31ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it 30ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away) 12ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 289ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 150ms
+   × F1: scheduling invariants over the whole database > a draft's lesson cards match its groups' weekly periods and doubles — none for a group a provider teaches 6ms
+ Test Files  2 failed (2)
+      Tests  8 failed | 25 passed (33)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > forming makes a group per unit and teacher; an online group is timetabled without a room; a provider’s group asks for no lessons and gets none
+    AssertionError: expected [ { …(8) } ] to deeply equal []
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher
+    AssertionError: expected [] to deeply equal [ Array(1) ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash
+    AssertionError: expected [ 'Maths W P1 — teacher rw-a-3zhe' ] to deeply equal [ 'Maths W P1 — teacher rw-b-3zhe' ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it
+    Error: That lesson does not take place on that date
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s6-scheduling-rework.test.ts:440:19
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away)
+    TypeError: Cannot read properties of undefined (reading 'find')
+     ❯ lessonOf test/08s6-scheduling-rework.test.ts:78:25
+         76|   const lessonOf = async (ttId: string, group: string, seq = 1) => {
+         77|     const tt = await load(ttId);
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over
+    AssertionError: expected 404 to be 201 // Object.is equality
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    AssertionError: expected 200 to be 409 // Object.is equality
+    - Expected
+    + Received
+ FAIL  test/09b-scheduling-invariants.test.ts > F1: scheduling invariants over the whole database > a draft's lesson cards match its groups' weekly periods and doubles — none for a group a provider teaches
+    AssertionError: expected [ …(3) ] to deeply equal []
+    - Expected
+    + Received

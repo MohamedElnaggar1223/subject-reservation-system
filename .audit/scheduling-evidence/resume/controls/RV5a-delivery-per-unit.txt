@@ -1,0 +1,9 @@
+Control RV5a-delivery-per-unit: apps/api/src/services/enrolment.services.ts — the guard undone ('let items = mine(onItems).filter((x) => (unitId ? (x.units ?? []).includes(unitId) : !(x.units ?? []).length)).sort(latestFirst);\n    let offers = mine(onOffers' -> 'let items: typeof onItems = []; void offerTeaches;\n    let offers: typeof onOffers = [];'); ran test/08s6 at 2026-10-08T19:19:45+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item 347ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item
+    AssertionError: expected [ [ 'Q1', …(2) ] ] to deeply equal [ [ 'Q1', …(2) ] ]
+    - Expected
+    + Received

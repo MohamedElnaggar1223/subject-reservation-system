@@ -1,0 +1,9 @@
+Control F1-dated-teacher-overlaps: apps/api/src/services/timetable.services.ts — the guard undone ('...(teacherOverlaps.length ? { teacherOverlaps } : {}),' -> ''); ran test/08s6 at 2026-10-08T13:45:44+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change dated inside a draft’s time is a clash from that day: the grid shows it, publishing refuses it, the generator keeps the two apart 151ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change dated inside a draft’s time is a clash from that day: the grid shows it, publishing refuses it, the generator keeps the two apart
+    AssertionError: expected [] to deeply equal [ [ 'teacher_busy', …(1) ] ]
+    - Expected
+    + Received

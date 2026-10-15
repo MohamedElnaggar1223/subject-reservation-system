@@ -23,6 +23,7 @@ import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { AsWritten } from '~/components/student-academic-panel';
 import { LoadingState } from '~/components/ui/query-state';
+import { PublishedClashNotice, isPublishedClash, clashMessage, goAheadWith } from '~/components/published-clash';
 import { rollOverSections, type RollOverPlan, type Year } from './sections.data';
 
 export function RollOver({
@@ -42,6 +43,9 @@ export function RollOver({
   const [previewedNames, setPreviewedNames] = useState<Record<string, string>>({});
   const [committed, setCommitted] = useState<RollOverPlan | null>(null);
   const [error, setError] = useState('');
+  // F1: students rolled into a section of a year whose timetable is published take its lessons — a
+  // clash is refused with its code, and the coordinator may go ahead with exactly those clashes.
+  const [clash, setClash] = useState<{ message: string; goAhead: { anyway: true; clashToken: string | null }; names: Record<string, string> } | null>(null);
 
   /** Only the names the coordinator typed are sent; the rest keep the API's default (the grade digits bumped). */
   const typedNames = (p: RollOverPlan | null, n: Record<string, string>) => {
@@ -70,23 +74,28 @@ export function RollOver({
   });
 
   const commit = useMutation({
-    mutationFn: (n: Record<string, string>) =>
+    mutationFn: (v: { names: Record<string, string>; goAhead?: { anyway: true; clashToken: string | null } }) =>
       rollOverSections({
         fromAcademicYearId: from.id,
         toAcademicYearId: to!.id,
         commit: true,
-        ...(Object.keys(n).length ? { names: n } : {}),
+        ...(Object.keys(v.names).length ? { names: v.names } : {}),
+        ...(v.goAhead ?? {}),
       }),
     onSuccess: (p) => {
       setCommitted(p);
       setError('');
+      setClash(null);
       qc.invalidateQueries({ queryKey: ['academic'] });
       qc.invalidateQueries({ queryKey: ['students'] });
       // Show what is left to do now (nothing, unless something changed meanwhile).
       preview.mutate({});
       setNames({});
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error, v) => {
+      if (isPublishedClash(err)) { setClash({ message: clashMessage(err), goAhead: goAheadWith(err), names: v.names }); return; }
+      setError(err.message);
+    },
   });
 
   // The preview is the first step: run it on opening.
@@ -152,6 +161,11 @@ export function RollOver({
                 <li>
                   <span>Students moved:</span> <span className="font-semibold">{committed.studentsMoved}</span>
                 </li>
+                {(committed.clashesAccepted?.length ?? 0) > 0 && (
+                  <li>
+                    <span>Clashes in the published timetable, gone ahead with:</span> <span className="font-semibold">{committed.clashesAccepted!.length}</span>
+                  </li>
+                )}
               </ul>
               <Button variant="outline" className="mt-3 h-10" onClick={() => onOpenYear(to.id)}>
                 <span>Go to</span> <span dir="ltr">{to.shortLabel}</span>
@@ -162,6 +176,10 @@ export function RollOver({
             <Notice tone="danger">
               <AsWritten>{error}</AsWritten>
             </Notice>
+          )}
+          {clash && (
+            <PublishedClashNotice message={clash.message} pending={commit.isPending}
+              onAnyway={() => commit.mutate({ names: clash.names, goAhead: clash.goAhead })} onCancel={() => setClash(null)} />
           )}
 
           {!plan ? (
@@ -299,7 +317,7 @@ export function RollOver({
                   </>
                 )}
                 {!nothingToDo && (
-                  <Button className="h-11" disabled={namesDirty || commit.isPending || preview.isPending} onClick={() => commit.mutate(pending)}>
+                  <Button className="h-11" disabled={namesDirty || commit.isPending || preview.isPending} onClick={() => commit.mutate({ names: pending })}>
                     {commit.isPending ? 'Working…' : 'Create the sections and move the students'}
                   </Button>
                 )}

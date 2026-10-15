@@ -1,0 +1,39 @@
+Control F3a-terms-share-lock: apps/api/src/services/timetable-clash.services.ts — the guard undone ("await tx.select({ id: academicTerm.id }).from(academicTerm).where(sql`${academicTerm.endsOn} >= ${from}`).orderBy(asc(academicTerm.id)).for('share');" -> ''); ran test/08s6 at 2026-10-08T13:46:26+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change and a publication at once, publishing first: the change sees the new version and is refused with the clash 5269ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change and a publication at once, the change first: the publication sees the change and is refused with the clash 30014ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > two teacher changes giving one teacher two lessons at once in a published timetable: the second waits for the first and is refused 190ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused 30002ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 34ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 30002ms
+ Test Files  1 failed (1)
+      Tests  6 failed | 16 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change and a publication at once, publishing first: the change sees the new version and is refused with the clash
+    Error: waitFor: timed out
+     ❯ waitFor test/helpers.ts:482:38
+        480|     const v = await probe();
+        481|     if (v) return v;
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change and a publication at once, the change first: the publication sees the change and is refused with the clash
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:490:3
+        488|   });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > two teacher changes giving one teacher two lessons at once in a published timetable: the second waits for the first and is refused
+    AssertionError: expected 200 to be 409 // Object.is equality
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:549:3
+        547|   });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over
+    TypeError: Cannot read properties of undefined (reading 'find')
+     ❯ lessonOf test/08s6-scheduling-rework.test.ts:78:25
+         76|   const lessonOf = async (ttId: string, group: string, seq = 1) => {
+         77|     const tt = await load(ttId);
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:646:3
+        644|   // ─── Round two, flag 5: the roll-over into a year with a published…

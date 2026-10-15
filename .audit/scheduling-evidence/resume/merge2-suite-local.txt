@@ -1,0 +1,16 @@
+Suite on the merged tree (origin/main c2d7a78 merged into 7266f26, before its commit), local time (Africa/Cairo), TEST_DB_NAME=igcse_scheduling_test
+
+ Test Files  36 passed (36)
+      Tests  593 passed | 1 todo (594)
+   Duration  410.50s (transform 1.56s, setup 66ms, collect 5.84s, tests 397.38s, environment 3ms, prepare 1.47s)
+exit=0
+(✓ lines in the log: 327)
+
+--- merge2-devdb.out
+DROP DATABASE
+CREATE DATABASE
+template copy: 34 migrations
+after main's folder: 55 migrations; F1 tables: 0
+after F1's folder: 57 migrations; F1 tables: 4
+files in F1's folder:       57
+leavings: users away 0, open student_leaving rows 0

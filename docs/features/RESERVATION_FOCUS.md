@@ -27,13 +27,14 @@ Everything lives in **`apps/web/lib/reservation-focus.ts`**:
 | Name | What it is |
 |---|---|
 | `RESERVATION_CYCLE_ONLY` | the switch (`true`). Set it to `false` and every sidebar, landing and link is as it was on main b6857cb — proved on the running system (§6). |
-| `OUTSIDE_THE_CYCLE` | per role (admin, coordinator, finance admin, finance officer, teacher, gate, parent, student), the screens outside the cycle that the role would otherwise reach from its sidebar or from a link on one of its kept screens. A path hides itself and everything under it. |
+| `OUTSIDE_THE_CYCLE` | per role (admin, coordinator, finance admin, finance officer, teacher, gate, parent, student), the screens outside the cycle that the role would otherwise reach from its sidebar or from a link on one of its kept screens. A path hides itself and everything under it. Since F1's merge (15 Oct 2026) every role's list also holds F1's screens, `TIMETABLE_SCREENS` (§2). |
 | `CYCLE_LANDING` | per role, where it lands after sign-in and its sidebar's first item: `/` for the admin, coordinator, teacher, gate, parent and student; `/desk` for both finance roles. |
 | `CYCLE_STAGES` | the staff sidebar's order: one group per stage of the cycle (Set up · Reserve and pay · Follow up · Money · Entries to the board · Account), each holding the role's kept items in this order. |
 | `STAGE_OVERRIDE` | the one exception: the finance officer's Sessions sits under Follow up (the officer reads a session for its Money and To verify tabs, never its sheet or fees). |
 | `isOutsideTheCycle(role, href)` | the sidebar's test, per role. |
 | `leadsOutsideTheCycle(href)` | the test for a link on a kept screen. A screen is outside the cycle or not whoever looks at it — the per-role lists differ only in which screens each role reaches — so a link reads every role's list, and the component drawing it need not know the viewer. |
 | `cycleLandingFor(role)`, `cycleStageOf(role, href)` | the landing and the stage of an item. |
+| `timetableHidden()` | added at F1's merge: whether the timetable is hidden (its screens on the lists, the switch on) — for a kept screen that draws a piece of the timetable in place rather than linking to it (§4). |
 
 **Who reads it.** `components/nav-shell.tsx` (`getCycleNavSections`: the role's items as before, less its
 list; a family keeps its own groups — Registration, Financial, Account — which already run in the
@@ -61,6 +62,16 @@ Counts are the sidebar's items, read from the drive (`before/before-sidebars.jso
 | Gate (placeholder account) | 3 | 3 | 1 | Home |
 | Parent | 14 | 12 | 2 | — |
 | Student | 12 | 9 | 3 | — |
+
+**Since F1's merge** (`feature/scheduling`, 15 Oct 2026, after F6b): F1's screens are outside the cycle, so
+`TIMETABLE_SCREENS` — Timetables `/timetable/versions` (with each version's editor and print under it),
+Teaching Groups `/timetable/groups`, Timetable Rules `/timetable/rules`, Cover `/timetable/cover` and the
+families' week `/my-timetable` — are on every role's list (the lead's direction, from the owner's of 14 Oct:
+only the cycle is visible, everything else hidden, never removed). With the switch off the sidebars have
+F1's items as well (read from `getNavSections`): the admin's and the coordinator's Timetable section (four
+items), the parent's Timetables and the student's My Timetable — "Before" reads 45, 30, 15 and 13 for those
+roles and "Hidden" 22, 17, 3 and 4; "After" is unchanged. Each F1 screen still opens by its URL (driven:
+`.audit/scheduling-evidence/final-merge/`; docs/features/SCHEDULING.md §14).
 
 A member of staff linked to a teacher record also had My Teaching, Forecast Grades and Invigilation;
 they are on every staff list (hidden). The reasons below are the plan's list (FEATURES_PLAN.md §1 F6b,
@@ -98,6 +109,7 @@ screen kept because the doubt was real.
 | Daily Takings `/takings` | Management | Money | named in the cycle |
 | Reports `/admin/reports`, Audit Log `/admin/audit` | Oversight | **hidden** | named outside |
 | Messages `/admin/messages` | Oversight | Follow up | reminders and messages |
+| Timetables, Teaching Groups, Timetable Rules, Cover `/timetable/*` (F1, merged after F6b) | Timetable | **hidden** | the timetable is outside the cycle (`TIMETABLE_SCREENS`) |
 | Notifications, Profile | Account | Account | the account |
 | **Home** `/` | — | first | the landing (§3.1) |
 
@@ -113,6 +125,7 @@ screen kept because the doubt was real.
 | Exam Catalogue, Board Series, Board Services | Exams | Set up | the papers and the boards' dates; Board Services **in doubt** as for the admin |
 | Sessions, Day-one Import, Settings | School | Set up | the session's sheet (the coordinator keeps subjects, teachers and items), the import, the settings |
 | Exceptions | School | Follow up | the academic gates are the coordinator's to grant |
+| Timetables, Teaching Groups, Timetable Rules, Cover `/timetable/*` (F1, merged after F6b) | Timetable | **hidden** | the timetable is outside the cycle (`TIMETABLE_SCREENS`) |
 | Notifications, Profile | Account | Account | the account |
 | **Home** `/` | — | first | the landing (§3.1) |
 
@@ -131,6 +144,9 @@ screen kept because the doubt was real.
 | Exceptions | Management | Follow up | lifting a rule for a family; payment plans |
 | Notifications, Profile | Account | Account | the account |
 
+F1's screens (`TIMETABLE_SCREENS`) are on both finance lists since F1's merge; neither finance sidebar has
+an F1 item, and the student record's week is hidden (§4).
+
 ### 2.4 Finance officer (12 → 9)
 
 As the finance admin without the Management group: The Desk (first, the landing); Students, Charges
@@ -147,6 +163,9 @@ Profile. **Hidden:** Remarks Desk, Results Entry, Certificates (named outside).
 | Notifications, Profile | Account | Account | "a role with nothing in the cycle sees its notifications and profile" |
 | **Home** `/` | — | first | the sentence that their screens come later (§3.4) |
 
+F1's teacher screens are My lessons today on Today and the week on My Teaching, both hidden above; F1's
+screens (`TIMETABLE_SCREENS`) are on both lists since F1's merge.
+
 ### 2.6 Parent (14 → 12)
 
 | Screen | Before (group) | After | Why |
@@ -158,6 +177,7 @@ Profile. **Hidden:** Remarks Desk, Results Entry, Certificates (named outside).
 | My Exams `/exams/my` | Registration | **hidden** | its three parts are the exam timetable, the statement of entry the school publishes with it, and results — all after the entries go to the board (§8, Q2) |
 | Statement, School Fee, Charges & Instalments, Escrow Balance | Financial | Financial | paying: the statement, the school fee, instalments, the wallet |
 | Linked Children, Notifications, Profile | Account | Account | the family's link (needed to reserve for a child) and the account |
+| Timetables `/my-timetable` (F1, merged after F6b) | first | **hidden** | the children's week: the timetable is outside the cycle (`TIMETABLE_SCREENS`) |
 
 The families' groups are kept as they were: they already run reserve → pay → account, and renaming them
 would change wording on the families' screens (point 4).
@@ -173,6 +193,7 @@ would change wording on the families' screens (point 4).
 | Remarks, My Exams | Registration | **hidden** | as for the parent |
 | Pending Requests | Requests | Requests | drop and swap requests: drops and refunds |
 | Linked Parents, Notifications, Profile | Account | Account | the account |
+| My Timetable `/my-timetable` (F1, merged after F6b) | first | **hidden** | the student's week: the timetable is outside the cycle (`TIMETABLE_SCREENS`) |
 
 ---
 
@@ -296,6 +317,7 @@ Hidden by the same switch (`leadsOutsideTheCycle`), each where it is drawn:
 | Import result `/imports/[id]` | "Sections" and "Course enrolment" in "See them on Students, Sections and Course enrolment" | named, not linked (the sentence keeps its words) |
 | Home `/` (family) | the Browse Subjects card (`/subjects`) | hidden |
 | Sign-in | the admin's redirect to `/admin/dashboard` | the landing |
+| Student record `/students/[id]` (F1, merged after F6b) | not a link: F1's week of the student under the academic panel (the timetable drawn in place) | not drawn while `timetableHidden()` (no week is asked of the API); back with the switch off. No kept screen links to an F1 screen: the only hrefs to `/timetable/*` and `/my-timetable` are the sidebar's |
 
 **Kept as steps of the cycle** ("a link that is a step of the cycle stays"): on Entry Lists, a row's fix
 link to the candidate's details (candidate number, legal name, date of birth, UCI, access arrangements)

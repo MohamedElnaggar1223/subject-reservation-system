@@ -1,0 +1,10 @@
+Control RV1b-replace-reread: apps/api/src/services/offer.services.ts — the guard undone ('assertStudentsLocked(locked, lines.map((l) => l.studentId));\n    if (!onOffer.length' -> 'void assertStudentsLocked;\n    if (!onOffer.length'); ran test/08s6 at 2026-10-08T19:16:37+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A line reserved for a new student while the replacement waited for its students: the replacement runs again with that student locked first — it never holds a line whose student it has not locked 6260ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A line reserved for a new student while the replacement waited for its students: the replacement runs again with that student locked first — it never holds a line whose student it has not locked
+    Error: waitFor: timed out
+     ❯ waitFor test/helpers.ts:482:38
+        480|     const v = await probe();
+        481|     if (v) return v;

@@ -1,0 +1,7 @@
+The committed code (with the online lesson's delivery), full suite, TZ=UTC, igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  619 passed | 1 todo (620)
+   Duration  344.78s (transform 1.12s, setup 54ms, collect 4.45s, tests 334.45s, environment 3ms, prepare 1.14s)
+exit=0
+(✓ lines in the log: 322)

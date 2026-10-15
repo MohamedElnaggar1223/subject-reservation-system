@@ -1,0 +1,14 @@
+Control F2a-09b-cover-against-own-lesson: apps/api/src/services/timetable.services.ts — the guard undone ('const lost = await cover.recheckCovers(tx, carried.moved, actorId, `${t.name} takes effect from ${readableDate(data.effectiveFrom)}`, ctx);' -> 'const lost: string[] = [];'); ran test/08s6 test/09b -t getTeachingDemand|forming makes|teacher changed at the desk|replaced on an offer|no preference|no group of the new teacher|would clash in the published|self-study now|checkEnrolments per unit|dated inside a draft|publishing judges each cover|scheduling invariants at 2026-10-08T13:56:33+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it 162ms
+   × F1: scheduling invariants over the whole database > cover: one live cover per lesson and date; a cover teacher is never in two covers at once nor covers their own lesson; each cover rests on an absence of the lesson’s teacher 9ms
+ Test Files  2 failed (2)
+      Tests  2 failed | 20 passed | 11 skipped (33)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it
+    AssertionError: expected [ { …(6) } ] to deeply equal []
+    - Expected
+    + Received
+ FAIL  test/09b-scheduling-invariants.test.ts > F1: scheduling invariants over the whole database > cover: one live cover per lesson and date; a cover teacher is never in two covers at once nor covers their own lesson; each cover rests on an absence of the lesson’s teacher
+    AssertionError: expected [ { …(2) } ] to deeply equal []
+    - Expected
+    + Received

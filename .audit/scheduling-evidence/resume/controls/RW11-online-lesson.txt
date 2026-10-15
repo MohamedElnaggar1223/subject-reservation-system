@@ -1,0 +1,9 @@
+Control RW11-online-lesson: apps/api/src/services/schedule.services.ts — the guard undone ("delivery: x.delivery === 'online' ? 'online' : 'in_school'," -> "delivery: 'in_school',"); ran test/08s6 at 2026-10-08T17:22:49+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > forming makes a group per unit and teacher; an online group is timetabled without a room; a provider’s group asks for no lessons and gets none 487ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > forming makes a group per unit and teacher; an online group is timetabled without a room; a provider’s group asks for no lessons and gets none
+    AssertionError: expected [ [ …(3) ] ] to deeply equal [ [ …(3) ] ]
+    - Expected
+    + Received

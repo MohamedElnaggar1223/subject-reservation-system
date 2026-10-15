@@ -1,0 +1,9 @@
+Control RW8-subject-and-unit-flag: apps/api/src/services/enrolment.services.ts — the guard undone ('if (!perUnit.length) continue;\n    const codes' -> 'if (perUnit.length >= 0) continue;\n    const codes'); ran test/08s6 at 2026-10-08T13:45:30+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > checkEnrolments per unit: a unit line against its unit’s enrolment; a subject held whole and by its units at once is flagged with the fix 34ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > checkEnrolments per unit: a unit line against its unit’s enrolment; a subject held whole and by its units at once is flagged with the fix
+    AssertionError: expected [] to deeply equal [ ObjectContaining{…} ]
+    - Expected
+    + Received

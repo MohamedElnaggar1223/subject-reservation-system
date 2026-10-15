@@ -6,10 +6,13 @@
  * where there are several — the coordinator assigns later — or self-study (no teacher). The
  * price never changes here: a change to self-study on a paid line is not re-priced, a difference
  * is finance's explicit act (a price adjustment or a refund). The enrolment follows (§10): the
- * student's open enrolment in the subject — per unit for an item entering units — takes the new
- * teacher and mode, or is made through F0b's `upsertEnrolments(source: 'registrations')`; the
- * teaching group follows the enrolment when F1 is live. A whole offer's teacher who leaves is
- * A's `POST …/offers/:offerId/replace-teacher`, not this.
+ * student's open enrolment in the subject — per unit for an item entering units, or the subject's
+ * own row for a converted line over an enrolment from before the rework (`lineEnrolmentUnits`) —
+ * takes the new teacher and mode, or is made, through F0b's `upsertEnrolments(source:
+ * 'registrations', follow)`; the teaching group follows it there (F1's `followEnrolments`, in this
+ * transaction). A whole offer's teacher who leaves is A's `POST …/offers/:offerId/replace-teacher`.
+ * `changeLineTeacherTx` is the same change inside a caller's transaction (F1's "no preference"
+ * assigned on Teaching groups).
  */
 
 import {
@@ -18,7 +21,8 @@ import {
 } from '@repo/db';
 import type { ChangeLineTeacherType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
-import { upsertEnrolments } from './enrolment.services';
+import { upsertEnrolments, lineEnrolmentUnits, groupFollowNotices, type EnrolmentChange } from './enrolment.services';
+import type { FollowOutcome } from './group.services';
 import { availabilityConstraints } from './offer.services';
 import { lineExceptions } from './line-exceptions';
 
@@ -30,8 +34,25 @@ export class LineTeacherError extends Error {
 
 const CHANGEABLE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed'];
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function changeLineTeacher(registrationId: string, input: ChangeLineTeacherType, actorId: string, ctx?: AuditContext) {
-  return db.transaction(async (tx) => {
+  const result = await db.transaction((tx) => changeLineTeacherTx(tx, registrationId, input, actorId, ctx));
+  // After the commit: the cover a group's new teacher made no longer holding is told.
+  await groupFollowNotices(result.groupsFollowed);
+  const { changes: _changes, ...out } = result;
+  return out;
+}
+
+/**
+ * The change inside the caller's transaction (its locks as below, after any the caller holds in
+ * the same order). `deferFollow`: the enrolment changes are returned for the caller to hand to
+ * F1's `followEnrolments` once (several lines at a time), instead of each moving the group here.
+ */
+export async function changeLineTeacherTx(
+  tx: Tx, registrationId: string, input: ChangeLineTeacherType, actorId: string, ctx?: AuditContext, opts: { deferFollow?: boolean } = {},
+) {
+  {
     const [found] = await tx.select({ studentId: registration.studentId, offerItemId: registration.offerItemId }).from(registration).where(eq(registration.id, registrationId));
     if (!found) throw new LineTeacherError('Registration not found', 404);
     // A's lock order (RESERVATIONS.md §2.1): the student (the enrolment reads it, as a withdrawal
@@ -104,31 +125,24 @@ export async function changeLineTeacher(registrationId: string, input: ChangeLin
       { teacherId, mode, reason: input.reason, price: line.priceAtRegistration, repriced: false }, ctx, tx);
 
     // The enrolment follows (§10): this academic year's open enrolment of the student in what the
-    // line enters — one per unit for an item entering units — updated, or made from the line.
+    // line enters — one per unit for an item entering units, or the subject's own row for a converted
+    // line over an enrolment from before the rework (lineEnrolmentUnits, as A's replace-teacher) —
+    // updated, or made from the line, through upsertEnrolments; the teaching group follows it there.
     const [year] = await tx.execute(sql`select id from academic_year where start_year = school_series_academic_year_start(${facts.sessionType}, ${facts.seriesYear})`)
       .then((r) => r.rows as { id: string }[]);
     let enrolmentsUpdated = 0;
     let enrolmentsCreated = 0;
+    let changes: EnrolmentChange[] = [];
+    let groupsFollowed: FollowOutcome | null = null;
     if (year) {
-      const units = facts.entersKind === 'units' && facts.units.length ? facts.units : [null];
-      for (const unitId of units) {
-        const [open] = await tx.select().from(courseEnrolment).where(and(
-          eq(courseEnrolment.academicYearId, year.id), eq(courseEnrolment.studentId, line.studentId), isNull(courseEnrolment.endedOn),
-          unitId ? eq(courseEnrolment.unitId, unitId) : and(eq(courseEnrolment.subjectId, line.subjectId), isNull(courseEnrolment.unitId)),
-        )).for('update');
-        if (open) {
-          if (open.teacherId === teacherId && open.mode === mode) continue;
-          await tx.update(courseEnrolment).set({ teacherId, mode, updatedAt: now }).where(eq(courseEnrolment.id, open.id));
-          await logAction(actorId, 'ENROLMENT_UPDATED', 'enrolment', open.id, { mode: open.mode, teacherId: open.teacherId },
-            { mode, teacherId, reason: input.reason, registrationId }, ctx, tx);
-          enrolmentsUpdated++;
-        } else {
-          const r = await upsertEnrolments(tx, year.id, [{ studentId: line.studentId, subjectId: line.subjectId, unitId, teacherId, mode, sourceRef: `registration:${registrationId}` }],
-            actorId, { source: 'registrations', commit: true, ctx });
-          enrolmentsCreated += r.created;
-        }
-      }
+      const units = await lineEnrolmentUnits(tx, year.id, line.studentId, line.subjectId, facts.entersKind === 'units' ? facts.units : []);
+      const r = await upsertEnrolments(tx, year.id, units.map((unitId) => ({ studentId: line.studentId, subjectId: line.subjectId, unitId, teacherId, mode, sourceRef: `registration:${registrationId}` })),
+        actorId, { source: 'registrations', commit: true, ctx, follow: opts.deferFollow ? 'defer' : true, reason: input.reason });
+      enrolmentsUpdated = r.updated;
+      enrolmentsCreated = r.created;
+      changes = r.changes;
+      groupsFollowed = r.groupsFollowed;
     }
-    return { registrationId, teacherId, mode, price: line.priceAtRegistration, repriced: false, enrolmentsUpdated, enrolmentsCreated };
-  });
+    return { registrationId, teacherId, mode, price: line.priceAtRegistration, repriced: false, enrolmentsUpdated, enrolmentsCreated, changes, groupsFollowed };
+  }
 }

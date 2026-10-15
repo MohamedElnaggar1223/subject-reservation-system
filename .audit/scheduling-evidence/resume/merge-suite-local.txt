@@ -1,0 +1,30 @@
+Suite on the merged tree (origin/main 2a26557 merged into 94e9d32, before its commit), local time (Africa/Cairo), TEST_DB_NAME=igcse_scheduling_test; started 15:13:39 Cairo (12:13:39Z), log written 12:18:40Z
+
+   × F1: the review round — changes after publishing, dated teachers, cover and the clock > a student added to a group after publishing, into a lesson at the time of one they have: refused with the clash; going ahead anyway records it and lists it until it no longer happens 34ms
+   × F1: the review round — changes after publishing, dated teachers, cover and the clock > the accepted clash is the only double booking in these published timetables 3ms
+ FAIL  test/08s5-scheduling-review.test.ts > F1: the review round — changes after publishing, dated teachers, cover and the clock > a student added to a group after publishing, into a lesson at the time of one they have: refused with the clash; going ahead anyway records it and lists it until it no longer happens
+    Error: In the published timetable, this would add a clash: Student rev-4 would be in Arabic R R-11B and Physics R at Sunday period 1 from Sunday, 8 October 2051 (R — first). The clashes are not the ones confirmed (they changed since they were shown); here they are now. Change it, or confirm to go ahead anyway (the clash is then listed on the Timetables screen) [confirm a32763afac85]
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s5-scheduling-review.test.ts:118:18
+        116|     expect(await sql(`select id from teaching_group_member where group…
+        117| 
+        118|     const went = await apiResponse(add(true));
+ FAIL  test/08s5-scheduling-review.test.ts > F1: the review round — changes after publishing, dated teachers, cover and the clock > the accepted clash is the only double booking in these published timetables
+    AssertionError: expected [] to deeply equal [ 'caXNtUDk0zLLBbrf41Btn2THiHUm4EUj' ]
+    - Expected
+    + Received
+    - [
+ Test Files  1 failed | 34 passed (35)
+      Tests  2 failed | 547 passed | 1 todo (550)
+   Duration  300.59s (transform 1.16s, setup 56ms, collect 4.16s, tests 290.00s, environment 3ms, prepare 1.17s)
+exit=1
+(✓ lines in the log: 295)
+
+--- merge-devdb.out
+DROP DATABASE
+CREATE DATABASE
+template copy: 34 migrations
+after main's folder: 50 migrations; F1 tables: 0
+after F1's folder: 52 migrations; F1 tables: 4
+files in F1's folder:       52
+leavings: users away 0, open student_leaving rows 0

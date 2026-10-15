@@ -17,6 +17,7 @@ import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
 import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
+import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
 
 export type Language = 'en' | 'ar';
 
@@ -114,6 +115,12 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.boardServices': 'Board Services',
     'nav.charges': 'Charges',
     'nav.chargesDue': 'Charges & Instalments',
+    'nav.timetable': 'Timetable',
+    'nav.timetables': 'Timetables',
+    'nav.teachingGroups': 'Teaching Groups',
+    'nav.timetableRules': 'Timetable Rules',
+    'nav.cover': 'Cover',
+    'nav.myTimetable': 'My Timetable',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -228,6 +235,12 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.boardServices': 'خدمات المجالس',
     'nav.charges': 'الرسوم الأخرى',
     'nav.chargesDue': 'الرسوم والأقساط',
+    'nav.timetable': 'الجدول الدراسي',
+    'nav.timetables': 'الجداول الدراسية',
+    'nav.teachingGroups': 'مجموعات التدريس',
+    'nav.timetableRules': 'قواعد الجدول',
+    'nav.cover': 'الحصص البديلة',
+    'nav.myTimetable': 'جدولي',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -1559,9 +1572,12 @@ for (const [en, ar] of Object.entries(messagesArabic)) if (!(en in autoArabicTex
 // and D's, so a word their screens share with F4's ("Session", "Dropped", "Collected") keeps the
 // rework's Arabic (the reviews of 093dbd1, item 10, and 54c225f, item 7).
 for (const [en, ar] of Object.entries(examsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
-// F6b's landings and the desk's Today (lib/i18n-focus.ts): last, so every word the app already
-// translates keeps its Arabic.
+// F6b's landings and the desk's Today (lib/i18n-focus.ts): after every dictionary before it, so
+// every word the app already translates keeps its Arabic.
 for (const [en, ar] of Object.entries(focusArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F1: the timetable screens, after F6b's (the order of F6a's and F6b's dictionaries kept, F1's
+// added after them at F1's final merge); their own words never replace a phrase already translated.
+for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1667,6 +1683,9 @@ function translateDynamicText(text: string): string | null {
   // Step D: the messages screens' sentences with a name, a number or a variable in them.
   const messagesText = translateMessagesText(text, translateExactText);
   if (messagesText) return messagesText;
+  // F1: the grid's clashes, the generator's explanations, cover's reasons, counted phrases.
+  const f1Text = translateSchedulingText(text);
+  if (f1Text) return f1Text;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

@@ -76,6 +76,12 @@ export const NOTIFICATION_TYPES = [
   'SCHOOL_MESSAGE',
   'PAYMENT_REMINDER',
   'STAFF_REMINDER',
+  // F1: the timetable and cover
+  'TIMETABLE_PUBLISHED',
+  'COVER_ASSIGNED',
+  'LESSON_COVERED',
+  'LESSON_CANCELLED',
+  'COVER_CHANGED',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -118,6 +124,11 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   SCHOOL_MESSAGE:                   'Message from the School',
   PAYMENT_REMINDER:                 'Payment Reminder',
   STAFF_REMINDER:                   'Reminder',
+  TIMETABLE_PUBLISHED:              'Timetable Published',
+  COVER_ASSIGNED:                   'Cover Lesson for You',
+  LESSON_COVERED:                   'A Lesson Is Covered',
+  LESSON_CANCELLED:                 'A Lesson Is Cancelled',
+  COVER_CHANGED:                    'Cover Changed',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -158,6 +169,11 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   SCHOOL_MESSAGE:                   '✉️',
   PAYMENT_REMINDER:                 '⏰',
   STAFF_REMINDER:                   '📌',
+  TIMETABLE_PUBLISHED:              '🗓️',
+  COVER_ASSIGNED:                   '🧑‍🏫',
+  LESSON_COVERED:                   '🔁',
+  LESSON_CANCELLED:                 '🚫',
+  COVER_CHANGED:                    '↩️',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

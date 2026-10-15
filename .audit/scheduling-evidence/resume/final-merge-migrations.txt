@@ -1,0 +1,33 @@
+Final merge (origin/main 384c5a2 into 011900e): F1's migrations regenerated as 0059/0060 after main's 0058, proven on copies of the dev template (scripts /tmp/f1/final-migrate-proof.sh and final-leavings-proof.sh; written 2026-10-09T01:52:33Z)
+
+main at the merge: 384c5a2 Merge remote-tracking branch 'origin/feature/import' into merge-rework-a
+main's last migration: 0058_import.sql
+F1's last two: 0059_scheduling.sql 0060_scheduling_leavings.sql 
+journal 58 0058_import when 1791504474468
+journal 59 0059_scheduling when 1791510450087
+journal 60 0060_scheduling_leavings when 1791510469146
+stamps rising: True
+snapshots chained: True
+NOTICE:  database "igcse_scheduling_final_copy" does not exist, skipping
+template copy: 34 migrations applied
+after main's folder: 59 migrations applied; F1 tables: 0 of 14
+after F1's folder: 61 migrations applied; F1 tables: 14 of 14
+last applied: 1791510469146 1791510450087 
+leavings: users away 0, open student_leaving rows 0
+again: 61 migrations applied (nothing new)
+
+--- 0060 on a copy with a student away
+students away before F1's folder: 1
+after F1's folder: 61 migrations; open student_leaving rows: 1, for the student away: withdrawn proof of 0060
+
+--- drizzle-kit migrate, main's folder (tail)
+Reading config file '/private/tmp/f1/main-db/packages/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] applying migrations...[2K[1G[⣯] applying migrations...[2K[1G[⣟] applying migrations...[2K[1G[⡿] applying migrations...[2K[1G[✓] migrations applied successfully!
+--- drizzle-kit migrate, F1's folder (tail)
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/agent-a127f2284d74101e7/packages/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] applying migrations...[2K[1G[✓] migrations applied successfully!
+
+--- 0059_scheduling.sql against the branch's previous 0056_scheduling.sql: identical (diff empty)

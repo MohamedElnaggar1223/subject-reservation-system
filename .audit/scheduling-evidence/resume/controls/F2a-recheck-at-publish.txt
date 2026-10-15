@@ -1,0 +1,25 @@
+Control F2a-recheck-at-publish: apps/api/src/services/timetable.services.ts — the guard undone ('const lost = await cover.recheckCovers(tx, carried.moved, actorId, `${t.name} takes effect from ${readableDate(data.effectiveFrom)}`, ctx);' -> 'const lost: string[] = [];'); ran test/08s6 test/09b at 2026-10-08T13:45:58+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it 149ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away) 19ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 332ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 133ms
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 29 passed (33)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it
+    AssertionError: expected [ { …(6) } ] to deeply equal []
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away)
+    TypeError: Cannot read properties of undefined (reading 'find')
+     ❯ lessonOf test/08s6-scheduling-rework.test.ts:78:25
+         76|   const lessonOf = async (ttId: string, group: string, seq = 1) => {
+         77|     const tt = await load(ttId);
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over
+    AssertionError: expected 404 to be 201 // Object.is equality
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    AssertionError: expected 200 to be 409 // Object.is equality
+    - Expected
+    + Received

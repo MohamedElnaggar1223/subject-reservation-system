@@ -1,0 +1,77 @@
+Control RV1a-replace-students-first: apps/api/src/services/offer.services.ts — the guard undone ('const locked = await lockStudents(tx, [...seen.map((x) => x.id), ...extra]);' -> 'const locked = new Set<string>([...seen.map((x) => x.id), ...extra]);'); ran test/08s6 at 2026-10-08T19:12:35+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher takes the students of its lines first: the coordinator adding one of them elsewhere while it is under way waits, then moves the student — the replacement first 5959ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s leaving of one of its students, the replacement first: the leaving waits, then ends the enrolment and the membership the replacement moved and expires the line — no deadlock 1911ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > … the leaving first: the replacement waits for the student, then finds the leaver’s line expired and moves the other alone 1981ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s cohort correction of one of its students, the replacement first: the correction waits, then expires the line now taught by Y — no deadlock 1963ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > … the correction first: the replacement waits, then finds the line expired; the other student moves to Y’s group (X’s group still has a student enrolled with X) 1921ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A line reserved for a new student while the replacement waited for its students: the replacement runs again with that student locked first — it never holds a line whose student it has not locked 30014ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error 30013ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > step D’s contract, studentsOfGroup(groupId, date): who is in a group on a date by §2’s rules — a move that day goes to the later group, a leaver is out after their last day, a section’s group follows the section 46ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item 30040ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms 30023ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike 30006ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting 30013ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 30012ms
+ Test Files  1 failed (1)
+      Tests  13 failed | 26 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher takes the students of its lines first: the coordinator adding one of them elsewhere while it is under way waits, then moves the student — the replacement first
+    Error: waitFor: timed out
+     ❯ waitFor test/helpers.ts:482:38
+        480|     const v = await probe();
+        481|     if (v) return v;
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s leaving of one of its students, the replacement first: the leaving waits, then ends the enrolment and the membership the replacement moved and expires the line — no deadlock
+    Error: Failed to record the leaving
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s6-scheduling-rework.test.ts:800:13
+        798|     expect(done).toMatchObject({ lines: 2, enrolments: 2 });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > … the leaving first: the replacement waits for the student, then finds the leaver’s line expired and moves the other alone
+    Error: Failed to replace the teacher
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s6-scheduling-rework.test.ts:812:18
+        810|       () => adm.api.v1.students[':id'].leave.$post({ param: { id: f.st…
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s cohort correction of one of its students, the replacement first: the correction waits, then expires the line now taught by Y — no deadlock
+    Error: Failed to correct the cohort
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s6-scheduling-rework.test.ts:824:13
+        822|       () => adm.api.v1.students[':id'].cohort.$put({ param: { id: f.st…
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > … the correction first: the replacement waits, then finds the line expired; the other student moves to Y’s group (X’s group still has a student enrolled with X)
+    Error: Failed to replace the teacher
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s6-scheduling-rework.test.ts:834:18
+        832|       () => adm.api.v1.students[':id'].cohort.$put({ param: { id: f.st…
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A line reserved for a new student while the replacement waited for its students: the replacement runs again with that student locked first — it never holds a line whose student it has not locked
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:860:3
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:895:3
+        893|   });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > step D’s contract, studentsOfGroup(groupId, date): who is in a group on a date by §2’s rules — a move that day goes to the later group, a leaver is out after their last day, a section’s group follows the section
+    AssertionError: expected [ …(2) ] to deeply equal [ 'Fb46lcapDTZEQvrCiCrWn9hicSHYRifD' ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:931:3
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:952:3
+        950|   });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:972:3
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:1017:3
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:1044:3
+        1042|   // ─── Round two, flag 5: the roll-over into a year with a published…

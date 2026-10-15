@@ -29,6 +29,14 @@ import { isRole, type Role } from '@repo/validations';
 export const RESERVATION_CYCLE_ONLY: boolean = true;
 
 /**
+ * F1's screens (docs/features/SCHEDULING.md §9): the timetables with their editor and print, teaching
+ * groups, the timetable rules, cover, and the families' week. The timetable is outside the cycle, so
+ * they are on every role's list (the lead, 15 Oct 2026, at F1's merge after F6b); each still opens
+ * by its URL, and the switch off puts them back on the sidebars that had them.
+ */
+const TIMETABLE_SCREENS = ['/timetable/versions', '/timetable/groups', '/timetable/rules', '/timetable/cover', '/my-timetable'] as const;
+
+/**
  * What is outside the cycle, per role: the screens that role would otherwise reach from its
  * sidebar or from a link on one of its kept screens. A path hides itself and everything under it
  * ("/academic/sections" hides "/academic/sections?section=…"). Why each line is here is in
@@ -43,28 +51,32 @@ export const OUTSIDE_THE_CYCLE: Readonly<Record<Role, readonly string[]>> = {
     '/exams/candidates', '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
     '/remarks-desk', '/results-entry',
     '/admin/reports', '/admin/audit',
+    ...TIMETABLE_SCREENS, // F1: the timetable
   ],
   coordinator: [
     '/today',
     '/teaching', '/exams/forecasts', '/exams/invigilation',
     '/academic/sections', '/academic/enrolment', '/academic/years', '/academic/calendar', '/academic/bells', '/academic/rooms',
     '/exams/candidates', '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
+    ...TIMETABLE_SCREENS,
   ],
   finance_admin: [
     '/teaching', '/exams/forecasts', '/exams/invigilation',
     '/remarks-desk', '/results-entry', '/exams/certificates',
     // Links on the desk's academic panel and on the student record.
     '/academic/sections', '/academic/enrolment', '/exams/my',
+    ...TIMETABLE_SCREENS,
   ],
   finance_officer: [
     '/teaching', '/exams/forecasts', '/exams/invigilation',
     '/remarks-desk', '/results-entry', '/exams/certificates',
     '/academic/sections', '/academic/enrolment', '/exams/my',
+    ...TIMETABLE_SCREENS,
   ],
-  teacher: ['/today', '/teaching', '/exams/forecasts', '/exams/invigilation'],
-  gate: ['/today', '/teaching', '/exams/forecasts', '/exams/invigilation'],
-  parent: ['/remarks', '/exams/my', '/subjects'],
-  student: ['/subjects', '/remarks', '/exams/my'],
+  teacher: ['/today', '/teaching', '/exams/forecasts', '/exams/invigilation', ...TIMETABLE_SCREENS],
+  gate: ['/today', '/teaching', '/exams/forecasts', '/exams/invigilation', ...TIMETABLE_SCREENS],
+  parent: ['/remarks', '/exams/my', '/subjects', ...TIMETABLE_SCREENS],
+  student: ['/subjects', '/remarks', '/exams/my', ...TIMETABLE_SCREENS],
 };
 
 /** Where each role lands after sign-in, and its sidebar's first item, while the switch is on. */
@@ -126,6 +138,15 @@ export function leadsOutsideTheCycle(href: string): boolean {
   if (!RESERVATION_CYCLE_ONLY) return false;
   const path = pathOf(href);
   return ON_ANY_LIST.some((screen) => under(path, screen));
+}
+
+/**
+ * Whether the timetable (F1) is hidden: its screens are on the lists above while the switch is on.
+ * A kept screen that draws a piece of the timetable in place (the student record's week) asks this,
+ * so the block comes back with the screens when the switch is off or the timetable leaves the lists.
+ */
+export function timetableHidden(): boolean {
+  return leadsOutsideTheCycle('/my-timetable');
 }
 
 /** Where a role lands after sign-in while the switch is on. */

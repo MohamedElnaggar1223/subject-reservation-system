@@ -1,0 +1,6 @@
+After the fix (the later-membership rule per enrolment key): 08s6 whole file
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Duration  16.06s (transform 896ms, setup 2ms, collect 386ms, tests 13.07s, environment 0ms, prepare 40ms)
+(✓ lines in the log: 10)

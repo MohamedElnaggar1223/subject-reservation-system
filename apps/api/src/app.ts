@@ -47,6 +47,10 @@ import { examResultRoutes } from './routes/exam-result.routes';
 import { boardFeeRoutes } from './routes/board-fee.routes';
 import { lineRoutes, sessionVerifyRoutes, statementRoutes } from './routes/reservation.routes';
 import { importRoutes } from './routes/import.routes';
+import { schedulingRoutes } from './routes/scheduling.routes';
+import { timetableRoutes } from './routes/timetable.routes';
+import { scheduleRoutes, icalRoutes } from './routes/schedule.routes';
+import { coverRoutes } from './routes/cover.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -379,6 +383,14 @@ const v1 = new Hono<HonoEnv>()
    * F7 — the day-one import:
    * - /v1/imports        a file staged, reviewed (fix, merge, skip, mapping)
    *                      and committed one family per transaction
+   * F1 — scheduling:
+   * - /v1/scheduling     teaching groups and the year's timetable rules
+   * - /v1/timetables     timetables per term: drafts, the grid, the
+   *                      generator, publishing, exports
+   * - /v1/schedule       the timetable as people read it (a day, a week,
+   *                      a lesson's class) and the calendar feed link
+   * - /v1/cover          absences, cover, the log and the report
+   * - /v1/ical/:token    the calendar feed (anonymous: the token is the key)
    *
    * Reports routes mounted at /v1/reports (admin only):
    * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
@@ -446,7 +458,13 @@ const v1 = new Hono<HonoEnv>()
   .route('/exams', examTimetableRoutes)
   .route('/exams', examResultRoutes)
   // F7: the day-one import
-  .route('/imports', importRoutes);
+  .route('/imports', importRoutes)
+  // F1: scheduling
+  .route('/scheduling', schedulingRoutes)
+  .route('/timetables', timetableRoutes)
+  .route('/schedule', scheduleRoutes)
+  .route('/cover', coverRoutes)
+  .route('/ical', icalRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.

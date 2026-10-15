@@ -1,0 +1,464 @@
+{
+  "sidebars": {
+    "admin": {
+      "landing": "/",
+      "count": 24,
+      "f1Items": [],
+      "items": [
+        "Home (/)",
+        "Sessions (/admin/sessions)",
+        "Exam Catalogue (/exams/catalogue)",
+        "Subjects (/admin/subjects)",
+        "Board Series (/exams/series)",
+        "Board Services (/exams/services)",
+        "School Fees (/admin/school-fees)",
+        "Settings (/settings)",
+        "Day-one Import (/imports)",
+        "Team (/admin/team)",
+        "The Desk (/desk)",
+        "Students (/students)",
+        "Charges (/charges)",
+        "Payments (/admin/payments)",
+        "Exceptions (/admin/exceptions)",
+        "Messages (/admin/messages)",
+        "Escrow (/admin/escrow)",
+        "Finance Workbench (/finance)",
+        "Daily Takings (/takings)",
+        "Exam Deadlines (/exams/deadlines)",
+        "Exam Entries (/exams/entries)",
+        "Entry Lists (/exams/entry-lists)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "coordinator": {
+      "landing": "/",
+      "count": 14,
+      "f1Items": [],
+      "items": [
+        "Home (/)",
+        "Sessions (/admin/sessions)",
+        "Exam Catalogue (/exams/catalogue)",
+        "Board Series (/exams/series)",
+        "Board Services (/exams/services)",
+        "Settings (/settings)",
+        "Day-one Import (/imports)",
+        "Students (/students)",
+        "Exceptions (/admin/exceptions)",
+        "Exam Deadlines (/exams/deadlines)",
+        "Exam Entries (/exams/entries)",
+        "Entry Lists (/exams/entry-lists)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "finance_admin": {
+      "landing": "/desk",
+      "count": 13,
+      "f1Items": [],
+      "items": [
+        "The Desk (/desk)",
+        "Sessions (/admin/sessions)",
+        "Board Services (/exams/services)",
+        "School Fees (/admin/school-fees)",
+        "Settings (/settings)",
+        "Students (/students)",
+        "Charges (/charges)",
+        "Exceptions (/admin/exceptions)",
+        "Messages (/admin/messages)",
+        "Finance Workbench (/finance)",
+        "Daily Takings (/takings)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "finance_officer": {
+      "landing": "/desk",
+      "count": 9,
+      "f1Items": [],
+      "items": [
+        "The Desk (/desk)",
+        "Students (/students)",
+        "Charges (/charges)",
+        "Sessions (/admin/sessions)",
+        "Messages (/admin/messages)",
+        "Finance Workbench (/finance)",
+        "Daily Takings (/takings)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "teacher": {
+      "landing": "/",
+      "count": 3,
+      "f1Items": [],
+      "items": [
+        "Home (/)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "gate": {
+      "landing": "/",
+      "count": 3,
+      "f1Items": [],
+      "items": [
+        "Home (/)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "parent": {
+      "landing": "/",
+      "count": 12,
+      "f1Items": [],
+      "items": [
+        "Home (/)",
+        "Reserve Subjects (/register)",
+        "My Registrations (/registrations)",
+        "History (/registrations/history)",
+        "Approvals (/approvals)",
+        "Statement (/statement)",
+        "School Fee (/school-fee)",
+        "Charges & Instalments (/charges-due)",
+        "Escrow Balance (/escrow)",
+        "Linked Children (/links)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    },
+    "student": {
+      "landing": "/",
+      "count": 9,
+      "f1Items": [],
+      "items": [
+        "Home (/)",
+        "Reserve Subjects (/register)",
+        "My Registrations (/registrations)",
+        "Statement (/statement)",
+        "History (/registrations/history)",
+        "Pending Requests (/pending-requests)",
+        "Linked Parents (/links)",
+        "Notifications (/notifications)",
+        "Profile (/profile)"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "role": "admin",
+      "lang": "en",
+      "name": "groups",
+      "path": "/timetable/groups",
+      "status": 200,
+      "url": "/timetable/groups",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Teaching groups | Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; a student is never in two groups of one subject, or of one unit."
+    },
+    {
+      "role": "admin",
+      "lang": "en",
+      "name": "versions",
+      "path": "/timetable/versions",
+      "status": 200,
+      "url": "/timetable/versions",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Timetables | Each term's drafts and published versions. The one in force is marked; earlier versions stay on record, so any past day can be read back."
+    },
+    {
+      "role": "admin",
+      "lang": "en",
+      "name": "editor",
+      "path": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "status": 200,
+      "url": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1 (changes)"
+    },
+    {
+      "role": "admin",
+      "lang": "en",
+      "name": "published",
+      "path": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "status": 200,
+      "url": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1"
+    },
+    {
+      "role": "admin",
+      "lang": "en",
+      "name": "rules",
+      "path": "/timetable/rules",
+      "status": 200,
+      "url": "/timetable/rules",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Timetable rules | When a teacher or a room cannot be used, a teacher's most periods a day and a week, and lessons kept on different days. The generator and every move obey them."
+    },
+    {
+      "role": "admin",
+      "lang": "en",
+      "name": "cover",
+      "path": "/timetable/cover",
+      "status": 200,
+      "url": "/timetable/cover",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Cover | Record who is away, see the lessons it leaves, and give each one a free teacher of the subject — or cancel it. The cover teacher and the class are told."
+    },
+    {
+      "role": "admin",
+      "lang": "ar",
+      "name": "groups",
+      "path": "/timetable/groups",
+      "status": 200,
+      "url": "/timetable/groups",
+      "dir": "rtl",
+      "arabicPct": 56,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | مجموعات التدريس | من يدرس معًا، ومع من، وكم حصة أسبوعيًا. تُكوَّن من الالتحاق بالمقررات (الدراسة الذاتية لا تكوّن مجموعة) ومن الفصول؛ ولا يكون طالب في مجموعتين لمادة واحدة أو لوحدة واحدة."
+    },
+    {
+      "role": "admin",
+      "lang": "ar",
+      "name": "versions",
+      "path": "/timetable/versions",
+      "status": 200,
+      "url": "/timetable/versions",
+      "dir": "rtl",
+      "arabicPct": 89,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الجداول الدراسية | مسودات كل فصل دراسي ونسخه المنشورة. يُميَّز الجدول الساري؛ وتبقى النسخ السابقة في السجل، فيمكن الرجوع إلى أي يوم مضى."
+    },
+    {
+      "role": "admin",
+      "lang": "ar",
+      "name": "editor",
+      "path": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "status": 200,
+      "url": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "dir": "rtl",
+      "arabicPct": 40,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1 (changes)"
+    },
+    {
+      "role": "admin",
+      "lang": "ar",
+      "name": "published",
+      "path": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "status": 200,
+      "url": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "dir": "rtl",
+      "arabicPct": 53,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1"
+    },
+    {
+      "role": "admin",
+      "lang": "ar",
+      "name": "rules",
+      "path": "/timetable/rules",
+      "status": 200,
+      "url": "/timetable/rules",
+      "dir": "rtl",
+      "arabicPct": 67,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | قواعد الجدول | متى لا يمكن الاستعانة بمعلم أو قاعة، وأقصى حصص المعلم يوميًا وأسبوعيًا، والحصص التي تُفصل على أيام مختلفة. يلتزم بها التوليد وكل نقل."
+    },
+    {
+      "role": "admin",
+      "lang": "ar",
+      "name": "cover",
+      "path": "/timetable/cover",
+      "status": 200,
+      "url": "/timetable/cover",
+      "dir": "rtl",
+      "arabicPct": 75,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الحصص البديلة | سجّل من الغائب، واطّلع على الحصص التي يتركها، وأعطِ كل حصة معلمًا متاحًا للمادة — أو ألغها. ويُبلَّغ المعلم البديل والفصل."
+    },
+    {
+      "role": "coordinator",
+      "lang": "en",
+      "name": "groups",
+      "path": "/timetable/groups",
+      "status": 200,
+      "url": "/timetable/groups",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Teaching groups | Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; a student is never in two groups of one subject, or of one unit."
+    },
+    {
+      "role": "coordinator",
+      "lang": "en",
+      "name": "versions",
+      "path": "/timetable/versions",
+      "status": 200,
+      "url": "/timetable/versions",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Timetables | Each term's drafts and published versions. The one in force is marked; earlier versions stay on record, so any past day can be read back."
+    },
+    {
+      "role": "coordinator",
+      "lang": "en",
+      "name": "editor",
+      "path": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "status": 200,
+      "url": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1 (changes)"
+    },
+    {
+      "role": "coordinator",
+      "lang": "en",
+      "name": "published",
+      "path": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "status": 200,
+      "url": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | ← Timetables | Term 1"
+    },
+    {
+      "role": "coordinator",
+      "lang": "en",
+      "name": "rules",
+      "path": "/timetable/rules",
+      "status": 200,
+      "url": "/timetable/rules",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Timetable rules | When a teacher or a room cannot be used, a teacher's most periods a day and a week, and lessons kept on different days. The generator and every move obey them."
+    },
+    {
+      "role": "coordinator",
+      "lang": "en",
+      "name": "cover",
+      "path": "/timetable/cover",
+      "status": 200,
+      "url": "/timetable/cover",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | Teaching groups | Rules | Cover | Cover | Record who is away, see the lessons it leaves, and give each one a free teacher of the subject — or cancel it. The cover teacher and the class are told."
+    },
+    {
+      "role": "coordinator",
+      "lang": "ar",
+      "name": "groups",
+      "path": "/timetable/groups",
+      "status": 200,
+      "url": "/timetable/groups",
+      "dir": "rtl",
+      "arabicPct": 56,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | مجموعات التدريس | من يدرس معًا، ومع من، وكم حصة أسبوعيًا. تُكوَّن من الالتحاق بالمقررات (الدراسة الذاتية لا تكوّن مجموعة) ومن الفصول؛ ولا يكون طالب في مجموعتين لمادة واحدة أو لوحدة واحدة."
+    },
+    {
+      "role": "coordinator",
+      "lang": "ar",
+      "name": "versions",
+      "path": "/timetable/versions",
+      "status": 200,
+      "url": "/timetable/versions",
+      "dir": "rtl",
+      "arabicPct": 89,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الجداول الدراسية | مسودات كل فصل دراسي ونسخه المنشورة. يُميَّز الجدول الساري؛ وتبقى النسخ السابقة في السجل، فيمكن الرجوع إلى أي يوم مضى."
+    },
+    {
+      "role": "coordinator",
+      "lang": "ar",
+      "name": "editor",
+      "path": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "status": 200,
+      "url": "/timetable/versions/41729ed6-d717-4dc9-bd31-87fb728a2455",
+      "dir": "rtl",
+      "arabicPct": 40,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1 (changes)"
+    },
+    {
+      "role": "coordinator",
+      "lang": "ar",
+      "name": "published",
+      "path": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "status": 200,
+      "url": "/timetable/versions/6754679e-4ab4-42fb-85c0-b3fa599f09e1",
+      "dir": "rtl",
+      "arabicPct": 53,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | → الجداول الدراسية | Term 1"
+    },
+    {
+      "role": "coordinator",
+      "lang": "ar",
+      "name": "rules",
+      "path": "/timetable/rules",
+      "status": 200,
+      "url": "/timetable/rules",
+      "dir": "rtl",
+      "arabicPct": 67,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | قواعد الجدول | متى لا يمكن الاستعانة بمعلم أو قاعة، وأقصى حصص المعلم يوميًا وأسبوعيًا، والحصص التي تُفصل على أيام مختلفة. يلتزم بها التوليد وكل نقل."
+    },
+    {
+      "role": "coordinator",
+      "lang": "ar",
+      "name": "cover",
+      "path": "/timetable/cover",
+      "status": 200,
+      "url": "/timetable/cover",
+      "dir": "rtl",
+      "arabicPct": 75,
+      "first": "الجداول الدراسية | مجموعات التدريس | القواعد | الحصص البديلة | الحصص البديلة | سجّل من الغائب، واطّلع على الحصص التي يتركها، وأعطِ كل حصة معلمًا متاحًا للمادة — أو ألغها. ويُبلَّغ المعلم البديل والفصل."
+    },
+    {
+      "role": "parent",
+      "lang": "en",
+      "name": "my-timetable",
+      "path": "/my-timetable",
+      "status": 200,
+      "url": "/my-timetable",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "Timetables | The week as it will run: holidays, short days and cover included. | Student Placeholder 1 | 11 October – 17 October 2026 | ‹ | This week"
+    },
+    {
+      "role": "parent",
+      "lang": "ar",
+      "name": "my-timetable",
+      "path": "/my-timetable",
+      "status": 200,
+      "url": "/my-timetable",
+      "dir": "rtl",
+      "arabicPct": 76,
+      "first": "الجداول الدراسية | الأسبوع كما سيجري: الإجازات والأيام القصيرة والحصص البديلة مضمّنة. | Student Placeholder 1 | 11 أكتوبر – 17 أكتوبر 2026 | ‹ | هذا الأسبوع"
+    },
+    {
+      "role": "student",
+      "lang": "en",
+      "name": "my-timetable",
+      "path": "/my-timetable",
+      "status": 200,
+      "url": "/my-timetable",
+      "dir": "ltr",
+      "arabicPct": 0,
+      "first": "My timetable | The week as it will run: holidays, short days and cover included. | 11 October – 17 October 2026 | ‹ | This week | ›"
+    },
+    {
+      "role": "student",
+      "lang": "ar",
+      "name": "my-timetable",
+      "path": "/my-timetable",
+      "status": 200,
+      "url": "/my-timetable",
+      "dir": "rtl",
+      "arabicPct": 79,
+      "first": "جدولي | الأسبوع كما سيجري: الإجازات والأيام القصيرة والحصص البديلة مضمّنة. | 11 أكتوبر – 17 أكتوبر 2026 | ‹ | هذا الأسبوع | ›"
+    }
+  ],
+  "cover": "Timetables | Teaching groups | Rules | Cover | Cover | Record who is away, see the lessons it leaves, and give each one a free teacher of the subject — or cancel it. The cover teacher and the class are told. | By day | Log | Report | ‹ | Day | › | Today | Thursday 15 October 2026",
+  "studentRecord": {
+    "status": 200,
+    "weekSection": 0,
+    "f1Links": [],
+    "mentionsTimetable": false
+  }
+}

@@ -1,0 +1,9 @@
+Control RV6b-generator-spans: packages/validations/src/scheduling/generator.ts — the guard undone ('const teaching = teachingOf(input);' -> 'const teaching = teachingOf({ ...input, teacherSpans: undefined });'); ran test/08s0 at 2026-10-08T19:21:06+00:00 on igcse_scheduling_ctl_test
+
+   × F1: the editor engine and the generator’s explanations > a teacher who takes a group later in the term: their unavailability and limits judged for it from that day — the cell judgement equals the full evaluation, and the generator places within them 1585ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+ FAIL  test/08s0-scheduling-engine.test.ts > F1: the editor engine and the generator’s explanations > a teacher who takes a group later in the term: their unavailability and limits judged for it from that day — the cell judgement equals the full evaluation, and the generator places within them
+    AssertionError: expected [ { kind: 'teacher_day_limit', …(4) } ] to deeply equal []
+    - Expected
+    + Received

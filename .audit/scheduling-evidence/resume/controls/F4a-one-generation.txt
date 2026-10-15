@@ -1,0 +1,9 @@
+Control F4a-one-generation: apps/api/src/services/timetable.services.ts — the guard undone ('if (!rows[0]?.locked) throw new SchedulingError(' -> 'if (rows[0]?.locked === null) throw new SchedulingError('); ran test/08s6 at 2026-10-08T13:50:43+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a second generation of a draft while one runs is refused; a request cancelled while the generator runs writes nothing 149ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a second generation of a draft while one runs is refused; a request cancelled while the generator runs writes nothing
+    AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+    - Expected
+    + Received

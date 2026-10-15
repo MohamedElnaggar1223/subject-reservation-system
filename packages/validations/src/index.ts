@@ -72,3 +72,11 @@ export * from './exams/exam-entry.validations'
  */
 export * from './import/import.validations'
 export * from './import/import-types'
+/**
+ * F1 — scheduling: the timetable's rules and generator (pure, shared by the
+ * API and the grid editor), and the inputs of its endpoints.
+ */
+export * from './scheduling/engine'
+export * from './scheduling/generator'
+export * from './scheduling/scheduling.validations'
+export * from './scheduling/schedule-types'

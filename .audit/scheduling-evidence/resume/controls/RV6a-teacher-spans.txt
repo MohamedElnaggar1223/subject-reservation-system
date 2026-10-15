@@ -1,0 +1,9 @@
+Control RV6a-teacher-spans: apps/api/src/services/timetable.services.ts — the guard undone ('...(teacherSpans ? { teacherSpans } : {}),' -> '...(teacherSpans && false ? { teacherSpans } : {}),'); ran test/08s6 at 2026-10-08T19:20:38+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike 253ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike
+    AssertionError: expected [] to deeply equal [ …(2) ]
+    - Expected
+    + Received

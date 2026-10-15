@@ -11,6 +11,7 @@ import { getServerApi } from '~/lib/hono-server';
 import { requireStaff } from '~/lib/auth/session';
 import { ACADEMIC_ROLES, apiResponse, hasRole } from '@repo/validations';
 import TodayClient from './today.client';
+import { TEACHES_KEY } from './today-keys';
 
 export const metadata = {
   title: 'Today — IGCSE',
@@ -23,6 +24,12 @@ export default async function TodayPage(): Promise<React.JSX.Element> {
   await queryClient.prefetchQuery({
     queryKey: ['academic', 'day', 'today'],
     queryFn: () => apiResponse(api.v1.academic.calendar.day.$get({ query: {} })),
+  });
+  // F1: whether the account teaches (is linked to a teacher record) — read with the day; a failure
+  // shows on the page as a failure (the client asks again), not as "no lessons".
+  await queryClient.prefetchQuery({
+    queryKey: TEACHES_KEY,
+    queryFn: async () => !!(await apiResponse(api.v1.users.me.$get())).teachingAs,
   });
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

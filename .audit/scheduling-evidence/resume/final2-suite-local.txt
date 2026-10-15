@@ -1,0 +1,7 @@
+The committed code (with the online lesson's delivery), full suite, local time (Africa/Cairo), igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  619 passed | 1 todo (620)
+   Duration  368.61s (transform 1.21s, setup 56ms, collect 4.71s, tests 357.85s, environment 3ms, prepare 1.21s)
+exit=0
+(✓ lines in the log: 332)

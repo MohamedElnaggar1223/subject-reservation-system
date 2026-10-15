@@ -1,0 +1,14 @@
+Control RV3-rules-cover-recheck: apps/api/src/services/schedule-rules.services.ts — the guard undone ("const coversLost = await cover.recheckCovers(tx, await cover.liveCoversFrom(tx, { teacherIds: [teacherId], from: todayAtSchool() }), actorId, `${t.name}'s timet" -> 'const coversLost: string[] = [];'); ran test/08s6 at 2026-10-08T19:19:14+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher's timetable rules changed: the cover they give at a period they can no longer teach is judged again and goes, and they are told 303ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 333ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 37 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher's timetable rules changed: the cover they give at a period they can no longer teach is judged again and goes, and they are told
+    AssertionError: expected [] to deeply equal [ ObjectContaining{…} ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over
+    AssertionError: expected 409 to be 201 // Object.is equality
+    - Expected
+    + Received

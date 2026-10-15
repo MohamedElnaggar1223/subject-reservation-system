@@ -14,9 +14,12 @@
  * (`checkEnrolments`): a registration without an enrolment, or an enrolment
  * never registered, is flagged — never blocked.
  *
- * Contracts (FEATURES_PLAN.md §2; docs/features/CATALOGUE.md §7):
- * - F1: `getTeachingDemand(academicYearId)` — per subject and teacher, the
- *   students taught in school. Self-study forms no group.
+ * Contracts (FEATURES_PLAN.md §2; docs/features/CATALOGUE.md §7; RESERVATIONS_REWORK.md §10):
+ * - F1: `getTeachingDemand(academicYearId)` — per subject, unit and teacher,
+ *   the students taught in school, with the offer teacher's delivery and kind.
+ *   Self-study forms no group. Every change of an enrolment's teacher or mode
+ *   reaches the teaching group through F1's `followEnrolments` (upsertEnrolments
+ *   with `follow`, updateEnrolment).
  * - F4: `teacherOf(studentId, subjectId, academicYearStart, unitId?)` — the teacher
  *   who gives the forecast grade (null: self-study, or none recorded); the unit since
  *   the reservations rework (an enrolment per unit).
@@ -26,16 +29,18 @@
 
 import {
   db, courseEnrolment, academicYear, subject, teacher, subjectTeacher, user, section, sectionMembership, registration, registrationSession,
-  sessionOfferItem, sessionOfferItemUnit, examUnit,
+  sessionOffer, sessionOfferItem, sessionOfferItemUnit, sessionOfferTeacher, sessionOfferItemTeacher, examUnit,
   eq, and, inArray, isNull, sql, asc, or,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, schoolDateString, seriesAcademicYearStart,
+  academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart,
   type CreateEnrolmentType, type UpdateEnrolmentType, type EndEnrolmentType, type BulkEnrolType, type EnrolSectionType,
   type BatchEnrolRowType, type ListEnrolmentsQueryType, type EnrolmentMode, type EnrolmentSource,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
+import { todayAtSchool } from '../lib/clock';
+import { endGroupMembershipsForSubject, followEnrolments, type FollowOutcome } from './group.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -174,7 +179,7 @@ async function teacherOrThrow(tx: Tx, teacherId: string) {
 }
 
 function clampStart(y: { startsOn: string; endsOn: string }, wanted?: string) {
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   const start = wanted ?? (today < y.startsOn ? y.startsOn : today > y.endsOn ? y.endsOn : today);
   if (start < y.startsOn || start > y.endsOn) throw new EnrolmentError(`The start date falls inside the school year (${y.startsOn} – ${y.endsOn})`);
   return start;
@@ -216,11 +221,25 @@ export async function createEnrolment(data: CreateEnrolmentType, actorId: string
   }
 }
 
+/**
+ * The enrolment, its student locked first (RESERVATIONS.md §2.1: the student before anything a path
+ * takes after it — the teaching group that follows, a leaving, a move into a group hold the student
+ * first), then the row FOR NO KEY UPDATE: only its teacher, mode or end changes, so a member row
+ * naming it (FOR KEY SHARE through its foreign key) never waits on it.
+ */
+async function enrolmentForChange(tx: Tx, id: string) {
+  const [seen] = await tx.select({ studentId: courseEnrolment.studentId }).from(courseEnrolment).where(eq(courseEnrolment.id, id));
+  if (!seen) throw new EnrolmentError('Enrolment not found', 404);
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, seen.studentId)).for('no key update');
+  const [e] = await tx.select().from(courseEnrolment).where(eq(courseEnrolment.id, id)).for('no key update');
+  if (!e) throw new EnrolmentError('Enrolment not found', 404);
+  return e;
+}
+
 /** Change an enrolment's teacher or mode (self-study has no teacher). */
 export async function updateEnrolment(id: string, data: UpdateEnrolmentType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
-    const [e] = await tx.select().from(courseEnrolment).where(eq(courseEnrolment.id, id)).for('update');
-    if (!e) throw new EnrolmentError('Enrolment not found', 404);
+    const e = await enrolmentForChange(tx, id);
     if (e.endedOn) throw new EnrolmentError('This enrolment has ended — enrol the student again instead', 409);
     const mode = data.mode ?? (e.mode as EnrolmentMode);
     const [s] = await tx.select({ id: subject.id, name: subject.name, code: subject.code, isActive: subject.isActive, isOfferedAtSchool: subject.isOfferedAtSchool })
@@ -234,21 +253,41 @@ export async function updateEnrolment(id: string, data: UpdateEnrolmentType, act
     }
     const [updated] = await tx.update(courseEnrolment).set({ mode, teacherId, updatedAt: new Date() }).where(eq(courseEnrolment.id, id)).returning();
     await logAction(actorId, 'ENROLMENT_UPDATED', 'enrolment', id, { mode: e.mode, teacherId: e.teacherId }, { mode, teacherId, teacherLinkedToSubject: linked }, ctx, tx);
-    return updated!;
+    // F1: the teaching group follows (self-study leaves it; a new teacher's group takes the student).
+    const groupsFollowed = await followEnrolments(tx, [{
+      enrolmentId: e.id, studentId: e.studentId, academicYearId: e.academicYearId, subjectId: e.subjectId, unitId: e.unitId,
+      before: { teacherId: e.teacherId, mode: e.mode as EnrolmentMode }, after: { teacherId, mode },
+    }], actorId, ctx);
+    return { ...updated!, groupsFollowed };
+  }).then(async (r) => {
+    await groupFollowNotices(r.groupsFollowed);
+    return r;
   });
+}
+
+/**
+ * After the commit of a change the teaching group followed: the cover a
+ * group's new teacher made no longer holding is told to its people. Callers
+ * of `upsertEnrolments(..., { follow })` call it after their transaction.
+ */
+export async function groupFollowNotices(f: FollowOutcome | null | undefined) {
+  if (!f?.coversLost.length) return;
+  const cover = await import('./cover.services');
+  await cover.coverChangeNotices(f.coversLost, 'no_longer_holds').catch((err) => console.error('[enrolment] cover notices failed:', err));
 }
 
 /** End an enrolment (the student stopped the subject): history is kept. */
 export async function endEnrolment(id: string, data: EndEnrolmentType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
-    const [e] = await tx.select().from(courseEnrolment).where(eq(courseEnrolment.id, id)).for('update');
-    if (!e) throw new EnrolmentError('Enrolment not found', 404);
+    const e = await enrolmentForChange(tx, id);
     if (e.endedOn) throw new EnrolmentError('This enrolment already ended', 409);
-    const endedOn = data.endedOn ?? schoolDateString(new Date());
+    const endedOn = data.endedOn ?? todayAtSchool();
     if (endedOn < e.startedOn) throw new EnrolmentError('An enrolment cannot end before it started');
     const [updated] = await tx.update(courseEnrolment).set({ endedOn, endReason: data.reason, endedBy: actorId, updatedAt: new Date() })
       .where(eq(courseEnrolment.id, id)).returning();
-    await logAction(actorId, 'ENROLMENT_ENDED', 'enrolment', id, { endedOn: null }, { endedOn, reason: data.reason }, ctx, tx);
+    // F1: no longer taught — they leave the subject's (or unit's) teaching group with the enrolment.
+    const groupsLeft = await endGroupMembershipsForSubject(tx, e.studentId, e.subjectId, e.unitId, e.academicYearId, endedOn, data.reason, actorId);
+    await logAction(actorId, 'ENROLMENT_ENDED', 'enrolment', id, { endedOn: null }, { endedOn, reason: data.reason, ...(groupsLeft ? { groupsLeft } : {}) }, ctx, tx);
     return updated!;
   });
 }
@@ -256,7 +295,7 @@ export async function endEnrolment(id: string, data: EndEnrolmentType, actorId: 
 /** End a student's open enrolments when they leave the school (F0a's leaving), in its transaction. */
 export async function endOpenEnrolments(tx: Tx, studentId: string, endedOn: string, reason: string, actorId: string) {
   const open = await tx.select({ id: courseEnrolment.id, startedOn: courseEnrolment.startedOn }).from(courseEnrolment)
-    .where(and(eq(courseEnrolment.studentId, studentId), isNull(courseEnrolment.endedOn))).for('update');
+    .where(and(eq(courseEnrolment.studentId, studentId), isNull(courseEnrolment.endedOn))).for('no key update');
   for (const e of open) {
     await tx.update(courseEnrolment)
       .set({ endedOn: endedOn < e.startedOn ? e.startedOn : endedOn, endReason: reason, endedBy: actorId, updatedAt: new Date() })
@@ -286,9 +325,43 @@ const enrolmentKey = (r: { studentId: string; subjectId: string; unitId?: string
   r.unitId ? `${r.studentId}|u:${r.unitId}` : `${r.studentId}|${r.subjectId}`;
 
 export type EnrolmentRowOutcome = EnrolmentRowInput & {
-  outcome: 'create' | 'created' | 'exists' | 'refused';
+  /** 'update' / 'updated': with `follow`, an open enrolment of the same key with another teacher or mode. */
+  outcome: 'create' | 'created' | 'update' | 'updated' | 'exists' | 'refused';
   reason: string | null;
 };
+
+/**
+ * An enrolment made, or its teacher or mode changed: what F1's
+ * `followEnrolments` moves the teaching group by (before null: just made).
+ */
+export type EnrolmentChange = {
+  enrolmentId: string;
+  studentId: string;
+  academicYearId: string;
+  subjectId: string;
+  unitId: string | null;
+  before: { teacherId: string | null; mode: EnrolmentMode } | null;
+  after: { teacherId: string | null; mode: EnrolmentMode };
+};
+
+/**
+ * The enrolment keys a reservation line is taught through (§10; RESERVATIONS.md
+ * §2.12): one per unit its item enters, or the subject's for an item entering
+ * none. A line whose item enters units while the student's enrolment of the
+ * subject is subject-level — from before the rework (no unit), under 0042's
+ * converted item entering all the subject's units — and none of those units
+ * has an enrolment of its own goes through the subject's own row, as A's
+ * replace-teacher does; it is never given unit enrolments beside it.
+ */
+export async function lineEnrolmentUnits(executor: Executor, academicYearId: string, studentId: string, subjectId: string, units: string[]): Promise<(string | null)[]> {
+  if (!units.length) return [null];
+  const perUnit = await executor.select({ id: courseEnrolment.id }).from(courseEnrolment)
+    .where(and(eq(courseEnrolment.academicYearId, academicYearId), eq(courseEnrolment.studentId, studentId), inArray(courseEnrolment.unitId, units), isNull(courseEnrolment.endedOn)));
+  if (perUnit.length) return units;
+  const [whole] = await executor.select({ id: courseEnrolment.id }).from(courseEnrolment)
+    .where(and(eq(courseEnrolment.academicYearId, academicYearId), eq(courseEnrolment.studentId, studentId), eq(courseEnrolment.subjectId, subjectId), isNull(courseEnrolment.unitId), isNull(courseEnrolment.endedOn)));
+  return whole ? [null] : units;
+}
 
 /**
  * Create enrolments for many (student, subject) pairs in the caller's
@@ -300,14 +373,24 @@ export type EnrolmentRowOutcome = EnrolmentRowInput & {
  * Idempotent: running the same rows again creates nothing new, and two runs
  * at the same moment create each enrolment once (the database's one open
  * enrolment per student, subject and year).
+ *
+ * `follow` (RESERVATIONS_REWORK.md §10: a line's teacher, its change or its
+ * replacement reaches the teaching group through here): a row whose open
+ * enrolment of the same key has another teacher or mode updates it
+ * (ENROLMENT_UPDATED, locked FOR UPDATE in id order after the students), and
+ * every enrolment made or updated is handed to F1's `followEnrolments` in this
+ * transaction — after the lines and enrolments in the lock order — or, with
+ * 'defer', returned as `changes` for the caller to hand over once.
  */
 export async function upsertEnrolments(
   tx: Tx,
   academicYearId: string,
   rows: EnrolmentRowInput[],
   actorId: string,
-  opts: { source: EnrolmentSource; commit: boolean; ctx?: AuditContext },
-): Promise<{ rows: EnrolmentRowOutcome[]; created: number; teacherLinks: number }> {
+  opts: {
+    source: EnrolmentSource; commit: boolean; ctx?: AuditContext; follow?: boolean | 'defer'; reason?: string;
+  },
+): Promise<{ rows: EnrolmentRowOutcome[]; created: number; updated: number; teacherLinks: number; changes: EnrolmentChange[]; groupsFollowed: FollowOutcome | null }> {
   const y = await yearOrThrow(academicYearId, tx);
   const startedOn = clampStart(y);
   const studentIds = [...new Set(rows.map((r) => r.studentId))];
@@ -317,22 +400,23 @@ export async function upsertEnrolments(
   // student: a leaving (which holds the student FOR UPDATE while it ends every
   // open enrolment) and this run one after the other, so no enrolment is made
   // for a student whose leaving has just ended the others.
-  const students = studentIds.length
-    ? await tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
-        .from(user).where(inArray(user.id, studentIds)).orderBy(user.id).for('share')
-    : [];
+  const studentRows = studentIds.length
+    ? tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
+        .from(user).where(inArray(user.id, studentIds)).orderBy(user.id)
+    : null;
+  const students = studentRows ? await studentRows.for('share') : [];
   const [subjects, teachers, existing] = await Promise.all([
     subjectIds.length ? tx.select({ id: subject.id, name: subject.name, code: subject.code, isActive: subject.isActive, isOfferedAtSchool: subject.isOfferedAtSchool }).from(subject).where(inArray(subject.id, subjectIds)) : [],
     teacherIds.length ? tx.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(teacher).where(inArray(teacher.id, teacherIds)) : [],
     studentIds.length
-      ? tx.select({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId }).from(courseEnrolment)
+      ? tx.select({ id: courseEnrolment.id, studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId, teacherId: courseEnrolment.teacherId, mode: courseEnrolment.mode }).from(courseEnrolment)
           .where(and(eq(courseEnrolment.academicYearId, y.id), isNull(courseEnrolment.endedOn), inArray(courseEnrolment.studentId, studentIds)))
       : [],
   ]);
   const studentBy = new Map(students.map((s) => [s.id, s]));
   const subjectBy = new Map(subjects.map((s) => [s.id, s]));
   const teacherBy = new Map(teachers.map((t) => [t.id, t]));
-  const enrolled = new Set(existing.map(enrolmentKey));
+  const enrolled = new Map(existing.map((e) => [enrolmentKey(e), e]));
   const seen = new Set<string>();
 
   const out: EnrolmentRowOutcome[] = rows.map((r) => {
@@ -349,12 +433,41 @@ export async function upsertEnrolments(
       if (!t) return refuse('Teacher not found');
       if (!t.isActive) return refuse(`${t.name} is inactive`);
     }
-    if (enrolled.has(key) || seen.has(key)) return { ...base, outcome: 'exists', reason: null };
+    const open = enrolled.get(key);
+    if (open && opts.follow && !seen.has(key) && ((open.teacherId ?? null) !== (teacherId ?? null) || open.mode !== r.mode)) {
+      seen.add(key);
+      return { ...base, outcome: 'update', reason: null };
+    }
+    if (open || seen.has(key)) return { ...base, outcome: 'exists', reason: null };
     seen.add(key);
     return { ...base, outcome: 'create', reason: null };
   });
 
-  if (!opts.commit) return { rows: out, created: 0, teacherLinks: 0 };
+  if (!opts.commit) return { rows: out, created: 0, updated: 0, teacherLinks: 0, changes: [], groupsFollowed: null };
+
+  // With `follow`: the open enrolments of the same key take the row's teacher and mode.
+  const changes: EnrolmentChange[] = [];
+  const toUpdate = out.filter((r) => r.outcome === 'update');
+  let updated = 0;
+  if (toUpdate.length) {
+    const ids = toUpdate.map((r) => enrolled.get(enrolmentKey(r))!.id).sort();
+    // FOR NO KEY UPDATE: only the teacher and mode change (a member row naming the enrolment does not wait on it).
+    const locked = new Map((await tx.select().from(courseEnrolment).where(inArray(courseEnrolment.id, ids)).orderBy(asc(courseEnrolment.id)).for('no key update')).map((e) => [e.id, e]));
+    for (const r of toUpdate) {
+      const e = locked.get(enrolled.get(enrolmentKey(r))!.id);
+      if (!e || e.endedOn) { r.outcome = 'exists'; continue; }
+      await tx.update(courseEnrolment).set({ teacherId: r.teacherId, mode: r.mode, updatedAt: new Date() }).where(eq(courseEnrolment.id, e.id));
+      await logAction(actorId, 'ENROLMENT_UPDATED', 'enrolment', e.id, { mode: e.mode, teacherId: e.teacherId },
+        { mode: r.mode, teacherId: r.teacherId, source: opts.source, ...(r.sourceRef ? { sourceRef: r.sourceRef } : {}), ...(opts.reason ? { reason: opts.reason } : {}) }, opts.ctx, tx);
+      if (r.teacherId && r.teacherId !== e.teacherId) await linkTeacher(tx, r.teacherId, e.subjectId);
+      changes.push({
+        enrolmentId: e.id, studentId: e.studentId, academicYearId: e.academicYearId, subjectId: e.subjectId, unitId: e.unitId,
+        before: { teacherId: e.teacherId, mode: e.mode as EnrolmentMode }, after: { teacherId: r.teacherId, mode: r.mode },
+      });
+      r.outcome = 'updated';
+      updated++;
+    }
+  }
 
   const toCreate = out.filter((r) => r.outcome === 'create');
   let created = 0;
@@ -365,10 +478,15 @@ export async function upsertEnrolments(
     const inserted = await tx.insert(courseEnrolment).values(toCreate.map((r) => ({
       id: randomUUID(), academicYearId: y.id, studentId: r.studentId, subjectId: r.subjectId, unitId: r.unitId ?? null, teacherId: r.teacherId,
       mode: r.mode, source: opts.source, sourceRef: r.sourceRef ?? null, startedOn, createdBy: actorId,
-    }))).onConflictDoNothing().returning({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId });
+    }))).onConflictDoNothing().returning({ id: courseEnrolment.id, studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId, teacherId: courseEnrolment.teacherId, mode: courseEnrolment.mode });
     const made = new Set(inserted.map(enrolmentKey));
     for (const r of toCreate) r.outcome = made.has(enrolmentKey(r)) ? 'created' : 'exists';
     created = inserted.length;
+    if (opts.follow) {
+      for (const e of inserted) {
+        changes.push({ enrolmentId: e.id, studentId: e.studentId, academicYearId: y.id, subjectId: e.subjectId, unitId: e.unitId, before: null, after: { teacherId: e.teacherId, mode: e.mode as EnrolmentMode } });
+      }
+    }
     for (const pair of new Set(toCreate.filter((r) => r.teacherId && r.outcome === 'created').map((r) => `${r.teacherId}|${r.subjectId}`))) {
       const [t, s] = pair.split('|') as [string, string];
       if (await linkTeacher(tx, t, s)) teacherLinks++;
@@ -379,7 +497,9 @@ export async function upsertEnrolments(
         opts.ctx, tx);
     }
   }
-  return { rows: out, created, teacherLinks };
+  // F1: the teaching group follows, in this transaction (or the caller hands the changes over once).
+  const groupsFollowed = opts.follow === true && changes.length ? await followEnrolments(tx, changes, actorId, opts.ctx) : null;
+  return { rows: out, created, updated, teacherLinks, changes, groupsFollowed };
 }
 
 async function namesFor(rows: EnrolmentRowOutcome[]) {
@@ -590,28 +710,39 @@ export async function batchEnrol(academicYearId: string, input: BatchEnrolRowTyp
 // ─── Registrations against enrolments ────────────────────────────────────────
 
 function emptyFlags() {
-  return { registeredNotEnrolled: [], enrolledNotRegistered: [], modeDiffers: [], teacherDiffers: [] } as {
+  return { registeredNotEnrolled: [], enrolledNotRegistered: [], modeDiffers: [], teacherDiffers: [], subjectAndUnit: [] } as {
     registeredNotEnrolled: FlagRow[]; enrolledNotRegistered: FlagRow[]; modeDiffers: FlagRow[]; teacherDiffers: FlagRow[];
+    /**
+     * A student enrolled in a subject as a whole (an enrolment from before the
+     * rework, no unit) and in units of it too: taught twice. `fix` names what
+     * the coordinator does.
+     */
+    subjectAndUnit: (FlagRow & { fix: string; units: string[] })[];
   };
 }
 
 type FlagRow = {
   studentId: string; studentName: string; studentCode: string | null; section: string | null;
   subjectId: string; subjectName: string; subjectCode: string;
+  /** The unit, for a line or an enrolment per unit (the reservations rework, §10); null for the subject. */
+  unitId: string | null; unitCode: string | null;
   registrationId: string | null; window: string | null; registrationStatus: string | null; takenOutsideSchool: boolean | null; registrationTeacher: string | null; registrationTeacherId: string | null;
   enrolmentId: string | null; mode: string | null; teacherName: string | null;
 };
 
 /**
  * Exam registrations of the year's series checked against the year's
- * enrolments — flagged, never blocked:
- * - registered, not enrolled: a live registration with no open enrolment in
- *   that subject that year;
- * - enrolled, not registered: an open enrolment with no live registration
- *   in any window of that year (yet — June's window opens in February);
- * - mode differs: self-study enrolment and an in-school registration, or the
- *   other way round;
- * - teacher differs: the registration names another teacher.
+ * enrolments — flagged, never blocked — per enrolment key (§10): a line of an
+ * item entering units against an enrolment per unit (or, for a converted line
+ * over a subject-level enrolment from before the rework, the subject's own
+ * row, as `lineEnrolmentUnits` decides), any other line against the subject's:
+ * - registered, not enrolled: a live line with no open enrolment of its key;
+ * - enrolled, not registered: an open enrolment no live line of that year is
+ *   taught through (yet — June's window opens in February);
+ * - mode differs: self-study enrolment and an in-school line, or the other way;
+ * - teacher differs: the line names another teacher;
+ * - subject and unit: a subject-level enrolment beside unit enrolments of the
+ *   same subject — the student would be taught twice.
  */
 export async function checkEnrolments(academicYearId: string, studentId?: string) {
   const y = await yearOrThrow(academicYearId);
@@ -619,9 +750,12 @@ export async function checkEnrolments(academicYearId: string, studentId?: string
     .select({
       id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, status: registration.status,
       outside: registration.takenOutsideSchool, teacherId: registration.teacherId, window: registrationSession.name,
+      entersKind: sessionOfferItem.entersKind,
+      units: sql<string[]>`coalesce((select array_agg(u.unit_id order by u.unit_id) from ${sessionOfferItemUnit} u where u.item_id = ${registration.offerItemId}), '{}')`,
     })
     .from(registration)
     .innerJoin(registrationSession, eq(registrationSession.id, registration.sessionId))
+    .leftJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
     .where(and(
       LIVE_REGISTRATION,
       sql`school_series_academic_year_start(${registrationSession.sessionType}, ${registrationSession.seriesYear}) = ${y.startYear}`,
@@ -632,58 +766,89 @@ export async function checkEnrolments(academicYearId: string, studentId?: string
   const studentIds = [...new Set([...regs.map((r) => r.studentId), ...enrols.map((e) => e.studentId)])];
   const subjectIds = [...new Set([...regs.map((r) => r.subjectId), ...enrols.map((e) => e.subjectId)])];
   const teacherIds = [...new Set([...regs.map((r) => r.teacherId), ...enrols.map((e) => e.teacherId)].filter((t): t is string => !!t))];
-  const [students, subjects, teachers, sections] = await Promise.all([
+  const unitIds = [...new Set([...regs.flatMap((r) => r.units ?? []), ...enrols.map((e) => e.unitId).filter((u): u is string => !!u)])];
+  const [students, subjects, teachers, units, sections] = await Promise.all([
     studentIds.length ? db.select({ id: user.id, name: user.name, code: user.studentId }).from(user).where(inArray(user.id, studentIds)) : [],
     subjectIds.length ? db.select({ id: subject.id, name: subject.name, code: subject.code }).from(subject).where(inArray(subject.id, subjectIds)) : [],
     teacherIds.length ? db.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds)) : [],
+    unitIds.length ? db.select({ id: examUnit.id, code: examUnit.code, shortCode: examUnit.shortCode }).from(examUnit).where(inArray(examUnit.id, unitIds)) : [],
     sectionsOf(studentIds, y.id),
   ]);
   const st = new Map(students.map((s) => [s.id, s]));
   const su = new Map(subjects.map((s) => [s.id, s]));
   const te = new Map(teachers.map((t) => [t.id, t.name]));
-  const enrolBy = new Map(enrols.map((e) => [`${e.studentId}|${e.subjectId}`, e]));
-  const regsBy = new Map<string, typeof regs>();
-  for (const r of regs) regsBy.set(`${r.studentId}|${r.subjectId}`, [...(regsBy.get(`${r.studentId}|${r.subjectId}`) ?? []), r]);
+  const un = new Map(units.map((u) => [u.id, u.shortCode ?? u.code]));
+  const keyOf = (sid: string, subId: string, unitId: string | null) => (unitId ? `${sid}|u:${unitId}` : `${sid}|s:${subId}`);
+  const enrolBy = new Map(enrols.map((e) => [keyOf(e.studentId, e.subjectId, e.unitId), e]));
 
-  const row = (sid: string, subId: string, r: (typeof regs)[number] | null, e: (typeof enrols)[number] | null): FlagRow => ({
+  const row = (sid: string, subId: string, unitId: string | null, r: (typeof regs)[number] | null, e: (typeof enrols)[number] | null): FlagRow => ({
     studentId: sid, studentName: st.get(sid)?.name ?? '', studentCode: st.get(sid)?.code ?? null, section: sections.get(sid)?.name ?? null,
     subjectId: subId, subjectName: su.get(subId)?.name ?? '', subjectCode: su.get(subId)?.code ?? '',
+    unitId, unitCode: unitId ? un.get(unitId) ?? null : null,
     registrationId: r?.id ?? null, window: r?.window ?? null, registrationStatus: r?.status ?? null, takenOutsideSchool: r?.outside ?? null,
     registrationTeacher: r?.teacherId ? te.get(r.teacherId) ?? null : null, registrationTeacherId: r?.teacherId ?? null,
     enrolmentId: e?.id ?? null, mode: e?.mode ?? null, teacherName: e?.teacherId ? te.get(e.teacherId) ?? null : null,
   });
+  // A line's keys (lineEnrolmentUnits, read from the enrolments in hand).
+  const keysOf = (r: (typeof regs)[number]): (string | null)[] => {
+    const lineUnits = r.entersKind === 'units' ? r.units ?? [] : [];
+    if (!lineUnits.length) return [null];
+    if (lineUnits.some((u) => enrolBy.has(keyOf(r.studentId, r.subjectId, u)))) return lineUnits;
+    return enrolBy.has(keyOf(r.studentId, r.subjectId, null)) ? [null] : lineUnits;
+  };
   const flags = emptyFlags();
+  const taughtThrough = new Set<string>();
   for (const r of regs) {
-    const e = enrolBy.get(`${r.studentId}|${r.subjectId}`);
-    if (!e) { flags.registeredNotEnrolled.push(row(r.studentId, r.subjectId, r, null)); continue; }
-    if ((e.mode === 'self_study') !== r.outside) flags.modeDiffers.push(row(r.studentId, r.subjectId, r, e));
-    if (r.teacherId && e.teacherId && r.teacherId !== e.teacherId) flags.teacherDiffers.push(row(r.studentId, r.subjectId, r, e));
+    for (const unitId of keysOf(r)) {
+      const key = keyOf(r.studentId, r.subjectId, unitId);
+      taughtThrough.add(key);
+      const e = enrolBy.get(key);
+      if (!e) { flags.registeredNotEnrolled.push(row(r.studentId, r.subjectId, unitId, r, null)); continue; }
+      if ((e.mode === 'self_study') !== r.outside) flags.modeDiffers.push(row(r.studentId, r.subjectId, unitId, r, e));
+      if (r.teacherId && e.teacherId && r.teacherId !== e.teacherId) flags.teacherDiffers.push(row(r.studentId, r.subjectId, unitId, r, e));
+    }
   }
   for (const e of enrols) {
-    if (!regsBy.has(`${e.studentId}|${e.subjectId}`)) flags.enrolledNotRegistered.push(row(e.studentId, e.subjectId, null, e));
+    if (!taughtThrough.has(keyOf(e.studentId, e.subjectId, e.unitId))) flags.enrolledNotRegistered.push(row(e.studentId, e.subjectId, e.unitId, null, e));
   }
-  const byName = (a: FlagRow, b: FlagRow) => a.studentName.localeCompare(b.studentName) || a.subjectName.localeCompare(b.subjectName);
+  for (const e of enrols.filter((x) => !x.unitId)) {
+    const perUnit = enrols.filter((x) => x.unitId && x.studentId === e.studentId && x.subjectId === e.subjectId);
+    if (!perUnit.length) continue;
+    const codes = perUnit.map((x) => un.get(x.unitId!) ?? '').filter(Boolean).sort();
+    flags.subjectAndUnit.push({
+      ...row(e.studentId, e.subjectId, null, null, e), units: codes,
+      fix: `End the enrolment in ${su.get(e.subjectId)?.name ?? 'the subject'} as a whole (the units ${codes.join(', ')} replace it), or end the unit enrolments if the subject is taught whole`,
+    });
+  }
+  const byName = (a: FlagRow, b: FlagRow) => a.studentName.localeCompare(b.studentName) || a.subjectName.localeCompare(b.subjectName) || (a.unitCode ?? '').localeCompare(b.unitCode ?? '');
   flags.registeredNotEnrolled.sort(byName);
   flags.enrolledNotRegistered.sort(byName);
   flags.modeDiffers.sort(byName);
   flags.teacherDiffers.sort(byName);
+  flags.subjectAndUnit.sort(byName);
   return flags;
 }
 
 // ─── Contracts for F1 and F4, and the teacher's own classes ──────────────────
 
 /**
- * F1's contract: per subject, unit (when the enrolments are per unit) and teacher, the students
- * taught in school this year (a teaching group's source). Self-study enrolments are not taught and
- * form no group; enrolments with no teacher yet form one group per subject
- * with `teacherId` null.
+ * F1's contract (RESERVATIONS_REWORK.md §10): per subject, unit (when the
+ * enrolments are per unit) and teacher, the students taught in school this
+ * year (a teaching group's source), with how the offer teaches it —
+ * `delivery` 'in_school' or 'online' (the teacher's mode on the item that
+ * names them, else on the offer, in the year's sessions, the latest first;
+ * 'in_school' when no offer names them) — and the teacher's kind ('provider':
+ * an external team, whose group has no lessons). Self-study enrolments are not
+ * taught and form no group; enrolments with no teacher yet ("no preference",
+ * §3.5) form one per subject or unit with `teacherId` null.
  */
 export async function getTeachingDemand(academicYearId: string) {
   const y = await yearOrThrow(academicYearId);
   const rows = await db
     .select({
-      subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId, unitCode: examUnit.code, teacherId: courseEnrolment.teacherId, studentId: courseEnrolment.studentId,
-      subjectName: subject.name, subjectCode: subject.code, qualificationLevel: subject.qualificationLevel, teacherName: teacher.name, studentName: user.name,
+      subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId, unitCode: examUnit.code, unitShortCode: examUnit.shortCode,
+      teacherId: courseEnrolment.teacherId, studentId: courseEnrolment.studentId,
+      subjectName: subject.name, subjectCode: subject.code, qualificationLevel: subject.qualificationLevel, teacherName: teacher.name, teacherKind: teacher.kind, studentName: user.name,
     })
     .from(courseEnrolment)
     .innerJoin(subject, eq(subject.id, courseEnrolment.subjectId))
@@ -691,13 +856,20 @@ export async function getTeachingDemand(academicYearId: string) {
     .leftJoin(teacher, eq(teacher.id, courseEnrolment.teacherId))
     .leftJoin(examUnit, eq(examUnit.id, courseEnrolment.unitId))
     .where(and(eq(courseEnrolment.academicYearId, y.id), isNull(courseEnrolment.endedOn), eq(courseEnrolment.mode, 'in_school')))
-    .orderBy(asc(subject.name), asc(teacher.name), asc(user.name));
+    .orderBy(asc(subject.name), asc(examUnit.code), asc(teacher.name), asc(user.name));
   const sections = await sectionsOf(rows.map((r) => r.studentId), y.id);
+  const deliveryOf = await offerDeliveries(y.startYear, [...new Set(rows.map((r) => r.subjectId))]);
   const groups = new Map<string, {
     subjectId: string; subjectName: string; subjectCode: string; qualificationLevel: string;
     /** The unit taught, when the enrolments are per unit (the reservations rework, §10); null for the subject. */
     unitId: string | null; unitCode: string | null;
+    /** What the school calls the unit ("P1"), else its code. */
+    unitName: string | null;
     teacherId: string | null; teacherName: string | null;
+    /** 'person', or 'provider': an external team, whose group has no lessons. */
+    teacherKind: string | null;
+    /** How the offer teaches it: online is timetabled without a room. */
+    delivery: 'in_school' | 'online';
     students: { studentId: string; name: string; sectionId: string | null; section: string | null }[];
   }>();
   for (const r of rows) {
@@ -705,13 +877,86 @@ export async function getTeachingDemand(academicYearId: string) {
     if (!groups.has(key)) {
       groups.set(key, {
         subjectId: r.subjectId, subjectName: r.subjectName, subjectCode: r.subjectCode, qualificationLevel: r.qualificationLevel,
-        unitId: r.unitId, unitCode: r.unitCode, teacherId: r.teacherId, teacherName: r.teacherName, students: [],
+        unitId: r.unitId, unitCode: r.unitCode, unitName: r.unitId ? r.unitShortCode ?? r.unitCode : null,
+        teacherId: r.teacherId, teacherName: r.teacherName, teacherKind: r.teacherId ? r.teacherKind : null,
+        delivery: r.teacherId ? deliveryOf(r.subjectId, r.unitId, r.teacherId) : 'in_school', students: [],
       });
     }
     const sec = sections.get(r.studentId) ?? null;
     groups.get(key)!.students.push({ studentId: r.studentId, name: r.studentName, sectionId: sec?.id ?? null, section: sec?.name ?? null });
   }
   return [...groups.values()];
+}
+
+/**
+ * How the year's offers teach a subject (or unit) with a teacher: per session
+ * of the academic year, the latest first, the teacher's mode on an item that
+ * names them, else on an offer that names them — each only where it teaches
+ * that unit (an item entering it; an offer with such an item) or, for the
+ * subject, the subject whole (an item entering no unit; an offer with one, or
+ * with no items). So a later session's offer of the subject's other unit, in
+ * school, does not override a unit's online item. With nothing that specific,
+ * any item or offer of the subject naming the teacher (a converted item
+ * entering every unit over an enrolment from before the rework).
+ */
+export async function offerDeliveries(startYear: number, subjectIds: string[], executor: Executor = db) {
+  if (!subjectIds.length) return () => 'in_school' as const;
+  const inYear = sql`school_series_academic_year_start(${registrationSession.sessionType}, ${registrationSession.seriesYear}) = ${startYear}`;
+  const onItems = await executor.select({
+    subjectId: sessionOffer.subjectId, itemId: sessionOfferItem.id, teacherId: sessionOfferItemTeacher.teacherId, mode: sessionOfferItemTeacher.mode,
+    sessionId: registrationSession.id, sessionStart: registrationSession.startDate, sessionCreated: registrationSession.createdAt,
+    units: sql<string[]>`coalesce((select array_agg(u.unit_id) from ${sessionOfferItemUnit} u where u.item_id = ${sessionOfferItem.id}), '{}')`,
+  }).from(sessionOfferItemTeacher)
+    .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, sessionOfferItemTeacher.itemId))
+    .innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId))
+    .innerJoin(registrationSession, eq(registrationSession.id, sessionOffer.sessionId))
+    .where(and(inArray(sessionOffer.subjectId, subjectIds), inYear));
+  const onOffers = await executor.select({
+    offerId: sessionOffer.id, subjectId: sessionOffer.subjectId, teacherId: sessionOfferTeacher.teacherId, mode: sessionOfferTeacher.mode,
+    sessionId: registrationSession.id, sessionStart: registrationSession.startDate, sessionCreated: registrationSession.createdAt,
+  }).from(sessionOfferTeacher)
+    .innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferTeacher.offerId))
+    .innerJoin(registrationSession, eq(registrationSession.id, sessionOffer.sessionId))
+    .where(and(inArray(sessionOffer.subjectId, subjectIds), inYear));
+  // What each offer teaches: the units its items enter, and whether one enters no unit (the subject whole).
+  const offerIds = [...new Set(onOffers.map((o) => o.offerId))];
+  const taught = new Map<string, { units: Set<string>; whole: boolean }>();
+  if (offerIds.length) {
+    const items = await executor.select({
+      offerId: sessionOfferItem.offerId,
+      units: sql<string[]>`coalesce((select array_agg(u.unit_id) from ${sessionOfferItemUnit} u where u.item_id = ${sessionOfferItem.id}), '{}')`,
+    }).from(sessionOfferItem).where(inArray(sessionOfferItem.offerId, offerIds));
+    for (const it of items) {
+      const t = taught.get(it.offerId) ?? { units: new Set<string>(), whole: false };
+      if (it.units?.length) for (const u of it.units) t.units.add(u);
+      else t.whole = true;
+      taught.set(it.offerId, t);
+    }
+  }
+  const offerTeaches = (offerId: string, unitId: string | null) => {
+    const t = taught.get(offerId);
+    if (!t) return !unitId;
+    return unitId ? t.units.has(unitId) : t.whole || t.units.size === 0;
+  };
+  const at = (d: Date | string) => new Date(d).getTime();
+  const latestFirst = (a: { sessionStart: Date | string; sessionCreated: Date }, b: { sessionStart: Date | string; sessionCreated: Date }) =>
+    at(b.sessionStart) - at(a.sessionStart) || at(b.sessionCreated) - at(a.sessionCreated);
+  return (subjectId: string, unitId: string | null, teacherId: string): 'in_school' | 'online' => {
+    const mine = <T extends { subjectId: string; teacherId: string }>(xs: T[]) => xs.filter((x) => x.subjectId === subjectId && x.teacherId === teacherId);
+    let items = mine(onItems).filter((x) => (unitId ? (x.units ?? []).includes(unitId) : !(x.units ?? []).length)).sort(latestFirst);
+    let offers = mine(onOffers).filter((x) => offerTeaches(x.offerId, unitId)).sort(latestFirst);
+    if (!items.length && !offers.length) {
+      items = mine(onItems).filter((x) => !unitId || (x.units ?? []).includes(unitId)).sort(latestFirst);
+      offers = mine(onOffers).sort(latestFirst);
+    }
+    // Session by session, the latest first: the item's word, else the offer's.
+    const sessions = [...items, ...offers].sort(latestFirst);
+    const first = sessions[0];
+    if (!first) return 'in_school';
+    const sameSession = (x: { sessionId: string }) => x.sessionId === first.sessionId;
+    const mode = items.find(sameSession)?.mode ?? offers.find(sameSession)?.mode ?? first.mode;
+    return mode === 'online' ? 'online' : 'in_school';
+  };
 }
 
 /**

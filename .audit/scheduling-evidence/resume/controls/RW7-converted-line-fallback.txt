@@ -1,0 +1,9 @@
+Control RW7-converted-line-fallback: apps/api/src/services/enrolment.services.ts — the guard undone ('return whole ? [null] : units;' -> 'void whole;\n  return units;'); ran test/08n at 2026-10-08T13:45:02+00:00 on igcse_scheduling_ctl_test
+
+   × 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line 391ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 passed (38)
+ FAIL  test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+    AssertionError: expected { lines: 1, items: +0, …(2) } to match object { lines: 1, enrolments: 1 }
+    (2 matching properties omitted from actual)
+    - Expected

@@ -12,7 +12,8 @@
  *   Readmission clears it, audited; what expired stays expired.
  */
 
-import { db, user, auditLog, registrationSession, academicYear, section, sectionMembership, eq, and, or, ilike, inArray, sql, gradeTodaySql } from '@repo/db';
+import { db, user, auditLog, registrationSession, academicYear, section, sectionMembership, studentLeaving, eq, and, or, ilike, inArray, isNull, sql, gradeTodaySql } from '@repo/db';
+import { randomUUID } from 'crypto';
 import {
   academicYearStartOf, academicYearShortLabel, academicYearLabel, cohortFromGrade, gradeInAcademicYear, gradeLabel,
   schoolDateString, FIRST_GRADE, LAST_GRADE,
@@ -24,6 +25,8 @@ import { closePaymentsOfExpiredRegistrations } from './payment.services';
 import { notifyGradeChanged } from './notification.services';
 import { endOpenMemberships, sectionOf, sectionHistoryOf } from './academic.services';
 import { endOpenEnrolments } from './enrolment.services';
+import { endGroupMembershipsOnLeaving } from './group.services';
+import { todayAtSchool } from '../lib/clock';
 
 export class StudentError extends Error {
   constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
@@ -209,18 +212,25 @@ export async function correctCohort(studentId: string, data: CorrectCohortType, 
 /** The student left the school (withdrawn or transferred). */
 export async function recordLeaving(studentId: string, data: RecordLeavingType, actorId: string, ctx?: AuditContext) {
   const now = new Date();
-  if (data.leftOn > schoolDateString(now)) throw new StudentError('The day the student left cannot be in the future');
+  // The day is judged by the school's clock (tests move it into a term; F1 review flag 5).
+  if (data.leftOn > todayAtSchool()) throw new StudentError('The day the student left cannot be in the future');
   const result = await db.transaction(async (tx) => {
     const s = await studentForUpdate(tx, studentId);
     if (s.leftOn) throw new StudentError(`${s.name} is already recorded as ${s.leftKind} (${s.leftOn})`, 409);
     await tx.update(user).set({
       leftOn: data.leftOn, leftKind: data.kind, leftReason: data.reason, leftRecordedBy: actorId, leftRecordedAt: now, updatedAt: now,
     }).where(eq(user.id, studentId));
+    // F1: every leaving is kept, so readmission does not undo "leaving wins" for the days away.
+    await tx.insert(studentLeaving).values({
+      id: randomUUID(), studentId, leftOn: data.leftOn, kind: data.kind, reason: data.reason, recordedBy: actorId, recordedAt: now,
+    });
     const sectionsEnded = await endOpenMemberships(tx, studentId, data.leftOn, `Left the school (${data.kind})`, actorId);
     // F0b: they are no longer taught — their course enrolments end with the leaving (history kept).
     const enrolmentsEnded = await endOpenEnrolments(tx, studentId, data.leftOn, `Left the school (${data.kind})`, actorId);
+    // F1: and they leave their teaching groups (a section's group follows the section).
+    const groupsEnded = await endGroupMembershipsOnLeaving(tx, studentId, data.leftOn, `Left the school (${data.kind})`, actorId);
     await logAction(actorId, 'STUDENT_LEFT', 'user', studentId, { leftOn: null },
-      { leftOn: data.leftOn, kind: data.kind, reason: data.reason, sectionsEnded, enrolmentsEnded }, ctx, tx);
+      { leftOn: data.leftOn, kind: data.kind, reason: data.reason, sectionsEnded, enrolmentsEnded, groupsEnded }, ctx, tx);
     const expired = await expireIneligibleRegistrations(tx, { studentIds: [studentId] }, data.kind, now);
     return { expired, sectionsEnded };
   });
@@ -236,6 +246,18 @@ export async function readmit(studentId: string, reason: string, actorId: string
     await tx.update(user).set({
       leftOn: null, leftKind: null, leftReason: null, leftRecordedBy: null, leftRecordedAt: null, updatedAt: new Date(),
     }).where(eq(user.id, studentId));
+    // F1: the leaving stays as history, closed from today (the first day back).
+    const back = todayAtSchool();
+    const closed = await tx.update(studentLeaving)
+      .set({ readmittedOn: back < s.leftOn ? s.leftOn : back, readmittedBy: actorId, readmittedAt: new Date(), readmitReason: reason })
+      .where(and(eq(studentLeaving.studentId, studentId), isNull(studentLeaving.readmittedOn)))
+      .returning({ id: studentLeaving.id });
+    if (!closed.length) {
+      await tx.insert(studentLeaving).values({
+        id: randomUUID(), studentId, leftOn: s.leftOn, kind: s.leftKind ?? 'withdrawn', reason: s.leftReason, recordedAt: new Date(),
+        readmittedOn: back < s.leftOn ? s.leftOn : back, readmittedBy: actorId, readmittedAt: new Date(), readmitReason: reason,
+      });
+    }
     await logAction(actorId, 'STUDENT_READMITTED', 'user', studentId,
       { leftOn: s.leftOn, kind: s.leftKind, reason: s.leftReason }, { leftOn: null, reason }, ctx, tx);
     return { readmitted: true };

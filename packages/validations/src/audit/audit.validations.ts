@@ -82,6 +82,13 @@ export const AUDIT_ENTITY_TYPES = [
   'message_audience',
   // F7
   'import',
+  // F1
+  'teaching_group',
+  'timetable',
+  'schedule_rules',
+  'teacher_absence',
+  'cover_assignment',
+  'calendar_feed',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -137,6 +144,12 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   reminder_rule:  'Reminder Rule',
   message_audience: 'Saved Audience',
   import:         'Import',
+  teaching_group: 'Teaching Group',
+  timetable:      'Timetable',
+  schedule_rules: 'Timetable Rules',
+  teacher_absence: 'Teacher Absence',
+  cover_assignment: 'Cover',
+  calendar_feed:  'Calendar Feed',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -388,6 +401,32 @@ export const AUDIT_ACTIONS = [
   'IMPORT_REGISTRATION',
   'IMPORT_COMMITTED',
   'IMPORT_DISCARDED',
+  // F1: scheduling
+  'TEACHING_GROUPS_FORMED',
+  'TEACHING_GROUP_CREATED',
+  'TEACHING_GROUP_UPDATED',
+  'TEACHING_GROUP_MEMBERS_ADDED',
+  'TEACHING_GROUP_MEMBERS_ENDED',
+  'TEACHING_GROUP_SPLIT',
+  'TEACHING_GROUPS_MERGED',
+  'TEACHING_GROUP_ARCHIVED',
+  // F1 on the rework's model: "no preference" lines given their teacher from Teaching groups
+  'TEACHING_GROUP_TEACHER_ASSIGNED',
+  'SCHEDULE_RULES_SET',
+  'TIMETABLE_CREATED',
+  'TIMETABLE_UPDATED',
+  'TIMETABLE_DELETED',
+  'TIMETABLE_LESSON_MOVED',
+  'TIMETABLE_LESSON_LOCKED',
+  'TIMETABLE_GENERATED',
+  'TIMETABLE_PUBLISHED',
+  'TEACHER_ABSENCE_RECORDED',
+  'TEACHER_ABSENCE_CANCELLED',
+  'COVER_ASSIGNED',
+  'LESSON_CANCELLED',
+  'COVER_REMOVED',
+  'CALENDAR_FEED_CREATED',
+  'CALENDAR_FEED_REVOKED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -660,6 +699,30 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   IMPORT_REGISTRATION:        'Registered by the Import (Awaiting Payment)',
   IMPORT_COMMITTED:           'Import Committed',
   IMPORT_DISCARDED:           'Import Discarded',
+  TEACHING_GROUPS_FORMED:     'Teaching Groups Formed from Enrolment',
+  TEACHING_GROUP_CREATED:     'Teaching Group Added',
+  TEACHING_GROUP_UPDATED:     'Teaching Group Changed',
+  TEACHING_GROUP_MEMBERS_ADDED: 'Students Added to a Teaching Group',
+  TEACHING_GROUP_MEMBERS_ENDED: 'Students Taken out of a Teaching Group',
+  TEACHING_GROUP_SPLIT:       'Teaching Group Split',
+  TEACHING_GROUPS_MERGED:     'Teaching Groups Merged',
+  TEACHING_GROUP_ARCHIVED:    'Teaching Group Retired',
+  TEACHING_GROUP_TEACHER_ASSIGNED: 'Teacher Assigned to Students',
+  SCHEDULE_RULES_SET:         'Timetable Rules Set',
+  TIMETABLE_CREATED:          'Timetable Draft Created',
+  TIMETABLE_UPDATED:          'Timetable Renamed',
+  TIMETABLE_DELETED:          'Timetable Draft Deleted',
+  TIMETABLE_LESSON_MOVED:     'Lesson Moved',
+  TIMETABLE_LESSON_LOCKED:    'Lesson Locked or Unlocked',
+  TIMETABLE_GENERATED:        'Timetable Generated',
+  TIMETABLE_PUBLISHED:        'Timetable Published',
+  TEACHER_ABSENCE_RECORDED:   'Teacher Absence Recorded',
+  TEACHER_ABSENCE_CANCELLED:  'Teacher Absence Cancelled',
+  COVER_ASSIGNED:             'Cover Assigned',
+  LESSON_CANCELLED:           'Lesson Cancelled',
+  COVER_REMOVED:              'Cover Removed',
+  CALENDAR_FEED_CREATED:      'Calendar Feed Link Made',
+  CALENDAR_FEED_REVOKED:      'Calendar Feed Link Revoked',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

@@ -55,6 +55,9 @@ const icons = {
   settings: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
   upload: 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5',
   today: 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z',
+  // F1
+  timetable: 'M3.375 19.5h17.25M3.375 19.5A1.125 1.125 0 012.25 18.375V5.625c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125M2.25 9h19.5M2.25 13.5h19.5M8.25 4.5v15m7.5-15v15',
+  cover: 'M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z',
 } as const;
 
 /* ─── Navigation Config ─────────────────────────────────────────────────────── */
@@ -114,6 +117,16 @@ const TEACHER_EXAM_ITEMS: NavItem[] = [
 
 /** F4: a family's statement of entry, exam timetable and results. */
 const MY_EXAMS_ITEM: NavItem = { labelKey: 'nav.myExams', href: '/exams/my', icon: 'calendar' };
+/** The timetable (F1): built by the coordinator and the admin. */
+const TIMETABLE_SECTION: NavSection = {
+  titleKey: 'nav.timetable',
+  items: [
+    { labelKey: 'nav.timetables', href: '/timetable/versions', icon: 'timetable' },
+    { labelKey: 'nav.teachingGroups', href: '/timetable/groups', icon: 'sections' },
+    { labelKey: 'nav.timetableRules', href: '/timetable/rules', icon: 'approvals' },
+    { labelKey: 'nav.cover', href: '/timetable/cover', icon: 'cover' },
+  ],
+};
 
 const ACCOUNT_SECTION: NavSection = {
   titleKey: 'nav.account',
@@ -132,6 +145,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
   if (role === 'coordinator') {
     return [
       { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
+      TIMETABLE_SECTION,
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
       // The reservations rework (§4.2): the coordinator keeps each session's subjects, teachers and items.
@@ -165,6 +179,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           ...teaching,
         ],
       },
+      TIMETABLE_SECTION,
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
       {
@@ -255,6 +270,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       {
         items: [
           { labelKey: 'nav.home', href: '/', icon: 'home' },
+          { labelKey: 'nav.timetables', href: '/my-timetable', icon: 'timetable' },
         ],
       },
       {
@@ -294,6 +310,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
     {
       items: [
         { labelKey: 'nav.home', href: '/', icon: 'home' },
+        { labelKey: 'nav.myTimetable', href: '/my-timetable', icon: 'timetable' },
       ],
     },
     {

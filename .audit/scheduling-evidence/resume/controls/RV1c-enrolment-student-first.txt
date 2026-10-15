@@ -1,0 +1,10 @@
+Control RV1c-enrolment-student-first: apps/api/src/services/enrolment.services.ts — the guard undone ("await tx.select({ id: user.id }).from(user).where(eq(user.id, seen.studentId)).for('no key update');" -> ''); ran test/08s6 at 2026-10-08T19:17:09+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > F0b’s enrolment change takes its student first: the coordinator adding the student elsewhere meanwhile waits, then moves them — the change first 5889ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > F0b’s enrolment change takes its student first: the coordinator adding the student elsewhere meanwhile waits, then moves them — the change first
+    Error: waitFor: timed out
+     ❯ waitFor test/helpers.ts:482:38
+        480|     const v = await probe();
+        481|     if (v) return v;

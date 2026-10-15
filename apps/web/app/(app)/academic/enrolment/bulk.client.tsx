@@ -227,6 +227,9 @@ const OUTCOME: Record<OutcomeRow['outcome'], { label: string; tone: 'success' | 
   create: { label: 'Will be enrolled', tone: 'info' },
   created: { label: 'Enrolled', tone: 'success' },
   exists: { label: 'Already enrolled', tone: 'neutral' },
+  // A line's teacher (F1's follow-up): the open enrolment takes the line's teacher or mode.
+  update: { label: 'Will be updated', tone: 'info' },
+  updated: { label: 'Updated', tone: 'success' },
   refused: { label: 'Refused', tone: 'danger' },
 };
 
