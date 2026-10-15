@@ -1065,7 +1065,7 @@
   "path": "/exams/deadlines",
   "finalUrl": "/exams/deadlines",
   "status": 200,
-  "settledMs": 2302,
+  "settledMs": 2849,
   "apiRequests": 2,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1076,30 +1076,9 @@
    "lang": "en",
    "dir": "ltr"
   },
-  "axe": [
-   {
-    "id": "button-name",
-    "impact": "critical",
-    "help": "Buttons must have discernible text",
-    "nodes": 1,
-    "sample": [
-     ".absolute — Element does not have inner text that is visible to screen readers"
-    ]
-   },
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": 7,
-    "sample": [
-     ".size-9.bg-sidebar-primary.text-sidebar-primary-foreground — Element has insufficient color contrast of 2.92 (foreground color: #fcfcfc, background color: #00a88f, font size: 10.5pt (14px), font weight: bold). Expected contrast ratio of 4.5:1",
-     ".py-5 > .min-w-0 > .text-\\[11px\\].text-sidebar-foreground\\/50.truncate — Element has insufficient color contrast of 4.17 (foreground color: #6c7d82, background color: #001a22, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
-     ".mt-5:nth-child(2) > .mb-1\\.5.text-\\[10px\\].tracking-widest — Element has insufficient color contrast of 3.11 (foreground color: #56696f, background color: #001a22, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
-    ]
-   }
-  ],
+  "axe": [],
   "shot": "s50-deadlines/before-en.jpg",
-  "bytes": 121901
+  "bytes": 119867
  },
  "s51-entries:en": {
   "id": "s51-entries",
@@ -1108,7 +1087,7 @@
   "path": "/exams/entries",
   "finalUrl": "/exams/entries",
   "status": 200,
-  "settledMs": 2211,
+  "settledMs": 2422,
   "apiRequests": 6,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1121,30 +1100,9 @@
    "lang": "en",
    "dir": "ltr"
   },
-  "axe": [
-   {
-    "id": "button-name",
-    "impact": "critical",
-    "help": "Buttons must have discernible text",
-    "nodes": 1,
-    "sample": [
-     ".absolute — Element does not have inner text that is visible to screen readers"
-    ]
-   },
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": 7,
-    "sample": [
-     ".size-9.bg-sidebar-primary.text-sidebar-primary-foreground — Element has insufficient color contrast of 2.92 (foreground color: #fcfcfc, background color: #00a88f, font size: 10.5pt (14px), font weight: bold). Expected contrast ratio of 4.5:1",
-     ".py-5 > .min-w-0 > .text-\\[11px\\].text-sidebar-foreground\\/50.truncate — Element has insufficient color contrast of 4.17 (foreground color: #6c7d82, background color: #001a22, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
-     ".mt-5:nth-child(2) > .mb-1\\.5.text-\\[10px\\].tracking-widest — Element has insufficient color contrast of 3.11 (foreground color: #56696f, background color: #001a22, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
-    ]
-   }
-  ],
+  "axe": [],
   "shot": "s51-entries/before-en.jpg",
-  "bytes": 68405
+  "bytes": 86284
  },
  "s52-entry-lists:en": {
   "id": "s52-entry-lists",
@@ -1153,7 +1111,7 @@
   "path": "/exams/entry-lists",
   "finalUrl": "/exams/entry-lists",
   "status": 200,
-  "settledMs": 2319,
+  "settledMs": 2348,
   "apiRequests": 6,
   "api": [
    "GET /v1/notifications/unread-count",
@@ -1166,30 +1124,9 @@
    "lang": "en",
    "dir": "ltr"
   },
-  "axe": [
-   {
-    "id": "button-name",
-    "impact": "critical",
-    "help": "Buttons must have discernible text",
-    "nodes": 1,
-    "sample": [
-     ".absolute — Element does not have inner text that is visible to screen readers"
-    ]
-   },
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": 7,
-    "sample": [
-     ".size-9.bg-sidebar-primary.text-sidebar-primary-foreground — Element has insufficient color contrast of 2.92 (foreground color: #fcfcfc, background color: #00a88f, font size: 10.5pt (14px), font weight: bold). Expected contrast ratio of 4.5:1",
-     ".py-5 > .min-w-0 > .text-\\[11px\\].text-sidebar-foreground\\/50.truncate — Element has insufficient color contrast of 4.17 (foreground color: #6c7d82, background color: #001a22, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
-     ".mt-5:nth-child(2) > .mb-1\\.5.text-\\[10px\\].tracking-widest — Element has insufficient color contrast of 3.11 (foreground color: #56696f, background color: #001a22, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
-    ]
-   }
-  ],
+  "axe": [],
   "shot": "s52-entry-lists/before-en.jpg",
-  "bytes": 119659
+  "bytes": 147494
  },
  "s55-notifications-staff:en": {
   "id": "s55-notifications-staff",
@@ -3856,43 +3793,20 @@
   "path": "/exams/deadlines",
   "finalUrl": "/exams/deadlines",
   "status": 200,
-  "settledMs": 1960,
+  "settledMs": 2096,
   "apiRequests": 2,
   "api": [
-   "GET /v1/exams/deadlines",
-   "GET /v1/notifications/unread-count"
+   "GET /v1/notifications/unread-count",
+   "GET /v1/exams/deadlines"
   ],
-  "errors": [
-   "pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:"
-  ],
+  "errors": [],
   "html": {
    "lang": "ar",
    "dir": "rtl"
   },
-  "axe": [
-   {
-    "id": "button-name",
-    "impact": "critical",
-    "help": "Buttons must have discernible text",
-    "nodes": 1,
-    "sample": [
-     ".absolute — Element does not have inner text that is visible to screen readers"
-    ]
-   },
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": 5,
-    "sample": [
-     ".size-9.bg-sidebar-primary.text-sidebar-primary-foreground — Element has insufficient color contrast of 2.92 (foreground color: #fcfcfc, background color: #00a88f, font size: 10.5pt (14px), font weight: bold). Expected contrast ratio of 4.5:1",
-     ".py-5 > .min-w-0 > .text-\\[11px\\].text-sidebar-foreground\\/50.truncate — Element has insufficient color contrast of 4.17 (foreground color: #6c7d82, background color: #001a22, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
-     ".mt-5:nth-child(2) > .mb-1\\.5.text-\\[10px\\].tracking-widest — Element has insufficient color contrast of 3.11 (foreground color: #56696f, background color: #001a22, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
-    ]
-   }
-  ],
+  "axe": [],
   "shot": "s50-deadlines/before-ar.jpg",
-  "bytes": 98417
+  "bytes": 97968
  },
  "s51-entries:ar": {
   "id": "s51-entries",
@@ -3901,45 +3815,22 @@
   "path": "/exams/entries",
   "finalUrl": "/exams/entries",
   "status": 200,
-  "settledMs": 1985,
+  "settledMs": 2137,
   "apiRequests": 6,
   "api": [
-   "GET /v1/board-series",
    "GET /v1/notifications/unread-count",
+   "GET /v1/board-series",
    "GET /v1/exams/entries",
    "GET /v1/catalogue"
   ],
-  "errors": [
-   "pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:"
-  ],
+  "errors": [],
   "html": {
    "lang": "ar",
    "dir": "rtl"
   },
-  "axe": [
-   {
-    "id": "button-name",
-    "impact": "critical",
-    "help": "Buttons must have discernible text",
-    "nodes": 1,
-    "sample": [
-     ".absolute — Element does not have inner text that is visible to screen readers"
-    ]
-   },
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": 5,
-    "sample": [
-     ".size-9.bg-sidebar-primary.text-sidebar-primary-foreground — Element has insufficient color contrast of 2.92 (foreground color: #fcfcfc, background color: #00a88f, font size: 10.5pt (14px), font weight: bold). Expected contrast ratio of 4.5:1",
-     ".py-5 > .min-w-0 > .text-\\[11px\\].text-sidebar-foreground\\/50.truncate — Element has insufficient color contrast of 4.17 (foreground color: #6c7d82, background color: #001a22, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
-     ".mt-5:nth-child(2) > .mb-1\\.5.text-\\[10px\\].tracking-widest — Element has insufficient color contrast of 3.11 (foreground color: #56696f, background color: #001a22, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
-    ]
-   }
-  ],
+  "axe": [],
   "shot": "s51-entries/before-ar.jpg",
-  "bytes": 56088
+  "bytes": 65853
  },
  "s52-entry-lists:ar": {
   "id": "s52-entry-lists",
@@ -3948,45 +3839,22 @@
   "path": "/exams/entry-lists",
   "finalUrl": "/exams/entry-lists",
   "status": 200,
-  "settledMs": 2007,
+  "settledMs": 2153,
   "apiRequests": 6,
   "api": [
-   "GET /v1/board-series",
    "GET /v1/notifications/unread-count",
+   "GET /v1/board-series",
    "GET /v1/exams/board-rules",
    "GET /v1/exams/entry-lists"
   ],
-  "errors": [
-   "pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:"
-  ],
+  "errors": [],
   "html": {
    "lang": "ar",
    "dir": "rtl"
   },
-  "axe": [
-   {
-    "id": "button-name",
-    "impact": "critical",
-    "help": "Buttons must have discernible text",
-    "nodes": 1,
-    "sample": [
-     ".absolute — Element does not have inner text that is visible to screen readers"
-    ]
-   },
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": 5,
-    "sample": [
-     ".size-9.bg-sidebar-primary.text-sidebar-primary-foreground — Element has insufficient color contrast of 2.92 (foreground color: #fcfcfc, background color: #00a88f, font size: 10.5pt (14px), font weight: bold). Expected contrast ratio of 4.5:1",
-     ".py-5 > .min-w-0 > .text-\\[11px\\].text-sidebar-foreground\\/50.truncate — Element has insufficient color contrast of 4.17 (foreground color: #6c7d82, background color: #001a22, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
-     ".mt-5:nth-child(2) > .mb-1\\.5.text-\\[10px\\].tracking-widest — Element has insufficient color contrast of 3.11 (foreground color: #56696f, background color: #001a22, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
-    ]
-   }
-  ],
+  "axe": [],
   "shot": "s52-entry-lists/before-ar.jpg",
-  "bytes": 81762
+  "bytes": 105681
  },
  "s55-notifications-staff:ar": {
   "id": "s55-notifications-staff",

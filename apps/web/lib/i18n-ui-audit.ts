@@ -33,6 +33,14 @@ export const uiAuditArabic: Record<string, string> = {
   "Paid, before the board's first-entry deadline: the reservation stands and is entered as a first entry; finance decides whether anything is owed.":
     'مدفوع، قبل موعد القيد الأول لدى المجلس: يبقى الحجز ويُقيَّد قيدًا أول؛ وتقرر المالية إن كان هناك مبلغ مستحق.',
 
+  // ── The entries to the board ──
+  'Each paid reservation becomes its entry with the board: a Cambridge syllabus with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.':
+    'يصبح كل حجز مدفوع قيده لدى المجلس: منهج Cambridge برمز خياره، ووحدات Pearson واحدة واحدة، وطلب احتساب مدفوع بمؤهله. اطّلع أولًا على ما سيُنشأ؛ لا يُنشأ شيء قبل أن تؤكد.',
+  'What the check above and the fee sentences on the Entries screen follow. Each was set from the board’s handbook; change one when the handbook says otherwise.':
+    'ما يتبعه الفحص أعلاه وجمل الرسوم في شاشة القيود. كل قاعدة مأخوذة من دليل المجلس؛ غيّرها حين يقول الدليل غير ذلك.',
+  "What the check above and the fee sentences on the Entries screen follow. Each was set from the board's handbook; change one when the handbook says otherwise.":
+    'ما يتبعه الفحص أعلاه وجمل الرسوم في شاشة القيود. كل قاعدة مأخوذة من دليل المجلس؛ غيّرها حين يقول الدليل غير ذلك.',
+
   // ── The desk ──
   '+ New family': '+ أسرة جديدة',
   'Transfer to check': 'تحويل للمراجعة',
@@ -65,7 +73,10 @@ export const uiAuditArabic: Record<string, string> = {
   'to escrow on return': 'إلى الرصيد عند الإعادة',
   'Requested on': 'طُلب في',
 
+  'Nothing to print': 'لا شيء للطباعة',
+  'This student has no reservation to put on a slip yet.': 'لا حجز لهذا الطالب يُطبع على إيصال بعد.',
   'Day': 'اليوم',
+  'Verified': 'مؤكَّد',
 
   // ── Escrow (withdrawals) ──
   'Approved: the cash handed over is signed for.': 'تم الاعتماد: صُرف المبلغ وتم التوقيع عليه.',

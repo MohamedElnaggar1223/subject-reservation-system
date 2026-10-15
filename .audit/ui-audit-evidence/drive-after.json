@@ -1846,5 +1846,319 @@
   "axe": [],
   "shot": "s48-sessions-officer/after-ar.jpg",
   "bytes": 74239
+ },
+ "s50-deadlines:en": {
+  "id": "s50-deadlines",
+  "role": "admin",
+  "lang": "en",
+  "path": "/exams/deadlines",
+  "finalUrl": "/exams/deadlines",
+  "status": 200,
+  "settledMs": 2411,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/exams/deadlines"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s50-deadlines/after-en.jpg",
+  "bytes": 120229
+ },
+ "s51-entries:en": {
+  "id": "s51-entries",
+  "role": "admin",
+  "lang": "en",
+  "path": "/exams/entries",
+  "finalUrl": "/exams/entries",
+  "status": 200,
+  "settledMs": 2484,
+  "apiRequests": 6,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/board-series",
+   "GET /v1/exams/entries",
+   "GET /v1/catalogue"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s51-entries/after-en.jpg",
+  "bytes": 85960
+ },
+ "s52-entry-lists:en": {
+  "id": "s52-entry-lists",
+  "role": "admin",
+  "lang": "en",
+  "path": "/exams/entry-lists",
+  "finalUrl": "/exams/entry-lists",
+  "status": 200,
+  "settledMs": 2378,
+  "apiRequests": 6,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/board-series",
+   "GET /v1/exams/board-rules",
+   "GET /v1/exams/entry-lists"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s52-entry-lists/after-en.jpg",
+  "bytes": 147471
+ },
+ "s55-notifications-staff:en": {
+  "id": "s55-notifications-staff",
+  "role": "admin",
+  "lang": "en",
+  "path": "/notifications",
+  "finalUrl": "/notifications",
+  "status": 200,
+  "settledMs": 2357,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s55-notifications-staff/after-en.jpg",
+  "bytes": 25615
+ },
+ "s56-profile-staff:en": {
+  "id": "s56-profile-staff",
+  "role": "admin",
+  "lang": "en",
+  "path": "/profile",
+  "finalUrl": "/profile",
+  "status": 200,
+  "settledMs": 2156,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/users/me",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s56-profile-staff/after-en.jpg",
+  "bytes": 38335
+ },
+ "s58-receipt-print:en": {
+  "id": "s58-receipt-print",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
+  "finalUrl": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
+  "status": 200,
+  "settledMs": 1962,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s58-receipt-print/after-en.jpg",
+  "bytes": 42284
+ },
+ "s59-reservation-slip:en": {
+  "id": "s59-reservation-slip",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "finalUrl": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "status": 200,
+  "settledMs": 4070,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s59-reservation-slip/after-en.jpg",
+  "bytes": 56770
+ },
+ "s50-deadlines:ar": {
+  "id": "s50-deadlines",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/exams/deadlines",
+  "finalUrl": "/exams/deadlines",
+  "status": 200,
+  "settledMs": 2104,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/exams/deadlines"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s50-deadlines/after-ar.jpg",
+  "bytes": 95687
+ },
+ "s51-entries:ar": {
+  "id": "s51-entries",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/exams/entries",
+  "finalUrl": "/exams/entries",
+  "status": 200,
+  "settledMs": 2144,
+  "apiRequests": 6,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/board-series",
+   "GET /v1/exams/entries",
+   "GET /v1/catalogue"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s51-entries/after-ar.jpg",
+  "bytes": 65218
+ },
+ "s52-entry-lists:ar": {
+  "id": "s52-entry-lists",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/exams/entry-lists",
+  "finalUrl": "/exams/entry-lists",
+  "status": 200,
+  "settledMs": 2015,
+  "apiRequests": 6,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/board-series",
+   "GET /v1/exams/board-rules",
+   "GET /v1/exams/entry-lists"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s52-entry-lists/after-ar.jpg",
+  "bytes": 105588
+ },
+ "s55-notifications-staff:ar": {
+  "id": "s55-notifications-staff",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/notifications",
+  "finalUrl": "/notifications",
+  "status": 200,
+  "settledMs": 1966,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s55-notifications-staff/after-ar.jpg",
+  "bytes": 22518
+ },
+ "s56-profile-staff:ar": {
+  "id": "s56-profile-staff",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/profile",
+  "finalUrl": "/profile",
+  "status": 200,
+  "settledMs": 1958,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/users/me",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s56-profile-staff/after-ar.jpg",
+  "bytes": 35507
+ },
+ "s58-receipt-print:ar": {
+  "id": "s58-receipt-print",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
+  "finalUrl": "/receipt-print/84852ac2-1a67-4372-b7a7-324ea7f7067b",
+  "status": 200,
+  "settledMs": 1977,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s58-receipt-print/after-ar.jpg",
+  "bytes": 38133
+ },
+ "s59-reservation-slip:ar": {
+  "id": "s59-reservation-slip",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "finalUrl": "/reservation-slip/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "status": 200,
+  "settledMs": 2005,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s59-reservation-slip/after-ar.jpg",
+  "bytes": 49427
  }
 }

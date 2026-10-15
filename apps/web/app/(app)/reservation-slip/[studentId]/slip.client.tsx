@@ -8,18 +8,34 @@ import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { fetchStatement, statementKey } from '~/components/reservations/statement';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 
+const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed'];
+
+/**
+ * The slip prints the reservations just made (`ids`). Opened without them — from a bookmark, or the
+ * student's record — it prints the student's live reservations of their latest session rather than an
+ * empty slip at EGP 0 that sent itself to the printer (F6).
+ */
+function linesToPrint<L extends { id: string; status: string }>(sessions: { lines: L[] }[], ids: string[]): L[] {
+  if (ids.length) return sessions.flatMap((x) => x.lines).filter((l) => ids.includes(l.id));
+  const latest = [...sessions].reverse().find((x) => x.lines.some((l) => LIVE.includes(l.status)));
+  return latest ? latest.lines.filter((l) => LIVE.includes(l.status)) : [];
+}
+
 export default function SlipClient({ studentId, ids }: { studentId: string; ids: string[] }): React.JSX.Element {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: statementKey({ studentId }), queryFn: () => fetchStatement({ studentId }) });
+  const s = data?.students[0];
+  const lines = s ? linesToPrint(s.sessions, ids) : [];
   useEffect(() => {
-    if (!data) return;
+    if (!data || lines.length === 0) return;
     const t = setTimeout(() => window.print(), 500);
     return () => clearTimeout(t);
-  }, [data]);
+  }, [data, lines.length]);
   if (isLoading) return <LoadingState />;
   if (isError || !data) return <ErrorState onRetry={() => refetch()} />;
-  const s = data.students[0];
   if (!s) return <ErrorState title="Student not found" />;
-  const lines = s.sessions.flatMap((x) => x.lines).filter((l) => ids.includes(l.id));
+  if (lines.length === 0) {
+    return <div className="mx-auto max-w-2xl p-8"><ErrorState title="Nothing to print" message="This student has no reservation to put on a slip yet." /></div>;
+  }
   const session = lines[0]?.session.name ?? '';
   const snapshot = (lines.find((l) => l.refundPolicySnapshot)?.refundPolicySnapshot ?? null) as RefundPolicySnapshot | null;
   const total = lines.reduce((a, l) => a + l.price, 0);
@@ -38,7 +54,7 @@ export default function SlipClient({ studentId, ids }: { studentId: string; ids:
         </dl>
         <table className="w-full text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground print:text-black">
-            <tr><th className="py-1 text-start">Line</th><th className="py-1 text-start">Entry</th><th className="py-1 text-end">Price</th><th className="py-1 text-start ps-3">Due</th></tr>
+            <tr><th className="py-1 text-start">Subject</th><th className="py-1 text-start">Entry</th><th className="py-1 text-end">Price</th><th className="py-1 text-start ps-3">Due</th></tr>
           </thead>
           <tbody>
             {lines.map((l) => (
@@ -54,7 +70,7 @@ export default function SlipClient({ studentId, ids }: { studentId: string; ids:
                     </div>
                   )}
                 </td>
-                <td className="py-1.5"><span>{l.attempt === 'retake' ? 'Retake' : 'First entry'}</span>, <span>{l.mode === 'self_study' ? 'self-study' : 'in school'}</span></td>
+                <td className="py-1.5"><span>{l.attempt === 'retake' ? 'Retake' : 'First entry'}</span> · <span>{l.mode === 'self_study' ? 'self-study' : 'in school'}</span></td>
                 <td className="py-1.5 text-end"><Money amount={l.price} />{l.provisional && <> ⓟ</>}<div className="text-[10px] text-muted-foreground print:text-black" dir="ltr">{l.basisText}</div></td>
                 <td className="py-1.5 ps-3">{l.status === 'confirmed' ? <span>paid</span> : <Day iso={l.dueAt} />}</td>
               </tr>

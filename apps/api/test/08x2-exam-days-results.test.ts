@@ -409,5 +409,13 @@ describe('F4: exam days, results and certificates', () => {
       const notes = await sql<{ n: number }>(`select count(*)::int as n from notification where user_id = $1 and type = 'EXAM_DEADLINE_REMINDER' and data->>'boardSeriesId' in ($2, $3)`, [coord.id, w.series.cambridgeNov, w.series.pearsonJan]);
       expect(notes[0]!.n).toBe(2);
     });
+
+    it('lists as having no entry deadline the sittings still ahead, not one already sat (F6)', async () => {
+      const y = new Date().getUTCFullYear();
+      const past = await apiResponse(coord.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: y - 3, label: 'F6 past' } }));
+      const ahead = await apiResponse(coord.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'november', year: y + 5, label: 'F6 ahead' } }));
+      const listed = (await apiResponse(coord.api.v1.exams.deadlines.$get({ query: {} }))).seriesWithoutDeadline.map((s) => s.id);
+      expect([listed.includes(past.id), listed.includes(ahead.id)]).toEqual([false, true]);
+    });
   });
 });

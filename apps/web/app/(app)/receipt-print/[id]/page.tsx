@@ -20,6 +20,9 @@ const fetchReceipt = (api: Awaited<ReturnType<typeof getServerApi>>, id: string)
   apiResponse(api.v1.receipts[':id'].$get({ param: { id } }));
 type ReceiptDetail = Awaited<ReturnType<typeof fetchReceipt>>;
 
+/** "EGP 14,000" (and "EGP 14,000.50" when there are piastres), as every money figure on the screens reads. */
+const egp = (n: number) => `EGP ${n.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+
 const COUNCILS: Record<string, string> = {
   pearson_edexcel: 'Pearson Edexcel',
   cambridge: 'Cambridge International',
@@ -52,14 +55,15 @@ export default async function ReceiptPrintPage({
   const rows: [string, string][] = reg
     ? [
         ['Subject', `${reg.subject.name} (${reg.subject.code})`],
-        ['Council', COUNCILS[reg.subject.council] ?? reg.subject.council],
+        // F6: the sheet's and the forms' words — "Board", "Board fee" — and amounts as the screens write them.
+        ['Board', COUNCILS[reg.subject.council] ?? reg.subject.council],
         ['Session', reg.session.name],
-        ['Course fee', `EGP ${reg.courseFeeAtRegistration.toFixed(2)}`],
-        ['Registration fee', `EGP ${reg.registrationFeeAtRegistration.toFixed(2)}`],
-        ['Total paid', `EGP ${reg.priceAtRegistration.toFixed(2)}`],
+        ['Course fee', egp(reg.courseFeeAtRegistration)],
+        ['Board fee', egp(reg.registrationFeeAtRegistration)],
+        ['Total paid', egp(reg.priceAtRegistration)],
       ]
     : ch
-      ? [['Charge', ch.description], ['Total paid', `EGP ${ch.amount.toFixed(2)}`]]
+      ? [['Charge', ch.description], ['Total paid', egp(ch.amount)]]
       : [];
 
   return (

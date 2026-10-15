@@ -305,6 +305,50 @@ officer and the next step:
 | Consistency | "07:41 AM" here, "07:41" everywhere else | L | the school's 24-hour time |
 | Print | `Print` and a print layout exist (the drawer's day on paper) | — | — |
 
+### 3.21 Exam Deadlines `/exams/deadlines` [s50]
+
+The group-4 before shots were taken again after the Cambridge June 2027 entries were derived (`setup-8-entries.mjs`), so
+the entries screens are judged with an entry on them; the shell's fixes were already in.
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Next step / noise | "Series without an entry deadline" listed Cambridge June 2026 in October 2026 — a sitting already sat, which needs no deadline now | M | only the sittings still ahead (exams not over, or month not gone) — in `getDeadlines`; an 08x2 case and its control (§10) |
+| Sentences | "1 draft entries not sent to the board", "1 registrations still waiting…" | L | one or many, the Arabic rules taking both |
+| Owner's word | the exam-start rows say "No timetable imported yet" (the timetable is outside the cycle) | — | recorded: RESERVATION_FOCUS §8 Q6 (show only the entry dates?) is the owner's |
+
+### 3.22 Exam Entries `/exams/entries` [s51]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Forms' words | "Each paid reservation becomes what its item enters with the board" — "item", "enters" are the model's words | M | "Each paid reservation becomes its entry with the board: a Cambridge syllabus with its option code, Pearson units one by one, a paid cash-in as its award." |
+| Owner's standard | from the landing's "Exam entries" the series is chosen and Preview / Make them is one step — the board's own list one click on | — | — |
+
+### 3.23 Entry Lists `/exams/entry-lists` [s52]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Sentences | "Each comes from the research" | L | "Each was set from the board's handbook" |
+| Truth / internal names | the board's rules end "From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026)" — an internal file's name on a staff screen | L | recorded (§8): the text is the rule's stored source (migration 0057's data); changing it is a data change, not F6's — the admin's "Change the rules" edits it |
+| Tables | the board portal's columns run past the screen; they scroll inside the card | — | kept: they are the board's file, column for column |
+
+### 3.24 Notifications [s55, f20], Profile [s56, f21]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| WCAG 1.3.1 | the profile's facts were `dt`/`dd` with no `dl` (axe `dlitem` on every profile) | M | a `dl` |
+| Screen readers | the "email verified" tick had no name | L | "Verified" |
+| Consistency | "Member Since 10/15/2026" | L | the school's date |
+
+### 3.25 The printed papers: the receipt [s58] and the reservation slip [s59]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Forms' words | the receipt said "Council" and "Registration fee" | M | "Board", "Board fee" — the sheet's and the forms' words |
+| Consistency | "EGP 14000.00" | M | "EGP 14,000" |
+| Empty state / print | the slip opened without its reservations (a bookmark, the record) printed an empty slip at EGP 0 and sent it to the printer by itself | M | it prints the student's live reservations of their latest session; with none it says "Nothing to print" and does not open the print dialog |
+| Sentences | the slip's column "Line" | L | "Subject" |
+| Arabic | "قيد أول, في المدرسة" (an English comma between two Arabic phrases) | L | a neutral "·" |
+
 ## 4. The queued findings, one by one
 
 ## 5. Accessibility results
@@ -350,4 +394,10 @@ officer and the next step:
   format on the workbench and Escrow; Exceptions' scope labels in the forms' words (`@repo/validations`
   rebuilt; the API server restarted, my PIDs 99084/99103, now pnpm pid 64513). Driven after: no axe
   violation, no console error on s40–s48 in either language. `useQuery<` generics 15.
-- Next: commit group 3; group 4 (the entries to the board) and group 5 (account, papers).
+- 20:20Z — group 3 committed (4cdf74a) and pushed.
+- 20:21–20:35Z — groups 4 and 5: Exam Deadlines lists only sittings still ahead (an 08x2 case, control at
+  20:26Z) and says one or many; the entries' and the rules' sentences in the forms' words; F4's and F1's
+  queued Arabic sentences (20:28Z); the profile's `dl`; the receipt's "Board" and "Board fee"; the slip
+  never empty nor printed by itself; the follow-ups' stale comment and the two document lines. Driven after:
+  no axe violation, no console error on s50–s59 in either language.
+- Next: commit groups 4–5; group 6 (the families' screens at a phone).
