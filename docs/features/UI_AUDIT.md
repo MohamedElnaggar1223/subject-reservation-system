@@ -667,18 +667,20 @@ F6's own:
 
 ## 10. Proof
 
-All on **0b71cb4** (`feature/ui-audit`), the last commit carrying code; what follows it is this document, the
-trail and the evidence.
+All on **9276212** (`feature/ui-audit`, the review's fixes), the last commit carrying code; what follows it is
+this document, the trail and the evidence. (Before the review the same gates were green on 0b71cb4: suites
+`gates/suite-*-0b71cb4.txt`, CI 38810433498.)
 
 | Gate | Result | Evidence |
 |---|---|---|
-| `pnpm --filter @repo/api check-types` (source and tests) | green, in the ui-audit worktree | trail 21:39:43Z; CI |
-| `pnpm --filter web check-types` | green, in the ui-audit worktree | trail 21:39:43Z; CI |
-| `pnpm --filter @repo/api test`, local time (Africa/Cairo) | 43 files, **839 passed**, 1 todo (main d6c6715: 836; F6 added three scenarios) | `gates/suite-local-0b71cb4.txt` |
-| the same with `TZ=UTC` | 43 files, **839 passed**, 1 todo | `gates/suite-utc-0b71cb4.txt` |
-| CI (`.github/workflows/ci.yml`) | **green, run 38810433498** (gate 0, both type-checks, the suite) | `gh run list --branch feature/ui-audit` |
+| `pnpm --filter @repo/api check-types` (source and tests) | green, in the ui-audit worktree | trail 23:14:25Z; CI |
+| `pnpm --filter web check-types` | green, in the ui-audit worktree | trail 23:14:25Z; CI |
+| `pnpm --filter @repo/api test`, local time (Africa/Cairo) | 43 files, **839 passed**, 1 todo (main d6c6715: 836; F6 added three scenarios) | `gates/suite-local-9276212.txt` |
+| the same with `TZ=UTC` | 43 files, **839 passed**, 1 todo | `gates/suite-utc-9276212.txt` |
+| CI (`.github/workflows/ci.yml`) | **green, run 38822418273** (gate 0, both type-checks, the suite) | `gh run list --branch feature/ui-audit` |
 | `useQuery<…>` generics in `apps/web` | **15** (19 on main; the limit 35) | `grep -rn "useQuery<" apps/web` |
-| The after drive, every screen of §1, EN and AR | 154 records: **0 axe violations, 0 console errors** (hydration included) | `drive-after.json`; trail 21:38:47Z |
+| The after drive, every screen of §1, EN and AR | 154 records: **0 axe violations, 0 console errors** (hydration included), again after the review's fixes | `drive-after.json`; trail 23:23:09Z |
+| The review's seven findings | each driven; controls for 1, 2, 3, 7 | §4.3; `review-fixes/` |
 | Before and after screenshots | 76 screens with all four (`before-en`, `before-ar`, `after-en`, `after-ar`), each under 300 KB; two after-only: f06b (Reserve with rows ticked, added to show the stacked rows) and s36 (the desk opened from the student record — before, the link opened the empty desk of s30) | `.audit/ui-audit-evidence/<screen>/` |
 
 **Controls** — each guard undone once, its proof red, restored green:
@@ -763,4 +765,7 @@ trail and the evidence.
   words (23:09Z), the desk's Cairo day (23:11Z). The document's hydration counts made one set (67 of 75
   Arabic records); the direction-only "no flash", the per-request rendering and the untested Arabic
   sentences written down (§4.1, §7, §8). Both type-checks green in the worktree; `useQuery<` generics 15.
-- Next: commit; the full suite in local time and UTC; the whole after drive; CI.
+- 23:15Z — committed (9276212) and pushed.
+- 23:15–23:33Z — the whole after drive on 9276212 (23:23Z): 154 records, none with an axe violation or a
+  console error; the full suite in local time (23:24Z) and with `TZ=UTC` (23:33Z): 839 passed, 1 todo, both;
+  CI run 38822418273 green. §10 brought to 9276212.
