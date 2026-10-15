@@ -501,7 +501,7 @@ async function teachingGroupOptions(academicYearId: string) {
     const teacherId = today.has(g.id) ? today.get(g.id)! : g.teacherId;
     const teacherName = teacherId ? names.get(teacherId) ?? null : null;
     const subject = g.subject ? `${g.subject.name}${g.unit ? ` ${g.unit.shortCode ?? g.unit.code}` : ''}` : null;
-    const extra = [subject && !g.name.includes(g.subject!.name) ? subject : null, teacherName && !g.name.includes(teacherName) ? teacherName : null].filter(Boolean);
+    const extra = [subject && !g.name.includes(subject) ? subject : null, teacherName && !g.name.includes(teacherName) ? teacherName : null].filter(Boolean);
     return {
       id: g.id, name: g.name, kind: g.kind, label: [g.name, ...extra].join(' · '),
       subject: g.subject ? { id: g.subject.id, name: g.subject.name } : null, unit: g.unit ? { id: g.unit.id, code: g.unit.code, shortCode: g.unit.shortCode } : null,

@@ -1,0 +1,27 @@
+{
+  "read": {
+    "messages-a-class-a-options": [
+      "Choose a group",
+      "Biology 11 — Teacher A",
+      "Biology 11 — Teacher B",
+      "Biology 11 — Teacher D · Teacher C",
+      "Homeroom 11 — Teacher H"
+    ],
+    "messages-a-class-a": {
+      "en": "Who\nEveryone or a grade\nA list in the system\nChosen people\nList\nA session's unpaid families\nA section\nA teaching group\nThe reservers of a subject\nThe holders of a charge\nTeaching group\nChoose a group\nBiology 11 — Teacher A\nBiology 11 — Teacher B\nBiology 11 — Teacher D · Teacher C\nHomeroom 11 — Teacher H\nTo\nParents and students\nParents\nStudents\n\n8 people\n Biology 11 — Teacher A: Biology with Teacher A — Parents and students\n\nStudent FU-2 (Student) · Student FU-3 (Student) · Student FU-5 (Student) · Student FU-6 (Student) · Parent FU-2 (Parent, Student FU-2) · Parent FU-3 (Parent, Student FU-3) …\n\nKeep this list in the picker as (optional)",
+      "ar": "إلى من\nالجميع أو صف\nقائمة في النظام\nأشخاص مختارون\nالقائمة\nالأسر غير المسددة في جلسة\nفصل\nمجموعة تدريس\nمن حجزوا مادة\nأصحاب رسم\nمجموعة تدريس\nاختر مجموعة\nBiology 11 — Teacher A\nBiology 11 — Teacher B\nBiology 11 — Teacher D · Teacher C\nHomeroom 11 — Teacher H\nإلى\nأولياء الأمور والطلاب\nأولياء الأمور\nالطلاب\n\n8 أشخاص\n Biology 11 — Teacher A: Biology مع Teacher A — أولياء الأمور والطلاب\n\nStudent FU-2 (طالب) · Student FU-3 (طالب) · Student FU-5 (طالب) · Student FU-6 (طالب) · Parent FU-2 (ولي أمر, Student FU-2) · Parent FU-3 (ولي أمر, Student FU-3) …\n\nاحفظ هذه القائمة في الاختيار باسم (اختياري)"
+    },
+    "messages-b-class-b-options": [
+      "Choose a group",
+      "Biology 11 — Teacher A",
+      "Biology 11 — Teacher B",
+      "Biology 11 — Teacher D · Teacher C",
+      "Homeroom 11 — Teacher H"
+    ],
+    "messages-b-class-b": {
+      "en": "Who\nEveryone or a grade\nA list in the system\nChosen people\nList\nA session's unpaid families\nA section\nA teaching group\nThe reservers of a subject\nThe holders of a charge\nTeaching group\nChoose a group\nBiology 11 — Teacher A\nBiology 11 — Teacher B\nBiology 11 — Teacher D · Teacher C\nHomeroom 11 — Teacher H\nTo\nParents and students\nParents\nStudents\n\n2 people\n Biology 11 — Teacher B: Biology with Teacher B — Parents and students\n\nStudent FU-1 (Student) · Parent FU-1 (Parent, Student FU-1)\n\nKeep this list in the picker as (optional)",
+      "ar": "إلى من\nالجميع أو صف\nقائمة في النظام\nأشخاص مختارون\nالقائمة\nالأسر غير المسددة في جلسة\nفصل\nمجموعة تدريس\nمن حجزوا مادة\nأصحاب رسم\nمجموعة تدريس\nاختر مجموعة\nBiology 11 — Teacher A\nBiology 11 — Teacher B\nBiology 11 — Teacher D · Teacher C\nHomeroom 11 — Teacher H\nإلى\nأولياء الأمور والطلاب\nأولياء الأمور\nالطلاب\n\nشخصان\n Biology 11 — Teacher B: Biology مع Teacher B — أولياء الأمور والطلاب\n\nStudent FU-1 (طالب) · Parent FU-1 (ولي أمر, Student FU-1)\n\nاحفظ هذه القائمة في الاختيار باسم (اختياري)"
+    }
+  },
+  "errors": []
+}
