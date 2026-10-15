@@ -283,13 +283,25 @@ Each restored from a kept copy (`grep CONTROL` 0) and its file green again in th
 
 ## 6. Gates (in the cycle-followups worktree)
 
+**The review round (1688f24, the last commit with code):**
+
+| Gate | Commit | Result | Kept |
+|---|---|---|---|
+| `pnpm --filter @repo/api check-types` (source and tests) | 1688f24 | clean | — |
+| `pnpm --filter web check-types` | 1688f24 | clean | — |
+| the suite, local time (+0300), `TEST_DB_NAME=igcse_followups_test` | 1688f24 | 43 files, **836 passed**, 1 todo (main 6108fa3: 832; the four new scenarios) | `suite/1688f24-local.log` |
+| the suite, `TZ=UTC` | 1688f24 | 43 files, **836 passed**, 1 todo | `suite/1688f24-utc.log` |
+| CI (`gates`) | 1688f24 | green: run 38676877485 | — |
+
+**Before the review:**
+
 | Gate | Commit | Result | Kept |
 |---|---|---|---|
 | `pnpm --filter @repo/api check-types` (source and tests) | 2bfc74c | clean | — |
 | `pnpm --filter web check-types` | 2bfc74c | clean | — |
 | the suite, local time (+0300), `TEST_DB_NAME=igcse_followups_test` | 2bfc74c | 43 files, **835 passed**, 1 todo (main 6108fa3: 832 and 1 todo; the three new scenarios) | `suite/2bfc74c-local.log` |
 | the suite, `TZ=UTC` | 2bfc74c | 43 files, **835 passed**, 1 todo | `suite/2bfc74c-utc.log` |
-| CI (`gates`) | 594fb6a, 2bfc74c | green: runs 38665662013, 38667940887 | — |
+| CI (`gates`) | 594fb6a, 2bfc74c, d015bdf, d3f62cf | green: runs 38665662013, 38667940887, 38669680333, 38671056078 | — |
 
 The same suite on 594fb6a in local time (835 passed) is kept as `suite/594fb6a-local.log`; 2bfc74c differs from
 it in one line of code (the picker's label) and the documents. `useQuery<` in `apps/web/app`: 19, unchanged.
@@ -399,3 +411,12 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
   status; restored from lead-env's own index (its content written back over the file; index and HEAD untouched);
   `git status` there clean again; no other lead-env file changed in this session. For the lead: anything run in
   lead-env between 01:28Z and 02:10Z saw that file changed.
+- 02:27–02:40 — d3f62cf (trail only) and its CI green (run 38671056078); the first report.
+- 03:15–03:33 — **the Opus 5.5 review of d3f62cf** ("confirmed: merge", five items to fix in one round, via the
+  coordinator): the group's day (item 1) with its summer case and control C3; the 22:30Z resolve (item 3) and
+  control C4 (red with TZ=UTC only); 08s 39 passed in both zones (03:20Z, 03:21Z). The form made again after a
+  replacement (item 2) and the quick-fill's reset (item 4), both driven on the servers started again (API PID
+  52239, web 52240), with controls C5 and C6 in the drive (03:27–03:29Z); the documents (item 5); the servers
+  stopped by their PIDs.
+- 03:33–03:48 — 1688f24 committed and pushed; both type-checks clean; the suite in local time (03:33Z) and with
+  TZ=UTC (03:41Z), 836 passed each; CI green (run 38676877485).
