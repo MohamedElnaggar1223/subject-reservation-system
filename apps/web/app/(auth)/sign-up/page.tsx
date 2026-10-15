@@ -15,47 +15,6 @@ export default async function SignUpPage(): Promise<React.JSX.Element> {
     <AuthLayout
       title="Create your account"
       subtitle="Choose your account type to get started with IGCSE subject reservations."
-      decorativeContent={
-        <div className="relative z-10 flex h-full flex-col justify-between p-10 lg:p-12">
-          <div className="animate-fade-up">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-5 w-5 text-white">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
-                </svg>
-              </div>
-              <span className="font-display text-lg font-bold tracking-tight text-white">IGCSE Reserve</span>
-            </div>
-          </div>
-
-          <div className="animate-fade-up stagger-2 space-y-4">
-            <h1 className="font-display text-3xl font-bold leading-tight text-white lg:text-4xl">
-              Join our academic
-              <br />
-              community.
-            </h1>
-            <p className="max-w-xs text-sm leading-relaxed text-white/70">
-              Whether you are a student or a parent, we have got you covered
-              with a seamless registration experience.
-            </p>
-          </div>
-
-          <div className="animate-fade-up stagger-4 flex gap-8">
-            <div>
-              <p className="font-display text-2xl font-bold text-white">2 min</p>
-              <p className="text-xs text-white/60">Quick Setup</p>
-            </div>
-            <div>
-              <p className="font-display text-2xl font-bold text-white">Secure</p>
-              <p className="text-xs text-white/60">Data Protected</p>
-            </div>
-            <div>
-              <p className="font-display text-2xl font-bold text-white">Free</p>
-              <p className="text-xs text-white/60">To Register</p>
-            </div>
-          </div>
-        </div>
-      }
       footer={
         <p>
           Already have an account?{" "}
@@ -73,7 +32,7 @@ export default async function SignUpPage(): Promise<React.JSX.Element> {
         <Link href={"/sign-up/student" as never} className="group">
           <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5">
             {/* Teal accent bar */}
-            <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-primary opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="absolute inset-y-0 start-0 w-1 rounded-s-xl bg-primary opacity-0 transition-opacity group-hover:opacity-100" />
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-primary transition-colors group-hover:bg-brand-100">
                 <svg
@@ -96,11 +55,11 @@ export default async function SignUpPage(): Promise<React.JSX.Element> {
                   I&apos;m a Student
                 </h2>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Register for IGCSE subjects, manage your registrations, and track your escrow balance.
+                  Reserve your own subjects and follow each one until it is paid.
                 </p>
               </div>
-              <div className="text-muted-foreground/50 transition-all group-hover:text-primary group-hover:translate-x-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+              <div aria-hidden className="text-muted-foreground/50 transition-all group-hover:text-primary group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5 rtl:rotate-180">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                 </svg>
               </div>
@@ -112,7 +71,7 @@ export default async function SignUpPage(): Promise<React.JSX.Element> {
         <Link href={"/sign-up/parent" as never} className="group">
           <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:border-emerald-400/30 hover:shadow-md hover:-translate-y-0.5">
             {/* Emerald accent bar */}
-            <div className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-emerald-500 opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="absolute inset-y-0 start-0 w-1 rounded-s-xl bg-emerald-500 opacity-0 transition-opacity group-hover:opacity-100" />
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
                 <svg
@@ -135,11 +94,11 @@ export default async function SignUpPage(): Promise<React.JSX.Element> {
                   I&apos;m a Parent
                 </h2>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Link to your children&apos;s accounts, register subjects on their behalf, and manage escrow transfers.
+                  Link each child&apos;s account, reserve their subjects, and pay at the school desk or by InstaPay.
                 </p>
               </div>
-              <div className="text-muted-foreground/50 transition-all group-hover:text-emerald-500 group-hover:translate-x-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+              <div aria-hidden className="text-muted-foreground/50 transition-all group-hover:text-emerald-500 group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5 rtl:rotate-180">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                 </svg>
               </div>

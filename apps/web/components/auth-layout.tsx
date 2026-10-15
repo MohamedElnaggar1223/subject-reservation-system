@@ -65,34 +65,33 @@ function DefaultBranding() {
         </div>
       </div>
 
-      {/* Center tagline */}
+      {/* What the account is for, in the family's words (F6: the figures that stood here —
+          "500+ Active Students", "98% Satisfaction" — were invented). */}
       <div className="animate-fade-up stagger-2 space-y-4">
         <h1 className="font-display text-3xl font-bold leading-tight text-white lg:text-4xl">
-          Your academic
-          <br />
-          journey starts here.
+          The school&apos;s subject reservations, in one place.
         </h1>
-        <p className="max-w-xs text-sm leading-relaxed text-white/70">
-          Reserve your IGCSE subjects with confidence. A seamless registration
-          experience built for students and parents.
+        <p className="max-w-xs text-sm leading-relaxed text-white/80">
+          One account for the family, in place of a form for every subject.
         </p>
       </div>
 
-      {/* Bottom stats / trust indicators */}
-      <div className="animate-fade-up stagger-4 flex gap-8">
-        <div>
-          <p className="font-display text-2xl font-bold text-white">500+</p>
-          <p className="text-xs text-white/60">Active Students</p>
-        </div>
-        <div>
-          <p className="font-display text-2xl font-bold text-white">30+</p>
-          <p className="text-xs text-white/60">IGCSE Subjects</p>
-        </div>
-        <div>
-          <p className="font-display text-2xl font-bold text-white">98%</p>
-          <p className="text-xs text-white/60">Satisfaction</p>
-        </div>
-      </div>
+      <ul className="animate-fade-up stagger-4 space-y-3">
+        {[
+          "Reserve each child's subjects",
+          'Pay at the school desk or by InstaPay',
+          'See every receipt, and what is still owed',
+        ].map((point) => (
+          <li key={point} className="flex items-center gap-3">
+            <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20">
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </span>
+            <span className="text-sm text-white/90">{point}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -168,7 +167,7 @@ export default function AuthLayout({
       </div>
 
       {/* ── Right content panel ── */}
-      <div className="relative flex flex-1 items-center justify-center bg-background px-6 py-10 lg:px-12">
+      <div className="relative flex flex-1 items-center justify-center bg-background px-6 pb-10 pt-16 lg:px-12 lg:py-10">
         <button
           type="button"
           onClick={toggleLanguage}

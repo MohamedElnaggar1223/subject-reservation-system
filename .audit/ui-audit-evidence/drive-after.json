@@ -3218,5 +3218,317 @@
   "axe": [],
   "shot": "f06b-register-ticked/after-ar.jpg",
   "bytes": 55086
+ },
+ "a01-sign-in:en": {
+  "id": "a01-sign-in",
+  "role": "anon",
+  "lang": "en",
+  "path": "/sign-in",
+  "finalUrl": "/sign-in",
+  "status": 200,
+  "settledMs": 3052,
+  "apiRequests": 1,
+  "api": [
+   "GET /api/auth/get-session"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a01-sign-in/after-en.jpg",
+  "bytes": 38221
+ },
+ "a08-unauthorized:en": {
+  "id": "a08-unauthorized",
+  "role": "anon",
+  "lang": "en",
+  "path": "/unauthorized",
+  "finalUrl": "/unauthorized",
+  "status": 200,
+  "settledMs": 2441,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a08-unauthorized/after-en.jpg",
+  "bytes": 16648
+ },
+ "a02-sign-in-phone:en": {
+  "id": "a02-sign-in-phone",
+  "role": "anon_phone",
+  "lang": "en",
+  "path": "/sign-in",
+  "finalUrl": "/sign-in",
+  "status": 200,
+  "settledMs": 1899,
+  "apiRequests": 1,
+  "api": [
+   "GET /api/auth/get-session"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a02-sign-in-phone/after-en.jpg",
+  "bytes": 15948
+ },
+ "a03-sign-up:en": {
+  "id": "a03-sign-up",
+  "role": "anon_phone",
+  "lang": "en",
+  "path": "/sign-up",
+  "finalUrl": "/sign-up",
+  "status": 200,
+  "settledMs": 3131,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a03-sign-up/after-en.jpg",
+  "bytes": 19395
+ },
+ "a04-sign-up-parent:en": {
+  "id": "a04-sign-up-parent",
+  "role": "anon_phone",
+  "lang": "en",
+  "path": "/sign-up/parent",
+  "finalUrl": "/sign-up/parent",
+  "status": 200,
+  "settledMs": 2225,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a04-sign-up-parent/after-en.jpg",
+  "bytes": 27818
+ },
+ "a05-sign-up-student:en": {
+  "id": "a05-sign-up-student",
+  "role": "anon_phone",
+  "lang": "en",
+  "path": "/sign-up/student",
+  "finalUrl": "/sign-up/student",
+  "status": 200,
+  "settledMs": 2131,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a05-sign-up-student/after-en.jpg",
+  "bytes": 26610
+ },
+ "a06-forgot-password:en": {
+  "id": "a06-forgot-password",
+  "role": "anon_phone",
+  "lang": "en",
+  "path": "/forgot-password",
+  "finalUrl": "/forgot-password",
+  "status": 200,
+  "settledMs": 2137,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a06-forgot-password/after-en.jpg",
+  "bytes": 14790
+ },
+ "a07-verify-email:en": {
+  "id": "a07-verify-email",
+  "role": "anon_phone",
+  "lang": "en",
+  "path": "/verify-email",
+  "finalUrl": "/verify-email",
+  "status": 200,
+  "settledMs": 2038,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "a07-verify-email/after-en.jpg",
+  "bytes": 10985
+ },
+ "a01-sign-in:ar": {
+  "id": "a01-sign-in",
+  "role": "anon",
+  "lang": "ar",
+  "path": "/sign-in",
+  "finalUrl": "/sign-in",
+  "status": 200,
+  "settledMs": 1936,
+  "apiRequests": 1,
+  "api": [
+   "GET /api/auth/get-session"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a01-sign-in/after-ar.jpg",
+  "bytes": 29807
+ },
+ "a08-unauthorized:ar": {
+  "id": "a08-unauthorized",
+  "role": "anon",
+  "lang": "ar",
+  "path": "/unauthorized",
+  "finalUrl": "/unauthorized",
+  "status": 200,
+  "settledMs": 1855,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a08-unauthorized/after-ar.jpg",
+  "bytes": 13843
+ },
+ "a02-sign-in-phone:ar": {
+  "id": "a02-sign-in-phone",
+  "role": "anon_phone",
+  "lang": "ar",
+  "path": "/sign-in",
+  "finalUrl": "/sign-in",
+  "status": 200,
+  "settledMs": 1901,
+  "apiRequests": 1,
+  "api": [
+   "GET /api/auth/get-session"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a02-sign-in-phone/after-ar.jpg",
+  "bytes": 12695
+ },
+ "a03-sign-up:ar": {
+  "id": "a03-sign-up",
+  "role": "anon_phone",
+  "lang": "ar",
+  "path": "/sign-up",
+  "finalUrl": "/sign-up",
+  "status": 200,
+  "settledMs": 1863,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a03-sign-up/after-ar.jpg",
+  "bytes": 13759
+ },
+ "a04-sign-up-parent:ar": {
+  "id": "a04-sign-up-parent",
+  "role": "anon_phone",
+  "lang": "ar",
+  "path": "/sign-up/parent",
+  "finalUrl": "/sign-up/parent",
+  "status": 200,
+  "settledMs": 1893,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a04-sign-up-parent/after-ar.jpg",
+  "bytes": 20604
+ },
+ "a05-sign-up-student:ar": {
+  "id": "a05-sign-up-student",
+  "role": "anon_phone",
+  "lang": "ar",
+  "path": "/sign-up/student",
+  "finalUrl": "/sign-up/student",
+  "status": 200,
+  "settledMs": 1879,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a05-sign-up-student/after-ar.jpg",
+  "bytes": 20585
+ },
+ "a06-forgot-password:ar": {
+  "id": "a06-forgot-password",
+  "role": "anon_phone",
+  "lang": "ar",
+  "path": "/forgot-password",
+  "finalUrl": "/forgot-password",
+  "status": 200,
+  "settledMs": 1876,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a06-forgot-password/after-ar.jpg",
+  "bytes": 12857
+ },
+ "a07-verify-email:ar": {
+  "id": "a07-verify-email",
+  "role": "anon_phone",
+  "lang": "ar",
+  "path": "/verify-email",
+  "finalUrl": "/verify-email",
+  "status": 200,
+  "settledMs": 1851,
+  "apiRequests": 0,
+  "api": [],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "a07-verify-email/after-ar.jpg",
+  "bytes": 9551
  }
 }

@@ -407,6 +407,25 @@ after: "Approve" first and filled. The page is half its length at a phone (f03: 
 | Consistency | "14850.00 EGP", dates "10/15/2026" | M | "EGP 14,850", the school's dates |
 | WCAG 4.1.2 | the child, from and to selects had no names (axe `select-name` 3) | M | tied to their labels |
 
+### 3.32 Sign-in [a01, a02], sign-up [a03–a05], the password and email links [a06, a07], unauthorized [a08]
+
+What the family did before: opened the school's Google Form from a link, nothing to sign in to. The first
+screen of the app is where they decide whether it is worth the switch, so it must say what the account is for
+and say only what is true.
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Untrue | the panel beside every sign-in form: "500+ Active Students · 30+ IGCSE Subjects · 98% Satisfaction" — invented figures; the sign-up's "2 min Quick Setup · Secure Data Protected · Free To Register" | H | one panel for every auth page: "The school's subject reservations, in one place. One account for the family, in place of a form for every subject." and the three things the account does — reserve each child's subjects; pay at the school desk or by InstaPay; see every receipt, and what is still owed. The sign-up, parent and student pages' own copies of the panel (each with its slogans: "Shape your academic future", "Support your child's success") gone with it |
+| Forms' words | the sign-up cards and the parent's box: "Register for IGCSE subjects … track your escrow balance", "register subjects on their behalf, and manage escrow transfers", "After registration … Manage escrow and payments" | M | "Reserve your own subjects and follow each one until it is paid"; "Link each child's account, reserve their subjects, and pay at the school desk or by InstaPay"; the parent's box "After you create the account": link each child's account (the child accepts the link), reserve their subjects, pay at the desk or by InstaPay |
+| Errors | every visitor's sign-up page logged "[session] getSession failed: Unauthorized" as an error (Next's dev overlay "1 Issue" at a03–a05): the server's session helper counted the API's "no one signed in" as a failure | M | **at the cause** (`lib/auth/session.ts`): a 401 from `/v1/session` is a visitor — null without a log; any other failure is still logged |
+| WCAG 4.1.3 status messages | the refusals (wrong password, passwords that differ, a reset that fails) appeared in a plain box a screen reader does not announce | M | `role="alert"` on the five forms' error box. Driven: a wrong password reads "The email or password you entered is incorrect…" in English and "البريد الإلكتروني أو كلمة المرور غير صحيحة…" in Arabic; parent sign-up with two different passwords, "Passwords do not match" / "كلمتا المرور غير متطابقتين" |
+| RTL | the cards' chevrons pointed right in Arabic (backwards), the "Back to account type" / "Back to sign in" arrows pointed left (forwards); the cards' hover bar sat on the left | M | `rtl:rotate-180` (the project's pattern, as on the home's list), the bar on the start side |
+| Responsive | at a phone the language button sat on the title of the long forms (a04, a05) | L | the form panel leaves the button its own line at a phone |
+| Sentences, not codes | "Missing verification token" | M | "This link is incomplete — Open the link in the email again, or copy all of it into the browser." |
+| Dead end; sentences | `/unauthorized`: "Unauthorized — You do not have access to this page." and nothing to press; grey from outside the tokens (`text-gray-600`) | M | "This page is not open to your account — It belongs to another part of the school's work. Your own pages are on your home." with **Go to your home**, in the project's button and tokens |
+| Arabic | the hydration warning on every Arabic auth page (a01, a02, a03–a07) | H | the shell's fix (§3.0) |
+| Kept | the sign-in form itself (two fields, the forgot link, one button); the student's grade cards; forgot and reset password | — | nothing to change |
+
 ## 4. The queued findings, one by one
 
 ## 5. Accessibility results
@@ -464,4 +483,11 @@ after: "Approve" first and filled. The page is half its length at a phone (f03: 
   sessions row typed by the API); the Reserve rows and the statement stacked at a phone; the checkout's and
   the wallet's money and dates in the school's format; "Wallet" for a family's escrow; three selects named.
   Driven after: 46 family records, none with an axe violation or a console error.
-- Next: commit group 6; group 7 (sign-in and sign-up).
+- 21:06Z — group 6 committed (d0c96c1) and pushed.
+- 21:07–21:18Z — group 7 (sign-in and sign-up): the invented figures and slogans replaced by one truthful
+  panel; the cards and the parent's box in the family's words; the session helper's "Unauthorized" log at
+  its cause; the refusals announced; the chevrons and arrows the reading direction's; the incomplete link
+  and the unauthorized page in sentences with a way on. Driven after: 16 records, none with an axe violation
+  or a console error; the wrong-password and mismatched-password refusals driven in both languages
+  (`drive/auth-errors.mjs`).
+- Next: commit group 7; the import review's "First entry"; the remaining sections; the gates.

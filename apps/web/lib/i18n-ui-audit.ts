@@ -141,4 +141,24 @@ export const uiAuditArabic: Record<string, string> = {
   'Each session carries its own refund policy, shown on its header (for June: 100% to week 2 · 50% in week 3 · 0% from week 4). These windows apply only to reservations made before the reservations were reworked, in October 2026.':
     'لكل جلسة سياسة استرداد خاصة بها تظهر في رأسها (ليونيو: 100% حتى الأسبوع 2 · 50% في الأسبوع 3 · 0% من الأسبوع 4). وهذه النوافذ تنطبق فقط على الحجوزات التي سبقت إعادة بناء الحجز في أكتوبر 2026.',
   'No refund windows: the sessions’ own refund policies apply.': 'لا نوافذ استرداد: تنطبق سياسات الاسترداد الخاصة بكل جلسة.',
+
+  // ── Sign-in and sign-up ──
+  "The school's subject reservations, in one place.": 'حجوزات المواد في المدرسة، في مكان واحد.',
+  'One account for the family, in place of a form for every subject.': 'حساب واحد للأسرة بدلًا من استمارة لكل مادة.',
+  "Reserve each child's subjects": 'احجز مواد كل ابن',
+  'Pay at the school desk or by InstaPay': 'ادفع في مكتب المدرسة أو عبر إنستاباي',
+  'See every receipt, and what is still owed': 'اطّلع على كل إيصال وعلى ما بقي مستحقًا',
+  'Reserve your own subjects and follow each one until it is paid.': 'احجز موادك وتابع كل مادة حتى تُدفع.',
+  "Link each child's account, reserve their subjects, and pay at the school desk or by InstaPay.":
+    'اربط حساب كل ابن، واحجز مواده، وادفع في مكتب المدرسة أو عبر إنستاباي.',
+  'Create your account, then link each child and reserve their subjects.': 'أنشئ حسابك، ثم اربط كل ابن واحجز مواده.',
+  'After you create the account': 'بعد إنشاء الحساب',
+  "Link each child's account — your child accepts the link": 'اربط حساب كل ابن — ويقبل ابنك طلب الربط',
+  'Reserve their subjects': 'احجز مواده',
+  'This link is incomplete': 'هذا الرابط غير مكتمل',
+  'Open the link in the email again, or copy all of it into the browser.': 'افتح الرابط من البريد مرة أخرى، أو انسخه كاملًا في المتصفح.',
+  'This page is not open to your account': 'هذه الصفحة غير متاحة لحسابك',
+  "It belongs to another part of the school's work. Your own pages are on your home.":
+    'إنها تخص جزءًا آخر من عمل المدرسة. صفحاتك موجودة في صفحتك الرئيسية.',
+  'Go to your home': 'اذهب إلى صفحتك الرئيسية',
 };
