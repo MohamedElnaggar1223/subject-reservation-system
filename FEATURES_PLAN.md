@@ -797,6 +797,61 @@ A-12, A-13 and A-14 (§0b); RF-09 (the grade of record after a remark: F4, F5); 
 answers (decision 3: F0b, F4, F7); DISCOVERY.md Q-02 (carry forward), Q-05 (candidate numbers
 and the entry route), F-01 (the money record: F7).
 
+**Decided by the lead on 16 Oct 2026, under the owner's delegation** ("some of these you can make
+the decision based on the descriptions I gave you and the research you did"), from SCHOOL_FORMS.md,
+DISCOVERY.md and the owner's direction of 14 Oct. Each is applied by the follow-up after F6 lands
+(one Opus 5.5 agent; the rule changes with their scenarios) unless marked "no change".
+
+1. **A first entry in self-study on a "Retake (Self Study ONLY)" subject: refused**, as on every
+   form ("Self Study 50% — ONLY 2nd entry") and as F7's import already treats it; the exception
+   gate "self-study on a first entry" stays the only way (an untaught subject a family insists on is
+   that exception). The G-09 allowance for the untaught subject goes; the offers read and
+   assertLineRules change, with a scenario; an existing assertion of the allowance may change to
+   the new rule (pre-authorised).
+2. **An IAL unit's sitting in a winter session: October and January only** (Pearson sits IAL units
+   in October, January and June; the school's forms say "November" loosely); the form offers a
+   unit of a units-cash-in award the board's IAL months; an IGCSE subject keeps every month the
+   board sits.
+3. **Arabic A Level's two qualifications: the family chooses through the teacher**, as the form does
+   ("T1 (Edexcel YAA01)", "T2 (Edexcel 9AA01)"); each teacher option names its qualification on the
+   Reserve page and the preview. No change beyond the label.
+4. **The old drawer's tools stay API-only.** The forms never think in items; the Catalogue page is
+   where a paper, a unit or a route is defined and the session's form offers it from there. No
+   change.
+5. **Candidates joins the sidebar under "Entries to the board"** (the entry lists refuse an entry
+   without a candidate number, legal name, date of birth or UCI): a step of the hand-off, not a
+   feature outside the cycle.
+6. **My Exams stays hidden** until the school sends its first entries through the system; then the
+   statement of entry alone (not the timetable or the results) is shown to families — queued for
+   that moment.
+7. **Board Services stays** (the services a reservation can carry and their fees per series are
+   money of the cycle); its remark-service rows are hidden by the switch.
+8. **Subjects (`/admin/subjects`) is hidden from the sidebar** (reachable by URL): the Catalogue is
+   the subject list, the session's form picks any teacher ("Show every teacher") and joins them to
+   the pool, and its legacy fee columns contradict the session's fees — two places for one thing.
+9. **"Subjects this year" on the Student 360 stays**, titled in the cycle's words ("This year's
+   subjects and teachers"): the desk needs it; its link to the enrolment screen stays hidden.
+10. **Exam Deadlines shows only the entry and retake deadlines** (and the exams' start where it is
+    the cut-off) while the switch is on; forecasts, results and certificates rows are hidden by it.
+11. **History stays** for families: the record of drops and refunds is the cycle's.
+12. **Words.** A section (11A) is "class" / فصل on family-facing text (the form's "Grade Level &
+    Class") and "section" / فصل on staff screens; a teaching group (Biology with Teacher A) is
+    "group" / مجموعة everywhere (the desk's and Replace a teacher's sentences change from "class"
+    / فصل to "group" / مجموعة; F1's مجموعة تدريس already agrees; D's قسم goes).
+13. **Payments (`/admin/payments`) is hidden from the sidebar** (reachable by URL): no new payment
+    uses the old bank-transfer path; InstaPay is confirmed on the Finance Workbench.
+14. **"Wallet" becomes "Balance"** ("Your balance with the school", الرصيد لدى المدرسة): the school's
+    people speak of a family's balance and deposits, not a wallet; the nav item, the family's home
+    and statement, the desk's and the admin's screens use the one word; "escrow" stays the code's
+    and the audit's word only.
+15. **The sign-in page carries the school's name** from a school-name setting (added if none
+    exists; default empty, the app's name shown until it is set), no logo until the school provides
+    one; the sentence under it stays the family's words.
+16. **Entry Lists' rule source reads the handbook's name alone** ("Cambridge Handbook 2026"): the
+    stored text is changed by a one-off update on the template and the owner's database and in
+    F4's seed for new installs.
+
+
 ---
 
 ## 7. Status
