@@ -4,7 +4,8 @@ import { apiResponse } from '@repo/validations'
 import { ROLES, ACADEMIC_ROLES, STUDENT_RECORD_ROLES, STAFF_ROLES, SETTINGS_READ_ROLES, type Role } from '@repo/validations'
 import { redirect } from 'next/navigation'
 
-const fetchSession = async () => apiResponse((await getServerApi()).v1.session.$get())
+const sessionRequest = async () => (await getServerApi()).v1.session.$get()
+const fetchSession = async () => apiResponse(sessionRequest())
 
 // Derived from the RPC fetcher, never hand-written: the hand-written copy
 // that used to live here still promised a session token after the API
@@ -14,7 +15,12 @@ export type SessionData = Awaited<ReturnType<typeof fetchSession>>
 // Cached per-request session fetch
 export const getSession = cache(async (): Promise<SessionData | null> => {
   try {
-    return await fetchSession()
+    const res = await sessionRequest()
+    // No one signed in is the API's answer for a visitor, not a failure: the sign-up pages ask so
+    // that a signed-in person is sent home, and every visitor's page logged "getSession failed:
+    // Unauthorized" as an error (F6). Anything else still is one.
+    if (res.status === 401) return null
+    return await apiResponse(Promise.resolve(res))
   } catch (err) {
     console.error('[session] getSession failed:', err instanceof Error ? err.message : err)
     return null

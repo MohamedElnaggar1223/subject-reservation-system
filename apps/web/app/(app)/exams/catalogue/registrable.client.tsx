@@ -56,7 +56,8 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
         <EmptyState title={onlyUnmapped ? 'Every subject is mapped' : 'No subject matches'} message={onlyUnmapped ? 'Untick the box to see them all.' : undefined} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full min-w-[1100px] text-sm">
+          {/* F6: 1100px pushed "Change" off a 1366px screen beside the sidebar; the columns wrap within 940px. */}
+          <table className="w-full min-w-[940px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
                 <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Subject</th>

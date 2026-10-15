@@ -99,7 +99,7 @@ export default function SignInPage(): React.JSX.Element {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className="animate-fade-up rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <div role="alert" className="animate-fade-up rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
             <p className="text-sm text-destructive">{error}</p>
           </div>
         )}

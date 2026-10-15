@@ -23,8 +23,9 @@ export const POLICY_SCOPE_LABELS: Record<PolicyScope, string> = {
   session: 'Session',
   subject: 'Subject (any session)',
   offer: 'Subject in a session',
-  item: 'Item (paper, unit or route)',
-  line: 'One reservation line',
+  // F6: the forms' words — "item" and "route" are the model's (SESSION_WORDS.md's rule).
+  item: 'Paper, unit or component',
+  line: 'One reservation',
   charge: 'One charge',
   boardSeries: 'Board series',
   academicYear: 'Academic year',

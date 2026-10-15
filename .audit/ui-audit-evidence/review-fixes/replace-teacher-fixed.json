@@ -1,0 +1,20 @@
+{
+ "label": "fixed",
+ "subject": "Physics A.S./A.L.",
+ "replaced": "Teacher B -> Teacher C",
+ "sheetBefore": [
+  "Teacher B"
+ ],
+ "sheetAfterReplace": [
+  "Teacher C"
+ ],
+ "formTicksAfterReplace": [
+  "Teacher C"
+ ],
+ "formNoteKept": true,
+ "sheetAfterSave": [
+  "Teacher C"
+ ],
+ "noteSaved": "Typed before the replacement (fixed)",
+ "departedBack": false
+}

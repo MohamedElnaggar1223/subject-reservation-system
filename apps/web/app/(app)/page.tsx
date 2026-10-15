@@ -26,12 +26,10 @@ import CycleLanding from "./cycle-landing.client";
 import LaterLanding from "./later-landing.client";
 import FamilyNext from "./family-next.client";
 
-type ActiveSessionRow = {
-  id: string;
-  name: string;
-  sessionType: string;
-  endDate: string;
-};
+// The open sessions, typed by the API (CLAUDE.md: Hono RPC everywhere; F6 replaced a hand-written row
+// type and its cast).
+const fetchActiveSessions = async () => apiResponse((await getServerApi()).v1.sessions.active.$get());
+type ActiveSessionRow = Awaited<ReturnType<typeof fetchActiveSessions>>[number];
 
 export default async function Home(): Promise<JSX.Element> {
   const session = await requireAuthenticated()
@@ -69,9 +67,7 @@ export default async function Home(): Promise<JSX.Element> {
   // open/closed banner with a live countdown for the current window.
   let activeSessions: ActiveSessionRow[] = [];
   try {
-    const serverApi = await getServerApi();
-    const rows = await apiResponse(serverApi.v1.sessions.active.$get()) as ActiveSessionRow[];
-    activeSessions = rows ?? [];
+    activeSessions = (await fetchActiveSessions()) ?? [];
   } catch {
     // Non-fatal: dashboard still renders without the banner.
   }
@@ -218,6 +214,33 @@ export default async function Home(): Promise<JSX.Element> {
 
   // F6b: a link to a screen outside the reservation cycle (Browse Subjects) is hidden.
   const visibleLinks = links.filter((l) => l.visible && !leadsOutsideTheCycle(l.href));
+  const studentNotices = (
+    <StudentNotices role={role} profileLoaded={profileLoaded} standing={standing} leftKind={leftKind} leftOn={leftOn} isGraduated={isGraduated} mayRegisterNow={mayRegisterNow} />
+  );
+
+  // F6 (the lead's drive): with the cycle on, the family's home is one page in the cycle's order — the
+  // next step for each child, then the rest of their pages — not the old banner ("IGCSE Subject
+  // Reservation System", the countdown) and six quick-link cards under it. The switch off gives back
+  // the old home exactly.
+  if (RESERVATION_CYCLE_ONLY) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-3xl mx-auto">
+        <div className="animate-fade-up mb-5">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            <span>Welcome back,</span> <bdi data-i18n-skip="true">{session.user.name || session.user.email}</bdi>
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {role === 'parent'
+              ? 'Your children’s subjects and payments, and the next step for each.'
+              : 'Your subjects, payments and requests, and the next step for each.'}
+            {role === 'student' && profileLoaded && !leftKind && <> <span>·</span> <span>{gradeLabel(grade)}</span></>}
+          </p>
+        </div>
+        {studentNotices}
+        <FamilyNext viewerRole={role === 'parent' ? 'parent' : 'student'} viewerId={session.user.id} mayReserve={!registrationClosed} />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
@@ -244,12 +267,49 @@ export default async function Home(): Promise<JSX.Element> {
       {/* SES-005: Active session status + countdown (hidden when no open window would take the student) */}
       {!registrationClosed && <SessionBanner sessions={activeSessions} />}
 
-      {/* "What do we owe / what's next" — actions before links. F6b: the cycle's next step for each
-          child (reserve, pay, the due date, the statement) in its place. */}
-      {RESERVATION_CYCLE_ONLY
-        ? <FamilyNext viewerRole={role === 'parent' ? 'parent' : 'student'} viewerId={session.user.id} mayReserve={!registrationClosed} />
-        : <HomeSummaryCard />}
+      {/* "What do we owe / what's next" — actions before links. */}
+      <HomeSummaryCard />
 
+      {studentNotices}
+
+      {/* Quick Links Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {visibleLinks.map((link, i) => (
+          <Link
+            key={link.href}
+            href={link.href as never}
+            className={`animate-fade-up stagger-${Math.min(i + 1, 8)} group block`}
+          >
+            <div className="relative h-full rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:border-brand-200 hover:shadow-md">
+              <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100 group-hover:text-brand-700">
+                {link.icon}
+              </div>
+              <h3 className="font-display font-semibold text-card-foreground">
+                {link.title}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                {link.description}
+              </p>
+              {/* Hover arrow indicator */}
+              <div className="absolute right-4 top-5 text-muted-foreground/0 transition-all duration-200 group-hover:text-brand-500 group-hover:translate-x-0.5">
+                <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The student's standing notices (graduated, left, grade unknown, starting next year), on either home. */
+function StudentNotices({ role, profileLoaded, standing, leftKind, leftOn, isGraduated, mayRegisterNow }: {
+  role: string | null; profileLoaded: boolean; standing: string; leftKind: string | null; leftOn: string | null; isGraduated: boolean; mayRegisterNow: boolean;
+}): JSX.Element {
+  return (
+    <>
       {/* Graduated Banner */}
       {isGraduated && (
         <div className="animate-fade-up stagger-1 mb-8 rounded-xl border border-brand-200 bg-brand-50 p-6">
@@ -295,35 +355,6 @@ export default async function Home(): Promise<JSX.Element> {
           <p>Exam registration opens to you from grade 10.</p>
         </Notice>
       )}
-
-      {/* Quick Links Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleLinks.map((link, i) => (
-          <Link
-            key={link.href}
-            href={link.href as never}
-            className={`animate-fade-up stagger-${Math.min(i + 1, 8)} group block`}
-          >
-            <div className="relative h-full rounded-xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:border-brand-200 hover:shadow-md">
-              <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100 group-hover:text-brand-700">
-                {link.icon}
-              </div>
-              <h3 className="font-display font-semibold text-card-foreground">
-                {link.title}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                {link.description}
-              </p>
-              {/* Hover arrow indicator */}
-              <div className="absolute right-4 top-5 text-muted-foreground/0 transition-all duration-200 group-hover:text-brand-500 group-hover:translate-x-0.5">
-                <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                </svg>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
+    </>
   );
 }

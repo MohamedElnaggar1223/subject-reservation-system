@@ -32,6 +32,7 @@ import {
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { InstantText } from '../exams/exams-shared';
+import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 
 interface CheckoutClientProps {
   registrationIds: string[];
@@ -240,7 +241,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   </p>
                 </div>
                 <div className="text-end">
-                  <p className="text-lg font-bold text-foreground tabular-nums" dir="ltr">{g.total.toFixed(2)} EGP</p>
+                  <p className="text-lg font-bold text-foreground tabular-nums" dir="ltr"><Money amount={g.total} /></p>
                   <Button className="mt-2" onClick={() => router.push(`/checkout?ids=${g.registrationIds.join(',')}` as never)}>
                     Pay for this series
                   </Button>
@@ -290,7 +291,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   Paid from escrow
                 </p>
                 <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">
-                  {(result.escrowAmountApplied ?? 0).toFixed(2)} EGP
+                  <Money amount={(result.escrowAmountApplied ?? 0)} />
                 </p>
                 <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-2">
                   A receipt has been emailed to you. Your subjects are confirmed.
@@ -329,7 +330,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                       ['Account Name', instapay?.account.accountName],
                       ['Account Number', instapay?.account.accountNumber],
                       ...(instapay?.account.iban ? [['IBAN', instapay.account.iban]] : []),
-                      ['Exact Amount', `${(instapay?.amountDue ?? result.amount ?? 0).toFixed(2)} EGP`],
+                      ['Exact Amount', `EGP ${(instapay?.amountDue ?? result.amount ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`],
                     ].map(([label, value]) => (
                       <div key={label as string} className="flex justify-between gap-4">
                         <dt className="text-violet-700 dark:text-violet-400">{label}</dt>
@@ -381,10 +382,10 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             <div className="mt-6 pt-6 border-t border-border flex justify-between text-sm text-muted-foreground">
               <span>Amount due</span>
               <span className="font-semibold text-foreground">
-                {amountDue.toFixed(2)} EGP
+                <Money amount={amountDue} />
                 {escrowToApply > 0 && (
                   <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 ml-1">
-                    (+ {escrowToApply.toFixed(2)} escrow)
+                    (+ <Money amount={escrowToApply} /> <span>escrow</span>)
                   </span>
                 )}
               </span>
@@ -414,8 +415,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
         <div className="max-w-xl mx-auto bg-card rounded-xl border border-border shadow-sm p-8">
           <h1 className="text-xl font-bold text-foreground font-display">Payment already started</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            A payment of {(open.amount + open.escrowAmountApplied).toFixed(2)} EGP ({methodLabel}) was started for{' '}
-            {summary.student.name} on {new Date(open.createdAt).toLocaleDateString()}. It covers:
+            <span>A payment of</span> <Money amount={open.amount + open.escrowAmountApplied} /> (<span>{methodLabel}</span>) <span>was started for</span>{' '}
+            <bdi>{summary.student.name}</bdi> <span>on</span> <Day iso={String(open.createdAt)} />. <span>It covers:</span>
           </p>
           <ul className="mt-2 text-sm text-foreground list-disc ps-5">
             {open.paymentRegistrations.map((pr) => (
@@ -446,7 +447,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           ) : (
             <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl">
               <p className="text-sm text-violet-800 dark:text-violet-300">
-                Transfer {(openMeta.instapay?.amountDue ?? open.amount).toFixed(2)} EGP by InstaPay, then submit the reference.
+                <span>Transfer</span> <Money amount={openMeta.instapay?.amountDue ?? open.amount} /> <span>by InstaPay, then submit the reference.</span>
               </p>
               {refSubmitted ? (
                 <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">Reference submitted. The finance team will verify it.</p>
@@ -512,7 +513,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                     <p className="text-xs text-muted-foreground">{reg.session.name}</p>
                   </div>
                   <span className="text-sm font-semibold text-foreground shrink-0 ml-4">
-                    {reg.priceAtRegistration.toFixed(2)} EGP
+                    <Money amount={reg.priceAtRegistration} />
                   </span>
                 </div>
               ))}
@@ -520,7 +521,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             <div className="px-6 py-3 bg-muted flex items-center justify-between">
               <span className="text-sm font-semibold text-foreground">Total</span>
               <span className="text-base font-bold text-foreground">
-                {summary.totalCost.toFixed(2)} EGP
+                <Money amount={summary.totalCost} />
               </span>
             </div>
           </div>
@@ -533,7 +534,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   <div>
                     <h2 className="text-sm font-semibold text-foreground font-display">Apply Escrow Balance</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Available: {summary.escrowBalance.toFixed(2)} EGP
+                      <span>Available:</span> <Money amount={summary.escrowBalance} />
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -569,7 +570,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                     <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Remaining to pay via payment method:</span>
                       <span className="font-semibold text-foreground">
-                        {Math.max(0, summary.totalCost - escrowToApply).toFixed(2)} EGP
+                        <Money amount={Math.max(0, summary.totalCost - escrowToApply)} />
                       </span>
                     </div>
                   </div>
@@ -621,17 +622,17 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span>{summary.totalCost.toFixed(2)} EGP</span>
+                <span><Money amount={summary.totalCost} /></span>
               </div>
               {escrowToApply > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <span>Escrow applied</span>
-                  <span>- {escrowToApply.toFixed(2)} EGP</span>
+                  <span>- <Money amount={escrowToApply} /></span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border">
                 <span>Amount due</span>
-                <span>{amountDue.toFixed(2)} EGP</span>
+                <span><Money amount={amountDue} /></span>
               </div>
             </div>
           </div>
@@ -665,8 +666,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {initiateMutation.isPending
               ? 'Processing...'
               : amountDue === 0 && escrowToApply > 0
-                ? `Confirm ${escrowToApply.toFixed(2)} EGP from escrow`
-                : `Pay ${amountDue.toFixed(2)} EGP via ${PAYMENT_METHOD_LABELS[selectedMethod]}`}
+                ? <><span>Confirm</span> <Money amount={escrowToApply} /> <span>from escrow</span></>
+                // "Pay EGP 14,350 at the school desk" (F6: was "Pay 14350.00 EGP via Pay at School").
+                : <><span>Pay</span> <Money amount={amountDue} /> <span>{selectedMethod === 'instapay' ? 'by InstaPay' : 'at the school desk'}</span></>}
           </Button>
 
           <Button

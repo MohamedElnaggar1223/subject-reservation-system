@@ -318,6 +318,7 @@ Hidden by the same switch (`leadsOutsideTheCycle`), each where it is drawn:
 | Home `/` (family) | the Browse Subjects card (`/subjects`) | hidden |
 | Sign-in | the admin's redirect to `/admin/dashboard` | the landing |
 | Student record `/students/[id]` (F1, merged after F6b) | not a link: F1's week of the student under the academic panel (the timetable drawn in place) | not drawn while `timetableHidden()` (no week is asked of the API); back with the switch off. No kept screen links to an F1 screen: the only hrefs to `/timetable/*` and `/my-timetable` are the sidebar's |
+| Notifications (F1's cover and publishing, merged after F6b; added by F6, 16 Oct 2026) | a cancelled or covered lesson, a changed cover and a published timetable carry `link: '/my-timetable'` in the notification's data (`cover.services.ts`, `timetable.services.ts`) — a hidden screen | nothing to hide: the Notifications screen draws a notification's title and sentence and never its `data.link`, so no notification leads outside the cycle. Such notifications come only from F1's screens, hidden with the switch on. A later screen that draws `data.link` must pass it through `leadsOutsideTheCycle` |
 
 **Kept as steps of the cycle** ("a link that is a step of the cycle stays"): on Entry Lists, a row's fix
 link to the candidate's details (candidate number, legal name, date of birth, UCI, access arrangements)

@@ -258,7 +258,7 @@ export default function StudentsClient(): React.JSX.Element {
               onChange={(e) => setParams({ inferred: e.target.checked ? '1' : null })}
               className="size-4"
             />
-            <span>Graduation inferred by the backfill</span>
+            <span>Graduation worked out from the old records (not confirmed)</span>
           </label>
           {filtered && (
             <Button

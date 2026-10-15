@@ -15,6 +15,8 @@ import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, gradeLabel } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { InstantText } from '~/app/(app)/exams/exams-shared';
 
 type ChildBalance = {
   id: string;
@@ -107,7 +109,7 @@ export default function TransferClient() {
           </div>
           <h1 className="text-xl font-bold text-foreground font-display mb-2">Transfer Complete</h1>
           <p className="text-sm text-muted-foreground">
-            {parsedAmount.toFixed(2)} EGP transferred from {fromChild?.name} to {toChild?.name}.
+            <Money amount={parsedAmount} /> <span>transferred from</span> <bdi>{fromChild?.name}</bdi> <span>to</span> <bdi>{toChild?.name}</bdi>.
           </p>
           <Button
             onClick={() => router.push('/escrow' as never)}
@@ -136,8 +138,9 @@ export default function TransferClient() {
         <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
           {/* From */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">From</label>
+            <label htmlFor="transfer-from" className="block text-sm font-medium text-foreground mb-1">From</label>
             <select
+              id="transfer-from"
               value={fromId}
               onChange={(e) => setFromId(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -145,21 +148,22 @@ export default function TransferClient() {
               <option value="">Select child</option>
               {children.map((child) => (
                 <option key={child.id} value={child.id} disabled={child.id === toId}>
-                  {child.name} ({gradeLabel(child.grade)}) — {child.escrowBalance.toFixed(2)} EGP
+                  {child.name} ({gradeLabel(child.grade)}) — {`EGP ${child.escrowBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
                 </option>
               ))}
             </select>
             {fromChild && (
               <p className="text-xs text-muted-foreground mt-1">
-                Available balance: <span className="font-semibold text-foreground">{fromChild.escrowBalance.toFixed(2)} EGP</span>
+                <span>Available balance:</span> <span className="font-semibold text-foreground"><Money amount={fromChild.escrowBalance} /></span>
               </p>
             )}
           </div>
 
           {/* To */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">To</label>
+            <label htmlFor="transfer-to" className="block text-sm font-medium text-foreground mb-1">To</label>
             <select
+              id="transfer-to"
               value={toId}
               onChange={(e) => setToId(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -167,7 +171,7 @@ export default function TransferClient() {
               <option value="">Select child</option>
               {children.map((child) => (
                 <option key={child.id} value={child.id} disabled={child.id === fromId}>
-                  {child.name} ({gradeLabel(child.grade)}) — {child.escrowBalance.toFixed(2)} EGP
+                  {child.name} ({gradeLabel(child.grade)}) — {`EGP ${child.escrowBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
                 </option>
               ))}
             </select>

@@ -42,8 +42,9 @@ function instrumentLabel(key: string): string {
   );
 }
 
+// The school's clock, 24-hour, as every other screen writes a time (F6: "07:41 AM" here, "07:41" elsewhere).
 const time = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Cairo' }) : '—';
 
 export default function TakingsClient(): React.JSX.Element {
   const [date, setDate] = useState(todayStr());
@@ -65,6 +66,7 @@ export default function TakingsClient(): React.JSX.Element {
         <div className="flex gap-2 items-center">
           <input
             type="date"
+            aria-label="Day"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"

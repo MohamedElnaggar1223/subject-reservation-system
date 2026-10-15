@@ -19,31 +19,27 @@ import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Money } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { InstantText } from '~/app/(app)/exams/exams-shared';
+import { labelFor } from '~/lib/format';
 
-// --- Types ---
+// --- Types, derived from the fetcher (CLAUDE.md: Hono RPC everywhere; F6 replaced a hand-written type) ---
 
-type WithdrawalRequest = {
-  id: string;
-  requestedAmount: number;
-  releasedAmount: number | null;
-  status: string;
-  adminNotes: string | null;
-  createdAt: string;
-  escrow: {
-    balance: number;
-    student: {
-      id: string;
-      name: string;
-      grade: number | null;
-      studentId: string | null;
-    };
-  };
-  parent: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-};
+const fetchWithdrawals = () => apiResponse(api.v1.escrow.admin.withdrawals.$get());
+type WithdrawalRequest = Awaited<ReturnType<typeof fetchWithdrawals>>[number];
+
+/**
+ * Cash already handed over waits for a second person's signature (maker-checker, D-C, MA-17): the
+ * approval covers every hand-over so far, as the server reads it (`approveWithdrawalRequest`) — a request
+ * fulfilled, partly fulfilled, or declined after a partial hand-over, not yet approved. A later hand-over
+ * clears the approval and it is asked again (F6: none of these showed Approve; F6's review, finding 4:
+ * a partial hand-over still did not).
+ */
+const awaitsApproval = (r: WithdrawalRequest) =>
+  !r.approvedBy && (r.releasedAmount ?? 0) > 0
+  && (r.status === 'fulfilled' || r.status === 'partially_fulfilled' || r.status === 'rejected');
+/** Still to hand over: a request waiting, or one partly paid out. */
+const stillToRelease = (r: WithdrawalRequest) => r.status === 'pending' || r.status === 'partially_fulfilled';
 
 // --- Styles ---
 
@@ -71,10 +67,16 @@ export default function EscrowAdminClient() {
     router.refresh();
   };
 
-  const { data: requests = [], isLoading, refetch } = useQuery<WithdrawalRequest[]>({
+  const { data: requests = [], isLoading, refetch } = useQuery({
     queryKey: ['admin', 'escrow', 'withdrawals'],
-    queryFn: () => apiResponse(api.v1.escrow.admin.withdrawals.$get()),
+    queryFn: fetchWithdrawals,
     refetchInterval: 30_000,
+  });
+  const [approved, setApproved] = useState('');
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => apiResponse(api.v1.escrow.admin.withdrawals[':id'].approve.$post({ param: { id } })),
+    onSuccess: () => { setApproved('Approved: the cash handed over is signed for.'); setActionError(''); invalidate(); },
+    onError: (err: Error) => { setApproved(''); setActionError(err.message); },
   });
 
   // Auto-refresh timer reset on manual refetch
@@ -135,6 +137,8 @@ export default function EscrowAdminClient() {
           <p className="text-sm text-muted-foreground mt-1">
             Pending and partially-fulfilled escrow withdrawals — oldest first.
           </p>
+          {approved && <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400" role="status">{approved}</p>}
+          {actionError && !fulfillTarget && !rejectTarget && <p className="mt-2 text-sm text-destructive" role="alert">{actionError}</p>}
         </div>
         <Button
           variant="outline"
@@ -170,40 +174,41 @@ export default function EscrowAdminClient() {
                         </span>
                       )}
                       {req.escrow.student.studentId && (
-                        <span className="text-xs text-muted-foreground font-normal ml-1">
-                          · ID: {req.escrow.student.studentId}
+                        <span className="text-xs text-muted-foreground font-normal ms-1">
+                          · ID: <bdi>{req.escrow.student.studentId}</bdi>
                         </span>
                       )}
                     </p>
                     {req.parent && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Parent: {req.parent.name} ({req.parent.email})
+                        <span>Parent:</span> <bdi>{req.parent.name}</bdi> (<bdi>{req.parent.email}</bdi>)
                       </p>
                     )}
+                    {/* The school's date and time, not the browser's "9/27/2026, 5:18:29 AM" (F6). */}
                     <p className="text-xs text-muted-foreground mt-1">
-                      Submitted {new Date(req.createdAt).toLocaleString()}
+                      <span>Submitted</span> <InstantText iso={String(req.createdAt)} />
                     </p>
                   </div>
 
                   {/* Status badge */}
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[req.status] ?? 'bg-muted text-muted-foreground'}`}>
-                    {WITHDRAWAL_STATUS_LABELS[req.status as keyof typeof WITHDRAWAL_STATUS_LABELS] ?? req.status}
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${awaitsApproval(req) && !stillToRelease(req) ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : STATUS_STYLES[req.status] ?? 'bg-muted text-muted-foreground'}`}>
+                    {awaitsApproval(req) && !stillToRelease(req) ? 'Cash released — approval pending' : labelFor(WITHDRAWAL_STATUS_LABELS, req.status)}
                   </span>
                 </div>
 
-                {/* Amounts */}
+                {/* Amounts — as every money figure in the app reads ("EGP 10,000"), not "10000.00 EGP" (F6). */}
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   <div className="bg-muted rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground">Requested</p>
-                    <p className="text-base font-bold text-foreground">{req.requestedAmount.toFixed(2)} EGP</p>
+                    <p className="text-base font-bold text-foreground"><Money amount={req.requestedAmount} /></p>
                   </div>
                   <div className="bg-muted rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground">Released</p>
-                    <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{(req.releasedAmount ?? 0).toFixed(2)} EGP</p>
+                    <p className="text-base font-bold text-emerald-700 dark:text-emerald-400"><Money amount={req.releasedAmount ?? 0} /></p>
                   </div>
                   <div className="bg-muted rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground">Escrow Balance</p>
-                    <p className="text-base font-bold text-primary">{req.escrow.balance.toFixed(2)} EGP</p>
+                    <p className="text-base font-bold text-primary"><Money amount={req.escrow.balance} /></p>
                   </div>
                 </div>
 
@@ -213,22 +218,35 @@ export default function EscrowAdminClient() {
                   </p>
                 )}
 
-                {/* Actions */}
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => { setFulfillTarget(req); setFulfillAmount(remaining.toFixed(2)); setActionError(''); }}
-                  >
-                    Fulfill
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                    onClick={() => { setRejectTarget(req); setActionError(''); }}
-                  >
-                    Reject
-                  </Button>
-                </div>
+                {/* Actions: what this request is waiting for (F6) — the second signature on the cash handed
+                    over so far, the rest of its hand-over, or both (a partial hand-over). */}
+                {awaitsApproval(req) && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-muted-foreground">
+                      {stillToRelease(req)
+                        ? 'Part of the cash is handed over; a second person approves it (not the one who released it). The rest can still be released or rejected.'
+                        : 'The cash is handed over; a second person approves it (not the one who released it).'}
+                    </p>
+                    <Button disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(req.id)}>Approve</Button>
+                  </div>
+                )}
+                {stillToRelease(req) && (
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      className="flex-1"
+                      onClick={() => { setFulfillTarget(req); setFulfillAmount(remaining.toFixed(2)); setActionError(''); }}
+                    >
+                      Fulfill
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                      onClick={() => { setRejectTarget(req); setActionError(''); }}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -303,7 +321,7 @@ export default function EscrowAdminClient() {
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                className="flex-1 font-semibold"
                 onClick={() =>
                   fulfillMutation.mutate({
                     id: fulfillTarget.id,

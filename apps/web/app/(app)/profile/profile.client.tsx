@@ -8,6 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { gradeLabel } from "@repo/validations";
+import { Day } from "~/app/(app)/(sessions)/admin/sessions/sessions-shared";
 
 interface UserProfile {
   id: string;
@@ -242,7 +243,8 @@ export default function ProfileClient(): React.JSX.Element {
         ) : (
           // Profile Display
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* A description list (F6: its dt/dd had no dl, axe "dlitem" on every profile). */}
+            <dl className="grid gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Email
@@ -250,7 +252,7 @@ export default function ProfileClient(): React.JSX.Element {
                 <dd className="mt-1 text-foreground">
                   {profile.email}
                   {profile.emailVerified && (
-                    <span className="ml-2 inline-flex items-center text-emerald-600 dark:text-emerald-400">
+                    <span className="ms-2 inline-flex items-center text-emerald-700 dark:text-emerald-400" role="img" aria-label="Verified">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -295,10 +297,10 @@ export default function ProfileClient(): React.JSX.Element {
                   Member Since
                 </dt>
                 <dd className="mt-1 text-foreground">
-                  {new Date(profile.createdAt).toLocaleDateString()}
+                  <Day iso={String(profile.createdAt)} />
                 </dd>
               </div>
-            </div>
+            </dl>
 
             <div className="pt-4">
               <Button onClick={() => setEditMode(true)}>Edit Profile</Button>

@@ -45,7 +45,7 @@ export function UnitsTab({ data }: { data: CatalogueData }) {
         </div>
       </div>
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[940px] text-sm">
           <thead className="border-b border-border bg-muted">
             <tr>
               <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Code</th>

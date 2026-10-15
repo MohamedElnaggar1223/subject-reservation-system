@@ -845,6 +845,12 @@ export async function getStudentSummary(studentId: string) {
   const owing = round2(registrations.filter(payableNow).reduce((sum, r) => sum + (planLineIds.has(r.id) ? Math.max(0, r.priceAtRegistration - (depositsOf.get(r.id) ?? 0)) : r.priceAtRegistration), 0)
     + owedCharges.reduce((sum, c) => sum + c.amount, 0));
 
+  // Which waiting lines carry the school's consent only (grade 10, reserved by the school): the desk
+  // asks the parent's own tick when it collects those, and only those (F6: the tick showed for lines
+  // the family had reserved itself, consent given). The checkout reads the same (`consentStanding`).
+  const waitingIds = registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id);
+  const familyConsentNeeded = new Set((await consentStanding(db, waitingIds)).schoolOnly);
+
   // The academic record (F0a): grade, cohort, section, status.
   const today = standingToday(student);
   const currentSection = await sectionOf(studentId);
@@ -882,6 +888,8 @@ export async function getStudentSummary(studentId: string) {
       // Under a live instalment plan (§3.6): paid by its instalments, never collected as a line. A
       // plan released in full or ended is not live: the line is collected in full again.
       livePlan: exceptions.some((e) => e.policyKey === 'plan.instalments' && e.registrationId === r.id),
+      // A grade-10 line the school reserved: the family's own consent goes with its collection.
+      familyConsentNeeded: familyConsentNeeded.has(r.id),
       receipt: receiptByReg.get(r.id) ?? null,
       // The exceptions that touched the line: priced it, are scoped to it, or let it through (§4.7).
       exceptions: lineExceptions.get(r.id) ?? [],

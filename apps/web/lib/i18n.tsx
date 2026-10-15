@@ -17,7 +17,9 @@ import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
 import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
+import { uiAuditArabic } from './i18n-ui-audit';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
+import { LANGUAGE_COOKIE } from './language';
 
 export type Language = 'en' | 'ar';
 
@@ -70,7 +72,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.history': 'History',
     'nav.approvals': 'Approvals',
     'nav.financial': 'Financial',
-    'nav.escrowBalance': 'Escrow Balance',
+    // F6: a family's word for the money the school holds for a child (the landings say "the wallet").
+    'nav.escrowBalance': 'Wallet',
     'nav.checkout': 'Checkout',
     'nav.account': 'Account',
     // F6b: the stages of the reservation cycle, as the staff sidebar groups them (lib/reservation-focus.ts).
@@ -121,6 +124,11 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.timetableRules': 'Timetable Rules',
     'nav.cover': 'Cover',
     'nav.myTimetable': 'My Timetable',
+    // F6: the shell's controls that had no name for a screen reader.
+    'nav.openMenu': 'Open the menu',
+    'nav.collapseMenu': 'Collapse the menu',
+    'nav.expandMenu': 'Expand the menu',
+    'nav.unread': 'unread',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -241,6 +249,10 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.timetableRules': 'قواعد الجدول',
     'nav.cover': 'الحصص البديلة',
     'nav.myTimetable': 'جدولي',
+    'nav.openMenu': 'فتح القائمة',
+    'nav.collapseMenu': 'طي القائمة',
+    'nav.expandMenu': 'توسيع القائمة',
+    'nav.unread': 'غير مقروءة',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -286,7 +298,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.history': 'السجل',
     'nav.approvals': 'الموافقات',
     'nav.financial': 'المالية',
-    'nav.escrowBalance': 'رصيد الحساب',
+    'nav.escrowBalance': 'المحفظة',
     'nav.checkout': 'الدفع',
     'nav.account': 'الحساب',
     'nav.cycleSetUp': 'الإعداد',
@@ -1579,6 +1591,9 @@ for (const [en, ar] of Object.entries(focusArabic)) if (!(en in autoArabicText))
 // added after them at F1's final merge); their own words never replace a phrase already translated.
 for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
+// F6 (lib/i18n-ui-audit.ts): its words are the ones used — where it rewrote a sentence, its Arabic wins.
+Object.assign(autoArabicText, uiAuditArabic);
+
 const textNodeOriginals = new WeakMap<Text, string>();
 
 /** Whether one of the rework's sentence rules (A's, B's, C's, D's) translates this text. */
@@ -1840,8 +1855,32 @@ function translatePreservingWhitespace(value: string): string {
   return `${leading}${translated}${trailing}`;
 }
 
-function localizeDom(language: Language) {
-  if (typeof document === 'undefined') return;
+/**
+ * Whether React owns this element yet: React attaches its fiber to every element it hydrates or
+ * creates. Server HTML inside a Suspense boundary that has not hydrated has none — the translator
+ * must leave it alone, or React finds Arabic where it rendered English and reports a hydration
+ * mismatch (F6: /students in Arabic, after the language cookie fixed the rest). It is translated on
+ * a later pass, once React has it.
+ */
+const hydratedElements = new WeakSet<Element>();
+function ownedByReact(el: Element): boolean {
+  if (hydratedElements.has(el)) return true;
+  for (const key in el) {
+    if (key.startsWith('__reactFiber$')) {
+      hydratedElements.add(el);
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Elements whose text is not prose for a reader: code, scripts and styles, templates, form values. */
+const NOT_TEXT = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'CODE', 'PRE', 'TEXTAREA']);
+
+/** Translates what React owns; returns whether something was left for a later pass (not hydrated yet). */
+function localizeDom(language: Language): boolean {
+  if (typeof document === 'undefined') return false;
+  let waiting = false;
 
   const walker = document.createTreeWalker(
     document.body,
@@ -1851,7 +1890,12 @@ function localizeDom(language: Language) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (parent.closest('[data-i18n-skip="true"]')) return NodeFilter.FILTER_REJECT;
-        if (['SCRIPT', 'STYLE', 'CODE', 'PRE', 'TEXTAREA'].includes(parent.tagName)) {
+        // Never text to translate, and never React's: Next's own script tags sit in <body> without a
+        // fiber, so testing ownership first kept `waiting` true on every page and the provider re-walked
+        // the whole page every 100 ms, a hundred times after each load (F6's review, finding 1).
+        if (NOT_TEXT.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        if (!ownedByReact(parent)) {
+          waiting = true;
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -1883,6 +1927,10 @@ function localizeDom(language: Language) {
 
   const attrNames = ['placeholder', 'title', 'aria-label', 'alt'];
   for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
+    if (!ownedByReact(element)) {
+      if (attrNames.some((a) => element.hasAttribute(a))) waiting = true;
+      continue;
+    }
     for (const attr of attrNames) {
       const current = element.getAttribute(attr);
       if (!current) continue;
@@ -1904,6 +1952,7 @@ function localizeDom(language: Language) {
       if (element.getAttribute(attr) !== nextValue) element.setAttribute(attr, nextValue);
     }
   }
+  return waiting;
 }
 
 type I18nContextValue = {
@@ -1916,14 +1965,25 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'en';
-    const stored = window.localStorage.getItem('language');
-    return stored === 'ar' || stored === 'en' ? stored : 'en';
-  });
+/**
+ * The language is kept in a cookie the server reads (app/layout.tsx), so the server renders the page
+ * in the reader's language and direction and the browser's first render agrees with it. Until F6 the
+ * provider's first render read localStorage, which only the browser has: the server rendered English,
+ * the browser's first render Arabic, and React reported a hydration mismatch on every page in Arabic
+ * (since 2c3d27f, 30 May 2026). localStorage is still written, and read once to carry an earlier choice
+ * into the cookie.
+ */
+function hasLanguageCookie(): boolean {
+  return document.cookie.split(';').some((c) => c.trim().startsWith(`${LANGUAGE_COOKIE}=`));
+}
 
+export function I18nProvider({ children, initialLanguage = 'en' }: { children: ReactNode; initialLanguage?: Language }) {
+  // The server's language (from the cookie): the browser's first render is the server's.
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
+
+  // A choice made before the cookie existed lives in localStorage only: carry it over once, after hydration.
   useEffect(() => {
+    if (hasLanguageCookie()) return;
     const stored = window.localStorage.getItem('language');
     if (stored === 'ar' || stored === 'en') setLanguageState(stored);
   }, []);
@@ -1934,13 +1994,25 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.language = language;
     document.title = language === 'ar' ? 'حجز مواد IGCSE' : 'IGCSE Subject Reservation';
     window.localStorage.setItem('language', language);
+    document.cookie = `${LANGUAGE_COOKIE}=${language}; path=/; max-age=31536000; samesite=lax`;
   }, [language]);
 
   useEffect(() => {
     let frame = 0;
+    let retry = 0;
+    let retries = 0;
     const schedule = () => {
       window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => localizeDom(language));
+      frame = window.requestAnimationFrame(() => {
+        // Hydration changes nothing in the DOM, so no mutation announces it: while a part of the page
+        // waits for React (a Suspense boundary still hydrating), look again shortly, for up to 10 s.
+        const waiting = localizeDom(language);
+        window.clearTimeout(retry);
+        if (waiting && retries < 100) {
+          retries += 1;
+          retry = window.setTimeout(schedule, 100);
+        }
+      });
     };
 
     schedule();
@@ -1955,6 +2027,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
     return () => {
       window.cancelAnimationFrame(frame);
+      window.clearTimeout(retry);
       observer.disconnect();
     };
   }, [language]);

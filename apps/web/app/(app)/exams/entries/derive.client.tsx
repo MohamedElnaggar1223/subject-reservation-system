@@ -78,7 +78,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
         <div className="max-w-3xl">
           <h2 id="derive-title" className="text-sm font-semibold text-foreground">Derive entries from reservations</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Each paid reservation becomes what its item enters with the board: a Cambridge syllabus as the award with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.
+            Each paid reservation becomes its entry with the board: a Cambridge syllabus with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.
           </p>
         </div>
         <div className="flex gap-2">

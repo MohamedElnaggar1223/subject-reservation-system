@@ -1,0 +1,20 @@
+{
+ "label": "control-old-code-delayed-notify",
+ "subject": "Physics A.S./A.L.",
+ "replaced": "Teacher C -> Teacher B",
+ "sheetBefore": [
+  "Teacher C"
+ ],
+ "sheetAfterReplace": [
+  "Teacher B"
+ ],
+ "formTicksAfterReplace": [
+  "Teacher C"
+ ],
+ "formNoteKept": true,
+ "sheetAfterSave": [
+  "Teacher C"
+ ],
+ "noteSaved": "Typed before the replacement (control-old-code-delayed-notify)",
+ "departedBack": true
+}

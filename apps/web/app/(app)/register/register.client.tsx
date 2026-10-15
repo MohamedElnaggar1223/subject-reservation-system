@@ -87,12 +87,12 @@ export default function RegisterClient({ userId, userRole }: { userId: string; u
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         {isParent && (
-          <div>
+          <div className="w-full min-w-0 sm:w-auto">
             <label htmlFor="reserve-child" className="mb-1 block text-xs font-medium text-foreground">Child</label>
             {children.length === 0 ? (
               <p className="text-sm text-muted-foreground"><span>No linked children yet:</span> <Link href="/links" className="text-primary underline">link to your child</Link></p>
             ) : (
-              <select id="reserve-child" className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={child?.student.id ?? ''} onChange={(e) => { setChildId(e.target.value); setDone(null); }}>
+              <select id="reserve-child" className="h-10 w-full max-w-full rounded-lg border border-input bg-background px-3 text-sm sm:w-auto" value={child?.student.id ?? ''} onChange={(e) => { setChildId(e.target.value); setDone(null); }}>
                 <option value="">Choose…</option>
                 {children.map((c) => (
                   <option key={c.student.id} value={c.student.id} data-i18n-skip="true">{c.student.name}{c.student.grade != null ? ` · ${gradeLabel(c.student.grade)}` : ''}</option>
@@ -101,9 +101,10 @@ export default function RegisterClient({ userId, userRole }: { userId: string; u
             )}
           </div>
         )}
-        <div>
+        {/* At a phone the selects take the card's width (F6: the session's long names pushed it off the screen). */}
+        <div className="w-full min-w-0 sm:w-auto">
           <label htmlFor="reserve-session" className="mb-1 block text-xs font-medium text-foreground">Session</label>
-          <select id="reserve-session" className="h-10 rounded-lg border border-input bg-background px-3 text-sm" value={session?.id ?? ''} onChange={(e) => { setSessionId(e.target.value); setDone(null); }}>
+          <select id="reserve-session" className="h-10 w-full max-w-full rounded-lg border border-input bg-background px-3 text-sm sm:w-auto" value={session?.id ?? ''} onChange={(e) => { setSessionId(e.target.value); setDone(null); }}>
             <option value="">Choose…</option>
             {sessions.map((s) => <option key={s.id} value={s.id} data-i18n-skip="true">{s.name}{s.status === 'draft' ? ' (preregistration)' : ''}</option>)}
           </select>

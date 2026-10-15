@@ -18,13 +18,12 @@ import {
   gradeLabel,
   REGISTRATION_STATUS_LABELS,
   RECEIPT_STATUS_LABELS,
-  IN_SCHOOL_INSTRUMENTS,
-  IN_SCHOOL_INSTRUMENT_LABELS,
+
   EXCEPTION_TYPE_LABELS,
   POLICIES,
   isRegistryPolicyKey,
 } from '@repo/validations';
-import { formatPrice } from '~/lib/format';
+import { formatPrice, labelFor } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
@@ -32,6 +31,7 @@ import { StudentAcademicPanel } from '~/components/student-academic-panel';
 import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
 import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
 import { StatementView } from '~/components/reservations/statement';
+import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { RESERVATION_CYCLE_ONLY } from '~/lib/reservation-focus';
 import DeskToday from './desk-today.client';
 
@@ -64,12 +64,17 @@ function paymentsLine(res: { payments: { series: string[]; collected: number }[]
   return parts.join('');
 }
 
-export default function DeskClient({ userRole }: { userRole: string }): React.JSX.Element {
+/** A payment's purpose and instrument in words (the API returns codes: "school_fee", "cash"). */
+const PAYMENT_PURPOSE: Record<string, string> = { registration: 'Reservations', school_fee: 'School fee', charge: 'Charge' };
+const PAYMENT_STATUS: Record<string, string> = { completed: 'Completed', pending: 'Pending', pending_verification: 'Transfer to check', failed: 'Failed', cancelled: 'Cancelled', reversed: 'Reversed', refunded: 'Refunded' };
+const INSTRUMENT: Record<string, string> = { cash: 'Cash', card: 'Card', instapay: 'InstaPay', other: 'Other' };
+
+export default function DeskClient({ userRole, initialStudentId = null }: { userRole: string; initialStudentId?: string | null }): React.JSX.Element {
   const isFinanceAdmin = userRole === 'finance_admin' || userRole === 'admin';
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
-  const [studentId, setStudentId] = useState<string | null>(null);
+  const [studentId, setStudentId] = useState<string | null>(initialStudentId);
   const [showOnboard, setShowOnboard] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   // A string, or a reservation's sentences (each shown, and translated, on its own).
@@ -105,17 +110,6 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const fail = (err: Error) => { setErrorMsg(err.message); setMessage(''); };
 
   // ── Desk actions ──────────────────────────────────────────────────────────
-  const collectFeeMutation = useMutation({
-    mutationFn: (instrumentUsed: 'cash' | 'card' | 'instapay' | 'other') =>
-      apiResponse(
-        api.v1['school-fees']['desk-pay'].$post({
-          json: { studentId: studentId!, instrumentUsed },
-        })
-      ),
-    onSuccess: (d) => done(`School fee collected (${formatPrice((d as unknown as { amount: number }).amount)}). Registration unlocked.`),
-    onError: fail,
-  });
-
   const issueReceiptMutation = useMutation({
     mutationFn: (id: string) => apiResponse(api.v1.receipts[':id'].issue.$post({ param: { id } })),
     onSuccess: () => done('Receipt marked as handed to the parent.'),
@@ -173,8 +167,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
             Find a student — see everything, do everything, in one place.
           </p>
         </div>
-        <Button variant="outline" onClick={() => { setShowOnboard((v) => !v); }}>
-          {showOnboard ? 'Close Onboarding' : '+ New Family (Onboard)'}
+        <Button variant="outline" onClick={() => { setShowOnboard((v) => !v); }} aria-expanded={showOnboard}>
+          {showOnboard ? 'Close' : '+ New family'}
         </Button>
       </div>
 
@@ -209,8 +203,9 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           value={search}
           onChange={(e) => { setSearch(e.target.value); setStudentId(null); }}
           placeholder="Type a student's name, email, or ID…"
+          aria-label="Type a student's name, email, or ID…"
           className="w-full max-w-xl px-4 py-2.5 text-sm border border-border bg-background rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          autoFocus
+          autoFocus={!initialStudentId}
         />
         {!studentId && search.trim().length >= 2 && searchFailed && (
           <p className="mt-2 max-w-xl text-sm text-destructive">
@@ -225,7 +220,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               className="underline hover:no-underline"
               onClick={() => setShowOnboard(true)}
             >
-              New Family (Onboard)
+              + New family
             </button>{' '}
             to create their accounts.
           </p>
@@ -236,7 +231,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               <button
                 key={h.id}
                 onClick={() => { setStudentId(h.id); setMessage(''); setErrorMsg(''); }}
-                className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors"
+                className="w-full text-start px-4 py-2.5 hover:bg-muted transition-colors"
               >
                 <span className="font-medium text-foreground text-sm">{h.name}</span>
                 <span className="text-xs text-muted-foreground ms-2">
@@ -291,16 +286,17 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                     : summary.parents.map((p) => `${p.name}${p.phone ? ` (${p.phone})` : ''}`).join(' · ')}
                 </p>
               </div>
-              <div className="flex gap-6 text-right">
+              <div className="flex gap-6 text-end">
                 <div>
                   <p className="text-xs text-muted-foreground">Owes now</p>
-                  <p className={`text-lg font-bold ${summary.owing > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
+                  {/* amber-700, not 600: 5.0:1 on the card (600 was 3.2:1, WCAG 1.4.3). */}
+                  <p className={`text-lg font-bold ${summary.owing > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`} dir="ltr">
                     {formatPrice(summary.owing)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Escrow</p>
-                  <p className="text-lg font-bold text-foreground">{formatPrice(summary.escrow.freeBalance)}</p>
+                  <p className="text-lg font-bold text-foreground" dir="ltr">{formatPrice(summary.escrow.freeBalance)}</p>
                   {summary.escrow.heldBalance > 0 && (
                     <p className="text-xs text-violet-700 dark:text-violet-400">+{formatPrice(summary.escrow.heldBalance)} held</p>
                   )}
@@ -318,24 +314,14 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
 
             {/* School fee state + actions */}
             <div className="mt-4 flex items-center gap-3 flex-wrap">
+              {/* The fee is collected in one place: "To collect now" below (ticked first), or with the
+                  reservation ("Also collect now"). F6: three more "Collect fee — Cash / Card / InstaPay"
+                  buttons here made three ways to take the same money. */}
               {summary.schoolFee.required && !summary.schoolFee.paid ? (
-                <>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    {summary.schoolFee.academicYear} school fee due
-                    {summary.schoolFee.amount != null && <> — {formatPrice(summary.schoolFee.amount)}</>}
-                  </span>
-                  {IN_SCHOOL_INSTRUMENTS.slice(0, 3).map((inst) => (
-                    <Button
-                      key={inst}
-                      size="sm"
-                      variant="outline"
-                      disabled={collectFeeMutation.isPending}
-                      onClick={() => collectFeeMutation.mutate(inst)}
-                    >
-                      Collect fee — {IN_SCHOOL_INSTRUMENT_LABELS[inst]}
-                    </Button>
-                  ))}
-                </>
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <span dir="ltr">{summary.schoolFee.academicYear}</span> <span>school fee due</span>
+                  {summary.schoolFee.amount != null && <> — <span dir="ltr">{formatPrice(summary.schoolFee.amount)}</span></>}
+                </span>
               ) : summary.schoolFee.required ? (
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                   {summary.schoolFee.academicYear} school fee paid
@@ -360,7 +346,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                 Active exceptions:{' '}
                 {summary.exceptions
                   // The registry's label (the student's own and the family's, RESERVATIONS_REWORK.md §3.7).
-                  .map((e) => (isRegistryPolicyKey(e.policyKey) ? POLICIES[e.policyKey].label : EXCEPTION_TYPE_LABELS[e.type as keyof typeof EXCEPTION_TYPE_LABELS] ?? e.policyKey))
+                  .map((e) => (isRegistryPolicyKey(e.policyKey) ? POLICIES[e.policyKey].label : labelFor(EXCEPTION_TYPE_LABELS, e.type) || e.policyKey))
                   .join(', ')}
               </p>
             )}
@@ -399,8 +385,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                       <td className="px-5 py-2.5">
                         <div className="font-medium text-foreground">
                           {r.subject.name}
-                          <span className="text-xs text-muted-foreground font-mono ml-1">{r.subject.code}</span>
-                          {r.takenOutsideSchool && <span className="text-xs text-muted-foreground ml-1">(outside)</span>}
+                          <span className="text-xs text-muted-foreground font-mono ms-1">{r.subject.code}</span>
+                          {r.takenOutsideSchool && <span className="text-xs text-muted-foreground ms-1">(outside)</span>}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {r.session.name}
@@ -417,16 +403,16 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-xs">
-                        {REGISTRATION_STATUS_LABELS[r.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? r.status}
+                        {labelFor(REGISTRATION_STATUS_LABELS, r.status)}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-medium text-foreground whitespace-nowrap">
+                      <td className="px-3 py-2.5 text-end font-medium text-foreground whitespace-nowrap" dir="ltr">
                         {formatPrice(r.priceAtRegistration)}
                       </td>
-                      <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                      <td className="px-5 py-2.5 text-end whitespace-nowrap">
                         {r.receipt ? (
                           <span className="inline-flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
-                              {RECEIPT_STATUS_LABELS[r.receipt.status as keyof typeof RECEIPT_STATUS_LABELS] ?? r.receipt.status}
+                              {labelFor(RECEIPT_STATUS_LABELS, r.receipt.status)}
                             </span>
                             {r.receipt.status === 'pending_issue' && (
                               <Button size="sm" variant="outline" disabled={issueReceiptMutation.isPending}
@@ -474,19 +460,19 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                 <tbody className="divide-y divide-border">
                   {summary.payments.slice(0, 10).map((p) => (
                     <tr key={p.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-5 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(p.createdAt).toLocaleDateString()}
+                      {/* The school's date ("15 Oct 2026"), not the browser's "10/15/2026"; the purpose,
+                          instrument and status in words, not their codes (F6). */}
+                      <td className="px-5 py-2.5 text-xs text-muted-foreground whitespace-nowrap"><Day iso={String(p.createdAt)} /></td>
+                      <td className="px-3 py-2.5 text-xs text-card-foreground">
+                        <span>{labelFor(PAYMENT_PURPOSE, p.purpose)}</span>
+                        {p.instrumentUsed && <> · <span>{labelFor(INSTRUMENT, p.instrumentUsed)}</span></>}
+                        {p.externalReference && <span className="font-mono text-muted-foreground"> · <bdi>{p.externalReference}</bdi></span>}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-card-foreground capitalize">
-                        {p.purpose.replace('_', ' ')}
-                        {p.instrumentUsed && <> · {p.instrumentUsed}</>}
-                        {p.externalReference && <span className="font-mono text-muted-foreground"> · {p.externalReference}</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs capitalize">{p.status.replace('_', ' ')}</td>
-                      <td className="px-5 py-2.5 text-right font-medium text-foreground whitespace-nowrap">
+                      <td className="px-3 py-2.5 text-xs">{labelFor(PAYMENT_STATUS, p.status)}</td>
+                      <td className="px-5 py-2.5 text-end font-medium text-foreground whitespace-nowrap" dir="ltr">
                         {formatPrice(p.amount + p.escrowAmountApplied)}
                       </td>
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="px-3 py-2.5 text-end">
                         {isFinanceAdmin && p.status === 'completed' &&
                           (p.purpose === 'registration' || p.purpose === 'school_fee') && (
                           <Button

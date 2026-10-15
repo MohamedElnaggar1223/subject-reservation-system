@@ -222,7 +222,8 @@ const SHORT_MONTHS_AR: Record<string, string> = {
   Jan: 'يناير', Feb: 'فبراير', Mar: 'مارس', Apr: 'أبريل', May: 'مايو', Jun: 'يونيو',
   Jul: 'يوليو', Aug: 'أغسطس', Sep: 'سبتمبر', Oct: 'أكتوبر', Nov: 'نوفمبر', Dec: 'ديسمبر',
 };
-const lines = (n: string) => `${n} ${Number(n) === 1 ? 'سطر' : 'أسطر'}`;
+// F6: a family reads its reservations (حجز), not the model's "lines" (سطر).
+const lines = (n: string) => `${n} ${Number(n) === 1 ? 'حجز' : 'حجوزات'}`;
 
 /** "100% to week 2 · 50% in week 3 · 0% from week 4" in Arabic. */
 function refundSteps(text: string): string | null {
@@ -253,10 +254,10 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
     return parts.every((x) => x) ? `أؤكد أنني قرأت سياسة الاسترداد: ${parts.join(' · ')}؛ ولا شيء خارج هذه التواريخ.` : null;
   }],
   // Sentences of the Reserve page's results.
-  [/^Sent to your parent for approval: (\d+) lines?\.$/, (m) => `أُرسل إلى ولي أمرك للموافقة: ${lines(m[1]!)}.`],
-  [/^Preregistered: (\d+) lines?\. Pay now to hold the money until the session opens\.$/, (m) => `تم التسجيل المسبق: ${lines(m[1]!)}. ادفع الآن لاحتجاز المبلغ حتى تُفتح الجلسة.`],
-  [/^Reserved: (\d+) lines? awaiting payment\. Pay by exam series on the next screen\.$/, (m) => `تم الحجز: ${lines(m[1]!)} في انتظار الدفع. ادفع لكل دورة امتحان في الشاشة التالية.`],
-  [/^Reserved (\d+) lines?\.$/, (m) => `تم حجز ${lines(m[1]!)}.`],
+  [/^Sent to your parent for approval: (\d+) (?:lines?|reservations?)\.$/, (m) => `أُرسل إلى ولي أمرك للموافقة: ${lines(m[1]!)}.`],
+  [/^Preregistered: (\d+) (?:lines?|reservations?)\. Pay now to hold the money until the session opens\.$/, (m) => `تم التسجيل المسبق: ${lines(m[1]!)}. ادفع الآن لاحتجاز المبلغ حتى تُفتح الجلسة.`],
+  [/^Reserved: (\d+) (?:lines?|reservations?) awaiting payment\. Pay by exam series on the next screen\.$/, (m) => `تم الحجز: ${lines(m[1]!)} في انتظار الدفع. ادفع لكل دورة امتحان في الشاشة التالية.`],
+  [/^Reserved (\d+) (?:lines?|reservations?)\.$/, (m) => `تم حجز ${lines(m[1]!)}.`],
   [/^Collected EGP ([\d,.]+)( in (\d+) payments, one per entry deadline)?\.$/, (m) => `تم تحصيل ${m[1]} جنيه${m[3] ? ` في ${m[3]} دفعات، دفعة لكل موعد قيد` : ''}.`],
   [/^(\d+) on a provisional board fee: collected once the fee is confirmed\.$/, (m) => `${m[1]} على رسوم مجلس مؤقتة: تُحصَّل حين تُؤكَّد الرسوم.`],
   [/^Not collected — hand this money back: (.+)\.$/, (m) => `لم يُحصَّل — أعد هذا المبلغ: ${m[1]}.`],

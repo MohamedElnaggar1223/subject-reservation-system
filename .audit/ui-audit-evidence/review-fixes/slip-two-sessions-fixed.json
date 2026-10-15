@@ -1,0 +1,19 @@
+{
+ "label": "fixed",
+ "statementOrder": [
+  {
+   "name": "June 2027",
+   "live": 1
+  },
+  {
+   "name": "June 2027 — IGCSE",
+   "live": 0
+  },
+  {
+   "name": "November 2026 – January 2027 — November IGCSE",
+   "live": 1
+  }
+ ],
+ "slipPrints": "June 2027",
+ "printDialogOpened": 1
+}

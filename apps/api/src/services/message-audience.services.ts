@@ -367,7 +367,7 @@ async function studentsOf(executor: Executor, query: ReturnType<typeof sql>) {
  * refused, a scheduled message sent to no one (the review of d3f62cf, item 1; the coordinator's
  * decision, a departure from SCHEDULING.md §8's literal `todayAtSchool()`, recorded there and in
  * docs/features/CYCLE_FOLLOWUPS.md §1.1). The resolve, the send and the scheduler's step all read
- * it here, through `resolveAudience`; the picker through `teachingGroupDayOf`.
+ * it here, through `resolveAudience`; the picker in `teachingGroupOptions` (message.services.ts).
  */
 export function teachingGroupDay(yearStartsOn: string, today: string = todayAtSchool()): string {
   return today < yearStartsOn ? yearStartsOn : today;

@@ -310,8 +310,10 @@ From `apps/api/src/services/schedule.services.ts` unless noted; types in
     student ids sorted, read in D's own transaction through `executor`: a section's group follows the
     section, a move made today goes to the later group, nobody after their last day (08s6, "step D's
     contract"); the families of those students as D's `section` list does;
-  - the label: the group's subject, unit and teacher from `teaching_group` (its teacher today:
-    `teachersOn([groupId], date)` in `scheduling-shared.services.ts`);
+  - the label: the group's subject, unit and teacher from `teaching_group` (its teacher on the group's
+    day — today, or the year's first day before it: `teachersOn([groupId], date)` in
+    `scheduling-shared.services.ts`; the Sent log names a sent message's class as it went out, from its
+    MESSAGE_SENT audit row — F6, 15 Oct 2026);
   - a saved audience of the old shape stays readable (its enrolment key): D keeps both shapes — the old
     one resolved as it was written, never written again (CYCLE_FOLLOWUPS.md §1.3). F1 changes none of D's
     files; D's switch added `kind` (`no_group` | `refused`) to `FollowOutcome.waiting` for the desk's

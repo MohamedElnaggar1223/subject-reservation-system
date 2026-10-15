@@ -1,0 +1,20 @@
+{
+ "label": "control-before-fix",
+ "subject": "Physics A.S./A.L.",
+ "replaced": "Teacher C -> Teacher B",
+ "sheetBefore": [
+  "Teacher C"
+ ],
+ "sheetAfterReplace": [
+  "Teacher B"
+ ],
+ "formTicksAfterReplace": [
+  "Teacher B"
+ ],
+ "formNoteKept": true,
+ "sheetAfterSave": [
+  "Teacher B"
+ ],
+ "noteSaved": "Typed before the replacement (control-before-fix)",
+ "departedBack": false
+}

@@ -33,6 +33,7 @@ import {
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
+import { cn } from '~/lib/utils';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, INPUT_CLASS, ErrorLine, errorText } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 
@@ -266,7 +267,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       // A consent belongs to the lines it was given for; the next reservation asks again.
       setPicks({}); setRefundTick(false); setDeclTick(false);
       qc.invalidateQueries({ queryKey: ['registrations'] });
-      const lines = `${made.length} line${made.length === 1 ? '' : 's'}`;
+      const lines = `${made.length} reservation${made.length === 1 ? '' : 's'}`;
       const sentences = viewer === 'student'
         ? [`Sent to your parent for approval: ${lines}.`]
         : data?.session.status === 'draft'
@@ -292,7 +293,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       qc.invalidateQueries({ queryKey: ['registrations'] });
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
-      const parts = [`Reserved ${r.registrations.length} line${r.registrations.length === 1 ? '' : 's'}.`];
+      const parts = [`Reserved ${r.registrations.length} reservation${r.registrations.length === 1 ? '' : 's'}.`];
       if (r.schoolFee) parts.push(`The ${r.schoolFee.academicYear} school fee collected first (EGP ${r.schoolFee.amount.toLocaleString('en-US')}).`);
       // With charges (step C's "Also collect now") the subjects are paid per entry deadline and each charge group on its own.
       const withCharges = r.payments.some((p) => 'chargeIds' in p && (p.chargeIds as string[] | undefined)?.length);
@@ -325,9 +326,11 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
           : 'Tick what you want to sit. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.'}
       </p>
 
+      {/* At a phone each paper's teacher, entry and price stack under it (F6: a 760 px table put the
+          entry and the price off a family's phone screen); from 640 px it is the table. */}
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+        <table className="w-full text-sm max-sm:block sm:min-w-[760px]">
+          <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground max-sm:hidden">
             <tr>
               <th className="w-8 px-3 py-2" />
               <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
@@ -337,8 +340,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
             </tr>
           </thead>
           {groups.map((g) => (
-            <tbody key={g}>
-              <tr><td colSpan={5} className="bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground">{g}</td></tr>
+            <tbody key={g} className="max-sm:block">
+              <tr className="max-sm:block"><td colSpan={5} className="bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground max-sm:block">{g}</td></tr>
               {offers.filter((o) => (LEVEL_GROUP[o.subject.level] ?? 'Other') === g).map((o) => (
                 <OfferRows key={o.id} o={o} desk={desk} coreLocked={coreLocked && o.grade10Core} pickOf={pickOf} setPick={setPick} toggle={toggle}
                   sittings={(data.declarableSittings ?? []).filter((s) => s.boardCode === o.subject.boardCode)} />
@@ -351,7 +354,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <p className="text-base font-semibold text-foreground">
-            <span>{chosen.length}</span> <span>{chosen.length === 1 ? 'line' : 'lines'}</span> · <Money amount={total} />
+            <span>{chosen.length}</span> <span>{chosen.length === 1 ? 'reservation' : 'reservations'}</span> · <Money amount={total} />
           </p>
           <p className="text-xs text-muted-foreground">
             <span>Due</span> <Day iso={typeof data.session.paymentDueAt === 'string' ? data.session.paymentDueAt : null} />
@@ -409,7 +412,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
           </div>
         ) : (
           <Button disabled={!ready || pending} onClick={() => { setFailure(null); familyMutation.mutate(); }}>
-            {pending ? 'Reserving…' : viewer === 'student' ? 'Send to my parent' : <><span>Reserve</span> <span>{chosen.length || ''}</span> <span>{chosen.length === 1 ? 'line' : chosen.length ? 'lines' : ''}</span></>}
+            {pending ? 'Reserving…' : viewer === 'student' ? 'Send to my parent' : <><span>Reserve</span>{chosen.length > 0 && <> <span dir="ltr">({chosen.length})</span></>}</>}
           </Button>
         )}
       </div>
@@ -427,10 +430,14 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
   pickOf: (it: Item) => Pick; setPick: (it: Item, patch: Partial<Pick>) => void; toggle: (o: Offer, it: Item, on: boolean) => void;
   preview?: boolean;
 }) {
+  // The sitting under each paper only where the subject's papers sit in more than one (an IAL subject
+  // across November, January and June); otherwise it is the session's own and said once by the
+  // session's name — "Cambridge International June 2027" under every row was noise (F6).
+  const manySittings = new Set(o.items.map((i) => i.series?.id ?? null)).size > 1;
   return (
     <>
-      <tr className="border-t border-border">
-        <td colSpan={5} className="px-3 pt-3 pb-1">
+      <tr className="border-t border-border max-sm:block">
+        <td colSpan={5} className="px-3 pt-3 pb-1 max-sm:block">
           <span className="font-semibold text-foreground"><bdi data-i18n-skip="true">{o.subject.name}</bdi></span>{' '}
           <span className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{o.subject.boardName}</bdi></span>
           {o.grade10Core && <> <Badge tone="info">grade-10 core</Badge></>}
@@ -447,7 +454,7 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
         const needsSitting = p.on && (attempt === 'retake' || it.needsPriorSeries) && !isKnown(it);
         const noFee = it.prices.length > 0 && it.prices.every((x) => x.noFee);
         return (
-          <tr key={it.id} className={unavailable ? 'text-muted-foreground' : ''}>
+          <tr key={it.id} className={cn(unavailable && 'text-muted-foreground', 'max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)]')}>
             <td className="px-3 py-2 align-top">
               <input type="checkbox" className="h-4 w-4" aria-label={`${o.subject.name}: ${itemDisplayLabel(it)}`}
                 checked={preview ? false : p.on} disabled={preview || unavailable || (coreLocked && p.on)} onChange={(e) => toggle(o, it, e.target.checked)} />
@@ -462,25 +469,25 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
               {noFee && <> <Badge tone="warning">board fee not set yet</Badge></>}
               {/* A retake or a carry-forward whose sitting the system does not know is declared: the school verifies it. */}
               {needsSitting && <> <Badge tone="warning">{desk ? 'declared — listed to verify' : 'to be verified by the school'}</Badge></>}
-              {it.series && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}
+              {it.series && manySittings && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}
             </td>
-            <td className="px-3 py-2 align-top">
+            <td className={cn('px-3 py-2 align-top max-sm:col-start-2 max-sm:py-1', !p.on && 'max-sm:hidden')}>
               {p.on && (mode === 'self_study' ? <span className="text-muted-foreground">— self-study</span>
                 : it.teachers.length > 1 ? (
-                  <select aria-label="Teacher" className={INPUT_CLASS.replace('w-full', 'w-48')} value={p.teacherId ?? ''} onChange={(e) => setPick(it, { teacherId: e.target.value || null })}>
+                  <select aria-label="Teacher" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-48')} value={p.teacherId ?? ''} onChange={(e) => setPick(it, { teacherId: e.target.value || null })}>
                     <option value="">No preference</option>
                     {it.teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.mode === 'online' ? ' (online)' : ''}</option>)}
                   </select>
                 ) : it.teachers.length === 1 ? <bdi data-i18n-skip="true">{it.teachers[0]!.name}{it.teachers[0]!.mode === 'online' ? ' (online)' : ''}</bdi> : <span className="text-muted-foreground">—</span>)}
             </td>
-            <td className="px-3 py-2 align-top">
+            <td className={cn('px-3 py-2 align-top max-sm:col-start-2 max-sm:py-1', !p.on && 'max-sm:hidden')}>
               {p.on && (
                 <div className="space-y-1.5">
-                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-80')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
+                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-80')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
                     {options.map((x) => <option key={entryKey(x)} value={entryKey(x)}>{entryLabel(x, isKnown(it))}</option>)}
                   </select>
                   {needsSitting && (
-                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-80')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
+                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-80')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
                       <option value="">{it.needsPriorSeries ? 'Carried from the sitting…' : 'From the sitting…'}</option>
                       {sittings.map((s) => <option key={sittingValue(s)} value={sittingValue(s)}>{sittingName(s)}</option>)}
                     </select>
@@ -496,7 +503,7 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
                 </div>
               )}
             </td>
-            <td className="px-3 py-2 text-end align-top">
+            <td className={cn('px-3 py-2 text-end align-top max-sm:col-start-2 max-sm:py-1 max-sm:text-start', !(p.on && price) && 'max-sm:hidden')}>
               {p.on && price && (
                 <span title={`course ${price.courseFee?.toLocaleString('en-US')} + board ${price.registrationFee?.toLocaleString('en-US')}`}>
                   <Money amount={price.total} />{price.provisional && <> <Badge tone="warning">ⓟ</Badge></>}

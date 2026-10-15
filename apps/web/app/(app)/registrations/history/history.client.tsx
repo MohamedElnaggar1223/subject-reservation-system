@@ -279,10 +279,11 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
       {/* Parent: child selector */}
       {isParent && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-foreground mb-1">
+          <label htmlFor="history-child" className="block text-sm font-medium text-foreground mb-1">
             Select Child
           </label>
           <select
+            id="history-child"
             value={selectedChildId ?? ''}
             onChange={(e) => setSelectedChildId(e.target.value || null)}
             className="w-full sm:w-64 px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"

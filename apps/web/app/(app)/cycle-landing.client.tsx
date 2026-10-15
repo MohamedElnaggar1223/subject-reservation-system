@@ -78,6 +78,9 @@ export default function CycleLanding({ viewerRole, userName }: { viewerRole: str
 
       {isLoading ? <LoadingState label="Reading the sessions…" /> : isError || !data ? <ErrorState message="The sessions did not load; nothing is lost. Try again." onRetry={() => refetch()} /> : (() => {
         const { shown, noneRunning, fallback } = current(data);
+        // The closed sessions still in progress are said to be closed once, above them (F6: the lead's
+        // drive found "Closed to new reservations" on every closed card, under its "Closed" badge).
+        const firstClosed = fallback ? -1 : shown.findIndex((s) => s.status === 'closed');
         return (
           <div className="space-y-5">
             {noneRunning && (
@@ -97,7 +100,15 @@ export default function CycleLanding({ viewerRole, userName }: { viewerRole: str
             )}
             {/* One action is in front of her: the banner's when it has one, else the first card's first. */}
             {shown.map((s, i) => (
-              <SessionCard key={s.id} s={s} viewerRole={viewerRole} closedTail={!!fallback} lead={i === 0 && !(noneRunning && isAdmin)} />
+              <div key={s.id} className="space-y-3">
+                {i === firstClosed && (
+                  <div className="pt-2">
+                    <h2 className="font-display text-base font-semibold text-foreground">Closed to new reservations — still in progress</h2>
+                    <p className="text-sm text-muted-foreground">Families still owe money, or entries still go to the board: each card says which.</p>
+                  </div>
+                )}
+                <SessionCard s={s} viewerRole={viewerRole} closedTail={!!fallback} lead={i === 0 && !(noneRunning && isAdmin)} />
+              </div>
             ))}
           </div>
         );
@@ -269,11 +280,7 @@ function SessionCard({ s, viewerRole, closedTail, lead }: { s: SessionRow; viewe
                 <span>Open: families reserve until</span> <Day iso={s.endDate} />. <span>Payment due</span> <Day iso={s.paymentDueAt} />.
               </>
             )}
-            {s.status === 'closed' && (
-              <>
-                <span>Closed to new reservations.</span>{closedTail && <> <span>The last session; the next one starts from it.</span></>}
-              </>
-            )}
+            {s.status === 'closed' && closedTail && <span>The last session; the next one starts from it.</span>}
           </p>
         </div>
         <Button asChild variant="outline" size="sm"><Link href={sheet as never}>Open the sheet</Link></Button>

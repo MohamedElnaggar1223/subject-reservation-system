@@ -1119,5 +1119,25 @@ describe('08s: messages and reminders', () => {
         setClockForTests(new Date(`${TODAY}T09:00:00Z`));
       }
     });
+
+    it('the Sent log names a class by its teacher when the message went out, not by its teacher when the log is read (F6)', async () => {
+      const definition = { kind: 'batch' as const, list: 'teaching_group' as const, groupId, who: 'families' as const };
+      const sent = await apiResponse(adm.api.v1.messages.$post({ json: { audience: { definition }, title: 'Biology: lab coats', body: 'Bring a lab coat on Sunday.', language: 'en', channels: ['in_app'] } }));
+      const sentWords = `${groupName}: ${subjAName} with ${teacherName} — Parents and students`;
+      // Another teacher takes the class from tomorrow; the school moves on to tomorrow.
+      const nextName = `Teacher E (08s ${RUN})`;
+      const next = await apiResponse(adm.api.v1.teachers.$post({ json: { name: nextName } }));
+      await apiResponse(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: groupId }, json: { teacherId: next!.id, teacherFrom: plus(TODAY, 1) } }));
+      setClockForTests(new Date(`${plus(TODAY, 1)}T09:00:00Z`));
+      try {
+        // Today's words name the new teacher; the log keeps the words the message went out with.
+        expect((await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }))).label)
+          .toBe(`${groupName}: ${subjAName} with ${nextName} — Parents and students`);
+        const row = (await apiResponse(adm.api.v1.messages.$get({ query: {} }))).find((m) => m.id === sent.id);
+        expect(row?.audience.label).toBe(sentWords);
+      } finally {
+        setClockForTests(new Date(`${TODAY}T09:00:00Z`));
+      }
+    });
   });
 });

@@ -13,7 +13,9 @@ export const metadata = {
   title: 'Desk — IGCSE',
 };
 
-export default async function DeskPage(): Promise<React.JSX.Element> {
+export default async function DeskPage({ searchParams }: { searchParams: Promise<{ student?: string }> }): Promise<React.JSX.Element> {
   const session = await requireFinance();
-  return <DeskClient userRole={session.user.role ?? ''} />;
+  // F6: a link from a student's record opens the desk on that student (no second search).
+  const { student } = await searchParams;
+  return <DeskClient userRole={session.user.role ?? ''} initialStudentId={student ?? null} />;
 }

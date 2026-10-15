@@ -355,8 +355,9 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
 ## 9. Deferred, and why
 
 - **A year picker for teaching groups** — the picker offers the school's year today, as the sections list
-  does; a message to next year's classes before the year starts would need one (and the group read on that
-  year's first day). Not asked for.
+  does (from 1 July, the coming year, its groups read on that year's first day — `teachingGroupDay`, §1.1);
+  a message to another year's classes would need one. Not asked for. *(Corrected by F6, 15 Oct 2026: the
+  bullet said the group read on the year's first day was still to come; the fix round made it.)*
 - **Sending an old-shape saved list from the composer** — clicking one sets the list and the recipients and
   clears the class picker (it names no group); it sends through its saved id only, which the API takes and the
   composer has no control for (it never had one for a saved batch).
@@ -365,9 +366,9 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
 
 - *The Sent log names a class by its teacher on the group's day when the log is read*, not at send time: a
   class whose teacher changed since reads with the new teacher. The audit row (`MESSAGE_SENT`) keeps the words
-  of the send.
+  of the send. *Fixed by F6 (15 Oct 2026): the log names a sent message by those words (UI_AUDIT.md §3.17).*
 - *F1's Arabic clash reason* isolates English names only up to the em dash and keeps an English comma in the
-  date (§4, found 2); F6 fixes it in `i18n-scheduling.ts`.
+  date (§4, found 2); F6 fixes it in `i18n-scheduling.ts`. *Fixed by F6 (UI_AUDIT.md §4).*
 - *Sending an old-shape definition* is refused with the validator's generic 400 (no sentence of its own); the
   composer cannot produce one.
 - *`listOptions` reads the sections' year from the school clock* too (the line moved from `new Date()` to

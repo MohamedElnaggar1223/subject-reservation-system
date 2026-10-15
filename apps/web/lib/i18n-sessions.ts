@@ -490,8 +490,9 @@ export function translateSessionsText(text: string): string | null {
       (m) => `لا يمكن نقل حجز إلى ${m[1]}: انقضى موعد ${m[2] === 'retake' ? 'الإعادات' : 'القيد'} لدى المجلس فيها (${m[3]})`],
     [/^A reservation cannot move to (.+): its exams start on (.+) and it has no entry deadline$/,
       (m) => `لا يمكن نقل حجز إلى ${m[1]}: تبدأ امتحاناتها في ${m[2]} ولا موعد قيد لها`],
+    // F4's sentence names "the candidate" when it has no name: the Arabic says للمرشح alone, not "للمرشح the candidate" (F6).
     [/^(.+) for (.+) has already gone to the board in (.+): withdraw its entries first$/,
-      (m) => `${m[1]} للمرشح ${m[2]} أُرسل إلى المجلس في ${m[3]}: اسحب قيوده أولًا`],
+      (m) => `${m[1]} ${m[2] === 'the candidate' ? 'للمرشح' : `للمرشح ${m[2]}`} أُرسل إلى المجلس في ${m[3]}: اسحب قيوده أولًا`],
     // generateItems' label for a one-paper retake ("Paper 4 only (retake)"): the paper's name is data.
     [/^(Paper \S+|Theory paper|\S+) only \(retake\)$/, (m) => `${m[1]} فقط (إعادة)`],
     [/^(January|June|October|November) is not a sitting of this session$/, (m) => `${MONTHS_AR[m[1]!]} ليست دورة من دورات هذه الجلسة`],

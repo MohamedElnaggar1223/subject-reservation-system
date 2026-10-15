@@ -44,7 +44,7 @@ export function BoardRulesPanel({ boardCode }: { boardCode: string }): React.JSX
             {rule && <> <span className="text-muted-foreground">·</span> <BoardText>{rule.boardName}</BoardText></>}
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            What the check above and the fee sentences on the Entries screen follow. Each comes from the research; change one when the board&apos;s handbook says otherwise.
+            What the check above and the fee sentences on the Entries screen follow. Each was set from the board&apos;s handbook; change one when the handbook says otherwise.
           </p>
         </div>
         {rule && !editing && <Button type="button" variant="outline" onClick={() => { setEditing(true); setSaved(false); }}>Change the rules</Button>}

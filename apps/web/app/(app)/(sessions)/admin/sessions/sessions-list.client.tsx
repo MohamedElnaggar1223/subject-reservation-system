@@ -39,7 +39,14 @@ export default function SessionsListClient({ viewerRole }: { viewerRole: string 
   const { data: sessions } = useSuspenseQuery({ queryKey: [...SESSIONS_KEY, 'admin'], queryFn: fetchSessions });
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState<'all' | 'june' | 'winter'>('all');
-  const shown = sessions.filter((s) => filter === 'all' || s.sessionType === filter);
+  // The cycle's order (F6): the open session first, then those being prepared, then the closed ones,
+  // newest first — the one she is running is at the top, not the one furthest in the future.
+  const rank = (s: SessionRow) => (s.status === 'active' ? 0 : s.status === 'draft' ? 1 : 2);
+  const shown = sessions
+    .filter((s) => filter === 'all' || s.sessionType === filter)
+    .sort((a, b) => rank(a) - rank(b) || (rank(a) < 2
+      ? +new Date(a.startDate) - +new Date(b.startDate)
+      : +new Date(b.startDate) - +new Date(a.startDate)));
   const open = sessions.filter((s) => s.status === 'active').length;
   const drafts = sessions.filter((s) => s.status === 'draft').length;
 
@@ -91,23 +98,27 @@ function SessionCard({ s, viewerRole }: { s: SessionRow; viewerRole: string }) {
             <StatusBadge status={s.status} />
           </div>
           <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span><span>Reserve</span> <Day iso={s.startDate} /> – <Day iso={s.endDate} /></span>
+            <span><span>Families reserve</span> <Day iso={s.startDate} /> – <Day iso={s.endDate} /></span>
             <span><span>Course starts</span> <Day iso={s.courseStartsOn} /></span>
-            <span><span>Due</span> <Day iso={s.paymentDueAt} /></span>
+            <span><span>Payment due</span> <Day iso={s.paymentDueAt} /></span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href={`/admin/sessions/${s.id}`}><Button variant="outline" size="sm">Open</Button></Link>
-          {money && <Link href={`/admin/sessions/${s.id}#money`}><Button variant="outline" size="sm">Money</Button></Link>}
+          <Button asChild variant="outline" size="sm"><Link href={`/admin/sessions/${s.id}`}>Open</Link></Button>
+          {money && s.summary.lines > 0 && <Button asChild variant="outline" size="sm"><Link href={`/admin/sessions/${s.id}#money`}>Money</Link></Button>}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-        <span className="text-foreground"><span>{s.summary.offers}</span> <span>{s.summary.offers === 1 ? 'subject' : 'subjects'}</span> · <span>{s.summary.boards}</span> <span>{s.summary.boards === 1 ? 'board' : 'boards'}</span></span>
+        {s.summary.offers === 0 && s.status !== 'closed'
+          ? <span className="text-amber-700 dark:text-amber-400">No subjects on the sheet yet.</span>
+          : <span className="text-foreground"><span>{s.summary.offers}</span> <span>{s.summary.offers === 1 ? 'subject' : 'subjects'}</span> · <span>{s.summary.boards}</span> <span>{s.summary.boards === 1 ? 'board' : 'boards'}</span></span>}
         {s.boardSeries.length > 0 && <span className="text-muted-foreground">·</span>}
         {s.boardSeries.map((b) => (
           <span key={b.id} className="inline-flex items-center gap-1.5">
             <SeriesName boardName={b.boardName} month={b.month} year={b.year} label={b.label} />
-            {b.entryDeadline || b.retakeDeadline
+            {b.entryDeadline
+              ? <><span className="text-muted-foreground"><span>entries by</span> <Day iso={b.entryDeadline} /></span> <DeadlineBadge iso={b.entryDeadline} /></>
+              : b.retakeDeadline
               ? <DeadlineBadge iso={b.entryDeadline} />
               : b.examsStart ? <Badge tone="neutral"><span>exams</span>&nbsp;<Day iso={b.examsStart} /></Badge> : <Badge tone="warning">Dates not set</Badge>}
           </span>

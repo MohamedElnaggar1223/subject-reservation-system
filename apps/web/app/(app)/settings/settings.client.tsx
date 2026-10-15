@@ -22,24 +22,29 @@ import { useI18n } from '~/lib/i18n';
 const fetchSettings = () => apiResponse(api.v1.settings.$get());
 type Setting = Awaited<ReturnType<typeof fetchSettings>>[number];
 
+/**
+ * The groups in the reservation cycle's order (F6): who may reserve, the school fee before it, the
+ * price, when it is due, refunds, declared sittings, exceptions, reminders; then what sets the cycle up
+ * (the catalogue, the day-one import, the exam centre) and the calendar last. The catalogue group was
+ * listed twice (F0b added it again), so its setting showed twice and React warned of a duplicate key.
+ */
 const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'eligibility', title: 'Who may register', hint: 'Which students may register for which exam series.' },
   { id: 'school_fee', title: 'School fee', hint: 'When the annual school fee gates registration.' },
-  { id: 'calendar', title: 'Calendar', hint: 'The school week the calendar and the day’s lists build on.' },
-  { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes are read from the units each entry covers.' },
-  { id: 'import', title: 'Day-one import', hint: 'The coordinator’s answers every import’s review starts from.' },
-  { id: 'verification', title: 'Declared sittings', hint: 'What happens to a retake a family declared when the school has not verified it by the board’s deadline.' },
-  { id: 'pricing', title: 'Prices', hint: 'How a line’s price is made from the course fee and the board’s fee.' },
-  { id: 'payment', title: 'Payment', hint: 'When a line’s money is due.' },
+  { id: 'pricing', title: 'Prices', hint: 'How a reservation’s price is made from the course fee and the board’s fee.' },
+  { id: 'payment', title: 'Payment', hint: 'When a reservation’s money is due.' },
   { id: 'refund', title: 'Refunds', hint: 'What a new session’s refund policy is.' },
+  { id: 'verification', title: 'Declared sittings', hint: 'What happens to a retake a family declared when the school has not verified it by the board’s deadline.' },
   // Step C (RESERVATIONS_REWORK.md §3.7): what an exception may lift beyond the registry's own rules.
   { id: 'exceptions', title: 'Exceptions', hint: 'What the school allows an exception to lift.' },
-  // F0b's reading of the level code (the group was missing here, so the setting never showed).
-  { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes read.' },
-  // F4: the school as an exam centre.
-  { id: 'exams', title: 'Exam entries', hint: 'The school as an exam centre: its numbers with the boards, and the rules the coordinator has not confirmed yet.' },
   // Step D (RESERVATIONS_REWORK.md §3.8): the reminders' switch and hour; the rules are on Messages > Reminders.
   { id: 'reminders', title: 'Reminders', hint: 'Whether the reminder rules on Messages > Reminders go out, and at what hour of their day.' },
+  // F0b's reading of the level code.
+  { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes are read from the units each entry covers.' },
+  { id: 'import', title: 'Day-one import', hint: 'The coordinator’s answers every import’s review starts from.' },
+  // F4: the school as an exam centre.
+  { id: 'exams', title: 'Exam entries', hint: 'The school as an exam centre: its numbers with the boards, and the rules the coordinator has not confirmed yet.' },
+  { id: 'calendar', title: 'Calendar', hint: 'The school week the calendar and the day’s lists build on.' },
 ];
 
 type Centres = Record<string, { centreNumber: string | null; route: 'direct' | 'british_council' }>;
@@ -102,11 +107,20 @@ export default function SettingsClient(): React.JSX.Element {
         <Notice tone="danger" title="Could not load the settings">{error instanceof Error ? error.message : null}</Notice>
       ) : (
         <div className="space-y-8">
+          {/* Eighteen settings on one long page: a list of its groups to jump to (F6). */}
+          <nav aria-label="On this page" className="rounded-xl border border-border bg-card p-4 text-sm shadow-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">On this page</p>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+              {GROUPS.filter((g) => settings.some((s) => s.group === g.id)).map((g) => (
+                <li key={g.id}><a href={`#group-${g.id}`} className="text-primary underline-offset-4 hover:underline">{g.title}</a></li>
+              ))}
+            </ul>
+          </nav>
           {GROUPS.map((g) => {
             const inGroup = settings.filter((s) => s.group === g.id);
             if (inGroup.length === 0) return null;
             return (
-              <section key={g.id} aria-labelledby={`group-${g.id}`}>
+              <section key={g.id} aria-labelledby={`group-${g.id}`} className="scroll-mt-6">
                 <h2 id={`group-${g.id}`} className="font-semibold text-foreground font-display">{g.title}</h2>
                 <p className="text-xs text-muted-foreground mb-3">{g.hint}</p>
                 <div className="space-y-3">

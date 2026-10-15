@@ -27,7 +27,8 @@ const ROOM_NEEDS: Record<string, string> = {
 };
 
 /** "Sunday Period 1" → "الأحد Period 1"; a date's weekday and month in Arabic. */
-const day = (s: string) => s.replace(/\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\b/g, (d) => DAYS[d]!).replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g, (m) => MONTHS[m]!);
+// "Wednesday, 21 October 2026": the weekday's comma becomes the Arabic comma (F6: "الأربعاء, 21 أكتوبر").
+const day = (s: string) => s.replace(/\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),/g, '$1،').replace(/\b(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\b/g, (d) => DAYS[d]!).replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g, (m) => MONTHS[m]!);
 const need = (s: string) => s.split(' and ').map((p) => ROOM_NEEDS[p] ?? p).join(' و');
 
 export const schedulingArabic: Record<string, string> = {
@@ -487,7 +488,9 @@ export function translateSchedulingText(text: string): string | null {
   return arabic === null ? null : arabic.replace(LATIN_RUN, (run) => `\u2068${run}\u2069`);
 }
 
-const LATIN_RUN = /[A-Za-z](?:[A-Za-z0-9'’.&/+\-–]|\([^()\u0600-\u06FF]*\)| (?=[A-Za-z0-9(]))*/g;
+// A name runs on across " — " when Latin follows ("Biology 11 — Teacher B" is one name, isolated whole;
+// F6: the run stopped at the em dash and the two halves were isolated apart).
+const LATIN_RUN = /[A-Za-z](?:[A-Za-z0-9'’.&/+\-–]|\([^()\u0600-\u06FF]*\)| — (?=[A-Za-z0-9(])| (?=[A-Za-z0-9(]))*/g;
 
 function translateInner(text: string): string | null {
   // A refusal that lists clashes: "It would clash: a; b" and "Resolve the clashes before publishing (n): a; b".

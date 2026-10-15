@@ -67,16 +67,17 @@ function outstanding(field: Field, st: Record<string, number | boolean>): string
   const n = (k: string) => Number(st[k] ?? 0);
   const out: string[] = [];
   switch (field) {
+    // One or many, as the sentence needs it (F6: "1 draft entries", "1 registrations").
     case 'entryDeadline':
-      if (n('unentered')) out.push(`${n('unentered')} confirmed registrations have no entry yet`);
-      if (n('drafts')) out.push(`${n('drafts')} draft entries not sent to the board`);
-      if (n('waiting')) out.push(`${n('waiting')} registrations still waiting for approval or payment`);
+      if (n('unentered')) out.push(n('unentered') === 1 ? '1 confirmed registration has no entry yet' : `${n('unentered')} confirmed registrations have no entry yet`);
+      if (n('drafts')) out.push(n('drafts') === 1 ? '1 draft entry not sent to the board' : `${n('drafts')} draft entries not sent to the board`);
+      if (n('waiting')) out.push(n('waiting') === 1 ? '1 registration still waiting for approval or payment' : `${n('waiting')} registrations still waiting for approval or payment`);
       break;
     case 'estimatedEntriesDue':
-      if (n('unentered')) out.push(`${n('unentered')} confirmed registrations have no entry yet`);
+      if (n('unentered')) out.push(n('unentered') === 1 ? '1 confirmed registration has no entry yet' : `${n('unentered')} confirmed registrations have no entry yet`);
       break;
     case 'retakeDeadline':
-      if (n('retakeDrafts')) out.push(`${n('retakeDrafts')} retake entries not sent`);
+      if (n('retakeDrafts')) out.push(n('retakeDrafts') === 1 ? '1 retake entry not sent' : `${n('retakeDrafts')} retake entries not sent`);
       break;
     case 'forecastGradesDue':
       if (n('forecastsMissing')) out.push(`${n('forecastsMissing')} forecast grades missing`);
@@ -101,6 +102,8 @@ function outstanding(field: Field, st: Record<string, number | boolean>): string
   }
   return out;
 }
+
+const MONTH_NUMBER: Record<string, string> = { january: '01', june: '06', october: '10', november: '11' };
 
 /** Every board date from `pastDays` ago on, across all series, in date order, with what is outstanding. */
 export async function getDeadlines(pastDays = 30) {
@@ -131,7 +134,10 @@ export async function getDeadlines(pastDays = 30) {
     }
   }
   items.sort((a, b) => a.date.localeCompare(b.date) || (a.at?.getTime() ?? 0) - (b.at?.getTime() ?? 0) || a.seriesName.localeCompare(b.seriesName));
-  const noDeadline = series.filter((s) => !s.entryDeadline).map((s) => ({ id: s.id, name: boardSeriesName(names, s) }));
+  // A sitting with no entry deadline matters while it is ahead: one already sat (its exams over, or its
+  // month gone) needs no deadline now (F6: June 2026 was listed in October 2026 as needing one).
+  const ahead = (s: (typeof series)[number]) => (s.examsEnd ? s.examsEnd >= today : `${s.year}-${MONTH_NUMBER[s.month] ?? '12'}` >= today.slice(0, 7));
+  const noDeadline = series.filter((s) => !s.entryDeadline && ahead(s)).map((s) => ({ id: s.id, name: boardSeriesName(names, s) }));
   return { today, items, seriesWithoutDeadline: noDeadline };
 }
 

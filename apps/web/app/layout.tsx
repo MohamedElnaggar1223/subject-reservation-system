@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Plus_Jakarta_Sans, DM_Sans } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import type { JSX } from "react";
 import Providers from "../providers/providers";
+import { LANGUAGE_COOKIE, languageFrom } from "../lib/language";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -32,15 +34,18 @@ export const metadata: Metadata = {
   description: "IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and escrow.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>): JSX.Element {
+}>): Promise<JSX.Element> {
+  // The reader's language, from the cookie the language button writes (lib/i18n.tsx): the page is
+  // rendered in it on the server, so the browser's first render matches and no hydration warning fires.
+  const language = languageFrom((await cookies()).get(LANGUAGE_COOKIE)?.value);
   return (
-    <html lang="en" suppressHydrationWarning className={`${jakarta.variable} ${dmSans.variable} ${geistMono.variable}`}>
+    <html lang={language} dir={language === "ar" ? "rtl" : "ltr"} data-language={language} suppressHydrationWarning className={`${jakarta.variable} ${dmSans.variable} ${geistMono.variable}`}>
       <body className="font-sans">
-        <Providers>
+        <Providers initialLanguage={language}>
           {children}
         </Providers>
       </body>
