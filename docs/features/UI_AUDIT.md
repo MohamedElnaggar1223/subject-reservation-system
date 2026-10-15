@@ -718,3 +718,5 @@ trail and the evidence.
   console error.
 - 21:31–21:47Z — the full suite in local time (finished 21:39:43Z) and with `TZ=UTC` (21:47:26Z): 839 passed,
   1 todo, both. CI run 38810433498 green on 0b71cb4 (21:48Z). §10 written.
+- 21:49Z — the proof committed (a509bdd) and pushed; CI run 38812765664 green on it (22:05Z). My dev servers
+  stopped; the import staged in `igcse_ui_dev` (§4.2) left there, uncommitted. Handed to the lead's review.
