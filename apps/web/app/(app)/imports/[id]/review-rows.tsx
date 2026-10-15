@@ -325,6 +325,10 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
   const [sitting, setSitting] = useState(() => edits.priorSitting ?? (first?.priorSitting ? { month: first.priorSitting.month, year: first.priorSitting.year } : { month: 'june', year: new Date().getFullYear() }));
   const teacherName = (id: string | null) => (id ? v.options.teachers.find((t) => t.id === id)?.name ?? null : null);
   const itemOption = (it: (typeof items)[number]) => `${it.subjectName} — ${it.label}${it.series ? ` · ${it.series}` : ''}${it.availability === 'closed' ? ' · closed' : ''}`;
+  // The forms' "One paper ONLY" is always a retake: the plan makes a one-paper line one whatever is chosen
+  // (F6a, the lead's decision of 11 Oct 2026), so "First entry" on it selected and changed nothing (F6a's
+  // review). When every line is one paper there is no entry to choose; a split with other items keeps it.
+  const allOnePaper = lines.length > 0 && lines.every((l) => items.find((it) => it.id === l.offerItemId)?.kind === 'one_paper');
   return (
     <section aria-labelledby="row-line" className="rounded-lg border border-border p-3">
       <h3 id="row-line" className="mb-2 text-sm font-semibold text-foreground">{lines.length > 1 ? 'The lines in the session' : 'The line in the session'}</h3>
@@ -403,14 +407,18 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
           </label>
           <div className="text-sm">
             <span className="mb-1 block text-xs text-muted-foreground">Entry</span>
-            <div className="flex flex-wrap gap-2">
-              {([['first', 'First entry'], ['retake', 'Retake'], [null, 'As the sheet says']] as const).map(([val, label]) => (
-                <Button key={String(val)} size="sm" variant={(edits.attempt ?? null) === val ? 'default' : 'outline'} disabled={save.isPending}
-                  onClick={() => save.mutate(val === null ? { rowIds: [row.id], clear: ['attempt'] } : { rowIds: [row.id], edits: { attempt: val } })}>
-                  {label}
-                </Button>
-              ))}
-            </div>
+            {allOnePaper ? (
+              <p className="text-muted-foreground">Retake — one paper only is always a retake; name the sitting it follows below.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {([['first', 'First entry'], ['retake', 'Retake'], [null, 'As the sheet says']] as const).map(([val, label]) => (
+                  <Button key={String(val)} size="sm" variant={(edits.attempt ?? null) === val ? 'default' : 'outline'} disabled={save.isPending}
+                    onClick={() => save.mutate(val === null ? { rowIds: [row.id], clear: ['attempt'] } : { rowIds: [row.id], edits: { attempt: val } })}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-sm">
             <span className="mb-1 flex items-center gap-2 text-xs text-muted-foreground"><span>The sitting a retake follows (the desk’s declaration, verified on To verify)</span>{edits.priorSitting && <Badge tone="warning">Fixed</Badge>}</span>

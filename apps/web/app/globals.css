@@ -323,6 +323,19 @@
   animation: subtle-pulse 2s ease-in-out infinite;
 }
 
+/* F6 (the checklist's reduced motion, WCAG 2.3.3): a reader whose system asks for less motion gets every page
+   without its entrance animations and without the pulses; the loading spinner keeps turning, since it says
+   the page is working. Unlayered, so it wins over Tailwind's own utilities. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-slide-in,
+  .animate-subtle-pulse,
+  .animate-pulse {
+    animation: none;
+  }
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {

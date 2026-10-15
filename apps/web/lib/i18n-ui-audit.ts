@@ -142,6 +142,10 @@ export const uiAuditArabic: Record<string, string> = {
     'لكل جلسة سياسة استرداد خاصة بها تظهر في رأسها (ليونيو: 100% حتى الأسبوع 2 · 50% في الأسبوع 3 · 0% من الأسبوع 4). وهذه النوافذ تنطبق فقط على الحجوزات التي سبقت إعادة بناء الحجز في أكتوبر 2026.',
   'No refund windows: the sessions’ own refund policies apply.': 'لا نوافذ استرداد: تنطبق سياسات الاسترداد الخاصة بكل جلسة.',
 
+  // ── The import review: a one-paper line ──
+  'Retake — one paper only is always a retake; name the sitting it follows below.':
+    'إعادة — الورقة الواحدة إعادة دائمًا؛ سمِّ الدورة التي تتبعها أدناه.',
+
   // ── Sign-in and sign-up ──
   "The school's subject reservations, in one place.": 'حجوزات المواد في المدرسة، في مكان واحد.',
   'One account for the family, in place of a form for every subject.': 'حساب واحد للأسرة بدلًا من استمارة لكل مادة.',

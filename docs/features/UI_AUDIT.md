@@ -19,8 +19,7 @@ and Arabic, judged against a written checklist (the principles below and the own
 its presentation and flow — the project's own components and tokens, no model change, no new endpoint, the
 money paths untouched.
 
-(The sections below are filled in as each group of screens is finished; the progress log at the end says
-where the work stands.)
+(The progress log at the end says how the work went, group by group.)
 
 ---
 
@@ -95,6 +94,7 @@ step is there but costs a search, a guess or a scroll, or a WCAG AA failure; **L
 | Screen readers | the current page was not marked in the sidebar; the unread badge said "3 unread" in English on an Arabic page | L | `aria-current="page"` on the lit item; "unread" from the dictionary |
 | Hono RPC | the sidebar's unread count hand-cast its response (`as { count?: number }`) | L | the response's own type |
 | RTL | the badge and the collapsed dot sat by `right`/`ml-auto` | L | logical `end`/`ms-auto` |
+| Reduced motion (WCAG 2.3.3) | every page fades its parts in (`animate-fade-up`, staggered) and a few pulse forever; nothing in the project answered a system's "reduce motion" | L | under `prefers-reduced-motion: reduce` the entrance animations and the pulses are off (`globals.css`); the loading spinner keeps turning |
 
 ### 3.1 The admin's landing `/` [s01] and the coordinator's [s02]
 
@@ -428,15 +428,207 @@ and say only what is true.
 
 ## 4. The queued findings, one by one
 
+The findings FEATURES_PLAN.md §1 "F6" queued for this audit (from C's review, F6a's review, F1's merge review,
+the cycle follow-ups' review), the records it keeps for the owner, and the lead's own drives.
+
+**To fix**
+
+| # | Finding (queued by) | Outcome | Where |
+|---|---|---|---|
+| Q1 | The Arabic hydration warning, at its cause — the language provider's initialiser since 2c3d27f (30 May); "1 Issue" on the Arabic drawer pages (F6a's review) | **fixed at both its causes** (§4.1). After: no hydration error on any of the 77 Arabic records | §3.0, §3.13, §4.1 |
+| Q2 | Three hand-cast API responses in `desk.client.tsx` (C's review) | **fixed**: the school fee's answer takes its own type (the header's three fee buttons that used it are gone, §3.12); the three statuses read through `labelFor(map, value)` | §3.12 |
+| Q3 | The import review offers "First entry" on a one-paper line, which the plan always makes a retake (F6a's review) | **fixed** (§4.2) | §4.2 |
+| Q4 | F4's Arabic refusal reads "للمرشح the candidate" when the candidate has no name (F6a's review) | **fixed** in the rule (`i18n-sessions.ts`): "… للمرشح أُرسل إلى المجلس …" without a name, and the name when there is one — read through the translator's own functions (`drive/sentences-check.ts`) | trail 20:28:51Z |
+| Q5 | F1's Arabic clash reason: English names isolated only up to the em dash; an English comma in the date (the follow-ups' review) | **fixed** (`i18n-scheduling.ts`): a Latin run carries across " — " before Latin ("Biology 11 — Teacher B", "Term 1 — first" whole), and the day reads "الأربعاء، 21 أكتوبر 2026" | trail 20:28:51Z |
+| Q6 | The Sent log names a class by its teacher on the day it is read, not at send time — if cheap (the follow-ups' review) | **fixed** (it was cheap): the words the MESSAGE_SENT audit row keeps; an 08s scenario and its control | §3.17 |
+| Q7 | Rebuilding the subject's form after a Replace a teacher discards what was typed (the follow-ups' review) | **fixed**: what was typed is carried into the rebuilt form; only its teachers are read again; the dialog says so | §3.4 |
+| Q8 | Two document nits: CYCLE_FOLLOWUPS §9's year-picker bullet, SCHEDULING §8's "its teacher today" (the follow-ups' review) | **fixed** in both documents; with them the follow-ups' comment naming a function that does not exist (`message-audience.services.ts`) | trail 20:39:33Z |
+| Q9 | The desk's parent-consent tick shown for every waiting line (step 4 of the rework's desk) | **fixed**: shown and sent only for a line carrying the school's consent alone; an 08o scenario and its control | §3.12 |
+| Q10 | Cover and publishing notify families with `/my-timetable` while the switch hides it — say so in RESERVATION_FOCUS.md §4 (F1's merge review) | **said**: a row in RESERVATION_FOCUS.md §4 — the Notifications screen draws a notification's title and sentence, never its `data.link`, so none leads outside the cycle | RESERVATION_FOCUS.md §4 |
+| — | The day-one import passes F1's published-timetable guard; a scenario and the import's sentence are owed (F1's merge review) | not F6's: owed to F7/F1 by the plan; no screen of the cycle shows it | — |
+
+**To keep for the owner (recorded, not changed)**
+
+| # | Record | Where it stands |
+|---|---|---|
+| R1 | Messages' "A section" is فصل (C's dictionary over D's قسم), and the desk's teaching group is فصل too | §9, question 12 |
+| R2 | The Student 360's "Subjects this year" (course enrolment) | audited where it is drawn (§3.13), unchanged; §9, question 9 |
+| R3 | Candidates, Board Services, Subjects, History, My Exams (RESERVATION_FOCUS §8) | as F6b left them: Board Services (§3.8), Subjects (§3.6) and History (§3.28) audited where reachable; Candidates and My Exams hidden; §9, questions 5–11 |
+
+**The lead's drives**
+
+| # | Finding | Outcome | Where |
+|---|---|---|---|
+| L1 | The family's home: the old banner and the quick-link cards around F6b's card | **one page in the cycle's order** with the switch on; the old home exactly with it off | §3.26 |
+| L2 | The admin's landing: "Closed to new reservations" twice on a closed card | **once**, as a heading above the closed sessions still in progress | §3.1 |
+| L3 | The Session dates dialog's "other dates" (the board's eleven dates and the notes) above Save | **behind a disclosure** that says how many are set and opens by itself when one is; on Board Series too | §3.7 |
+
+### 4.1 The hydration warning's two causes
+
+1. **The provider's first render.** `I18nProvider`'s state initialiser read localStorage, which the server does
+   not have: the server rendered English, the browser's first render Arabic, and React threw away the tree
+   (reproduced first on `/sign-in`: the language button's "Switch language" / "تغيير اللغة"). The language now
+   lives in a cookie (`language`, a year, `SameSite=Lax`) that the root layout reads (`app/layout.tsx`,
+   `lib/language.ts`): the server renders `<html lang dir>` and the first state in the reader's language, so
+   an Arabic page also arrives right to left with no flash. A choice made before (localStorage only) is
+   carried into the cookie once, after hydration.
+2. **The page translator.** On `/students` the warning remained: `localizeDom` rewrote the list's server HTML
+   inside a Suspense boundary before React hydrated it. It now touches only what React owns (the element's
+   fiber attached) and looks again every 100 ms, up to 10 s, while part of a page waits to hydrate — hydrating
+   mutates nothing, so the mutation observer alone would not see it. Control (trail 05:40:04Z): with the check
+   disabled, four loads of `/students` in Arabic gave four hydration errors; restored, none.
+
+### 4.2 The import review's entry choice on a one-paper line
+
+The forms' "One paper ONLY" is always a retake (F6a, the lead's decision of 11 Oct 2026): the plan makes a
+one-paper line a retake whatever staff choose (`import/view.ts`), so "First entry" on it lit up and changed
+nothing. Now, when every line a row makes is a one-paper item, the editor offers no entry choice and says
+"Retake — one paper only is always a retake; name the sitting it follows below." (Arabic in the dictionary); a
+split row with other items keeps the choice, which the plan honours for those. Driven on an import staged in
+the dev database (`drive/setup-9-import.mjs`: Biology "(One paper ONLY) From June 2026", staff choosing "Paper 4
+only (retake)"; staged, never committed), the row editor at a desk (`drive/import-row.mjs`): before — "First
+entry · Retake · As the sheet says"; after — the sentence, in English and Arabic; no axe violation, no console
+error (`.audit/ui-audit-evidence/s19b-import-one-paper-line/`).
+
 ## 5. Accessibility results
+
+axe-core 4 (WCAG 2.0, 2.1, 2.2 A and AA rules) on every record of both drives — the whole page as the role
+reaches it (`drive-before.json`, `drive-after.json`); the console's errors on the same loads.
+
+| | Before | After |
+|---|---|---|
+| Records (screens × EN, AR) | 150 (75 screens) | 154 (77: f06b and s36 added) |
+| Records with an axe violation | 128 | **0** |
+| Records with a console error | 71 | **0** |
+| — of which React's hydration error (Arabic) | 67 of 75 Arabic records | **0** |
+
+The eight Arabic records without it in the before file were taken after the shell's fix (s35, s43b–d, and
+s50–s52 taken again once the entries were derived) or render nothing language-dependent on the server (a08).
+
+| Rule (WCAG) | Records | Nodes | Screens | Fixed by |
+|---|---|---|---|---|
+| `button-name` (4.1.2) | 120 | 120 | 60 — every screen with the sidebar or the phone's menu | the collapse and menu buttons named (§3.0) |
+| `color-contrast` (1.4.3) | 76 | 470 | 38 — every staff screen, and Approvals | the sidebar through its tokens (§3.0); amber-700 and emerald-700 from the tone palette (§3.12, §3.18, §3.19, §3.28) |
+| `select-name` (4.1.2) | 10 | 16 | 5 — Subjects, School Fees, History, withdraw, transfer | each select tied to its label (§3.6, §3.9, §3.28, §3.31) |
+| `label` (1.3.1) | 4 | 14 | 2 — School Fees, Daily Takings | labels tied to their inputs (§3.9, §3.20) |
+| `dlitem` (1.3.1) | 4 | 24 | 2 — both profiles | a `dl` (§3.24) |
+| `label-content-name-mismatch` (2.5.3) | 8 | 8 | 7 — sign-in, sign-up, forgot, verify | the language button named by its word (§3.0) |
+| `scrollable-region-focusable` (2.1.1) | 4 | 4 | 2 — both statements at a phone | the statement stacked at a phone, no sideways scroll (§3.29) |
+
+Console errors before, besides hydration: "[session] getSession failed: Unauthorized" on the three sign-up
+pages (fixed at its cause, §3.32) and React's duplicate-key warning on Settings (§3.10).
+
+Beyond axe: the refusals on the five auth forms are `role="alert"` (WCAG 4.1.3, §3.32); the current page is
+marked in the sidebar (`aria-current`); the filter of My Registrations is a labelled group with
+`aria-pressed`; a reader whose system asks for less motion gets no entrance animation and no pulse — there
+was no such rule (§3.0); checked with Chrome's reduced-motion emulation (`drive/motion-check.mjs`: `fade-up`
+without the preference, `none` with it).
 
 ## 6. Measurements
 
+RESERVATIONS_REWORK.md §11's step-4 method: what the person must type, click or read before the right action.
+
+| Task | Before | After |
+|---|---|---|
+| The desk: collect for a family on three instalments, the first due in three days (§3.12) | "Collect EGP 24,850", all three ticked: two unticks to take what is due | "Collect EGP 8,283": none |
+| The desk: a walk-in family whose school fee gates reserving — reserve and collect (§3.12) | the fee unticked: "Reserve and collect" refused, one refusal read and one tick | the fee ticked: none |
+| The student record's "Payments and receipts at the desk" (§3.12) | an empty desk: the name typed again (one input) and the result opened (one click) | the desk opens on the student: none |
+| The desk: collect for a family that reserved in the app (§3.12) | a parent-consent tick that did not apply, on every waiting line | not shown: one question fewer |
+| The family's home, parent B owing June 2027 (§3.26) | the filled button "Preregister" (a session opening later); "Pay now" the third action, two rows down | "Pay now" the first and only filled button |
+| The family's home, parent C with a child's request (§3.26) | "Approve" the third action, below two "Preregister" rows | "Approve" first, filled |
+| The family's home at a phone (§3.26) | f01 1950 px, f03 2309 px | 1154 px, 1262 px |
+| The dates form (§3.7) | the two deadlines, then eleven dates and the notes, above Save | the two deadlines, then one closed line saying how many dates are set |
+| The import review on a one-paper line (§4.2) | three entry buttons, one of which changed nothing | no choice to make; one sentence |
+
 ## 7. Decisions and why
+
+1. **The language in a cookie, not a silenced warning.** `suppressHydrationWarning` would have hidden 67
+   mismatches and left the server rendering English to an Arabic reader; reading the cookie in the root layout
+   removes the mismatch and the left-to-right flash together (§4.1).
+2. **The translator waits for React** rather than racing it: touching server HTML React has not hydrated was
+   the second cause (§4.1).
+3. **Contrast through the project's own values.** The sidebar's lit item takes the sidebar's own deep teal
+   (`--sidebar-primary-foreground` given `--sidebar`'s value); text on tones moves from the -600 to the -700 of
+   the tone palette already in `components/ui/tone.tsx`. No new colour.
+4. **A new pattern, named: a table at a phone stacks.** No pattern existed for a table at a phone (they
+   scrolled sideways, the price and the teacher off the screen). Below 640 px each row's cells stack under
+   their names (`max-sm:` grid classes and a label shown only at a phone), the same component, CSS only; from
+   640 px the table. Used on Reserve (`components/reservations/reserve.tsx`) and the statement
+   (`components/reservations/statement.tsx`), which the desk's Student 360 shares.
+5. **`labelFor(map, value)`** (`lib/format.ts`) reads a status code to its label without casting the response
+   (CLAUDE.md: never hand-type an API response).
+6. **No new endpoint; three existing reads changed, each proven.** The desk summary's `familyConsentNeeded`
+   per line (08o), the Sent log's send-time words (08s), the deadlines' sittings still ahead (08x2) — each a
+   scenario and a control (§10). No route was added, so no authz-policy row or 05 case was owed. One label set
+   in `@repo/validations` (`POLICY_SCOPE_LABELS`: words only).
+7. **The family's home is one page with the switch on, and the old home with it off** — F6b's contract that
+   the switch gives the full system back unchanged.
+8. **"Wallet" (المحفظة) on the family's screens only**: the landings already said "the wallet"; staff keep
+   "Escrow", their ledger's word.
+9. **One panel for every auth page**: the three page-specific copies (each with its own slogans and figures)
+   removed; one truthful panel is less code and one thing to keep true.
+10. **The session helper reads a 401 as a visitor** (`lib/auth/session.ts`): the fix where the misreading
+    was, not a filter on the log; any other failure still logs.
+11. **The import review hides the choice only when every line is one paper**: a mixed split keeps it, since the
+    plan honours it for the other lines.
+12. **F6's Arabic is merged last** (`Object.assign(autoArabicText, uiAuditArabic)`), so a rewritten sentence
+    wins over an old one; a generic word whose override would have changed other screens ("Open now",
+    "Closed", "Submitted", "Reservations", "Requested", …) was left to the dictionary that had it.
 
 ## 8. Deferred, and why
 
+| Item | Why not now |
+|---|---|
+| My Registrations types its rows by hand (§3.28) | its rows come from three endpoints in a 900-line screen from before the rework; typing them from the fetchers is a rewrite, not a presentation pass |
+| A registration card names the subject, not the paper (§3.28) | the registrations read does not carry the item's label: an API change no other screen needed |
+| A sort on the Money tab's table (§3.4) | its order (student, then subject) and its filters and Export answer what finance asks |
+| The Charges cards' columns do not line up across families (§3.14) | a shared grid changes the component every money list uses |
+| The message composer's `{guardian}`, `{student}` (§3.17) | the template's own tokens, filled before sending; words would need a second set |
+| Board Services' "Pick a series…" with nothing chosen (§3.8) | waits on the owner's Q3 (keep the page?) |
+| Entry Lists' rule source "From DISCOVERY_RESEARCH.md §2 …" (§3.23) | stored data (migration 0057), editable by the admin's "Change the rules"; a data change is not F6's |
+| The landing's unpaid count includes the lines awaiting the parent (§3.1) | the Money tab splits them one click on; the count is the Sessions list's own |
+| A refusal on an auth form is drawn in English and translated a moment later (§3.32) | the DOM translator's way; in Arabic a screen reader may hear the English sentence before the Arabic. The fix is the auth errors through `t()` keys — every auth form's error path |
+| `lib/hono-server.ts` warns "Cookie … not found" on every server render for a visitor | a server log, not a screen — the same misreading as the session helper's; left to whoever next touches the server client |
+| Hidden screens | not audited (the brief): they come back with the switch |
+
 ## 9. Questions for the owner
+
+Each with the default kept until the owner answers.
+
+From SESSION_WORDS.md §12 (F6a):
+1. "Retake (Self Study ONLY)": does the school ever take a first entry in self study on a subject it does not
+   teach this cycle? Default: allowed, shown as "First entry, self-study (not taught this cycle)".
+2. A unit's sitting in a winter session: hide November for IAL units? Default: every month the board sits.
+3. A second qualification under one subject (Arabic A Level): who chooses — the family or the teacher (Q-16)?
+   Default: the family, through the teacher.
+4. The old drawer's tools (adding or removing an item, a labelled sitting, the exclusive group, fee keys,
+   "required in a first entry"): does the coordinator need any on a screen? Default: API-only.
+
+From RESERVATION_FOCUS.md §8 (F6b):
+5. Candidates in the cycle's sidebar? (Reachable now from the entries' fix links.)
+6. My Exams for families: show the statement of entry once entries are sent?
+7. Board Services: keep it in the cycle? (§3.8)
+8. Subjects `/admin/subjects`: its fee columns predate the session's fees and differ from the sheet's — keep,
+   relabel or hide? (§3.6)
+9. "Subjects this year" (course enrolment) on the Student 360: hide the block too? (§3.13)
+10. Exam Deadlines: show only the entry dates? Its exam-start rows say "No timetable imported yet". (§3.21)
+11. History for families: keep it? (§3.28)
+
+From CYCLE_FOLLOWUPS.md §10:
+12. The Arabic words for a section (11A) and a subject's class (Biology with Teacher A): Messages says فصل for
+    a section, the desk فصل for a class, F1's screens مجموعة تدريس. Default: as they are.
+
+F6's own:
+13. **Payments** (`/admin/payments`) lists only the old bank transfers, a method no new payment uses; InstaPay
+    transfers are confirmed on the Finance Workbench, and the page now says so (§3.15). Keep it on the admin's
+    sidebar? Default: kept (F6b's list is not F6's to change).
+14. **"Wallet"** (المحفظة) for the money the school holds for a child, on the family's screens (§3.31): the
+    school's word? Default: Wallet.
+15. **The sign-in page's words** (§3.32): "The school's subject reservations, in one place — One account for
+    the family, in place of a form for every subject", under the app's name "IGCSE Reserve". Should it carry
+    the school's own name and logo? Default: the app's name, as before.
+16. **Entry Lists' rule source** reads "From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026)" (§3.23):
+    change the stored text to the handbook's name alone? Default: as stored.
 
 ## 10. Proof
 
@@ -490,4 +682,9 @@ and say only what is true.
   and the unauthorized page in sentences with a way on. Driven after: 16 records, none with an axe violation
   or a console error; the wrong-password and mismatched-password refusals driven in both languages
   (`drive/auth-errors.mjs`).
-- Next: commit group 7; the import review's "First entry"; the remaining sections; the gates.
+- 21:19Z — group 7 committed (f54260b) and pushed.
+- 21:19–21:30Z — the import review's entry choice on a one-paper line (§4.2), driven on an import staged in
+  dev, before and after; RESERVATION_FOCUS §4's row for the notifications' `/my-timetable`; the
+  reduced-motion rule (none existed; the web server restarted for the stylesheet, my PIDs 28901/28905/28911
+  stopped, now pnpm pid 83122); §4–§9 written. Type-checks green in the worktree; `useQuery<` generics 15.
+- Next: commit; the full suite in local time and in UTC; the whole after drive once more; CI.
