@@ -344,4 +344,10 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
 - 01:50 — this document, B's and D's documents marked done; 2bfc74c committed and pushed (01:51); the servers
   stopped by their PIDs.
 - 01:52–02:08 — the gates on 2bfc74c: the suite in local time (01:52) and with TZ=UTC (01:59), 835 passed each;
-  CI green (run 38667940887).
+  CI green (run 38667940887). 41b2778 (documents and evidence) pushed.
+- 02:09–02:10 — **lead-env's `package.json` restored.** At 01:28Z, setting up the drive's scratch directory,
+  `npm --prefix /tmp/cycle-followups-drive init -y` wrote a `package.json` into the shell's working directory —
+  lead-env — instead of the prefix (npm's `init` does not honour `--prefix`). Found while checking lead-env's
+  status; restored from lead-env's own index (its content written back over the file; index and HEAD untouched);
+  `git status` there clean again; no other lead-env file changed in this session. For the lead: anything run in
+  lead-env between 01:28Z and 02:10Z saw that file changed.
