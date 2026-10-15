@@ -48,11 +48,12 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Lines" value={<span>{t.lines}</span>} />
+        <Stat label="Reservations" value={<span>{t.lines}</span>} />
         <Stat label="Paid" value={<><span>{t.paid}</span> · <Money amount={t.paidAmount} /></>} />
+        {/* What is not payable yet (a board fee not published) belongs with what is unpaid, not with what is overdue. */}
         <Stat label="Unpaid" value={<><span>{t.unpaid}</span> · <Money amount={t.outstanding} /></>}
-          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}{t.depositsHeld > 0 && <> · <span>held from instalments</span> <Money amount={t.depositsHeld} /></>}</>} />
-        <Stat label="Overdue" value={<><span>{t.overdue}</span> · <Money amount={t.overdueAmount} /></>} hint={t.provisional ? <><span>{t.provisional}</span> <span>provisional (not payable yet)</span></> : undefined} />
+          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}{t.provisional > 0 && <> · <span>{t.provisional}</span> <span>provisional (not payable yet)</span></>}{t.depositsHeld > 0 && <> · <span>held from instalments</span> <Money amount={t.depositsHeld} /></>}</>} />
+        <Stat label="Overdue" value={<><span>{t.overdue}</span> · <Money amount={t.overdueAmount} /></>} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -82,7 +83,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data.lines.length}>Export</Button>
         </div>
       </div>
-      {data.lines.length === 0 ? <EmptyState title="No lines here" /> : (
+      {data.lines.length === 0 ? <EmptyState title="No reservation here" /> : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">

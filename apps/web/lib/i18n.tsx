@@ -17,7 +17,9 @@ import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
 import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
+import { uiAuditArabic } from './i18n-ui-audit';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
+import { LANGUAGE_COOKIE } from './language';
 
 export type Language = 'en' | 'ar';
 
@@ -121,6 +123,11 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.timetableRules': 'Timetable Rules',
     'nav.cover': 'Cover',
     'nav.myTimetable': 'My Timetable',
+    // F6: the shell's controls that had no name for a screen reader.
+    'nav.openMenu': 'Open the menu',
+    'nav.collapseMenu': 'Collapse the menu',
+    'nav.expandMenu': 'Expand the menu',
+    'nav.unread': 'unread',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -241,6 +248,10 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.timetableRules': 'قواعد الجدول',
     'nav.cover': 'الحصص البديلة',
     'nav.myTimetable': 'جدولي',
+    'nav.openMenu': 'فتح القائمة',
+    'nav.collapseMenu': 'طي القائمة',
+    'nav.expandMenu': 'توسيع القائمة',
+    'nav.unread': 'غير مقروءة',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -1579,6 +1590,9 @@ for (const [en, ar] of Object.entries(focusArabic)) if (!(en in autoArabicText))
 // added after them at F1's final merge); their own words never replace a phrase already translated.
 for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
+// F6 (lib/i18n-ui-audit.ts): its words are the ones used — where it rewrote a sentence, its Arabic wins.
+Object.assign(autoArabicText, uiAuditArabic);
+
 const textNodeOriginals = new WeakMap<Text, string>();
 
 /** Whether one of the rework's sentence rules (A's, B's, C's, D's) translates this text. */
@@ -1916,14 +1930,25 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'en';
-    const stored = window.localStorage.getItem('language');
-    return stored === 'ar' || stored === 'en' ? stored : 'en';
-  });
+/**
+ * The language is kept in a cookie the server reads (app/layout.tsx), so the server renders the page
+ * in the reader's language and direction and the browser's first render agrees with it. Until F6 the
+ * provider's first render read localStorage, which only the browser has: the server rendered English,
+ * the browser's first render Arabic, and React reported a hydration mismatch on every page in Arabic
+ * (since 2c3d27f, 30 May 2026). localStorage is still written, and read once to carry an earlier choice
+ * into the cookie.
+ */
+function hasLanguageCookie(): boolean {
+  return document.cookie.split(';').some((c) => c.trim().startsWith(`${LANGUAGE_COOKIE}=`));
+}
 
+export function I18nProvider({ children, initialLanguage = 'en' }: { children: ReactNode; initialLanguage?: Language }) {
+  // The server's language (from the cookie): the browser's first render is the server's.
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
+
+  // A choice made before the cookie existed lives in localStorage only: carry it over once, after hydration.
   useEffect(() => {
+    if (hasLanguageCookie()) return;
     const stored = window.localStorage.getItem('language');
     if (stored === 'ar' || stored === 'en') setLanguageState(stored);
   }, []);
@@ -1934,6 +1959,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.language = language;
     document.title = language === 'ar' ? 'حجز مواد IGCSE' : 'IGCSE Subject Reservation';
     window.localStorage.setItem('language', language);
+    document.cookie = `${LANGUAGE_COOKIE}=${language}; path=/; max-age=31536000; samesite=lax`;
   }, [language]);
 
   useEffect(() => {

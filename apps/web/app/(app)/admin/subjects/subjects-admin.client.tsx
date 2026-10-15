@@ -568,22 +568,25 @@ export default function SubjectsAdminClient(): React.JSX.Element {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <input
           type="text"
+          aria-label="Search by name or code..."
           placeholder="Search by name or code..."
           value={filterSearch}
           onChange={(e) => setFilterSearch(e.target.value)}
           className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <select
+          aria-label="Board"
           value={filterCouncil}
           onChange={(e) => setFilterCouncil(e.target.value)}
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
-          <option value="">All Councils</option>
+          <option value="">All boards</option>
           {COUNCIL_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <select
+          aria-label="Status"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -604,13 +607,14 @@ export default function SubjectsAdminClient(): React.JSX.Element {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Subject</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Council</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Level</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Fees</th>
+                {/* F6: "Board", the forms' and the session sheet's word (the model's "council" stays in the API). */}
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Subject</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Board</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Level</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Fees</th>
                 <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Core</th>
                 <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

@@ -399,6 +399,7 @@ function NavLink({
 }) {
   const pathname = usePathname();
   const { t } = useI18n();
+  const unread = t('nav.unread');
   const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
   const showBadge = typeof badgeCount === 'number' && badgeCount > 0;
   const badgeLabel = showBadge ? (badgeCount > 99 ? '99+' : String(badgeCount)) : '';
@@ -415,6 +416,7 @@ function NavLink({
           : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       )}
       title={collapsed ? label : undefined}
+      aria-current={isActive ? 'page' : undefined}
     >
       <span className="relative">
         <Icon d={icons[item.icon]} className={cn(isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100')} />
@@ -422,8 +424,8 @@ function NavLink({
             count badge would be clipped by the narrower column. */}
         {collapsed && showBadge && (
           <span
-            aria-label={`${badgeLabel} unread`}
-            className="absolute -top-1 -right-1 size-2 rounded-full bg-primary ring-2 ring-sidebar"
+            aria-label={`${badgeLabel} ${unread}`}
+            className="absolute -top-1 -end-1 size-2 rounded-full bg-primary ring-2 ring-sidebar"
           />
         )}
       </span>
@@ -432,9 +434,9 @@ function NavLink({
           <span className="flex-1">{label}</span>
           {showBadge && (
             <span
-              aria-label={`${badgeLabel} unread`}
+              aria-label={`${badgeLabel} ${unread}`}
               className={cn(
-                'ml-auto inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums',
+                'ms-auto inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums',
                 isActive
                   ? 'bg-sidebar-primary-foreground text-sidebar-primary'
                   : 'bg-primary text-primary-foreground',
@@ -482,7 +484,7 @@ export default function NavShell({
     // authenticated, so `enabled` can stay at its default (always).
     retry: false,
   });
-  const unreadCount = (unreadData as { count?: number } | undefined)?.count ?? 0;
+  const unreadCount = unreadData?.count ?? 0;
 
   const handleSignOut = async () => {
     await authClient.signOut();
@@ -501,7 +503,7 @@ export default function NavShell({
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-sidebar-foreground font-display">IGCSE</p>
-            <p className="truncate text-[11px] text-sidebar-foreground/50">{t('app.subjectReservation')}</p>
+            <p className="truncate text-[11px] text-sidebar-foreground/70">{t('app.subjectReservation')}</p>
           </div>
         )}
       </div>
@@ -511,7 +513,7 @@ export default function NavShell({
         {sections.map((section, si) => (
           <div key={si} className={si > 0 ? 'mt-5' : ''}>
             {section.titleKey && !collapsed && (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/60">
                 {t(section.titleKey)}
               </p>
             )}
@@ -554,7 +556,7 @@ export default function NavShell({
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-sidebar-foreground">{userName || t('common.user')}</p>
-              <p className="truncate text-[11px] text-sidebar-foreground/50">{userRole && isRole(userRole) ? ROLE_LABELS[userRole] : userRole || 'user'}</p>
+              <p className="truncate text-[11px] text-sidebar-foreground/70">{userRole && isRole(userRole) ? ROLE_LABELS[userRole] : userRole || 'user'}</p>
             </div>
           )}
         </div>
@@ -586,8 +588,11 @@ export default function NavShell({
         {sidebarContent}
         {/* Collapse toggle */}
         <button
+          type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute bottom-20 -right-3 z-10 hidden lg:flex size-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground/50 shadow-sm hover:text-sidebar-foreground transition-colors"
+          aria-label={collapsed ? t('nav.expandMenu') : t('nav.collapseMenu')}
+          aria-expanded={!collapsed}
+          className="absolute bottom-20 -right-3 z-10 hidden lg:flex size-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground/70 shadow-sm hover:text-sidebar-foreground transition-colors"
           style={{ insetInlineStart: collapsed ? '56px' : '248px' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={cn('size-3 transition-transform', collapsed && 'rotate-180')}>
@@ -614,8 +619,11 @@ export default function NavShell({
         {/* Mobile top bar */}
         <header className="flex h-14 items-center gap-3 border-b border-border bg-card px-4 lg:hidden">
           <button
+            type="button"
             onClick={() => setMobileOpen(true)}
-            className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+            aria-label={t('nav.openMenu')}
+            aria-expanded={mobileOpen}
+            className="flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
           >
             <Icon d={icons.menu} />
           </button>

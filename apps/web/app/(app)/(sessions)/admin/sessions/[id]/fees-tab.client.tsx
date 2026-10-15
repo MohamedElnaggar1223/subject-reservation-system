@@ -42,6 +42,7 @@ function SeriesGrid({ session, series, canEdit }: { session: SessionDetail; seri
   const [copying, setCopying] = useState(false);
   const [repricing, setRepricing] = useState(false);
   const [repriced, setRepriced] = useState<string | null>(null);
+  const [showUnused, setShowUnused] = useState(false);
   const refresh = () => Promise.all([
     queryClient.invalidateQueries({ queryKey: feesKey(series.id) }),
     queryClient.invalidateQueries({ queryKey: offersKey(session.id) }),
@@ -74,6 +75,14 @@ function SeriesGrid({ session, series, canEdit }: { session: SessionDetail; seri
   const toList = grid.rows.filter((r) => !r.provisional).reduce((a, r) => a + r.toList, 0);
   const changedNew = grid.missing.filter((m) => edits[`new|${m.keyKind}|${m.keyId}`]);
   const changedProvisional = provisionalRows.filter((r) => edits[r.id] !== undefined && edits[r.id] !== String(r.amount));
+  // F6: what needs her first — a fee missing ("No fee" rows come first, below), then the provisional
+  // ones to confirm, then the confirmed fees this sheet reads, each by its code; the board's other rows
+  // (the list's subjects no subject on this sheet reads) wait behind "Show them".
+  const byCode = (a: { code: string }, b: { code: string }) => a.code.localeCompare(b.code, 'en', { numeric: true });
+  const usedRows = grid.rows.filter((r) => r.items.length > 0 || r.provisional || r.lines > 0);
+  const unusedRows = grid.rows.filter((r) => !usedRows.includes(r));
+  const orderedRows = [...usedRows.filter((r) => r.provisional).sort(byCode), ...usedRows.filter((r) => !r.provisional).sort(byCode)];
+  const shownRows = showUnused ? [...orderedRows, ...[...unusedRows].sort(byCode)] : orderedRows;
 
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm" aria-label={grid.series.name}>
@@ -136,11 +145,26 @@ function SeriesGrid({ session, series, canEdit }: { session: SessionDetail; seri
                 <th className="px-2 py-2 text-start font-medium">Used by</th>
                 <th className="px-2 py-2 text-end font-medium">Amount</th>
                 <th className="px-2 py-2 text-start font-medium">State</th>
-                <th className="px-2 py-2 text-end font-medium">Lines</th>
+                <th className="px-2 py-2 text-end font-medium">Reservations</th>
               </tr>
             </thead>
             <tbody>
-              {grid.rows.map((r) => (
+              {grid.missing.map((m) => (
+                <tr key={`${m.keyKind}|${m.keyId}`} className="border-b border-border last:border-0">
+                  <td className="px-2 py-2 font-mono text-xs"><bdi data-i18n-skip="true">{m.code}</bdi></td>
+                  <td className="px-2 py-2"><bdi data-i18n-skip="true">{m.title}</bdi></td>
+                  <td className="px-2 py-2 text-xs text-muted-foreground"><bdi data-i18n-skip="true">{m.subjectName}</bdi></td>
+                  <td className="px-2 py-2 text-end">
+                    {canEdit ? (
+                      <input aria-label={`Amount for ${m.code}`} className={`${INPUT_CLASS} ms-auto h-8 w-28 text-end`} type="number" min={0} value={edits[`new|${m.keyKind}|${m.keyId}`] ?? ''} placeholder="—"
+                        onChange={(e) => setEdits({ ...edits, [`new|${m.keyKind}|${m.keyId}`]: e.target.value })} />
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-2 py-2"><Badge tone="warning">No fee</Badge></td>
+                  <td className="px-2 py-2 text-end">—</td>
+                </tr>
+              ))}
+              {shownRows.map((r) => (
                 <tr key={r.id} className="border-b border-border last:border-0">
                   <td className="px-2 py-2 font-mono text-xs"><bdi data-i18n-skip="true">{r.code}</bdi></td>
                   <td className="px-2 py-2"><bdi data-i18n-skip="true">{r.title}</bdi></td>
@@ -158,27 +182,20 @@ function SeriesGrid({ session, series, canEdit }: { session: SessionDetail; seri
                   <td className="px-2 py-2 text-end tabular-nums">{r.lines}{(r.toReprice > 0 || r.toList > 0) && <> <Badge tone="warning">to re-price</Badge></>}</td>
                 </tr>
               ))}
-              {grid.missing.map((m) => (
-                <tr key={`${m.keyKind}|${m.keyId}`} className="border-b border-border last:border-0">
-                  <td className="px-2 py-2 font-mono text-xs"><bdi data-i18n-skip="true">{m.code}</bdi></td>
-                  <td className="px-2 py-2"><bdi data-i18n-skip="true">{m.title}</bdi></td>
-                  <td className="px-2 py-2 text-xs text-muted-foreground"><bdi data-i18n-skip="true">{m.subjectName}</bdi></td>
-                  <td className="px-2 py-2 text-end">
-                    {canEdit ? (
-                      <input aria-label={`Amount for ${m.code}`} className={`${INPUT_CLASS} ms-auto h-8 w-28 text-end`} type="number" min={0} value={edits[`new|${m.keyKind}|${m.keyId}`] ?? ''} placeholder="—"
-                        onChange={(e) => setEdits({ ...edits, [`new|${m.keyKind}|${m.keyId}`]: e.target.value })} />
-                    ) : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-2 py-2"><Badge tone="warning">No fee</Badge></td>
-                  <td className="px-2 py-2 text-end">—</td>
-                </tr>
-              ))}
               {grid.rows.length === 0 && grid.missing.length === 0 && (
                 <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No subject on this sheet reads a fee from this sitting yet.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+        {unusedRows.length > 0 && (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span><span>{unusedRows.length}</span> <span>{unusedRows.length === 1 ? 'more fee on the board’s list, not read by any subject on this sheet' : 'more fees on the board’s list, not read by any subject on this sheet'}</span></span>
+            <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" aria-expanded={showUnused} onClick={() => setShowUnused((v) => !v)}>
+              {showUnused ? 'Hide them' : 'Show them'}
+            </button>
+          </p>
+        )}
         {canEdit && (changedNew.length > 0 || changedProvisional.length > 0) && (
           <div className="flex flex-wrap items-center justify-end gap-3">
             <label className="flex items-center gap-2 text-sm">

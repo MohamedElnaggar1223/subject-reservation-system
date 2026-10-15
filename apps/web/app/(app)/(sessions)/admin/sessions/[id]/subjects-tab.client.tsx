@@ -265,13 +265,15 @@ function FormPhrases({ o, shares }: { o: OfferRow; shares: Shares }) {
   }
   for (const u of s.units.filter((i) => i.availability !== 'closed')) {
     const code = u.units[0]?.shortCode ?? u.units[0]?.code ?? itemDisplayLabel(u);
-    const teachers = u.teachers.length ? u.teachers : o.teachers;
+    // A unit taught by the subject's own teachers says nothing more (they are in the Teachers column):
+    // "P1 (Teacher A) · P2 (Teacher A) · … · S1 (Teacher A)" read the same name six times (F6).
+    const teachers = u.teachers;
     parts.push(
       <span key={u.id}>
-        <bdi data-i18n-skip="true">{code}</bdi>{' '}
+        <bdi data-i18n-skip="true">{code}</bdi>
         {u.availability === 'self_study_only' || o.availability === 'self_study_only'
-          ? <span className="text-muted-foreground">(self study only)</span>
-          : <span className="text-muted-foreground">(<bdi data-i18n-skip="true">{teachers.map((t) => t.name).join(' / ')}</bdi>{teachers.some((t) => t.mode === 'online') && <>, <span>online</span></>})</span>}
+          ? <> <span className="text-muted-foreground">(self study only)</span></>
+          : teachers.length > 0 && <> <span className="text-muted-foreground">(<bdi data-i18n-skip="true">{teachers.map((t) => t.name).join(' / ')}</bdi>{teachers.some((t) => t.mode === 'online') && <>, <span>online</span></>})</span></>}
       </span>,
     );
   }
@@ -385,6 +387,42 @@ type FormState = {
 const asMode = (m: string): Mode => (m === 'online' ? 'online' : 'in_school');
 const feeText = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n));
 
+/**
+ * What was typed on the subject's form since it was made (every field but its teachers, which a Replace
+ * a teacher changes; per paper or unit its offer, fee and sitting, not its teachers), to carry into the
+ * form made again after a replacement.
+ */
+type Carry = Partial<Omit<FormState, 'teachers' | 'teams' | 'items'>> & { items?: Record<string, Partial<Omit<ItemState, 'teachers'>>> };
+
+function typedSince(base: FormState, now: FormState): Carry {
+  const out: Carry = {};
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  for (const k of ['availability', 'courseFee', 'zeroReason', 'papers', 'grade10Core', 'courseStartsOn', 'notes', 'linesStand', 'reason'] as const) {
+    if (!same(base[k], now[k])) (out as Record<string, unknown>)[k] = now[k];
+  }
+  for (const [id, item] of Object.entries(now.items)) {
+    const was = base.items[id];
+    if (!was) continue;
+    const changed: Partial<Omit<ItemState, 'teachers'>> = {};
+    if (item.availability !== was.availability) changed.availability = item.availability;
+    if (item.courseFee !== was.courseFee) changed.courseFee = item.courseFee;
+    if (item.seriesMonth !== was.seriesMonth) changed.seriesMonth = item.seriesMonth;
+    if (Object.keys(changed).length) (out.items ??= {})[id] = changed;
+  }
+  return out;
+}
+
+function withCarry(fresh: FormState, carry: Carry | null): FormState {
+  if (!carry) return fresh;
+  const { items, ...top } = carry;
+  const merged: FormState = { ...fresh, ...top };
+  if (items) {
+    merged.items = { ...fresh.items };
+    for (const [id, patch] of Object.entries(items)) if (merged.items[id]) merged.items[id] = { ...merged.items[id]!, ...patch };
+  }
+  return merged;
+}
+
 function stateOf(o: OfferRow): FormState {
   return {
     teachers: o.teachers.map((t) => ({ teacherId: t.teacherId, mode: asMode(t.mode) })),
@@ -421,6 +459,8 @@ function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onP
 }) {
   const [version, setVersion] = useState(0);
   const [saved, setSaved] = useState<string | null>(null);
+  // What was typed on the form before a Replace a teacher, carried into the form made again after it.
+  const [carry, setCarry] = useState<Carry | null>(null);
   const offer = 'offerId' in target ? data.offers.find((o) => o.id === target.offerId) ?? null : null;
   const addable = 'addable' in target ? target.addable : null;
   if ('offerId' in target && !offer) return null;
@@ -432,26 +472,32 @@ function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onP
     <Drawer title={title} subtitle={subtitle} onClose={onClose}>
       {saved && <Notice tone="success">{saved}</Notice>}
       <SubjectForm key={`${offer?.id ?? addable!.id}:${version}`} session={session} shares={data.shares} offer={offer} addable={addable} canEdit={canEdit}
+        carry={carry}
         onSaved={(message, createdId) => {
           setSaved(message);
+          setCarry(null);
           setVersion((v) => v + 1);
           if (createdId) onCreated(createdId);
         }}
         // A teacher replaced: the form is made again from the offer as it is now (the review of d3f62cf,
-        // item 2) — kept, its old ticks would send the teacher who left back with the next Save.
-        onReplaced={() => setVersion((v) => v + 1)}
+        // item 2) — kept, its old ticks would send the teacher who left back with the next Save. What
+        // else was typed on it comes across (F6, the follow-ups' queued note): only the teachers are read again.
+        onReplaced={(edits) => { setCarry(edits); setVersion((v) => v + 1); }}
         onPreview={onPreview} onRemoved={onClose} />
     </Drawer>
   );
 }
 
-function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onReplaced, onPreview, onRemoved }: {
-  session: SessionDetail; shares: Shares; offer: OfferRow | null; addable: AddableRow | null; canEdit: boolean;
-  onSaved: (message: string, createdId?: string) => void; onReplaced: () => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
+function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved, onReplaced, onPreview, onRemoved }: {
+  session: SessionDetail; shares: Shares; offer: OfferRow | null; addable: AddableRow | null; canEdit: boolean; carry: Carry | null;
+  onSaved: (message: string, createdId?: string) => void; onReplaced: (edits: Carry) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: catalogue } = useCatalogue();
-  const [f, setF] = useState<FormState>(() => (offer ? stateOf(offer) : newState(addable!)));
+  // The form as the offer is now (and what was typed before a Replace, carried over), and that base,
+  // so a later Replace knows what was typed.
+  const [base] = useState<FormState | null>(() => (offer ? stateOf(offer) : null));
+  const [f, setF] = useState<FormState>(() => (offer ? withCarry(stateOf(offer), carry) : newState(addable!)));
   const [team, setTeam] = useState('');
   const [replacing, setReplacing] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -613,7 +659,8 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onRepl
           {s.papers.length === 0 && offer.papersToAdd.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               <span>The Catalogue gives this subject no papers yet.</span>{' '}
-              <Link href="/exams/catalogue" className="text-primary underline">Set this subject&apos;s papers on the Catalogue</Link>
+              {/* Straight to the tab where a qualification's papers are set (F6: one click fewer). */}
+              <Link href="/exams/catalogue?tab=qualifications" className="text-primary underline">Set this subject&apos;s papers on the Catalogue</Link>
             </p>
           ) : (
             <div className="space-y-2">
@@ -771,7 +818,7 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onRepl
           <Button type="submit" disabled={invalid || save.isPending}>{save.isPending ? 'Saving…' : offer ? 'Save' : 'Add subject'}</Button>
         </div>
       )}
-      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} onReplaced={onReplaced} />}
+      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} onReplaced={() => onReplaced(base ? typedSince(base, f) : {})} />}
       {removing && offer && (
         <Modal title="Remove this subject" onClose={() => setRemoving(false)}>
           <div className="space-y-4">
@@ -833,6 +880,7 @@ function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: Sess
     <Modal title="Replace a teacher" onClose={close}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{"Every reservation, paper and this year's class of the teacher who leaves moves to the other, audited."}</p>
+        <p className="text-sm text-muted-foreground">Anything else you changed on the subject’s form stays; its teachers are read again after the replacement.</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
         {classSaid ? (
           <>

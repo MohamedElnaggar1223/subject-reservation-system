@@ -1,0 +1,936 @@
+{
+ "s01-home-admin:en": {
+  "id": "s01-home-admin",
+  "role": "admin",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1997,
+  "apiRequests": 9,
+  "api": [
+   "GET /v1/sessions",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/to-verify",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/offers",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/to-verify",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/offers",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/to-verify",
+   "GET /v1/sessions/sess_november-2026/to-verify"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s01-home-admin/after-en.jpg",
+  "bytes": 104610
+ },
+ "s05-sessions:en": {
+  "id": "s05-sessions",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions",
+  "finalUrl": "/admin/sessions",
+  "status": 200,
+  "settledMs": 2315,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s05-sessions/after-en.jpg",
+  "bytes": 91807
+ },
+ "s06-session-subjects:en": {
+  "id": "s06-session-subjects",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "status": 200,
+  "settledMs": 2627,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s06-session-subjects/after-en.jpg",
+  "bytes": 131673
+ },
+ "s07-session-fees:en": {
+  "id": "s07-session-fees",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
+  "status": 200,
+  "settledMs": 2007,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/board-fees"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s07-session-fees/after-en.jpg",
+  "bytes": 123223
+ },
+ "s08-session-money:en": {
+  "id": "s08-session-money",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "status": 200,
+  "settledMs": 2018,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/charges"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s08-session-money/after-en.jpg",
+  "bytes": 143667
+ },
+ "s09-session-grade10:en": {
+  "id": "s09-session-grade10",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
+  "status": 200,
+  "settledMs": 2000,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s09-session-grade10/after-en.jpg",
+  "bytes": 52456
+ },
+ "s10-session-verify:en": {
+  "id": "s10-session-verify",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
+  "status": 200,
+  "settledMs": 1962,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/to-verify"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s10-session-verify/after-en.jpg",
+  "bytes": 65257
+ },
+ "s12-session-draft:en": {
+  "id": "s12-session-draft",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
+  "finalUrl": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
+  "status": 200,
+  "settledMs": 1972,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/offers",
+   "GET /v1/sessions"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s12-session-draft/after-en.jpg",
+  "bytes": 48089
+ },
+ "s13-catalogue:en": {
+  "id": "s13-catalogue",
+  "role": "admin",
+  "lang": "en",
+  "path": "/exams/catalogue",
+  "finalUrl": "/exams/catalogue",
+  "status": 200,
+  "settledMs": 2206,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s13-catalogue/after-en.jpg",
+  "bytes": 174951
+ },
+ "s14-subjects:en": {
+  "id": "s14-subjects",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/subjects",
+  "finalUrl": "/admin/subjects",
+  "status": 200,
+  "settledMs": 2139,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s14-subjects/after-en.jpg",
+  "bytes": 155258
+ },
+ "s15-series:en": {
+  "id": "s15-series",
+  "role": "admin",
+  "lang": "en",
+  "path": "/exams/series",
+  "finalUrl": "/exams/series",
+  "status": 200,
+  "settledMs": 2126,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/board-series/inferred",
+   "GET /v1/catalogue",
+   "GET /v1/board-series",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s15-series/after-en.jpg",
+  "bytes": 70854
+ },
+ "s16-services:en": {
+  "id": "s16-services",
+  "role": "admin",
+  "lang": "en",
+  "path": "/exams/services",
+  "finalUrl": "/exams/services",
+  "status": 200,
+  "settledMs": 2132,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/board-services",
+   "GET /v1/board-series",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s16-services/after-en.jpg",
+  "bytes": 74272
+ },
+ "s17-school-fees:en": {
+  "id": "s17-school-fees",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/school-fees",
+  "finalUrl": "/admin/school-fees",
+  "status": 200,
+  "settledMs": 2151,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/receipts/refund-windows",
+   "GET /v1/sessions",
+   "GET /v1/school-fees/schedules",
+   "GET /v1/academic/sections",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s17-school-fees/after-en.jpg",
+  "bytes": 72745
+ },
+ "s18-settings:en": {
+  "id": "s18-settings",
+  "role": "admin",
+  "lang": "en",
+  "path": "/settings",
+  "finalUrl": "/settings",
+  "status": 200,
+  "settledMs": 2088,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/settings",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s18-settings/after-en.jpg",
+  "bytes": 230565
+ },
+ "s19-imports:en": {
+  "id": "s19-imports",
+  "role": "admin",
+  "lang": "en",
+  "path": "/imports",
+  "finalUrl": "/imports",
+  "status": 200,
+  "settledMs": 2107,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/imports",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s19-imports/after-en.jpg",
+  "bytes": 64242
+ },
+ "s20-team:en": {
+  "id": "s20-team",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/team",
+  "finalUrl": "/admin/team",
+  "status": 200,
+  "settledMs": 2075,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/users",
+   "GET /v1/teachers",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s20-team/after-en.jpg",
+  "bytes": 70357
+ },
+ "s02-home-coordinator:en": {
+  "id": "s02-home-coordinator",
+  "role": "coordinator",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1975,
+  "apiRequests": 9,
+  "api": [
+   "GET /v1/sessions",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/to-verify",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/offers",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/to-verify",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/offers",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/to-verify",
+   "GET /v1/sessions/sess_november-2026/to-verify"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s02-home-coordinator/after-en.jpg",
+  "bytes": 101045
+ },
+ "s11-session-coordinator:en": {
+  "id": "s11-session-coordinator",
+  "role": "coordinator",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "status": 200,
+  "settledMs": 1987,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s11-session-coordinator/after-en.jpg",
+  "bytes": 125845
+ },
+ "s03-home-teacher:en": {
+  "id": "s03-home-teacher",
+  "role": "teacher",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1900,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s03-home-teacher/after-en.jpg",
+  "bytes": 37767
+ },
+ "s04-home-gate:en": {
+  "id": "s04-home-gate",
+  "role": "gate",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1901,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s04-home-gate/after-en.jpg",
+  "bytes": 37012
+ },
+ "s01-home-admin:ar": {
+  "id": "s01-home-admin",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1992,
+  "apiRequests": 9,
+  "api": [
+   "GET /v1/sessions",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/to-verify",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/offers",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/to-verify",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/offers",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/to-verify",
+   "GET /v1/sessions/sess_november-2026/to-verify"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s01-home-admin/after-ar.jpg",
+  "bytes": 85050
+ },
+ "s05-sessions:ar": {
+  "id": "s05-sessions",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions",
+  "finalUrl": "/admin/sessions",
+  "status": 200,
+  "settledMs": 1973,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s05-sessions/after-ar.jpg",
+  "bytes": 78001
+ },
+ "s06-session-subjects:ar": {
+  "id": "s06-session-subjects",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "status": 200,
+  "settledMs": 1988,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s06-session-subjects/after-ar.jpg",
+  "bytes": 108353
+ },
+ "s07-session-fees:ar": {
+  "id": "s07-session-fees",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#fees",
+  "status": 200,
+  "settledMs": 1992,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/board-fees"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s07-session-fees/after-ar.jpg",
+  "bytes": 109779
+ },
+ "s08-session-money:ar": {
+  "id": "s08-session-money",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "status": 200,
+  "settledMs": 2016,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/charges"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s08-session-money/after-ar.jpg",
+  "bytes": 124717
+ },
+ "s09-session-grade10:ar": {
+  "id": "s09-session-grade10",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#grade10",
+  "status": 200,
+  "settledMs": 2007,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s09-session-grade10/after-ar.jpg",
+  "bytes": 48652
+ },
+ "s10-session-verify:ar": {
+  "id": "s10-session-verify",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#verify",
+  "status": 200,
+  "settledMs": 1965,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/to-verify"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s10-session-verify/after-ar.jpg",
+  "bytes": 54807
+ },
+ "s12-session-draft:ar": {
+  "id": "s12-session-draft",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
+  "finalUrl": "/admin/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375#subjects",
+  "status": 200,
+  "settledMs": 2001,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/offers",
+   "GET /v1/sessions"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s12-session-draft/after-ar.jpg",
+  "bytes": 40645
+ },
+ "s13-catalogue:ar": {
+  "id": "s13-catalogue",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/exams/catalogue",
+  "finalUrl": "/exams/catalogue",
+  "status": 200,
+  "settledMs": 1996,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s13-catalogue/after-ar.jpg",
+  "bytes": 156664
+ },
+ "s14-subjects:ar": {
+  "id": "s14-subjects",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/subjects",
+  "finalUrl": "/admin/subjects",
+  "status": 200,
+  "settledMs": 1942,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s14-subjects/after-ar.jpg",
+  "bytes": 145481
+ },
+ "s15-series:ar": {
+  "id": "s15-series",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/exams/series",
+  "finalUrl": "/exams/series",
+  "status": 200,
+  "settledMs": 1929,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/board-series/inferred",
+   "GET /v1/catalogue",
+   "GET /v1/board-series",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s15-series/after-ar.jpg",
+  "bytes": 61490
+ },
+ "s16-services:ar": {
+  "id": "s16-services",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/exams/services",
+  "finalUrl": "/exams/services",
+  "status": 200,
+  "settledMs": 1969,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/board-services",
+   "GET /v1/board-series",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s16-services/after-ar.jpg",
+  "bytes": 61137
+ },
+ "s17-school-fees:ar": {
+  "id": "s17-school-fees",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/school-fees",
+  "finalUrl": "/admin/school-fees",
+  "status": 200,
+  "settledMs": 1941,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/receipts/refund-windows",
+   "GET /v1/sessions",
+   "GET /v1/school-fees/schedules",
+   "GET /v1/academic/sections",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s17-school-fees/after-ar.jpg",
+  "bytes": 61112
+ },
+ "s18-settings:ar": {
+  "id": "s18-settings",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/settings",
+  "finalUrl": "/settings",
+  "status": 200,
+  "settledMs": 1921,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/settings",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s18-settings/after-ar.jpg",
+  "bytes": 282496
+ },
+ "s19-imports:ar": {
+  "id": "s19-imports",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/imports",
+  "finalUrl": "/imports",
+  "status": 200,
+  "settledMs": 1934,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/imports",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s19-imports/after-ar.jpg",
+  "bytes": 53472
+ },
+ "s20-team:ar": {
+  "id": "s20-team",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/team",
+  "finalUrl": "/admin/team",
+  "status": 200,
+  "settledMs": 1969,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/users",
+   "GET /v1/teachers",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s20-team/after-ar.jpg",
+  "bytes": 61076
+ },
+ "s02-home-coordinator:ar": {
+  "id": "s02-home-coordinator",
+  "role": "coordinator",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1980,
+  "apiRequests": 9,
+  "api": [
+   "GET /v1/sessions",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/to-verify",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/offers",
+   "GET /v1/sessions/8ed91356-dedc-4028-a36d-f0be8acc2375/to-verify",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/offers",
+   "GET /v1/sessions/553c0870-98d2-458a-bd64-1ae6cbffaf52/to-verify",
+   "GET /v1/sessions/sess_november-2026/to-verify"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s02-home-coordinator/after-ar.jpg",
+  "bytes": 81868
+ },
+ "s11-session-coordinator:ar": {
+  "id": "s11-session-coordinator",
+  "role": "coordinator",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#subjects",
+  "status": 200,
+  "settledMs": 2003,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s11-session-coordinator/after-ar.jpg",
+  "bytes": 105609
+ },
+ "s03-home-teacher:ar": {
+  "id": "s03-home-teacher",
+  "role": "teacher",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1901,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s03-home-teacher/after-ar.jpg",
+  "bytes": 32329
+ },
+ "s04-home-gate:ar": {
+  "id": "s04-home-gate",
+  "role": "gate",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1912,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s04-home-gate/after-ar.jpg",
+  "bytes": 31831
+ }
+}

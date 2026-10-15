@@ -172,8 +172,9 @@ export default function AuthLayout({
         <button
           type="button"
           onClick={toggleLanguage}
-          className="absolute right-4 top-4 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-          aria-label={t('language.switchTo')}
+          className="absolute end-4 top-4 min-h-9 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+          // The visible word is the button's name (WCAG 2.5.3): the other language, in its own language.
+          lang={language === 'en' ? 'ar' : 'en'}
           title={t('language.switchTo')}
           data-i18n-skip="true"
         >

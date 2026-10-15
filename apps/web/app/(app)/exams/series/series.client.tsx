@@ -53,6 +53,8 @@ export default function SeriesClient({ viewerRole }: { viewerRole: string }): Re
   const isAdmin = viewerRole === ROLES.ADMIN;
   const [year, setYear] = useState(academicYearStartOf());
   const { data: series, isLoading, isError, refetch } = useQuery({ queryKey: [...SERIES_KEY, year], queryFn: () => fetchBoardSeries(year) });
+  // The late-fee columns only when a series has one (F6: dates the school rarely fills took two columns).
+  const showLate = (series ?? []).some((x) => x.lateFeeFrom || x.highLateFeeFrom);
   const [openId, setOpenId] = useState<string | null>(null);
 
   const next = useMemo(() => (series ?? []).find((s) => s.entryDeadline && !s.entryDeadlinePassed), [series]);
@@ -106,25 +108,25 @@ export default function SeriesClient({ viewerRole }: { viewerRole: string }): Re
       ) : !series?.length ? (
         <EmptyState
           title="No board series this academic year yet"
-          message="Add each board's sittings above — IAL October, International GCSE November, IAL January, June — then give each window the series it feeds on the Sessions page."
+          message="A sitting appears here once a subject on a session's sheet is entered in it; add one here only to type a board's dates early."
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full min-w-[1080px] text-sm">
+          <table className={cn('w-full text-sm', showLate ? 'min-w-[1080px]' : 'min-w-[860px]')}>
             <thead className="border-b border-border bg-muted">
               <tr>
                 <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Series</th>
                 <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Entry deadline</th>
-                <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Late fee from</th>
-                <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">High late fee from</th>
-                <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Windows feeding it</th>
+                {showLate && <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Late fee from</th>}
+                {showLate && <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">High late fee from</th>}
+                <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Sessions</th>
                 <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Registrations</th>
                 <th scope="col" className="px-3 py-2 text-end font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {series.map((s) => (
-                <SeriesRow key={s.id} s={s} open={openId === s.id} onToggle={() => setOpenId(openId === s.id ? null : s.id)} isAdmin={isAdmin} />
+                <SeriesRow key={s.id} s={s} open={openId === s.id} onToggle={() => setOpenId(openId === s.id ? null : s.id)} isAdmin={isAdmin} showLate={showLate} />
               ))}
             </tbody>
           </table>
@@ -215,7 +217,7 @@ function AddSeriesRow({ year }: { year: number }) {
 
 // ─── One series ──────────────────────────────────────────────────────────────
 
-function SeriesRow({ s, open, onToggle, isAdmin }: { s: BoardSeriesRow; open: boolean; onToggle: () => void; isAdmin: boolean }) {
+function SeriesRow({ s, open, onToggle, isAdmin, showLate }: { s: BoardSeriesRow; open: boolean; onToggle: () => void; isAdmin: boolean; showLate: boolean }) {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const remove = useMutation({
@@ -239,11 +241,11 @@ function SeriesRow({ s, open, onToggle, isAdmin }: { s: BoardSeriesRow; open: bo
             )}
           </div>
         </td>
-        <td className="px-3 py-2.5 text-foreground"><MaybeDate date={s.lateFeeFrom} /></td>
-        <td className="px-3 py-2.5 text-foreground"><MaybeDate date={s.highLateFeeFrom} /></td>
+        {showLate && <td className="px-3 py-2.5 text-foreground"><MaybeDate date={s.lateFeeFrom} /></td>}
+        {showLate && <td className="px-3 py-2.5 text-foreground"><MaybeDate date={s.highLateFeeFrom} /></td>}
         <td className="px-3 py-2.5">
           {s.windows.length === 0 ? (
-            <span className="text-muted-foreground">No window yet</span>
+            <span className="text-muted-foreground">No session yet</span>
           ) : (
             <ul className="space-y-0.5">
               {s.windows.map((w) => (
@@ -261,7 +263,7 @@ function SeriesRow({ s, open, onToggle, isAdmin }: { s: BoardSeriesRow; open: bo
             <p className="text-xs text-amber-700 dark:text-amber-400"><span className="tabular-nums">{s.registrations.waiting}</span> <span>waiting</span></p>
           )}
           {s.openPayments > 0 && (
-            <p className="text-xs text-amber-700 dark:text-amber-400"><span className="tabular-nums">{s.openPayments}</span> <span>payments open</span></p>
+            <p className="text-xs text-amber-700 dark:text-amber-400"><span className="tabular-nums">{s.openPayments}</span> <span>{s.openPayments === 1 ? 'payment open' : 'payments open'}</span></p>
           )}
         </td>
         <td className="px-3 py-2.5 text-end">
@@ -274,11 +276,11 @@ function SeriesRow({ s, open, onToggle, isAdmin }: { s: BoardSeriesRow; open: bo
         </td>
       </tr>
       {error && (
-        <tr><td colSpan={7} className="px-3 pb-3"><Notice tone="danger">{error}</Notice></td></tr>
+        <tr><td colSpan={showLate ? 7 : 5} className="px-3 pb-3"><Notice tone="danger">{error}</Notice></td></tr>
       )}
       {open && (
         <tr className="bg-muted/30">
-          <td colSpan={7} className="px-3 py-4"><DatesForm s={s} isAdmin={isAdmin} onDone={onToggle} /></td>
+          <td colSpan={showLate ? 7 : 5} className="px-3 py-4"><DatesForm s={s} isAdmin={isAdmin} onDone={onToggle} /></td>
         </tr>
       )}
     </>
@@ -300,6 +302,7 @@ export function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: 
   const [notes, setNotes] = useState(s.notes ?? '');
   const [error, setError] = useState('');
   const deadlineChanged = deadline !== toLocalInput(s.entryDeadline);
+  const setCount = BOARD_SERIES_DATE_FIELDS.filter((f) => !!s[f]).length + (s.notes ? 1 : 0);
   const retakeChanged = retake !== toLocalInput(s.retakeDeadline);
 
   const save = useMutation({
@@ -359,9 +362,18 @@ export function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: 
         )}
       </fieldset>
 
-      <fieldset className="rounded-lg border border-border bg-card p-4">
-        <legend className="px-1 text-sm font-semibold text-foreground">The board&apos;s other dates (information)</legend>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* F6 (the lead's drive): the eleven dates and the notes the school almost never fills wait behind a
+          disclosure; it says how many are set, and opens by itself when one is. */}
+      <details className="group rounded-lg border border-border bg-card p-4" open={setCount > 0 || undefined}>
+        <summary className="cursor-pointer list-none text-sm font-semibold text-foreground marker:hidden">
+          <span className="me-1 inline-block transition-transform group-open:rotate-90 rtl:group-open:-rotate-90" aria-hidden>›</span>
+          <span>The board&apos;s other dates (information)</span>{' '}
+          <span className="font-normal text-muted-foreground">
+            (<span>{setCount > 0 ? <><span>{setCount}</span> <span>{setCount === 1 ? 'date set' : 'dates set'}</span></> : <span>none set</span>}</span>)
+          </span>
+          <span className="mt-1 block text-xs font-normal text-muted-foreground">Late fees, exams, results and certificates — the school rarely needs them; the entry deadline above is what stops reservations.</span>
+        </summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {BOARD_SERIES_DATE_FIELDS.map((f) => (
             <div key={f}>
               <Label htmlFor={`${f}-${s.id}`} className="mb-1 text-xs text-muted-foreground">{BOARD_SERIES_DATE_LABELS[f]}</Label>
@@ -373,7 +385,7 @@ export function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: 
           <Label htmlFor={`notes-${s.id}`} className="mb-1 text-xs text-muted-foreground">Notes</Label>
           <Input id={`notes-${s.id}`} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} placeholder="e.g. the fee doubles at the late date and trebles at the high-late date" />
         </div>
-      </fieldset>
+      </details>
 
       {error && <Notice tone="danger">{error}</Notice>}
       <div className="flex justify-end gap-2">

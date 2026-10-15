@@ -50,7 +50,7 @@ export default function ToVerifyTab({ session, viewerRole }: { session: SessionD
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Retakes and carried sittings declared by a family or at the desk. Verified, the line stands. Not confirmed: a line not yet paid ends and the family may reserve a first entry; a paid line stands as a first entry before the board&apos;s first-entry deadline, and is dropped with its refund after it.
+          Retakes and carried sittings declared by a family or at the desk. Verified: the reservation stands. Not confirmed: a reservation not yet paid ends and the family may reserve a first entry; a paid one stands as a first entry before the board’s first-entry deadline, and is dropped with its refund after it.
         </p>
         {!finance && show === 'awaiting' && data.lines.length > 0 && (
           <Button type="button" variant="outline" size="sm" disabled={check.isPending} onClick={() => check.mutate()}>
@@ -80,7 +80,7 @@ export default function ToVerifyTab({ session, viewerRole }: { session: SessionD
             <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 text-start font-medium">Student</th>
-                <th className="px-4 py-2 text-start font-medium">Line</th>
+                <th className="px-4 py-2 text-start font-medium">Reservation</th>
                 <th className="px-4 py-2 text-start font-medium">Declared sitting</th>
                 <th className="px-4 py-2 text-start font-medium">Declared by</th>
                 <th className="px-4 py-2 text-start font-medium">Paid</th>
@@ -162,15 +162,15 @@ function AnswerModal({ row, outcome, finance, sessionId, onClose }: { row: Row; 
   // The one outcome that applies to this line (§3.5), said before the answer is given.
   const refusedWhileOpen = outcome === 'rejected' && !row.paid && row.paymentOpen;
   const effect = outcome === 'verified'
-    ? 'The line stands as it is.'
+    ? 'The reservation stands as it is.'
     : refusedWhileOpen
       ? 'A payment for this line is in progress: a rejection is refused until the Finance Workbench confirms or rejects it.'
       : !row.paid
         ? 'Not paid: the line ends and the family is told it may reserve a first entry.'
         : row.status === 'preregistered'
-          ? 'Paid and held until the session opens: the line stands as a first entry; its capture or the deadline\'s refund settles it.'
+          ? 'Paid and held until the session opens: the reservation stands as a first entry; its capture or the deadline\'s refund settles it.'
           : !row.firstEntryDeadlinePassed
-            ? 'Paid, before the board\'s first-entry deadline: the line stands and is entered as a first entry; finance decides whether anything is owed.'
+            ? 'Paid, before the board\'s first-entry deadline: the reservation stands and is entered as a first entry; finance decides whether anything is owed.'
             : 'Paid, after the board\'s first-entry deadline: the line is dropped and refunded by the refund policy (the paper receipt comes back first).';
   return (
     <Modal title={outcome === 'verified' ? 'Verify the declared sitting' : 'The sitting is not confirmed'} onClose={onClose}>

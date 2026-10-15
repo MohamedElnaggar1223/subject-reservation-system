@@ -32,13 +32,14 @@ export function SessionCharges({ sessionId }: { sessionId: string }) {
         <p className="px-5 py-4 text-sm text-muted-foreground">No charge in this session yet.</p>
       ) : (
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="border-b border-border bg-muted">
+          {/* The header as the lines' table above has it (F6: one look on one tab). */}
+          <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-start font-semibold text-muted-foreground">Student</th>
-              <th className="px-4 py-2 text-start font-semibold text-muted-foreground">Charge</th>
-              <th className="px-4 py-2 text-end font-semibold text-muted-foreground">Amount</th>
-              <th className="px-4 py-2 text-start font-semibold text-muted-foreground">Due</th>
-              <th className="px-4 py-2 text-start font-semibold text-muted-foreground">Status</th>
+              <th className="px-4 py-2 text-start font-medium">Student</th>
+              <th className="px-4 py-2 text-start font-medium">Charge</th>
+              <th className="px-4 py-2 text-end font-medium">Amount</th>
+              <th className="px-4 py-2 text-start font-medium">Due</th>
+              <th className="px-4 py-2 text-start font-medium">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

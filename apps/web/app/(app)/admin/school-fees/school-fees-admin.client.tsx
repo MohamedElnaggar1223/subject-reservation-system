@@ -13,27 +13,15 @@ import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
+import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 
-type RefundWindowRow = {
-  id: string;
-  sessionId: string | null;
-  academicYear: string | null;
-  startsAt: string;
-  endsAt: string;
-  percentage: number;
-  label: string | null;
-};
+// The rows, typed by the API (CLAUDE.md: Hono RPC everywhere) — F6 replaced three hand-written row
+// types and their useQuery generics here.
+const fetchSchedules = () => apiResponse(api.v1['school-fees'].schedules.$get());
+const fetchRefundWindows = () => apiResponse(api.v1.receipts['refund-windows'].$get());
+const fetchSessionOptions = () => apiResponse(api.v1.sessions.$get({ query: {} }));
 
-type SessionOption = { id: string; name: string };
-
-type ScheduleRow = {
-  id: string;
-  academicYear: string;
-  grade: number | null;
-  amount: number;
-  opensAt: string;
-  dueAt: string | null;
-};
+const LABEL = 'mb-1 block text-xs font-medium text-foreground';
 
 const emptyForm = {
   academicYear: '',
@@ -48,9 +36,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
 
-  const { data: schedules = [], isLoading } = useQuery<ScheduleRow[]>({
+  const { data: schedules = [], isLoading } = useQuery({
     queryKey: ['school-fees', 'schedules'],
-    queryFn: async () => (await apiResponse(api.v1['school-fees'].schedules.$get())) as ScheduleRow[],
+    queryFn: fetchSchedules,
   });
 
   const createMutation = useMutation({
@@ -93,14 +81,14 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
   });
   const [rwError, setRwError] = useState('');
 
-  const { data: refundWindows = [] } = useQuery<RefundWindowRow[]>({
+  const { data: refundWindows = [] } = useQuery({
     queryKey: ['refund-windows'],
-    queryFn: async () => (await apiResponse(api.v1.receipts['refund-windows'].$get())) as RefundWindowRow[],
+    queryFn: fetchRefundWindows,
   });
 
-  const { data: allSessions = [] } = useQuery<SessionOption[]>({
+  const { data: allSessions = [] } = useQuery({
     queryKey: ['sessions', 'all-admin'],
-    queryFn: async () => (await apiResponse(api.v1.sessions.$get({ query: {} }))) as SessionOption[],
+    queryFn: fetchSessionOptions,
   });
 
   const createWindowMutation = useMutation({
@@ -166,8 +154,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
       <form onSubmit={handleSubmit} className="bg-card rounded-xl border border-border shadow-sm p-5 mb-6">
         <div className="grid gap-3 sm:grid-cols-5">
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Academic Year</label>
+            <label htmlFor="sf-year" className={LABEL}>Academic Year</label>
             <input
+              id="sf-year"
               type="text"
               value={form.academicYear}
               onChange={(e) => setForm({ ...form, academicYear: e.target.value })}
@@ -176,8 +165,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Grade</label>
+            <label htmlFor="sf-grade" className={LABEL}>Grade</label>
             <select
+              id="sf-grade"
               value={form.grade}
               onChange={(e) => setForm({ ...form, grade: e.target.value as typeof form.grade })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -189,8 +179,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Amount (EGP)</label>
+            <label htmlFor="sf-amount" className={LABEL}>Amount (EGP)</label>
             <input
+              id="sf-amount"
               type="number"
               min="0"
               step="0.01"
@@ -200,8 +191,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Opens</label>
+            <label htmlFor="sf-opens" className={LABEL}>Opens</label>
             <input
+              id="sf-opens"
               type="date"
               value={form.opensAt}
               onChange={(e) => setForm({ ...form, opensAt: e.target.value })}
@@ -209,8 +201,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Due (optional)</label>
+            <label htmlFor="sf-due" className={LABEL}>Due (optional)</label>
             <input
+              id="sf-due"
               type="date"
               value={form.dueAt}
               onChange={(e) => setForm({ ...form, dueAt: e.target.value })}
@@ -240,29 +233,26 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Academic Year</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Grade</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Amount</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Opens</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Due</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Academic Year</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Grade</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Amount</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Opens</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Due</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {schedules.map((row) => (
                 <tr key={row.id} className="hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">{row.academicYear}</td>
+                  <td className="px-4 py-3 font-medium text-foreground"><span dir="ltr">{row.academicYear}</span></td>
                   <td className="px-4 py-3 text-card-foreground">
                     {row.grade ? `Grade ${row.grade}` : 'All grades'}
                   </td>
-                  <td className="px-4 py-3 text-right text-foreground">{formatPrice(row.amount)}</td>
-                  <td className="px-4 py-3 text-card-foreground">
-                    {new Date(row.opensAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 text-card-foreground">
-                    {row.dueAt ? new Date(row.dueAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-end text-foreground"><span dir="ltr">{formatPrice(row.amount)}</span></td>
+                  {/* The school's dates ("1 Sep 2026"), as every other screen writes them — not the browser's "9/1/2026". */}
+                  <td className="px-4 py-3 text-card-foreground"><Day iso={String(row.opensAt)} /></td>
+                  <td className="px-4 py-3 text-card-foreground"><Day iso={row.dueAt ? String(row.dueAt) : null} /></td>
+                  <td className="px-4 py-3 text-end">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -285,13 +275,19 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
       )}
 
       {/* ── Refund Windows (V3 §6.12) ─────────────────────────────────── */}
-      <div className="mt-12 mb-6">
-        <h2 className="text-xl font-bold text-foreground font-display tracking-tight">Refund Windows</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Time-scaled drop refunds. While a scope has windows, gaps between them refund 0%; a
-          scope with no windows refunds 100%. Session windows override academic-year windows.
-        </p>
-      </div>
+      {/* F6: since the rework each session carries its own refund policy (refund.services reads these
+          windows for converted reservations only), so the windows wait behind a disclosure that says so
+          instead of reading as the school's refund rule ("drops refund 100% until configured"). */}
+      <details className="group mt-12">
+        <summary className="mb-6 cursor-pointer list-none marker:hidden">
+          <h2 className="text-xl font-bold text-foreground font-display tracking-tight">
+            <span className="me-1 inline-block text-muted-foreground transition-transform group-open:rotate-90 rtl:group-open:-rotate-90" aria-hidden>›</span>
+            Refund windows (reservations made before October 2026)
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Each session carries its own refund policy, shown on its header (for June: 100% to week 2 · 50% in week 3 · 0% from week 4). These windows apply only to reservations made before the reservations were reworked, in October 2026.
+          </p>
+        </summary>
 
       <form
         onSubmit={(e) => {
@@ -308,8 +304,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
       >
         <div className="grid gap-3 sm:grid-cols-6">
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Scope</label>
+            <label htmlFor="rw-scope" className={LABEL}>Scope</label>
             <select
+              id="rw-scope"
               value={rwForm.scope}
               onChange={(e) => setRwForm({ ...rwForm, scope: e.target.value as 'year' | 'session' })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
@@ -320,8 +317,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
           </div>
           {rwForm.scope === 'session' ? (
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">Session</label>
+              <label htmlFor="rw-session" className={LABEL}>Session</label>
               <select
+                id="rw-session"
                 value={rwForm.sessionId}
                 onChange={(e) => setRwForm({ ...rwForm, sessionId: e.target.value })}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
@@ -334,8 +332,9 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
             </div>
           ) : (
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">Academic Year</label>
+              <label htmlFor="rw-year" className={LABEL}>Academic Year</label>
               <input
+                id="rw-year"
                 type="text"
                 value={rwForm.academicYear}
                 onChange={(e) => setRwForm({ ...rwForm, academicYear: e.target.value })}
@@ -345,23 +344,23 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
             </div>
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">From</label>
-            <input type="date" value={rwForm.startsAt} onChange={(e) => setRwForm({ ...rwForm, startsAt: e.target.value })}
+            <label htmlFor="rw-from" className={LABEL}>From</label>
+            <input id="rw-from" type="date" value={rwForm.startsAt} onChange={(e) => setRwForm({ ...rwForm, startsAt: e.target.value })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">To</label>
-            <input type="date" value={rwForm.endsAt} onChange={(e) => setRwForm({ ...rwForm, endsAt: e.target.value })}
+            <label htmlFor="rw-to" className={LABEL}>To</label>
+            <input id="rw-to" type="date" value={rwForm.endsAt} onChange={(e) => setRwForm({ ...rwForm, endsAt: e.target.value })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Refund %</label>
-            <input type="number" min="0" max="100" value={rwForm.percentage} onChange={(e) => setRwForm({ ...rwForm, percentage: e.target.value })}
+            <label htmlFor="rw-pct" className={LABEL}>Refund %</label>
+            <input id="rw-pct" type="number" min="0" max="100" value={rwForm.percentage} onChange={(e) => setRwForm({ ...rwForm, percentage: e.target.value })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-foreground">Label</label>
-            <input type="text" value={rwForm.label} onChange={(e) => setRwForm({ ...rwForm, label: e.target.value })}
+            <label htmlFor="rw-label" className={LABEL}>Label</label>
+            <input id="rw-label" type="text" value={rwForm.label} onChange={(e) => setRwForm({ ...rwForm, label: e.target.value })}
               placeholder="Before entry deadline" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
           </div>
         </div>
@@ -375,19 +374,19 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
 
       {refundWindows.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center shadow-sm">
-          <p className="text-muted-foreground text-sm">No refund windows — drops refund 100% until configured.</p>
+          <p className="text-muted-foreground text-sm">No refund windows: the sessions’ own refund policies apply.</p>
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Scope</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Label</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">From</th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">To</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Refund</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Scope</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Label</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">From</th>
+                <th className="px-4 py-3 text-start font-semibold text-muted-foreground">To</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Refund</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -397,10 +396,10 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
                     {w.sessionId ? sessionName(w.sessionId) : w.academicYear}
                   </td>
                   <td className="px-4 py-3 text-card-foreground">{w.label ?? '—'}</td>
-                  <td className="px-4 py-3 text-card-foreground">{new Date(w.startsAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-card-foreground">{new Date(w.endsAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">{w.percentage}%</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-card-foreground"><Day iso={String(w.startsAt)} /></td>
+                  <td className="px-4 py-3 text-card-foreground"><Day iso={String(w.endsAt)} /></td>
+                  <td className="px-4 py-3 text-end font-medium text-foreground">{w.percentage}%</td>
+                  <td className="px-4 py-3 text-end">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -417,6 +416,7 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
           </table>
         </div>
       )}
+      </details>
     </div>
   );
 }
