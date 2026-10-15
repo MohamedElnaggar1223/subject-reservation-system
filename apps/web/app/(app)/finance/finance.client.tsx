@@ -28,6 +28,8 @@ import {
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
+import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { InstantText } from '~/app/(app)/exams/exams-shared';
 
 const fetchPendingManual = () => apiResponse(api.v1.payments['pending-manual'].$get());
 type PendingPayment = Awaited<ReturnType<typeof fetchPendingManual>>[number];
@@ -346,14 +348,15 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Parent: {pay.parent.name} · {new Date(pay.createdAt).toLocaleString()}
+                      {/* The school's dates and money as every screen writes them (F6): not "10/15/2026, 7:41:55 AM", not "8800.00 EGP". */}
+                      <span>Parent:</span> <bdi>{pay.parent.name}</bdi> · <InstantText iso={String(pay.createdAt)} />
                     </p>
                     <p className="text-xs mt-1">
                       {pay.paymentMethod === 'instapay' ? (
                         pay.verificationReference ? (
                           <span className="font-mono font-semibold text-primary">Ref: {pay.verificationReference}</span>
                         ) : (
-                          <span className="text-amber-600 dark:text-amber-400">Parent has not submitted a transfer reference yet</span>
+                          <span className="text-amber-700 dark:text-amber-400">Parent has not submitted a transfer reference yet</span>
                         )
                       ) : (
                         <span className="font-mono text-muted-foreground">{pay.externalReference ?? ''}</span>
@@ -368,8 +371,8 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                     </p>
                     {/* MO-10: what is due once the window has closed */}
                     {pay.status === 'pending' && pay.referenceDueAt && (
-                      <p className="text-xs mt-1 text-amber-600 dark:text-amber-400">
-                        Window closed — the family has until {new Date(pay.referenceDueAt).toLocaleString()} to submit the reference; then it lapses on its own.
+                      <p className="text-xs mt-1 text-amber-700 dark:text-amber-400">
+                        <span>Window closed — the family has until</span> <InstantText iso={String(pay.referenceDueAt)} /> <span>to submit the reference; then it lapses on its own.</span>
                       </p>
                     )}
                     {(() => {
@@ -379,18 +382,18 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                         .map((pr) => pr.registration.boardSeries!.entryDeadline!)
                         .sort();
                       return deadlines[0] ? (
-                        <p className="text-xs mt-1 text-amber-600 dark:text-amber-400">
-                          Confirm or reject before the board deadline, {new Date(deadlines[0]).toLocaleDateString()} — after it this payment is closed automatically.
+                        <p className="text-xs mt-1 text-amber-700 dark:text-amber-400">
+                          <span>Confirm or reject before the board deadline,</span> <Day iso={String(deadlines[0])} /> <span>— after it this payment is closed automatically.</span>
                         </p>
                       ) : null;
                     })()}
                   </div>
-                  <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                  <div className="text-end shrink-0 flex flex-col items-end gap-2">
                     <div>
-                      <p className="text-lg font-bold text-foreground">{totalAmount.toFixed(2)} EGP</p>
+                      <p className="text-lg font-bold text-foreground"><Money amount={totalAmount} /></p>
                       {pay.escrowAmountApplied > 0 && (
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                          Incl. {pay.escrowAmountApplied.toFixed(2)} escrow
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                          <span>Incl.</span> <Money amount={pay.escrowAmountApplied} /> <span>escrow</span>
                         </p>
                       )}
                     </div>
@@ -460,8 +463,8 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                   {receiptOwner(r).student.name} · {receiptOwner(r).what}{receiptOwner(r).where ? <> · {receiptOwner(r).where}</> : null}
                 </p>
                 {r.status === 'return_required' && r.refundAmountOnReturn != null && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                    Releases {r.refundAmountOnReturn.toFixed(2)} EGP to escrow on return
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
+                    <span>Releases</span> <Money amount={r.refundAmountOnReturn} /> <span>to escrow on return</span>
                   </p>
                 )}
               </div>
@@ -532,12 +535,12 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Parent: {w.parent?.name ?? '—'} · Requested {new Date(w.createdAt).toLocaleDateString()}
+                    <span>Parent:</span> <bdi>{w.parent?.name ?? '—'}</bdi> · <span>Requested on</span> <Day iso={String(w.createdAt)} />
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Requested {w.requestedAmount.toFixed(2)} EGP
-                    {released > 0 && ` · Released ${released.toFixed(2)} EGP`}
-                    {w.status !== 'rejected' && ` · Remaining ${remaining.toFixed(2)} EGP`}
+                    <span>Requested</span> <Money amount={w.requestedAmount} />
+                    {released > 0 && <> · <span>Released</span> <Money amount={released} /></>}
+                    {w.status !== 'rejected' && <> · <span>Remaining</span> <Money amount={remaining} /></>}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -571,7 +574,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                     isFinanceAdmin ? (
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white"
                         disabled={approveWithdrawalMutation.isPending}
                         onClick={() => approveWithdrawalMutation.mutate(w.id)}
                       >
@@ -687,7 +690,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
                 disabled={
                   confirmMutation.isPending ||
                   (confirmTarget.paymentMethod === 'in_school' && !instrument)
@@ -746,7 +749,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
                 disabled={fulfillMutation.isPending || !(parseFloat(amountInput) > 0)}
                 onClick={() =>
                   fulfillMutation.mutate({

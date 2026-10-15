@@ -43,6 +43,35 @@ export const uiAuditArabic: Record<string, string> = {
   'reservation': 'حجز',
   'reservations': 'حجوزات',
 
+  // ── Payments (bank transfers) ──
+  'InstaPay transfer waits for its confirmation on the Finance Workbench.': 'تحويل إنستاباي ينتظر تأكيده في مكتب المالية.',
+  'InstaPay transfers wait for their confirmation on the Finance Workbench.': 'تحويلات إنستاباي تنتظر تأكيدها في مكتب المالية.',
+  'Open the Finance Workbench': 'افتح مكتب المالية',
+  'No bank transfer is waiting': 'لا تحويل بنكي في الانتظار',
+  'Transfers families make by InstaPay are confirmed on the Finance Workbench.': 'تُؤكَّد تحويلات الأسر عبر إنستاباي في مكتب المالية.',
+
+  // ── Exceptions ──
+  'Paper, unit or component': 'الورقة أو الوحدة أو المكوّن',
+  'One reservation': 'حجز واحد',
+  'One rule lifted for one student or one family — a price, a refund, a deadline, a gate, a payment plan. Each takes effect where its rule applies; everything is audited.':
+    'قاعدة تُرفع لطالب واحد أو لأسرة واحدة — سعر أو استرداد أو موعد أو شرط أو خطة سداد. تسري حيث تنطبق قاعدتها، وكل شيء مُسجَّل في سجل التدقيق.',
+
+  // ── The Finance Workbench (its sentences split around the date and the amount) ──
+  'Window closed — the family has until': 'أُغلقت النافذة — أمام الأسرة حتى',
+  'to submit the reference; then it lapses on its own.': 'لتقديم المرجع؛ وبعدها يسقط من تلقاء نفسه.',
+  'Confirm or reject before the board deadline,': 'أكّد أو ارفض قبل موعد المجلس،',
+  '— after it this payment is closed automatically.': '— وبعده تُغلق هذه الدفعة تلقائيًا.',
+  'Releases': 'يُفرج عن',
+  'to escrow on return': 'إلى الرصيد عند الإعادة',
+  'Requested on': 'طُلب في',
+
+  'Day': 'اليوم',
+
+  // ── Escrow (withdrawals) ──
+  'Approved: the cash handed over is signed for.': 'تم الاعتماد: صُرف المبلغ وتم التوقيع عليه.',
+  'The cash is handed over; a second person approves it (not the one who released it).': 'سُلّم المبلغ نقدًا؛ ويعتمده شخص ثانٍ (غير الذي صرفه).',
+
+
   // ── Students ──
   'Graduation worked out from the old records (not confirmed)': 'تخرّج مستنتج من السجلات القديمة (غير مؤكد)',
 

@@ -19,10 +19,13 @@ import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, gradeLabel } from '@repo/validations';
+import Link from 'next/link';
 import { Button } from '~/components/ui/button';
 
 const fetchPendingPayments = () => apiResponse(api.v1.payments['pending-bank'].$get());
 type PendingPayment = Awaited<ReturnType<typeof fetchPendingPayments>>[number];
+// What the Finance Workbench confirms: the families' InstaPay transfers and pay-at-school checkouts.
+const fetchWorkbenchPayments = () => apiResponse(api.v1.payments['pending-manual'].$get());
 
 export default function AdminPaymentsClient() {
   const queryClient = useQueryClient();
@@ -38,6 +41,10 @@ export default function AdminPaymentsClient() {
     queryFn: fetchPendingPayments,
     refetchInterval: 30_000,
   });
+  // F6: this screen lists the old bank transfers only; a family's InstaPay transfer is confirmed on the
+  // Finance Workbench. "All transfers have been confirmed" while one waited there was untrue.
+  const { data: workbench = [] } = useQuery({ queryKey: ['payments', 'pending-manual'], queryFn: fetchWorkbenchPayments, refetchInterval: 30_000 });
+  const instapayWaiting = workbench.filter((p) => p.paymentMethod === 'instapay').length;
 
   const confirmMutation = useMutation({
     mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
@@ -102,15 +109,16 @@ export default function AdminPaymentsClient() {
         </div>
       )}
 
+      {instapayWaiting > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+          <span><span>{instapayWaiting}</span> <span>{instapayWaiting === 1 ? 'InstaPay transfer waits for its confirmation on the Finance Workbench.' : 'InstaPay transfers wait for their confirmation on the Finance Workbench.'}</span></span>
+          <Button asChild size="sm"><Link href="/finance">Open the Finance Workbench</Link></Button>
+        </div>
+      )}
       {pending.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-16 text-center shadow-sm">
-          <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-          </div>
-          <p className="text-foreground font-medium">No pending bank transfers</p>
-          <p className="text-sm text-muted-foreground mt-1">All transfers have been confirmed.</p>
+          <p className="text-foreground font-medium">No bank transfer is waiting</p>
+          <p className="text-sm text-muted-foreground mt-1">Transfers families make by InstaPay are confirmed on the Finance Workbench.</p>
         </div>
       ) : (
         <div className="space-y-4">

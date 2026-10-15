@@ -45,7 +45,7 @@ function Page({ children }: { children: React.ReactNode }) {
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Exceptions</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          One rule lifted for one student or one family — a price, a refund, a deadline, a gate, a payment plan. Every hook reads them; everything is audited.
+          One rule lifted for one student or one family — a price, a refund, a deadline, a gate, a payment plan. Each takes effect where its rule applies; everything is audited.
         </p>
       </div>
       {children}

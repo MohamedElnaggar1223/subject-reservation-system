@@ -252,6 +252,59 @@ officer and the next step:
 | Owner's word | "Subjects this year: Not enrolled… 3 exam registrations have no enrolment" (course enrolment, outside the cycle) | — | kept for the owner's word (RESERVATION_FOCUS §8, Q5): recorded, not changed |
 | Search-first | "Enter opens the first student; the arrow keys move through the list" — already the desk standard | — | — |
 
+### 3.14 Charges `/charges` [s40]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Owner's standard | per family, the charges owed with one Collect — the desk's own pattern | — | none needed |
+| Consistency | each family's card aligns its columns on its own, so amounts do not line up across cards | L | recorded (§8): a shared grid would change the component for all money lists |
+
+### 3.15 Payments `/admin/payments` [s41]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Truth | "No pending bank transfers — All transfers have been confirmed." while a family's InstaPay transfer waited: the page lists only the old bank-transfer method (`pending-bank`, `paymentMethod = 'bank_transfer'`, which no new payment uses); InstaPay transfers are confirmed on the Finance Workbench | H | the page says how many InstaPay transfers wait on the Finance Workbench, with the button that opens it; its empty state "No bank transfer is waiting — transfers families make by InstaPay are confirmed on the Finance Workbench". Whether the admin's sidebar keeps this screen is the owner's question (§9) — F6b's list is not F6's to change |
+| Consistency | a big green tick for "nothing waiting" | L | removed with the untrue sentence |
+
+### 3.16 Exceptions `/admin/exceptions` [s42]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Sentences, not codes | "Every hook reads them" (the code's word for where a rule is applied) | L | "Each takes effect where its rule applies" |
+| Forms' words | the scope "Item (paper, unit or route)", "One reservation line" — the model's words (SESSION_WORDS.md's rule) | M | "Paper, unit or component", "One reservation" (`POLICY_SCOPE_LABELS` in `@repo/validations`, read by the screen from the policies endpoint) |
+
+### 3.17 Messages `/admin/messages` [s43, s43b–d]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Queued (follow-ups' review) | the Sent log named a class by its teacher on the day the log was read, not when the message went out | L | **fixed** (it was cheap): a sent message is named by the words its MESSAGE_SENT audit row keeps — the words it went out with; reminders keep their rule's words. An 08s scenario and its control (§10) |
+| Queued (owner's word) | "A section" is فصل on Messages (C's dictionary), and a teaching group is فصل on the desk | — | recorded for the owner (§9): the brief keeps it for the owner's word |
+| Sentences | the composer's variables `{guardian}`, `{student}` read as code | L | recorded (§8): they are the template's own tokens and each is filled before sending; naming them in words would need a second set of tokens |
+
+### 3.18 Escrow `/admin/escrow` [s44]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Truth / next step | requests whose cash was already handed over (status fulfilled, or declined after a partial hand-over) wait in this queue for the second signature, yet showed "Fulfill" and "Reject" and no "Approve" | H | such a request reads "Cash released — approval pending", says a second person approves it, and offers **Approve** (the admin may: `POST …/approve` is the admin's and the finance admin's); the others keep Fulfill and Reject |
+| Consistency | "10000.00 EGP", "9/27/2026, 5:18:29 AM" | M | "EGP 10,000", "27 Sep 2026 05:18" (the shared `Money`, `InstantText`) |
+| Hono RPC | a hand-written request type and a `useQuery<…>` generic | M | the fetcher's type (generics 16 → 15) |
+| WCAG 1.4.3 | white on emerald-600, 3.65:1 | M | emerald-700, 5.36:1 (the tone palette's own) |
+
+### 3.19 Finance Workbench `/finance` [s45]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Consistency | "8800.00 EGP", "Requested 600.00 EGP", "10/15/2026, 7:41:55 AM", "9/27/2026" | M | the shared `Money`, `Day` and `InstantText`; the sentences split around them, each part with its Arabic |
+| WCAG 1.4.3 | amber-600 notes (3.2:1) and white on emerald-600 buttons (3.65:1) | M | amber-700 and emerald-700 |
+
+### 3.20 Daily Takings `/takings` [s46]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| WCAG 1.3.1 | the day's date input had no name (axe `label`) | M | named "Day" |
+| Consistency | "07:41 AM" here, "07:41" everywhere else | L | the school's 24-hour time |
+| Print | `Print` and a print layout exist (the drawer's day on paper) | — | — |
+
 ## 4. The queued findings, one by one
 
 ## 5. Accessibility results
@@ -289,4 +342,12 @@ officer and the next step:
   in one place, the desk opened on a student from the record; a second hydration cause found on
   Students (the translator inside an unhydrated Suspense boundary) and fixed (control at 05:40Z).
   Driven after: no axe violation, no console error in either language on s30–s36.
-- Next: commit group 2; group 3 (money and follow-up).
+- 05:45Z — group 2 committed (79dbb80) and pushed; CI 38686414105 (group 1) and 38688334091 (group 2) green.
+- (05:46Z–20:00Z: no work — the session was paused; the dev servers kept running.)
+- 20:00–20:15Z — group 3 (money and follow-up): the Sent log's send-time words (an 08s scenario, control
+  red then green at 20:04Z); the admin's Payments page tells of the InstaPay transfers waiting on the
+  workbench; the Escrow queue offers Approve for cash already handed over; money and dates in the school's
+  format on the workbench and Escrow; Exceptions' scope labels in the forms' words (`@repo/validations`
+  rebuilt; the API server restarted, my PIDs 99084/99103, now pnpm pid 64513). Driven after: no axe
+  violation, no console error on s40–s48 in either language. `useQuery<` generics 15.
+- Next: commit group 3; group 4 (the entries to the board) and group 5 (account, papers).

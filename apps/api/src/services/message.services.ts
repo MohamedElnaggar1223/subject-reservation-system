@@ -375,6 +375,10 @@ export async function listMessages(viewer: Viewer, q: { status?: string; source?
   const counts = rows.length ? await db.select({ messageId: messageDelivery.messageId, channel: messageDelivery.channel, status: messageDelivery.status, n: sql<number>`count(*)::int` })
     .from(messageDelivery).where(inArray(messageDelivery.messageId, rows.map((r) => r.id)))
     .groupBy(messageDelivery.messageId, messageDelivery.channel, messageDelivery.status) : [];
+  // A sent message is named by its audience as it was when it went out (the words its MESSAGE_SENT
+  // audit row keeps), not as the list reads today: a class whose teacher changed since reads with the
+  // teacher it had then (F6; the cycle follow-ups' review, recorded in CYCLE_FOLLOWUPS.md §9).
+  const sentWords = await sentAudienceWords(rows.filter((r) => r.status === 'sent' && !r.reminderKind).map((r) => r.id));
   const out = [];
   for (const r of rows) {
     const aud = await describeAudience(db, { kind: r.audienceKind, definition: r.audienceDefinition, name: r.audienceName }, viewer, r.reminderKind);
@@ -388,12 +392,22 @@ export async function listMessages(viewer: Viewer, q: { status?: string; source?
     out.push({
       id: r.id, status: r.status, source: r.source, title: r.title ?? r.templateName ?? r.templateTitle ?? '', templateName: r.templateName ?? null, channels: r.channels,
       scheduledAt: r.scheduledAt, sentAt: r.sentAt, createdAt: r.createdAt, people: r.recipientCount ?? r.resolvedCount ?? null, error: r.error, cancelReason: r.cancelReason,
-      audience: { kind: r.audienceKind, label: aud.label }, createdBy: r.createdByName ?? null, reminderKind: r.reminderKind ?? null,
+      audience: { kind: r.audienceKind, label: sentWords.get(r.id) ?? aud.label }, createdBy: r.createdByName ?? null, reminderKind: r.reminderKind ?? null,
       deliveries: { in_app: of('in_app'), email: of('email') },
     });
     if (out.length >= q.limit) break;
   }
   return out;
+}
+
+/** The audience's words each sent message went out with, from its latest MESSAGE_SENT audit row. */
+async function sentAudienceWords(messageIds: string[]): Promise<Map<string, string>> {
+  if (!messageIds.length) return new Map();
+  const r = await db.execute(sql`
+    select distinct on (entity_id) entity_id as id, new_data->>'audience' as audience
+    from audit_log where action = 'MESSAGE_SENT' and entity_id in (${sql.join(messageIds.map((id) => sql`${id}`), sql`, `)})
+    order by entity_id, created_at desc`);
+  return new Map((r.rows as { id: string; audience: string | null }[]).filter((x) => x.audience).map((x) => [x.id, x.audience!]));
 }
 
 /** One message's deliveries, per recipient and channel (GET /v1/messages/deliveries). */

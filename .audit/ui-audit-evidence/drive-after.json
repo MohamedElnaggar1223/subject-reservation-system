@@ -1288,5 +1288,563 @@
   "axe": [],
   "shot": "s34-student-record/after-ar.jpg",
   "bytes": 60169
+ },
+ "s40-charges:en": {
+  "id": "s40-charges",
+  "role": "finance_admin",
+  "lang": "en",
+  "path": "/charges",
+  "finalUrl": "/charges",
+  "status": 200,
+  "settledMs": 2620,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s40-charges/after-en.jpg",
+  "bytes": 62617
+ },
+ "s42-exceptions:en": {
+  "id": "s42-exceptions",
+  "role": "finance_admin",
+  "lang": "en",
+  "path": "/admin/exceptions",
+  "finalUrl": "/admin/exceptions",
+  "status": 200,
+  "settledMs": 2167,
+  "apiRequests": 7,
+  "api": [
+   "GET /v1/policies",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/exceptions/check-these",
+   "GET /v1/students",
+   "GET /v1/sessions",
+   "GET /v1/subjects",
+   "GET /v1/exceptions"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s42-exceptions/after-en.jpg",
+  "bytes": 73273
+ },
+ "s45-finance:en": {
+  "id": "s45-finance",
+  "role": "finance_admin",
+  "lang": "en",
+  "path": "/finance",
+  "finalUrl": "/finance",
+  "status": 200,
+  "settledMs": 2688,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s45-finance/after-en.jpg",
+  "bytes": 76527
+ },
+ "s41-payments:en": {
+  "id": "s41-payments",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/payments",
+  "finalUrl": "/admin/payments",
+  "status": 200,
+  "settledMs": 1943,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/payments/pending-manual",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s41-payments/after-en.jpg",
+  "bytes": 39010
+ },
+ "s43-messages:en": {
+  "id": "s43-messages",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 2398,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s43-messages/after-en.jpg",
+  "bytes": 65226
+ },
+ "s43b-messages-sent:en": {
+  "id": "s43b-messages-sent",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 4382,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/messages"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s43b-messages-sent/after-en.jpg",
+  "bytes": 46169
+ },
+ "s43c-messages-reminders:en": {
+  "id": "s43c-messages-reminders",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 4340,
+  "apiRequests": 6,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/reminders/rules",
+   "GET /v1/reminders/sent"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s43c-messages-reminders/after-en.jpg",
+  "bytes": 107648
+ },
+ "s44-escrow-admin:en": {
+  "id": "s44-escrow-admin",
+  "role": "admin",
+  "lang": "en",
+  "path": "/admin/escrow",
+  "finalUrl": "/admin/escrow",
+  "status": 200,
+  "settledMs": 2371,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s44-escrow-admin/after-en.jpg",
+  "bytes": 92369
+ },
+ "s43d-messages-officer:en": {
+  "id": "s43d-messages-officer",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 1928,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s43d-messages-officer/after-en.jpg",
+  "bytes": 56653
+ },
+ "s46-takings:en": {
+  "id": "s46-takings",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/takings",
+  "finalUrl": "/takings",
+  "status": 200,
+  "settledMs": 2386,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s46-takings/after-en.jpg",
+  "bytes": 62228
+ },
+ "s47-session-money-officer:en": {
+  "id": "s47-session-money-officer",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "status": 200,
+  "settledMs": 2493,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/charges"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s47-session-money-officer/after-en.jpg",
+  "bytes": 133960
+ },
+ "s48-sessions-officer:en": {
+  "id": "s48-sessions-officer",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/admin/sessions",
+  "finalUrl": "/admin/sessions",
+  "status": 200,
+  "settledMs": 2991,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s48-sessions-officer/after-en.jpg",
+  "bytes": 86950
+ },
+ "s40-charges:ar": {
+  "id": "s40-charges",
+  "role": "finance_admin",
+  "lang": "ar",
+  "path": "/charges",
+  "finalUrl": "/charges",
+  "status": 200,
+  "settledMs": 1955,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s40-charges/after-ar.jpg",
+  "bytes": 54952
+ },
+ "s42-exceptions:ar": {
+  "id": "s42-exceptions",
+  "role": "finance_admin",
+  "lang": "ar",
+  "path": "/admin/exceptions",
+  "finalUrl": "/admin/exceptions",
+  "status": 200,
+  "settledMs": 2088,
+  "apiRequests": 7,
+  "api": [
+   "GET /v1/policies",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/exceptions/check-these",
+   "GET /v1/students",
+   "GET /v1/sessions",
+   "GET /v1/subjects",
+   "GET /v1/exceptions"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s42-exceptions/after-ar.jpg",
+  "bytes": 60341
+ },
+ "s45-finance:ar": {
+  "id": "s45-finance",
+  "role": "finance_admin",
+  "lang": "ar",
+  "path": "/finance",
+  "finalUrl": "/finance",
+  "status": 200,
+  "settledMs": 1951,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s45-finance/after-ar.jpg",
+  "bytes": 67448
+ },
+ "s41-payments:ar": {
+  "id": "s41-payments",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/payments",
+  "finalUrl": "/admin/payments",
+  "status": 200,
+  "settledMs": 1947,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/payments/pending-manual",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s41-payments/after-ar.jpg",
+  "bytes": 30881
+ },
+ "s43-messages:ar": {
+  "id": "s43-messages",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 1981,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s43-messages/after-ar.jpg",
+  "bytes": 55627
+ },
+ "s43b-messages-sent:ar": {
+  "id": "s43b-messages-sent",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 4422,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/messages"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s43b-messages-sent/after-ar.jpg",
+  "bytes": 41086
+ },
+ "s43c-messages-reminders:ar": {
+  "id": "s43c-messages-reminders",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 4483,
+  "apiRequests": 6,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/reminders/rules",
+   "GET /v1/reminders/sent"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s43c-messages-reminders/after-ar.jpg",
+  "bytes": 86442
+ },
+ "s44-escrow-admin:ar": {
+  "id": "s44-escrow-admin",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/admin/escrow",
+  "finalUrl": "/admin/escrow",
+  "status": 200,
+  "settledMs": 1952,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s44-escrow-admin/after-ar.jpg",
+  "bytes": 79901
+ },
+ "s43d-messages-officer:ar": {
+  "id": "s43d-messages-officer",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/admin/messages",
+  "finalUrl": "/admin/messages",
+  "status": 200,
+  "settledMs": 1978,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/messages/audiences",
+   "GET /v1/messages/templates",
+   "GET /v1/messages/lists",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s43d-messages-officer/after-ar.jpg",
+  "bytes": 48811
+ },
+ "s46-takings:ar": {
+  "id": "s46-takings",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/takings",
+  "finalUrl": "/takings",
+  "status": 200,
+  "settledMs": 1956,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s46-takings/after-ar.jpg",
+  "bytes": 59301
+ },
+ "s47-session-money-officer:ar": {
+  "id": "s47-session-money-officer",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "finalUrl": "/admin/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9#money",
+  "status": 200,
+  "settledMs": 2045,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/charges"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s47-session-money-officer/after-ar.jpg",
+  "bytes": 118644
+ },
+ "s48-sessions-officer:ar": {
+  "id": "s48-sessions-officer",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/admin/sessions",
+  "finalUrl": "/admin/sessions",
+  "status": 200,
+  "settledMs": 2083,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s48-sessions-officer/after-ar.jpg",
+  "bytes": 74239
  }
 }
