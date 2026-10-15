@@ -72,7 +72,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.history': 'History',
     'nav.approvals': 'Approvals',
     'nav.financial': 'Financial',
-    'nav.escrowBalance': 'Escrow Balance',
+    // F6: a family's word for the money the school holds for a child (the landings say "the wallet").
+    'nav.escrowBalance': 'Wallet',
     'nav.checkout': 'Checkout',
     'nav.account': 'Account',
     // F6b: the stages of the reservation cycle, as the staff sidebar groups them (lib/reservation-focus.ts).
@@ -297,7 +298,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.history': 'السجل',
     'nav.approvals': 'الموافقات',
     'nav.financial': 'المالية',
-    'nav.escrowBalance': 'رصيد الحساب',
+    'nav.escrowBalance': 'المحفظة',
     'nav.checkout': 'الدفع',
     'nav.account': 'الحساب',
     'nav.cycleSetUp': 'الإعداد',

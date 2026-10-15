@@ -101,6 +101,7 @@ export const SCREENS = [
   S('f04-home-parent-a', 'parent_a', '/'),
   S('f05-home-student-c1', 'student_c1', '/'),
   S('f06-register-parent', 'parent_b', '/register'),
+  S('f06b-register-ticked', 'parent_b', '/register', { act: async (page) => { const boxes = page.locator('main table input[type=checkbox]:not([disabled])'); await boxes.nth(1).check(); await boxes.nth(0).check(); await page.waitForTimeout(800); } }),
   S('f07-register-student', 'student_c1', '/register'),
   S('f08-registrations', 'parent_b', '/registrations'),
   S('f09-history', 'parent_c', '/registrations/history'),

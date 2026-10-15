@@ -15,6 +15,8 @@ import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { InstantText } from '~/app/(app)/exams/exams-shared';
 
 type ChildBalance = {
   id: string;
@@ -121,8 +123,9 @@ export default function WithdrawClient() {
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Child</label>
+              <label htmlFor="withdraw-child" className="block text-sm font-medium text-foreground mb-1">Child</label>
               <select
+                id="withdraw-child"
                 value={selectedChildId}
                 onChange={(e) => setSelectedChildId(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -130,7 +133,7 @@ export default function WithdrawClient() {
                 <option value="">Select a child</option>
                 {children.map((child) => (
                   <option key={child.id} value={child.id}>
-                    {child.name} — {child.escrowBalance.toFixed(2)} EGP available
+                    {child.name} — {`EGP ${child.escrowBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} available
                   </option>
                 ))}
               </select>
@@ -193,7 +196,7 @@ export default function WithdrawClient() {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(req.createdAt).toLocaleDateString()}
+                      <Day iso={String(req.createdAt)} />
                     </p>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[req.status] ?? 'bg-muted text-muted-foreground'}`}>
@@ -202,12 +205,12 @@ export default function WithdrawClient() {
                 </div>
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Requested</span>
-                  <span className="font-semibold text-foreground">{req.requestedAmount.toFixed(2)} EGP</span>
+                  <span className="font-semibold text-foreground"><Money amount={req.requestedAmount} /></span>
                 </div>
                 {req.releasedAmount != null && req.releasedAmount > 0 && (
                   <div className="flex items-center justify-between text-sm mt-1">
                     <span className="text-muted-foreground">Released</span>
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">{req.releasedAmount.toFixed(2)} EGP</span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400"><Money amount={req.releasedAmount} /></span>
                   </div>
                 )}
                 {req.adminNotes && (

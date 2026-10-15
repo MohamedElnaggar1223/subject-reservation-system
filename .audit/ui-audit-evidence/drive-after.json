@@ -2160,5 +2160,1063 @@
   "axe": [],
   "shot": "s59-reservation-slip/after-ar.jpg",
   "bytes": 49427
+ },
+ "f01-home-parent-b:en": {
+  "id": "f01-home-parent-b",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1964,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f01-home-parent-b/after-en.jpg",
+  "bytes": 36570
+ },
+ "f06-register-parent:en": {
+  "id": "f06-register-parent",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/register",
+  "finalUrl": "/register",
+  "status": 200,
+  "settledMs": 2602,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/registrations/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/refund-terms",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/school-fees/status",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f06-register-parent/after-en.jpg",
+  "bytes": 60513
+ },
+ "f08-registrations:en": {
+  "id": "f08-registrations",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/registrations",
+  "finalUrl": "/registrations",
+  "status": 200,
+  "settledMs": 4333,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f08-registrations/after-en.jpg",
+  "bytes": 30251
+ },
+ "f11-statement:en": {
+  "id": "f11-statement",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/statement",
+  "finalUrl": "/statement",
+  "status": 200,
+  "settledMs": 2651,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/statement",
+   "GET /v1/links/children",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f11-statement/after-en.jpg",
+  "bytes": 66224
+ },
+ "f13-charges-due:en": {
+  "id": "f13-charges-due",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/charges-due",
+  "finalUrl": "/charges-due",
+  "status": 200,
+  "settledMs": 2414,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f13-charges-due/after-en.jpg",
+  "bytes": 21107
+ },
+ "f17-links:en": {
+  "id": "f17-links",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/links",
+  "finalUrl": "/links",
+  "status": 200,
+  "settledMs": 2307,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /api/auth/get-session",
+   "GET /v1/links/pending",
+   "GET /v1/links/children"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f17-links/after-en.jpg",
+  "bytes": 19955
+ },
+ "f18-checkout:en": {
+  "id": "f18-checkout",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
+  "finalUrl": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
+  "status": 200,
+  "settledMs": 2494,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f18-checkout/after-en.jpg",
+  "bytes": 28227
+ },
+ "f20-notifications-family:en": {
+  "id": "f20-notifications-family",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/notifications",
+  "finalUrl": "/notifications",
+  "status": 200,
+  "settledMs": 2466,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f20-notifications-family/after-en.jpg",
+  "bytes": 44184
+ },
+ "f21-profile-family:en": {
+  "id": "f21-profile-family",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/profile",
+  "finalUrl": "/profile",
+  "status": 200,
+  "settledMs": 2324,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/users/me",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f21-profile-family/after-en.jpg",
+  "bytes": 21923
+ },
+ "f02-home-parent-d:en": {
+  "id": "f02-home-parent-d",
+  "role": "parent_d",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 2004,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f02-home-parent-d/after-en.jpg",
+  "bytes": 41453
+ },
+ "f12-school-fee:en": {
+  "id": "f12-school-fee",
+  "role": "parent_d",
+  "lang": "en",
+  "path": "/school-fee",
+  "finalUrl": "/school-fee",
+  "status": 200,
+  "settledMs": 2459,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/links/children",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/school-fees/status"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f12-school-fee/after-en.jpg",
+  "bytes": 20920
+ },
+ "f03-home-parent-c:en": {
+  "id": "f03-home-parent-c",
+  "role": "parent_c",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1968,
+  "apiRequests": 11,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f03-home-parent-c/after-en.jpg",
+  "bytes": 40906
+ },
+ "f09-history:en": {
+  "id": "f09-history",
+  "role": "parent_c",
+  "lang": "en",
+  "path": "/registrations/history",
+  "finalUrl": "/registrations/history",
+  "status": 200,
+  "settledMs": 2480,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f09-history/after-en.jpg",
+  "bytes": 14418
+ },
+ "f10-approvals:en": {
+  "id": "f10-approvals",
+  "role": "parent_c",
+  "lang": "en",
+  "path": "/approvals",
+  "finalUrl": "/approvals",
+  "status": 200,
+  "settledMs": 2370,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f10-approvals/after-en.jpg",
+  "bytes": 18766
+ },
+ "f14-escrow:en": {
+  "id": "f14-escrow",
+  "role": "parent_c",
+  "lang": "en",
+  "path": "/escrow",
+  "finalUrl": "/escrow",
+  "status": 200,
+  "settledMs": 2528,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f14-escrow/after-en.jpg",
+  "bytes": 20852
+ },
+ "f15-escrow-withdraw:en": {
+  "id": "f15-escrow-withdraw",
+  "role": "parent_c",
+  "lang": "en",
+  "path": "/escrow/withdraw",
+  "finalUrl": "/escrow/withdraw",
+  "status": 200,
+  "settledMs": 2479,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f15-escrow-withdraw/after-en.jpg",
+  "bytes": 19833
+ },
+ "f16-escrow-transfer:en": {
+  "id": "f16-escrow-transfer",
+  "role": "parent_c",
+  "lang": "en",
+  "path": "/escrow/transfer",
+  "finalUrl": "/escrow/transfer",
+  "status": 200,
+  "settledMs": 4980,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f16-escrow-transfer/after-en.jpg",
+  "bytes": 16192
+ },
+ "f04-home-parent-a:en": {
+  "id": "f04-home-parent-a",
+  "role": "parent_a",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1970,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f04-home-parent-a/after-en.jpg",
+  "bytes": 36577
+ },
+ "f05-home-student-c1:en": {
+  "id": "f05-home-student-c1",
+  "role": "student_c1",
+  "lang": "en",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1972,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f05-home-student-c1/after-en.jpg",
+  "bytes": 22432
+ },
+ "f07-register-student:en": {
+  "id": "f07-register-student",
+  "role": "student_c1",
+  "lang": "en",
+  "path": "/register",
+  "finalUrl": "/register",
+  "status": 200,
+  "settledMs": 2196,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/registrations/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/refund-terms",
+   "GET /v1/school-fees/status",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f07-register-student/after-en.jpg",
+  "bytes": 57297
+ },
+ "f19-pending-requests:en": {
+  "id": "f19-pending-requests",
+  "role": "student_c1",
+  "lang": "en",
+  "path": "/pending-requests",
+  "finalUrl": "/pending-requests",
+  "status": 200,
+  "settledMs": 2969,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f19-pending-requests/after-en.jpg",
+  "bytes": 16025
+ },
+ "f22-statement-student:en": {
+  "id": "f22-statement-student",
+  "role": "student_a1",
+  "lang": "en",
+  "path": "/statement",
+  "finalUrl": "/statement",
+  "status": 200,
+  "settledMs": 1968,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f22-statement-student/after-en.jpg",
+  "bytes": 65521
+ },
+ "f01-home-parent-b:ar": {
+  "id": "f01-home-parent-b",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1972,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f01-home-parent-b/after-ar.jpg",
+  "bytes": 29004
+ },
+ "f06-register-parent:ar": {
+  "id": "f06-register-parent",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/register",
+  "finalUrl": "/register",
+  "status": 200,
+  "settledMs": 2178,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/registrations/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/refund-terms",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/school-fees/status",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f06-register-parent/after-ar.jpg",
+  "bytes": 49507
+ },
+ "f08-registrations:ar": {
+  "id": "f08-registrations",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/registrations",
+  "finalUrl": "/registrations",
+  "status": 200,
+  "settledMs": 2067,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f08-registrations/after-ar.jpg",
+  "bytes": 24964
+ },
+ "f11-statement:ar": {
+  "id": "f11-statement",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/statement",
+  "finalUrl": "/statement",
+  "status": 200,
+  "settledMs": 2038,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/statement",
+   "GET /v1/links/children",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f11-statement/after-ar.jpg",
+  "bytes": 53860
+ },
+ "f13-charges-due:ar": {
+  "id": "f13-charges-due",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/charges-due",
+  "finalUrl": "/charges-due",
+  "status": 200,
+  "settledMs": 1962,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f13-charges-due/after-ar.jpg",
+  "bytes": 15002
+ },
+ "f17-links:ar": {
+  "id": "f17-links",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/links",
+  "finalUrl": "/links",
+  "status": 200,
+  "settledMs": 1979,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /api/auth/get-session",
+   "GET /v1/links/pending",
+   "GET /v1/links/children"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f17-links/after-ar.jpg",
+  "bytes": 16458
+ },
+ "f18-checkout:ar": {
+  "id": "f18-checkout",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
+  "finalUrl": "/checkout?ids=2ca9edbd-ac2b-4b0c-b228-1e7e4844a6eb",
+  "status": 200,
+  "settledMs": 1992,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f18-checkout/after-ar.jpg",
+  "bytes": 24372
+ },
+ "f20-notifications-family:ar": {
+  "id": "f20-notifications-family",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/notifications",
+  "finalUrl": "/notifications",
+  "status": 200,
+  "settledMs": 1987,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/notifications",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f20-notifications-family/after-ar.jpg",
+  "bytes": 41240
+ },
+ "f21-profile-family:ar": {
+  "id": "f21-profile-family",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/profile",
+  "finalUrl": "/profile",
+  "status": 200,
+  "settledMs": 1945,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/users/me",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f21-profile-family/after-ar.jpg",
+  "bytes": 18624
+ },
+ "f02-home-parent-d:ar": {
+  "id": "f02-home-parent-d",
+  "role": "parent_d",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1996,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f02-home-parent-d/after-ar.jpg",
+  "bytes": 32029
+ },
+ "f12-school-fee:ar": {
+  "id": "f12-school-fee",
+  "role": "parent_d",
+  "lang": "ar",
+  "path": "/school-fee",
+  "finalUrl": "/school-fee",
+  "status": 200,
+  "settledMs": 1975,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/links/children",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/school-fees/status"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f12-school-fee/after-ar.jpg",
+  "bytes": 18436
+ },
+ "f03-home-parent-c:ar": {
+  "id": "f03-home-parent-c",
+  "role": "parent_c",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1996,
+  "apiRequests": 11,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f03-home-parent-c/after-ar.jpg",
+  "bytes": 31063
+ },
+ "f09-history:ar": {
+  "id": "f09-history",
+  "role": "parent_c",
+  "lang": "ar",
+  "path": "/registrations/history",
+  "finalUrl": "/registrations/history",
+  "status": 200,
+  "settledMs": 1956,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f09-history/after-ar.jpg",
+  "bytes": 10036
+ },
+ "f10-approvals:ar": {
+  "id": "f10-approvals",
+  "role": "parent_c",
+  "lang": "ar",
+  "path": "/approvals",
+  "finalUrl": "/approvals",
+  "status": 200,
+  "settledMs": 1967,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f10-approvals/after-ar.jpg",
+  "bytes": 15608
+ },
+ "f14-escrow:ar": {
+  "id": "f14-escrow",
+  "role": "parent_c",
+  "lang": "ar",
+  "path": "/escrow",
+  "finalUrl": "/escrow",
+  "status": 200,
+  "settledMs": 1994,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f14-escrow/after-ar.jpg",
+  "bytes": 16254
+ },
+ "f15-escrow-withdraw:ar": {
+  "id": "f15-escrow-withdraw",
+  "role": "parent_c",
+  "lang": "ar",
+  "path": "/escrow/withdraw",
+  "finalUrl": "/escrow/withdraw",
+  "status": 200,
+  "settledMs": 1981,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f15-escrow-withdraw/after-ar.jpg",
+  "bytes": 14680
+ },
+ "f16-escrow-transfer:ar": {
+  "id": "f16-escrow-transfer",
+  "role": "parent_c",
+  "lang": "ar",
+  "path": "/escrow/transfer",
+  "finalUrl": "/escrow/transfer",
+  "status": 200,
+  "settledMs": 1979,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f16-escrow-transfer/after-ar.jpg",
+  "bytes": 12743
+ },
+ "f04-home-parent-a:ar": {
+  "id": "f04-home-parent-a",
+  "role": "parent_a",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 2026,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f04-home-parent-a/after-ar.jpg",
+  "bytes": 29032
+ },
+ "f05-home-student-c1:ar": {
+  "id": "f05-home-student-c1",
+  "role": "student_c1",
+  "lang": "ar",
+  "path": "/",
+  "finalUrl": "/",
+  "status": 200,
+  "settledMs": 1983,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/users/me/home-summary",
+   "GET /v1/sessions/active",
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/registrations/eligibility"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f05-home-student-c1/after-ar.jpg",
+  "bytes": 16439
+ },
+ "f07-register-student:ar": {
+  "id": "f07-register-student",
+  "role": "student_c1",
+  "lang": "ar",
+  "path": "/register",
+  "finalUrl": "/register",
+  "status": 200,
+  "settledMs": 2188,
+  "apiRequests": 4,
+  "api": [
+   "GET /v1/registrations/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/refund-terms",
+   "GET /v1/school-fees/status",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f07-register-student/after-ar.jpg",
+  "bytes": 46445
+ },
+ "f19-pending-requests:ar": {
+  "id": "f19-pending-requests",
+  "role": "student_c1",
+  "lang": "ar",
+  "path": "/pending-requests",
+  "finalUrl": "/pending-requests",
+  "status": 200,
+  "settledMs": 1974,
+  "apiRequests": 1,
+  "api": [
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f19-pending-requests/after-ar.jpg",
+  "bytes": 11189
+ },
+ "f22-statement-student:ar": {
+  "id": "f22-statement-student",
+  "role": "student_a1",
+  "lang": "ar",
+  "path": "/statement",
+  "finalUrl": "/statement",
+  "status": 200,
+  "settledMs": 1945,
+  "apiRequests": 2,
+  "api": [
+   "GET /v1/statement",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f22-statement-student/after-ar.jpg",
+  "bytes": 53746
+ },
+ "f06b-register-ticked:en": {
+  "id": "f06b-register-ticked",
+  "role": "parent_b",
+  "lang": "en",
+  "path": "/register",
+  "finalUrl": "/register",
+  "status": 200,
+  "settledMs": 3857,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/registrations/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/refund-terms",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/school-fees/status",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "f06b-register-ticked/after-en.jpg",
+  "bytes": 66738
+ },
+ "f06b-register-ticked:ar": {
+  "id": "f06b-register-ticked",
+  "role": "parent_b",
+  "lang": "ar",
+  "path": "/register",
+  "finalUrl": "/register",
+  "status": 200,
+  "settledMs": 3887,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/registrations/offers",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/refund-terms",
+   "GET /v1/sessions/upcoming",
+   "GET /v1/school-fees/status",
+   "GET /v1/notifications/unread-count"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "f06b-register-ticked/after-ar.jpg",
+  "bytes": 55086
  }
 }

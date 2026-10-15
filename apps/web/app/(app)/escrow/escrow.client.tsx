@@ -22,6 +22,8 @@ import Link from 'next/link';
 import { api } from '~/lib/hono';
 import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { InstantText } from '~/app/(app)/exams/exams-shared';
 
 // ─── Reason Labels ────────────────────────────────────────────────────────────
 
@@ -120,13 +122,11 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
         <div className="bg-card rounded-xl border border-border shadow-sm p-6 mb-6">
           <p className="text-sm text-muted-foreground">Available Balance</p>
           <p className="text-4xl font-bold text-foreground mt-1 font-display">
-            {(balance?.balance ?? 0).toFixed(2)}{' '}
-            <span className="text-lg text-muted-foreground font-normal font-sans">EGP</span>
+            <Money amount={balance?.balance ?? 0} />
           </p>
           {heldBalance > 0 && (
             <p className="text-sm text-violet-700 dark:text-violet-400 mt-2">
-              + {heldBalance.toFixed(2)} EGP held for preregistered subjects
-              (auto-applied when their session opens)
+              + <Money amount={heldBalance} /> <span>held for preregistered subjects (auto-applied when their session opens)</span>
             </p>
           )}
         </div>
@@ -143,9 +143,9 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
     <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Escrow Management</h1>
+          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Wallet</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage your children&apos;s escrow balances.
+            Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.
           </p>
         </div>
         <div className="flex gap-2">
@@ -184,14 +184,13 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
                     <p className="text-xs text-muted-foreground mt-0.5">{gradeLabel(child.grade)}</p>
                   )}
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                   <p className="text-lg font-bold text-foreground font-display">
-                    {child.escrowBalance.toFixed(2)}
+                    <Money amount={child.escrowBalance} />
                   </p>
-                  <p className="text-xs text-muted-foreground">EGP</p>
                   {(child.heldBalance ?? 0) > 0 && (
                     <p className="text-xs text-violet-700 dark:text-violet-400 mt-0.5">
-                      + {(child.heldBalance ?? 0).toFixed(2)} held
+                      + <Money amount={child.heldBalance ?? 0} /> <span>held</span>
                     </p>
                   )}
                 </div>
@@ -209,9 +208,9 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
               Transaction History — {children.find((c) => c.id === selectedChildId)?.name}
             </h2>
             <div className="text-sm font-bold text-foreground">
-              Balance: {(balance?.balance ?? 0).toFixed(2)} EGP
+              <span>Balance:</span> <Money amount={balance?.balance ?? 0} />
               {heldBalance > 0 && (
-                <span className="text-violet-700 dark:text-violet-400"> · Held: {heldBalance.toFixed(2)} EGP</span>
+                <span className="text-violet-700 dark:text-violet-400"> · <span>Held:</span> <Money amount={heldBalance} /></span>
               )}
             </div>
           </div>
@@ -274,11 +273,11 @@ function TransactionList({
                 {REASON_LABELS[tx.reason] ?? tx.reason}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {new Date(tx.createdAt).toLocaleString()}
+                <InstantText iso={String(tx.createdAt)} />
               </p>
             </div>
             <span className={`text-sm font-bold ${TRANSACTION_STYLES[tx.type] ?? 'text-foreground'}`}>
-              {tx.type === 'credit' ? '+' : '-'} {tx.amount.toFixed(2)} EGP
+              {tx.type === 'credit' ? '+' : '-'} <Money amount={tx.amount} />
             </span>
           </div>
         ))}

@@ -476,7 +476,7 @@ export default function ApprovalsClient(): React.JSX.Element {
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {reg.subject.code} · {councilLabel}
                         {reg.subject.isCore && (
-                          <span className="ml-2 text-amber-600 dark:text-amber-400">Core</span>
+                          <span className="ms-2 text-amber-700 dark:text-amber-400">Core</span>
                         )}
                         {!reg.subject.isOfferedAtSchool && (
                           <span className="ml-2 text-muted-foreground">(External)</span>

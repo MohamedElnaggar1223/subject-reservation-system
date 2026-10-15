@@ -83,6 +83,35 @@ export const uiAuditArabic: Record<string, string> = {
   'The cash is handed over; a second person approves it (not the one who released it).': 'سُلّم المبلغ نقدًا؛ ويعتمده شخص ثانٍ (غير الذي صرفه).',
 
 
+  // ── The family's home ──
+  'Your children’s subjects and payments, and the next step for each.': 'مواد أبنائك ومدفوعاتهم، والخطوة التالية لكل منهم.',
+  'Your subjects, payments and requests, and the next step for each.': 'موادك ومدفوعاتك وطلباتك، والخطوة التالية لكل منها.',
+  'Coming up': 'القادم',
+
+  // ── Checkout (its sentences split around the amount and the date) ──
+  'A payment of': 'دفعة بقيمة',
+  'was started for': 'بدأت لـ',
+  'on': 'في',
+  'It covers:': 'وتشمل:',
+  'Transfer': 'حوّل',
+  'by InstaPay, then submit the reference.': 'عبر إنستاباي، ثم أرسل المرجع.',
+  'by InstaPay': 'عبر إنستاباي',
+  'at the school desk': 'في مكتب المدرسة',
+
+  // ── The wallet (the family's escrow) ──
+  'Wallet': 'المحفظة',
+  'Charges & Instalments': 'الرسوم والأقساط',
+  'Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.':
+    'مبالغ تحتفظ بها المدرسة لكل ابن — استردادات وأرصدة — تُستخدم في دفعة لاحقة، أو تُنقل إلى ابن آخر، أو تُسترد.',
+  'held for preregistered subjects (auto-applied when their session opens)': 'محتجزة لمواد مسجلة مسبقًا (تُطبَّق تلقائيًا عند فتح جلستها)',
+  'Held:': 'المحتجز:',
+  'transferred from': 'حُوّلت من',
+
+  // ── The statement ──
+  'Show ended reservations (expired, rejected)': 'إظهار الحجوزات المنتهية (منتهية الصلاحية، مرفوضة)',
+  'Every reservation with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.':
+    'كل حجز بسعره وسببه، وما دُفع وما بقي، والدفعات — دفعة لكل موعد للمجلس.',
+
   // ── Students ──
   'Graduation worked out from the old records (not confirmed)': 'تخرّج مستنتج من السجلات القديمة (غير مؤكد)',
 

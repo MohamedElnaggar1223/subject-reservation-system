@@ -349,6 +349,64 @@ the entries screens are judged with an entry on them; the shell's fixes were alr
 | Sentences | the slip's column "Line" | L | "Subject" |
 | Arabic | "قيد أول, في المدرسة" (an English comma between two Arabic phrases) | L | a neutral "·" |
 
+### 3.26 The family's home `/` [f01–f05]
+
+What the family did on the forms: one Google Form per subject, the seven identity questions each time, no
+price, no due date, nothing to come back to (SCHOOL_FORMS.md §1, §2.1). F6b put the next step on the home;
+the lead's drive found the old page still around it.
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Owner's standard (the lead's drive) | the old banner ("IGCSE Subject Reservation System", the role pill, "Registration open — June 2027 … CLOSING IN 119d 23h 50m", or "No active registration window") above F6b's card, and six quick-link cards under it repeating the sidebar | H | **one page in the cycle's order**: the welcome and one sentence of what the page is, the next step for each child, "Coming up", then the family's other pages as one short list (Reserve subjects · My Registrations · School Fee · Charges & Instalments · Wallet, with what it holds · Linked Children; a student's: Reserve · My Registrations · My requests · Linked Parents). The switch off gives back the old home exactly |
+| Owner's standard | the filled button — "the one thing in front of her" — went to "Preregister" for November 2026 – January 2027, a session opening in three weeks, ahead of "Pay now" for June 2027's EGP 23,150 (parent B) and ahead of "Approve" for two subjects a child had asked for (parent C); each child listed two sessions to preregister for | H | each child's steps in the order the family meets them: the school fee that gates reserving, a request waiting for the parent, what is owed (overdue first), reserving in the session open now, then what is done and what waits on the school. A session that opens later is not today's step: it is said once, under "Coming up", for the family, with outlined buttons |
+| Hono RPC | the home's open sessions were a hand-written row type with a cast (`as ActiveSessionRow[]`) | M | the fetcher's type |
+| Forms' words | "Escrow Balance" for a family's money held by the school (the landings already said "the wallet") | M | "Wallet" (المحفظة) in the family's sidebar, on the home and on the wallet page |
+
+Measured (step 4's method, what the person must read or click before the right action): parent B, before:
+the filled button was "Preregister" and "Pay now" the third action, two rows down; after: "Pay now" is the
+first and only filled button. Parent C, before: "Approve" the third action, below two "Preregister" rows;
+after: "Approve" first and filled. The page is half its length at a phone (f03: 2309 px → 1262 px; f01: 1950 px → 1154 px).
+
+### 3.27 Reserve `/register` [f06, f06b, f07]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Responsive (families at phones) | the rows were a 760 px table: at a phone the teacher, the entry and the price were off the screen, reached by scrolling the table sideways; the Session select ran past the card | H | at a phone each paper's teacher, entry and price stack under it (CSS only, the same component; from 640 px it is the table); the selects take the card's width |
+| Aesthetic and minimal | "Cambridge International June 2027" under every paper | M | only where a subject's papers sit in different sittings (§3.12) |
+| Forms' words | "0 lines · EGP 0", "Reserve 2 lines" | M | "0 reservations", "Reserve (2)"; the Arabic sentences say حجوزات |
+
+### 3.28 My Registrations [f08], History [f09], Approvals [f10], Pending Requests [f19]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Responsive | the status filter ran off a phone's screen ("Dropp…"), the subject cut ("Arabic Langua…") | M | the filter scrolls inside its frame, as a labelled group with `aria-pressed`; the name wraps |
+| WCAG 4.1.2 | History's child select had no name | M | tied to its label |
+| WCAG 1.4.3 | "Core" in amber-600 on Approvals (3.2:1) | M | amber-700 |
+| Hono RPC | My Registrations types its rows by hand (`type Registration = {…}`, a 900-line screen from before the rework) | M | recorded (§8): its rows come from three endpoints and a rewrite of the screen's types is beyond F6's presentation pass; the casts on its status labels now read through `labelFor` |
+| Forms' words | a card names the subject, not the paper ("Biology" for "Paper 4 only (retake)") | M | recorded (§8): the registrations read does not carry the item's label; adding it is an API change F6 did not need for any other screen |
+
+### 3.29 Statement `/statement` [f11, f22]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Responsive | an 820 px table: at a phone the price, what is paid and what is owed were off the screen (and the scrolling region took no keyboard focus, axe `scrollable-region-focusable`) | H | at a phone each reservation stacks its figures, each under its name (Price, Paid, Outstanding, Due, Receipt); from 640 px the table; the same component on the desk's Student 360 |
+| Forms' words | "Line" (column), "Show ended lines", "Every line with its price" | M | "Subject", "Show ended reservations", "Every reservation with its price" |
+
+### 3.30 Checkout `/checkout` [f18], School Fee [f12], Charges & Instalments [f13]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Consistency | "14350.00 EGP" in every figure; "Pay 14350.00 EGP via Pay at School" | M | "EGP 14,350"; "Pay EGP 14,350 at the school desk" / "… by InstaPay"; the open-payment notice's sentences split around the amount and the date, each with its Arabic |
+| School Fee, Charges & Instalments | the fee and the charges owed, each with its pay action | — | none needed |
+
+### 3.31 The wallet `/escrow` [f14] with withdraw [f15] and transfer [f16]; Linked Children [f17]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Sentences, not codes | "Escrow Management — Manage your children's escrow balances" | M | "Wallet — Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back." |
+| Consistency | "14850.00 EGP", dates "10/15/2026" | M | "EGP 14,850", the school's dates |
+| WCAG 4.1.2 | the child, from and to selects had no names (axe `select-name` 3) | M | tied to their labels |
+
 ## 4. The queued findings, one by one
 
 ## 5. Accessibility results
@@ -400,4 +458,10 @@ the entries screens are judged with an entry on them; the shell's fixes were alr
   queued Arabic sentences (20:28Z); the profile's `dl`; the receipt's "Board" and "Board fee"; the slip
   never empty nor printed by itself; the follow-ups' stale comment and the two document lines. Driven after:
   no axe violation, no console error on s50–s59 in either language.
-- Next: commit groups 4–5; group 6 (the families' screens at a phone).
+- 20:40Z — groups 4–5 committed (e1bf2c2) and pushed.
+- 20:41–21:05Z — group 6 (the families at a phone): the home as one page in the cycle's order (the old
+  banner and quick links gone with the switch on; the steps reordered; "Coming up" once; the hand-cast
+  sessions row typed by the API); the Reserve rows and the statement stacked at a phone; the checkout's and
+  the wallet's money and dates in the school's format; "Wallet" for a family's escrow; three selects named.
+  Driven after: 46 family records, none with an axe violation or a console error.
+- Next: commit group 6; group 7 (sign-in and sign-up).

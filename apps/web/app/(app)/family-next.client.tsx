@@ -53,10 +53,9 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
   const statement = useQuery({ queryKey: statementKey(q), queryFn: () => fetchStatement(q) });
 
   // What can be reserved now: the open sessions, and for a parent the ones about to open (preregistration).
-  const reservable = [
-    ...(active.data ?? []).map((s) => ({ id: s.id, name: s.name, opens: null as string | null, closes: String(s.endDate) })),
-    ...(isParent ? (upcoming.data ?? []) : []).map((s) => ({ id: s.id, name: s.name, opens: String(s.startDate), closes: String(s.endDate) })),
-  ];
+  const open = (active.data ?? []).map((s) => ({ id: s.id, name: s.name, opens: null as string | null, closes: String(s.endDate) }));
+  const comingUp = (isParent ? (upcoming.data ?? []) : []).map((s) => ({ id: s.id, name: s.name, opens: String(s.startDate) as string | null, closes: String(s.endDate) }));
+  const reservable = [...open, ...comingUp];
   // Whether each child may reserve in each of them (grade, leaving, graduation): the Reserve page's own check.
   const pairs = (home.data?.children ?? []).flatMap((c) => reservable.map((s) => ({ studentId: c.student.id, sessionId: s.id })));
   const verdicts = useQueries({
@@ -93,10 +92,16 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
     );
   }
 
+  // F6: each child's rows in the order the family meets them — the school fee that gates reserving, a
+  // request waiting for the parent, what is owed (overdue first), then reserving in the session open now,
+  // then what is done and what waits on the school. A session that opens later is not a step today: it
+  // is said once, under "Coming up", for the whole family (it came first, filled, above "Pay now").
   const perChild = children.map((c) => {
     const st = statement.data?.students.find((x) => x.student.id === c.student.id);
     const rows: Row[] = [];
     const who = c.student.id;
+    const reserveRows: Row[] = [];
+    const payRows: Row[] = [];
 
     // 1. The school fee gates reserving for the year (D-H).
     if (c.schoolFee.required && !c.schoolFee.paid) {
@@ -109,25 +114,23 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
         : { key: `fee-${who}`, tone: 'warning', body: <span>The school fee is not paid yet: ask your parent.</span> });
     }
 
-    // 2. Reserve, in each session open now (or opening soon, for a parent) with nothing reserved in it
-    //    yet — where the child may reserve in it; where not, the school's reason, once.
-    for (const s of reservable) {
+    // 2. Reserve, in each session open now with nothing reserved in it yet — where the child may
+    //    reserve in it; where not, the school's reason, once.
+    for (const s of open) {
       const mine = st?.sessions.find((x) => x.id === s.id)?.lines.filter((l) => LIVE.includes(l.status)) ?? [];
       if (mine.length > 0 || !mayReserve) continue;
       const verdict = verdictOf(who, s.id);
       if (verdict && !verdict.allowed) {
-        rows.push({
+        reserveRows.push({
           key: `cannot-${who}-${s.id}`, tone: 'neutral',
           body: <span><bdi>{s.name}</bdi><span>:</span> <span>{verdict.reason ?? 'Not open to this student.'}</span></span>,
         });
         continue;
       }
-      rows.push({
+      reserveRows.push({
         key: `reserve-${who}-${s.id}`, tone: 'info',
-        body: s.opens
-          ? <span><bdi>{s.name}</bdi><span>:</span> <span>opens on</span> <Day iso={s.opens} /><span>; you can preregister now.</span></span>
-          : <span><bdi>{s.name}</bdi> <span>is open for reservations until</span> <Day iso={s.closes} />.</span>,
-        action: { label: s.opens ? 'Preregister' : 'Reserve subjects', href: '/register' },
+        body: <span><bdi>{s.name}</bdi> <span>is open for reservations until</span> <Day iso={s.closes} />.</span>,
+        action: { label: 'Reserve subjects', href: '/register' },
       });
     }
 
@@ -157,7 +160,7 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
       const now = owed.filter((l) => !waitingFee.includes(l));
       const due = now.map((l) => l.dueAt).filter((d): d is NonNullable<typeof d> => !!d).map(String).sort()[0] ?? null;
       const overdue = now.some((l) => l.overdueDays > 0);
-      rows.push({
+      payRows.push({
         key: `pay-${who}-${sess.id}`, tone: overdue ? 'danger' : now.length ? 'warning' : 'info',
         body: now.length ? (
           <span>
@@ -182,9 +185,12 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
           : { label: isParent ? 'See the statement' : 'Ask your parent: see the statement', href: '/statement' },
       });
     }
+    // What is overdue first, then what is due, then what waits for the board's fee.
+    const weight = (r: Row) => (r.tone === 'danger' ? 0 : r.tone === 'warning' ? 1 : 2);
+    rows.push(...payRows.sort((a, b) => weight(a) - weight(b)), ...reserveRows);
 
     // 5. Everything reserved in an open session is paid: done, the statement shows it.
-    for (const s of reservable) {
+    for (const s of open) {
       const mine = st?.sessions.find((x) => x.id === s.id)?.lines.filter((l) => LIVE.includes(l.status)) ?? [];
       if (!mine.length || mine.some((l) => l.outstanding > 0 || l.status === 'pending_approval')) continue;
       rows.push({
@@ -217,6 +223,14 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
     }
     return { child: c, rows };
   });
+
+  // Coming up (a parent): the sessions that open later, said once for the family, where a child may
+  // preregister — not before what is owed or open now.
+  const later = mayReserve ? comingUp.filter((s) => children.some((c) => {
+    const mine = statement.data?.students.find((x) => x.student.id === c.student.id)?.sessions.find((x) => x.id === s.id)?.lines.filter((l) => LIVE.includes(l.status)) ?? [];
+    const verdict = verdictOf(c.student.id, s.id);
+    return mine.length === 0 && (!verdict || verdict.allowed);
+  })) : [];
 
   const firstAction = perChild.flatMap((p) => p.rows).find((r) => r.action)?.key;
   const nothing = perChild.every((p) => p.rows.length === 0);
@@ -267,11 +281,53 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
         </div>
       )}
 
-      {escrowFree > 0 && (
-        <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-          <span>In the wallet:</span> <Money amount={escrowFree} /> <span>available</span>
-        </p>
+      {later.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <h3 className="text-sm font-semibold text-foreground">Coming up</h3>
+          <ul className="mt-1 divide-y divide-border">
+            {later.map((s) => (
+              <li key={`later-${s.id}`} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm text-foreground">
+                <span className="flex min-w-0 items-start gap-2">
+                  <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT.neutral)} aria-hidden />
+                  <span><bdi>{s.name}</bdi><span>:</span> <span>opens on</span> <Day iso={s.opens} /><span>; you can preregister now.</span></span>
+                </span>
+                <Button asChild size="sm" variant="outline"><Link href="/register">Preregister</Link></Button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
+
+      {/* F6: the rest of the family's pages, in the cycle's order — what the six quick-link cards under
+          this card used to repeat of the sidebar, as one short list (on a phone the sidebar is behind
+          the menu button). */}
+      <nav aria-label="Everything else" className="mt-4 border-t border-border pt-3">
+        <ul className="divide-y divide-border text-sm">
+          {(isParent
+            ? [
+                { href: '/register', label: 'Reserve subjects' },
+                { href: '/registrations', label: 'My Registrations' },
+                { href: '/school-fee', label: 'School Fee' },
+                { href: '/charges-due', label: 'Charges & Instalments' },
+                { href: '/escrow', label: 'Wallet', extra: escrowFree > 0 ? <><Money amount={escrowFree} /> <span>available</span></> : null },
+                { href: '/links', label: 'Linked Children' },
+              ]
+            : [
+                ...(mayReserve ? [{ href: '/register', label: 'Reserve subjects' }] : []),
+                { href: '/registrations', label: 'My Registrations' },
+                { href: '/pending-requests', label: 'My requests' },
+                { href: '/links', label: 'Linked Parents' },
+              ] as { href: string; label: string; extra?: React.ReactNode }[]
+          ).map((l) => (
+            <li key={l.href}>
+              <Link href={l.href as never} className="flex min-h-11 items-center justify-between gap-3 py-2 text-foreground hover:text-primary">
+                <span>{l.label}</span>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">{'extra' in l && l.extra}<span aria-hidden className="rtl:rotate-180">›</span></span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </section>
   );
 }

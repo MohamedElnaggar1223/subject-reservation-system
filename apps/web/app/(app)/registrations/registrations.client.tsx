@@ -5,7 +5,7 @@ import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from '@tansta
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
-import { formatPrice } from '~/lib/format';
+import { formatPrice, labelFor } from '~/lib/format';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   apiResponse,
@@ -222,7 +222,8 @@ function RegistrationCard({
             />
           )}
           <div className="min-w-0">
-            <div className="font-medium text-foreground truncate">{reg.subject.name}</div>
+            {/* The whole name, wrapped (F6: "Arabic Langua…" at a phone). */}
+            <div className="font-medium text-foreground break-words">{reg.subject.name}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
               {reg.subject.code} · {councilLabel}
             </div>
@@ -907,18 +908,21 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+          {/* At a phone the filter scrolls inside its own frame instead of running off the screen (F6). */}
+          <div className="flex max-w-full overflow-x-auto rounded-lg border border-border text-sm" role="group" aria-label="Show">
             {['all', 'pending_approval', 'pending_payment', 'confirmed', 'dropped', 'rejected'].map((s) => (
               <button
                 key={s}
+                type="button"
+                aria-pressed={statusFilter === s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 transition-colors ${
                   statusFilter === s
                     ? 'bg-primary text-primary-foreground font-medium'
                     : 'bg-card text-muted-foreground hover:bg-muted'
                 }`}
               >
-                {s === 'all' ? 'All' : REGISTRATION_STATUS_LABELS[s as keyof typeof REGISTRATION_STATUS_LABELS] ?? s}
+                {s === 'all' ? 'All' : labelFor(REGISTRATION_STATUS_LABELS, s)}
               </button>
             ))}
           </div>

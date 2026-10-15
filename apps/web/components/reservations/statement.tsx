@@ -25,6 +25,12 @@ import { Money, Day, Modal, Field, INPUT_CLASS, TEXTAREA_CLASS, ErrorLine, error
 import { fetchReserveOffers } from './reserve';
 import { ClassFollowNotice } from './class-follow';
 import { followSentences, type FollowSentence } from '~/lib/groups-followed';
+import { labelFor } from '~/lib/format';
+
+/** At a phone a statement row stacks, each figure under its name (the table's header is hidden there). */
+function PhoneLabel({ children }: { children: React.ReactNode }) {
+  return <span className="block text-[11px] uppercase tracking-wide text-muted-foreground sm:hidden">{children}</span>;
+}
 
 export const fetchStatement = (q: { studentId?: string; familyId?: string }) => apiResponse(api.v1.statement.$get({ query: q }));
 export type StatementData = Awaited<ReturnType<typeof fetchStatement>>;
@@ -76,7 +82,7 @@ export function StatementView({ query, money = true, teacherChange = false }: {
       )}
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <input type="checkbox" className="h-3.5 w-3.5" checked={showEnded} onChange={(e) => setShowEnded(e.target.checked)} />
-        <span>Show ended lines (expired, rejected)</span>
+        <span>Show ended reservations (expired, rejected)</span>
       </label>
       {data.students.map((s) => (
         <StudentBlock key={s.student.id} s={s} money={money} showEnded={showEnded} teacherChange={teacherChange} onTeacher={setTeacherFor} />
@@ -128,11 +134,13 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
         return (
           <div key={sess.id} className="space-y-2">
             <h3 className="text-sm font-semibold text-foreground"><bdi data-i18n-skip="true">{sess.name}</bdi></h3>
+            {/* F6: at a phone each reservation stacks its figures (an 820 px table put the price, what is
+                paid and what is owed off a family's phone screen); from 640 px it is the table. */}
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <table className="w-full text-sm max-sm:block sm:min-w-[820px]">
+                <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground max-sm:hidden">
                   <tr>
-                    <th className="px-3 py-2 text-start font-medium">Line</th>
+                    <th className="px-3 py-2 text-start font-medium">Subject</th>
                     {money && <th className="px-3 py-2 text-end font-medium">Price</th>}
                     {money && <th className="px-3 py-2 text-end font-medium">Paid</th>}
                     {money && <th className="px-3 py-2 text-end font-medium">Outstanding</th>}
@@ -142,10 +150,10 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                     {teacherChange && <th className="px-3 py-2" />}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="max-sm:block">
                   {lines.map((l) => (
-                    <tr key={l.id} className="border-b border-border last:border-0 align-top">
-                      <td className="px-3 py-2">
+                    <tr key={l.id} className="border-b border-border last:border-0 align-top max-sm:flex max-sm:flex-wrap max-sm:gap-x-5 max-sm:py-1">
+                      <td className="px-3 py-2 max-sm:w-full">
                         <div className="font-medium text-foreground"><bdi data-i18n-skip="true">{l.label}</bdi></div>
                         <div className="text-xs text-muted-foreground">
                           <span>{entryText(l)}</span>
@@ -175,32 +183,35 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                         )}
                       </td>
                       {money && (
-                        <td className="px-3 py-2 text-end">
+                        <td className="px-3 py-2 text-end max-sm:text-start">
+                          <PhoneLabel>Price</PhoneLabel>
                           <span title={l.basisText}><Money amount={l.price} /></span>
                           {l.provisional && <> <Badge tone="warning">ⓟ</Badge></>}
                           <div className="text-[11px] text-muted-foreground" dir="ltr">{l.basisText}</div>
                         </td>
                       )}
-                      {money && <td className="px-3 py-2 text-end"><Money amount={l.paid} />{l.plan?.live && l.paid > 0 && <div className="text-xs text-muted-foreground">held for it, paid in instalments</div>}{l.refunded > 0 && <div className="text-xs text-muted-foreground"><span>refunded</span> <Money amount={l.refunded} /></div>}</td>}
-                      {money && <td className="px-3 py-2 text-end">{l.outstanding > 0 ? <Money amount={l.outstanding} className="font-semibold text-amber-700 dark:text-amber-400" /> : <span className="text-muted-foreground">—</span>}</td>}
+                      {money && <td className="px-3 py-2 text-end max-sm:text-start"><PhoneLabel>Paid</PhoneLabel><Money amount={l.paid} />{l.plan?.live && l.paid > 0 && <div className="text-xs text-muted-foreground">held for it, paid in instalments</div>}{l.refunded > 0 && <div className="text-xs text-muted-foreground"><span>refunded</span> <Money amount={l.refunded} /></div>}</td>}
+                      {money && <td className="px-3 py-2 text-end max-sm:text-start"><PhoneLabel>Outstanding</PhoneLabel>{l.outstanding > 0 ? <Money amount={l.outstanding} className="font-semibold text-amber-700 dark:text-amber-400" /> : <span className="text-muted-foreground">—</span>}</td>}
                       {money && (
                         <td className="px-3 py-2">
+                          <PhoneLabel>Due</PhoneLabel>
                           <Day iso={l.dueAt} />
                           {l.overdueDays > 0 && <div><Badge tone="danger"><span>{l.overdueDays}</span>&nbsp;<span>{l.overdueDays === 1 ? 'day overdue' : 'days overdue'}</span></Badge></div>}
                           {l.provisional && l.outstanding > 0 && <div className="text-xs text-muted-foreground">board fee provisional, confirmed before payment</div>}
                         </td>
                       )}
                       {money && (
-                        <td className="px-3 py-2 text-xs">
+                        <td className={l.receipt ? 'px-3 py-2 text-xs' : 'px-3 py-2 text-xs max-sm:hidden'}>
+                          <PhoneLabel>Receipt</PhoneLabel>
                           {l.receipt ? (
                             <>
                               <span className="font-mono" data-i18n-skip="true">{l.receipt.number}</span>
-                              <div className="text-muted-foreground">{RECEIPT_STATUS_LABELS[l.receipt.status as keyof typeof RECEIPT_STATUS_LABELS] ?? l.receipt.status}</div>
+                              <div className="text-muted-foreground">{labelFor(RECEIPT_STATUS_LABELS, l.receipt.status)}</div>
                             </>
                           ) : <span className="text-muted-foreground">—</span>}
                         </td>
                       )}
-                      <td className="px-3 py-2"><Badge tone={STATUS_TONE[l.status] ?? 'neutral'}>{REGISTRATION_STATUS_LABELS[l.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? l.status}</Badge></td>
+                      <td className="px-3 py-2 max-sm:w-full max-sm:pt-0"><Badge tone={STATUS_TONE[l.status] ?? 'neutral'}>{labelFor(REGISTRATION_STATUS_LABELS, l.status)}</Badge></td>
                       {teacherChange && (
                         <td className="px-3 py-2 text-end">
                           {['pending_approval', 'pending_payment', 'preregistered', 'confirmed'].includes(l.status) && (
