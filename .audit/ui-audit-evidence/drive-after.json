@@ -932,5 +932,361 @@
   "axe": [],
   "shot": "s04-home-gate/after-ar.jpg",
   "bytes": 31831
+ },
+ "s30-desk-officer:en": {
+  "id": "s30-desk-officer",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 1956,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s30-desk-officer/after-en.jpg",
+  "bytes": 38547
+ },
+ "s31-desk-student:en": {
+  "id": "s31-desk-student",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 5234,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/users/search",
+   "GET /v1/users/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP/summary"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s31-desk-student/after-en.jpg",
+  "bytes": 92715
+ },
+ "s35-desk-reserve-new-family:en": {
+  "id": "s35-desk-reserve-new-family",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 6837,
+  "apiRequests": 10,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/users/search",
+   "GET /v1/users/WW0prJC4XjLa0N3tbZqbcLVS66XDqLXV/summary",
+   "GET /v1/sessions/active",
+   "GET /v1/registrations/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s35-desk-reserve-new-family/after-en.jpg",
+  "bytes": 146799
+ },
+ "s36-desk-from-record:en": {
+  "id": "s36-desk-from-record",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "finalUrl": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "status": 200,
+  "settledMs": 2020,
+  "apiRequests": 7,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/users/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP/summary",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s36-desk-from-record/after-en.jpg",
+  "bytes": 92867
+ },
+ "s32-desk-admin:en": {
+  "id": "s32-desk-admin",
+  "role": "admin",
+  "lang": "en",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 1972,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s32-desk-admin/after-en.jpg",
+  "bytes": 40673
+ },
+ "s33-students:en": {
+  "id": "s33-students",
+  "role": "admin",
+  "lang": "en",
+  "path": "/students",
+  "finalUrl": "/students",
+  "status": 200,
+  "settledMs": 2395,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/students",
+   "GET /v1/academic/sections"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s33-students/after-en.jpg",
+  "bytes": 72606
+ },
+ "s34-student-record:en": {
+  "id": "s34-student-record",
+  "role": "admin",
+  "lang": "en",
+  "path": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "finalUrl": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "status": 200,
+  "settledMs": 2491,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/enrolments/student/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s34-student-record/after-en.jpg",
+  "bytes": 68777
+ },
+ "s30-desk-officer:ar": {
+  "id": "s30-desk-officer",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 1951,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s30-desk-officer/after-ar.jpg",
+  "bytes": 33756
+ },
+ "s31-desk-student:ar": {
+  "id": "s31-desk-student",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 5289,
+  "apiRequests": 8,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/users/search",
+   "GET /v1/users/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP/summary"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s31-desk-student/after-ar.jpg",
+  "bytes": 82067
+ },
+ "s35-desk-reserve-new-family:ar": {
+  "id": "s35-desk-reserve-new-family",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 6872,
+  "apiRequests": 10,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/users/search",
+   "GET /v1/users/WW0prJC4XjLa0N3tbZqbcLVS66XDqLXV/summary",
+   "GET /v1/sessions/active",
+   "GET /v1/registrations/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s35-desk-reserve-new-family/after-ar.jpg",
+  "bytes": 130970
+ },
+ "s36-desk-from-record:ar": {
+  "id": "s36-desk-from-record",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "finalUrl": "/desk?student=LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "status": 200,
+  "settledMs": 2058,
+  "apiRequests": 7,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/users/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP/summary",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s36-desk-from-record/after-ar.jpg",
+  "bytes": 82178
+ },
+ "s32-desk-admin:ar": {
+  "id": "s32-desk-admin",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 1972,
+  "apiRequests": 5,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s32-desk-admin/after-ar.jpg",
+  "bytes": 35946
+ },
+ "s33-students:ar": {
+  "id": "s33-students",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/students",
+  "finalUrl": "/students",
+  "status": 200,
+  "settledMs": 2134,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/notifications/unread-count",
+   "GET /v1/students",
+   "GET /v1/academic/sections"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s33-students/after-ar.jpg",
+  "bytes": 62714
+ },
+ "s34-student-record:ar": {
+  "id": "s34-student-record",
+  "role": "admin",
+  "lang": "ar",
+  "path": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "finalUrl": "/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+  "status": 200,
+  "settledMs": 2443,
+  "apiRequests": 3,
+  "api": [
+   "GET /v1/students/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/enrolments/student/LWt5OX5OJu635vIH3zP8N85lyLOBRaKP"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s34-student-record/after-ar.jpg",
+  "bytes": 60169
  }
 }

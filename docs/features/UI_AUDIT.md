@@ -223,6 +223,35 @@ first, F6a).
 |---|---|---|---|
 | — | nothing beyond the shell; the import's review screen is §4's queued finding | — | — |
 
+### 3.12 The desk `/desk` [s30, s32] and the Student 360 [s31, s35, s36]
+
+What the officer did on the sheet: found the family's rows with Ctrl-F, wrote the fee note, wrote a paper
+receipt per column (UX_AUDIT.md §1). The desk already answers it in one screen; what stood between the
+officer and the next step:
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Owner's standard / money shown | for a family on three instalments, "To collect now" ticked all three — "Collect EGP 24,850" for a plan whose first instalment falls due in three days | H | each plan's next instalment (and any already due) ticked; the later ones listed, unticked: "Collect EGP 8,283". The officer can tick the rest. The API, the payment and the receipts are unchanged |
+| Owner's standard (queued: step 4) | the parent-consent tick ("Refund policy and declaration read and signed by the parent") showed for every waiting line, also those the family had reserved itself with both consents | M | shown — and sent — only when a ticked line carries the school's consent alone (a grade-10 line the school reserved). The summary gains `familyConsentNeeded` per line, read from `consentStanding` as the checkout reads it; a new 08o scenario and its control (§10) |
+| Owner's standard | a walk-in family whose school fee gates reserving: the fee unticked in "Also collect now", so "Reserve and collect" was refused for it; and three more "Collect fee — Cash / Credit / InstaPay" buttons in the header, a third place to take the same fee | M | the fee ticked first in "Also collect now" (the button reads "Reserve and collect EGP 30,000"); the header keeps the fee's badge and drops its three buttons ("To collect now" collects the fee alone, with its instrument) |
+| Desk-first (memory) | the student record's "Payments and receipts at the desk" opened an empty desk: the officer searched again | M | it opens the desk on that student (`/desk?student=`): one input and one click fewer |
+| Queued (C) / Hono RPC | the desk hand-cast API responses: the school fee's answer (`as unknown as { amount: number }`) and three statuses (`as keyof typeof …`) | M | the answer's own type (and the header's fee buttons that used it are gone); the statuses read through `labelFor(map, value)` in `lib/format.ts`, the response untouched |
+| Sentences, not codes | "Recent payments": "10/15/2026", "registration · cash", "completed" (codes, the browser's date) | M | "15 Oct 2026 · Reservations · Cash · Completed" |
+| WCAG 1.4.3 | "Owes now" in amber-600 on white, 3.2:1 | M | amber-700, 5.0:1 |
+| Jargon | "+ New Family (Onboard)", "Close Onboarding" | L | "+ New family", "Close" |
+| Reserve card | "Cambridge International June 2027" under every paper of a one-sitting subject (20 rows); "0 lines · EGP 0", "Reserve 2 lines" | M | the sitting only where a subject's papers sit in more than one; "reservations", "Reserve (2)"; the Arabic sentences say حجوزات, not أسطر |
+| RTL | `text-right`, `ml-1` in the tables | L | logical |
+| Keyboard | the search is focused on arrival (kept); opened from a record it is not, so the page does not jump | — | — |
+
+### 3.13 Students `/students` [s33] and the student record [s34]
+
+| Principle | Finding | Sev | Fix / reason |
+|---|---|---|---|
+| Arabic, errors | a hydration warning in Arabic remained here after the language cookie: the page translator rewrote the list's server HTML inside a Suspense boundary before React hydrated it | H | the translator touches only what React owns and looks again while a part waits to hydrate (§4.1) |
+| Jargon | the filter "Graduation inferred by the backfill" | L | "Graduation worked out from the old records (not confirmed)" |
+| Owner's word | "Subjects this year: Not enrolled… 3 exam registrations have no enrolment" (course enrolment, outside the cycle) | — | kept for the owner's word (RESERVATION_FOCUS §8, Q5): recorded, not changed |
+| Search-first | "Enter opens the first student; the arrow keys move through the list" — already the desk standard | — | — |
+
 ## 4. The queued findings, one by one
 
 ## 5. Accessibility results
@@ -254,4 +283,10 @@ first, F6a).
   `globals.css`): the web server (my PIDs 99085/99088) stopped, `apps/web/.next` cleared, restarted (pnpm pid
   28901). A CSS change needs that restart. 05:16–05:19Z group 1 driven after: no axe violation and no console
   error on any of its 20 screens in either language (`drive-after.json`).
-- Next: commit group 1; group 2 (the desk and the Student 360).
+- 05:21Z — group 1 committed (fd56215) and pushed.
+- 05:22–05:45Z — group 2 (the desk, the Student 360, Students): the desk's casts, its instalment ticks,
+  its consent tick (an API field and an 08o scenario, control red then green at 05:30Z), the school fee
+  in one place, the desk opened on a student from the record; a second hydration cause found on
+  Students (the translator inside an unhydrated Suspense boundary) and fixed (control at 05:40Z).
+  Driven after: no axe violation, no console error in either language on s30–s36.
+- Next: commit group 2; group 3 (money and follow-up).

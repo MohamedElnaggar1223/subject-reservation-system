@@ -99,7 +99,7 @@ export default function StudentClient({ studentId, viewerRole }: { studentId: st
             )}
             {MONEY_ROLES.includes(viewerRole) && (
               <Link
-                href="/desk"
+                href={`/desk?student=${encodeURIComponent(studentId)}`}
                 className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 Payments and receipts at the desk

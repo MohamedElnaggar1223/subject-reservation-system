@@ -33,6 +33,19 @@ export const uiAuditArabic: Record<string, string> = {
   "Paid, before the board's first-entry deadline: the reservation stands and is entered as a first entry; finance decides whether anything is owed.":
     'مدفوع، قبل موعد القيد الأول لدى المجلس: يبقى الحجز ويُقيَّد قيدًا أول؛ وتقرر المالية إن كان هناك مبلغ مستحق.',
 
+  // ── The desk ──
+  '+ New family': '+ أسرة جديدة',
+  'Transfer to check': 'تحويل للمراجعة',
+  // The school fee is المصاريف الدراسية everywhere (the sidebar, the landings); C's dictionary had الرسوم المدرسية.
+  'School fee': 'المصاريف الدراسية',
+
+  'school fee due': 'المصاريف الدراسية مستحقة',
+  'reservation': 'حجز',
+  'reservations': 'حجوزات',
+
+  // ── Students ──
+  'Graduation worked out from the old records (not confirmed)': 'تخرّج مستنتج من السجلات القديمة (غير مؤكد)',
+
   // ── The subject's form: Replace a teacher ──
   'Anything else you changed on the subject’s form stays; its teachers are read again after the replacement.':
     'ما غيّرته في نموذج المادة يبقى كما هو؛ ويُقرأ معلموها من جديد بعد الاستبدال.',

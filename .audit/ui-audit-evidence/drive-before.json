@@ -5823,5 +5823,63 @@
   ],
   "shot": "a07-verify-email/before-ar.jpg",
   "bytes": 10701
+ },
+ "s35-desk-reserve-new-family:en": {
+  "id": "s35-desk-reserve-new-family",
+  "role": "finance_officer",
+  "lang": "en",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 6805,
+  "apiRequests": 10,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/users/search",
+   "GET /v1/users/WW0prJC4XjLa0N3tbZqbcLVS66XDqLXV/summary",
+   "GET /v1/sessions/active",
+   "GET /v1/registrations/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "en",
+   "dir": "ltr"
+  },
+  "axe": [],
+  "shot": "s35-desk-reserve-new-family/before-en.jpg",
+  "bytes": 167973
+ },
+ "s35-desk-reserve-new-family:ar": {
+  "id": "s35-desk-reserve-new-family",
+  "role": "finance_officer",
+  "lang": "ar",
+  "path": "/desk",
+  "finalUrl": "/desk",
+  "status": 200,
+  "settledMs": 6804,
+  "apiRequests": 10,
+  "api": [
+   "GET /v1/payments/daily-takings",
+   "GET /v1/sessions",
+   "GET /v1/charges",
+   "GET /v1/notifications/unread-count",
+   "GET /v1/sessions/6d34f4aa-11fc-45a8-b04b-55e04a25b3a9/money",
+   "GET /v1/users/search",
+   "GET /v1/users/WW0prJC4XjLa0N3tbZqbcLVS66XDqLXV/summary",
+   "GET /v1/sessions/active",
+   "GET /v1/registrations/offers"
+  ],
+  "errors": [],
+  "html": {
+   "lang": "ar",
+   "dir": "rtl"
+  },
+  "axe": [],
+  "shot": "s35-desk-reserve-new-family/before-ar.jpg",
+  "bytes": 152974
  }
 }

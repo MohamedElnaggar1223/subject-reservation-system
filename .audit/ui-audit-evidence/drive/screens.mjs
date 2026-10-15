@@ -68,6 +68,8 @@ export const SCREENS = [
   S('s30-desk-officer', 'finance_officer', '/desk'),
   S('s31-desk-student', 'finance_officer', '/desk', { act: openDeskStudent('Student Placeholder A1') }),
   S('s32-desk-admin', 'admin', '/desk'),
+  S('s35-desk-reserve-new-family', 'finance_officer', '/desk', { act: async (page) => { await openDeskStudent('Student Placeholder D1')(page); await page.getByRole('button', { name: /^\+ ?(Reserve|احجز|حجز)/ }).first().click(); await page.waitForTimeout(1500); } }),
+  S('s36-desk-from-record', 'finance_officer', `/desk?student=${IDS.a1}`),
   S('s33-students', 'admin', '/students'),
   S('s34-student-record', 'admin', `/students/${IDS.a1}`),
   // ── 3. Money and follow-up ──

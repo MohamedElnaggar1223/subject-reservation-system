@@ -1854,8 +1854,29 @@ function translatePreservingWhitespace(value: string): string {
   return `${leading}${translated}${trailing}`;
 }
 
-function localizeDom(language: Language) {
-  if (typeof document === 'undefined') return;
+/**
+ * Whether React owns this element yet: React attaches its fiber to every element it hydrates or
+ * creates. Server HTML inside a Suspense boundary that has not hydrated has none — the translator
+ * must leave it alone, or React finds Arabic where it rendered English and reports a hydration
+ * mismatch (F6: /students in Arabic, after the language cookie fixed the rest). It is translated on
+ * a later pass, once React has it.
+ */
+const hydratedElements = new WeakSet<Element>();
+function ownedByReact(el: Element): boolean {
+  if (hydratedElements.has(el)) return true;
+  for (const key in el) {
+    if (key.startsWith('__reactFiber$')) {
+      hydratedElements.add(el);
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Translates what React owns; returns whether something was left for a later pass (not hydrated yet). */
+function localizeDom(language: Language): boolean {
+  if (typeof document === 'undefined') return false;
+  let waiting = false;
 
   const walker = document.createTreeWalker(
     document.body,
@@ -1865,6 +1886,10 @@ function localizeDom(language: Language) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (parent.closest('[data-i18n-skip="true"]')) return NodeFilter.FILTER_REJECT;
+        if (!ownedByReact(parent)) {
+          waiting = true;
+          return NodeFilter.FILTER_REJECT;
+        }
         if (['SCRIPT', 'STYLE', 'CODE', 'PRE', 'TEXTAREA'].includes(parent.tagName)) {
           return NodeFilter.FILTER_REJECT;
         }
@@ -1897,6 +1922,10 @@ function localizeDom(language: Language) {
 
   const attrNames = ['placeholder', 'title', 'aria-label', 'alt'];
   for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
+    if (!ownedByReact(element)) {
+      if (attrNames.some((a) => element.hasAttribute(a))) waiting = true;
+      continue;
+    }
     for (const attr of attrNames) {
       const current = element.getAttribute(attr);
       if (!current) continue;
@@ -1918,6 +1947,7 @@ function localizeDom(language: Language) {
       if (element.getAttribute(attr) !== nextValue) element.setAttribute(attr, nextValue);
     }
   }
+  return waiting;
 }
 
 type I18nContextValue = {
@@ -1964,9 +1994,20 @@ export function I18nProvider({ children, initialLanguage = 'en' }: { children: R
 
   useEffect(() => {
     let frame = 0;
+    let retry = 0;
+    let retries = 0;
     const schedule = () => {
       window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => localizeDom(language));
+      frame = window.requestAnimationFrame(() => {
+        // Hydration changes nothing in the DOM, so no mutation announces it: while a part of the page
+        // waits for React (a Suspense boundary still hydrating), look again shortly, for up to 10 s.
+        const waiting = localizeDom(language);
+        window.clearTimeout(retry);
+        if (waiting && retries < 100) {
+          retries += 1;
+          retry = window.setTimeout(schedule, 100);
+        }
+      });
     };
 
     schedule();
@@ -1981,6 +2022,7 @@ export function I18nProvider({ children, initialLanguage = 'en' }: { children: R
 
     return () => {
       window.cancelAnimationFrame(frame);
+      window.clearTimeout(retry);
       observer.disconnect();
     };
   }, [language]);

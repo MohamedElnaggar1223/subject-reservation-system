@@ -681,6 +681,17 @@ describe('08o: reservation lines (step B)', () => {
     expect((await lineOf(l!.id)).status).toBe('pending_payment');
   });
 
+  it("the desk's summary marks the waiting lines that need the family's own consent: the school's grade-10 line, not a line the family reserved itself (F6)", async () => {
+    const g10 = await onboard(officer, `o08-g10d-${RUN}`, 10);
+    await apiResponse(adm.api.v1.sessions[':id'].grade10.commit.$post({ param: { id: june }, json: { studentIds: [g10.studentId] } }));
+    const school = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: g10.studentId } }));
+    expect(school.registrations.map((r) => [r.status, r.familyConsentNeeded])).toEqual([['pending_payment', true]]);
+    const f = await onboard(officer, `o08-ownc-${RUN}`, 11);
+    await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, studentId: f.studentId, lines: [first(matItem)], consent: CONSENT } }));
+    const own = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }));
+    expect(own.registrations.map((r) => [r.status, r.familyConsentNeeded])).toEqual([['pending_payment', false]]);
+  });
+
   it("a swap's new line inherits the dropped line's consent and refund steps", async () => {
     const f = await onboard(officer, `o08-swap-${RUN}`, 11);
     const desk = await apiResponse(officer.api.v1.registrations.desk.$post({

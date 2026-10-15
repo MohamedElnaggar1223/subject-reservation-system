@@ -266,7 +266,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       // A consent belongs to the lines it was given for; the next reservation asks again.
       setPicks({}); setRefundTick(false); setDeclTick(false);
       qc.invalidateQueries({ queryKey: ['registrations'] });
-      const lines = `${made.length} line${made.length === 1 ? '' : 's'}`;
+      const lines = `${made.length} reservation${made.length === 1 ? '' : 's'}`;
       const sentences = viewer === 'student'
         ? [`Sent to your parent for approval: ${lines}.`]
         : data?.session.status === 'draft'
@@ -292,7 +292,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       qc.invalidateQueries({ queryKey: ['registrations'] });
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
-      const parts = [`Reserved ${r.registrations.length} line${r.registrations.length === 1 ? '' : 's'}.`];
+      const parts = [`Reserved ${r.registrations.length} reservation${r.registrations.length === 1 ? '' : 's'}.`];
       if (r.schoolFee) parts.push(`The ${r.schoolFee.academicYear} school fee collected first (EGP ${r.schoolFee.amount.toLocaleString('en-US')}).`);
       // With charges (step C's "Also collect now") the subjects are paid per entry deadline and each charge group on its own.
       const withCharges = r.payments.some((p) => 'chargeIds' in p && (p.chargeIds as string[] | undefined)?.length);
@@ -351,7 +351,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <p className="text-base font-semibold text-foreground">
-            <span>{chosen.length}</span> <span>{chosen.length === 1 ? 'line' : 'lines'}</span> · <Money amount={total} />
+            <span>{chosen.length}</span> <span>{chosen.length === 1 ? 'reservation' : 'reservations'}</span> · <Money amount={total} />
           </p>
           <p className="text-xs text-muted-foreground">
             <span>Due</span> <Day iso={typeof data.session.paymentDueAt === 'string' ? data.session.paymentDueAt : null} />
@@ -409,7 +409,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
           </div>
         ) : (
           <Button disabled={!ready || pending} onClick={() => { setFailure(null); familyMutation.mutate(); }}>
-            {pending ? 'Reserving…' : viewer === 'student' ? 'Send to my parent' : <><span>Reserve</span> <span>{chosen.length || ''}</span> <span>{chosen.length === 1 ? 'line' : chosen.length ? 'lines' : ''}</span></>}
+            {pending ? 'Reserving…' : viewer === 'student' ? 'Send to my parent' : <><span>Reserve</span>{chosen.length > 0 && <> <span dir="ltr">({chosen.length})</span></>}</>}
           </Button>
         )}
       </div>
@@ -427,6 +427,10 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
   pickOf: (it: Item) => Pick; setPick: (it: Item, patch: Partial<Pick>) => void; toggle: (o: Offer, it: Item, on: boolean) => void;
   preview?: boolean;
 }) {
+  // The sitting under each paper only where the subject's papers sit in more than one (an IAL subject
+  // across November, January and June); otherwise it is the session's own and said once by the
+  // session's name — "Cambridge International June 2027" under every row was noise (F6).
+  const manySittings = new Set(o.items.map((i) => i.series?.id ?? null)).size > 1;
   return (
     <>
       <tr className="border-t border-border">
@@ -462,7 +466,7 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
               {noFee && <> <Badge tone="warning">board fee not set yet</Badge></>}
               {/* A retake or a carry-forward whose sitting the system does not know is declared: the school verifies it. */}
               {needsSitting && <> <Badge tone="warning">{desk ? 'declared — listed to verify' : 'to be verified by the school'}</Badge></>}
-              {it.series && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}
+              {it.series && manySittings && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}
             </td>
             <td className="px-3 py-2 align-top">
               {p.on && (mode === 'self_study' ? <span className="text-muted-foreground">— self-study</span>

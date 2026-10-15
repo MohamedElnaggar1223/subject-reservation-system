@@ -16,7 +16,7 @@
  * ticked total is the money in hand, and each part gets its own receipt.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
@@ -45,25 +45,34 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     const requested = rows.filter((c) => c.status === 'requested');
     const pushes = rows.filter((c) => c.kind === 'school_fee_push' && c.status === 'pending_payment');
     const fees = (summary?.schoolFeesDue ?? []).map((f) => ({ ...f, push: pushes.find((p) => p.academicYear === f.academicYear) ?? null }));
-    return { lines, provisional, payable, requested, fees, loading: charges.isLoading };
+    // An instalment plan is paid over time: only each plan's next instalment (and any already due) is
+    // ticked at first, not the whole plan (F6: the desk offered all three instalments, EGP 24,850, for a
+    // plan whose first falls due in three days). The officer can still tick the rest.
+    const today = new Date().toISOString().slice(0, 10);
+    const nextOfPlan = new Map<string, string>();
+    for (const c of [...payable].filter((x) => x.kind === 'instalment').sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)))) {
+      const plan = c.registration?.id ?? c.id;
+      if (!nextOfPlan.has(plan)) nextOfPlan.set(plan, c.id);
+    }
+    const laterInstalments = new Set(payable
+      .filter((c) => c.kind === 'instalment' && nextOfPlan.get(c.registration?.id ?? c.id) !== c.id && !(c.dueAt && String(c.dueAt).slice(0, 10) <= today))
+      .map((c) => `c:${c.id}`));
+    return { lines, provisional, payable, requested, fees, laterInstalments, loading: charges.isLoading };
   }, [charges.data, charges.isLoading, summary]);
 }
 
 export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: string; summary: Summary; onDone: () => void }) {
   const queryClient = useQueryClient();
   const owed = useOwed(studentId, summary);
-  const [unticked, setUnticked] = useState<Set<string>>(new Set());
+  // What the officer changed from the first ticks (everything owed, less a plan's later instalments).
+  const [picked, setPicked] = useState<Map<string, boolean>>(new Map());
   const [result, setResult] = useState<Collected | null>(null);
   const [error, setError] = useState('');
   // A subject the school reserved (grade 10) carries the school's consent only: the parent's own,
   // read and signed, goes with its collection (step B, RESERVATIONS_REWORK.md §3.5).
   const [consent, setConsent] = useState(false);
-  const isOn = (key: string) => !unticked.has(key);
-  const flip = (key: string) => setUnticked((u) => {
-    const next = new Set(u);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
+  const isOn = (key: string) => picked.get(key) ?? !owed.laterInstalments.has(key);
+  const flip = (key: string) => setPicked((m) => new Map(m).set(key, !isOn(key)));
   const lineIds = owed.lines.filter((l) => isOn(`l:${l.id}`)).map((l) => l.id);
   const chargeIds = owed.payable.filter((c) => isOn(`c:${c.id}`)).map((c) => c.id);
   const fee = owed.fees.find((f) => isOn(`f:${f.academicYear}`));
@@ -75,9 +84,9 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
     mutationFn: (instrumentUsed: Parameters<typeof collectAtDesk>[0]['instrumentUsed']) => collectAtDesk({
       studentId, registrationIds: lineIds, chargeIds, instrumentUsed, escrowAmountToApply: 0,
       ...(fee ? { schoolFeeYear: fee.academicYear } : {}),
-      ...(consent && lineIds.length ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
+      ...(consent && owed.lines.some((l) => l.familyConsentNeeded && lineIds.includes(l.id)) ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
     }),
-    onSuccess: (r) => { setResult(r); setError(''); setUnticked(new Set()); setConsent(false); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
+    onSuccess: (r) => { setResult(r); setError(''); setPicked(new Map()); setConsent(false); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
     onError: (err: Error) => setError(err.message),
   });
 
@@ -117,7 +126,8 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
           </li>
         ))}
       </ul>
-      {owed.lines.length > 0 && (
+      {/* Only for a line the school reserved (grade 10): a family that reserved itself already gave it (F6). */}
+      {owed.lines.some((l) => l.familyConsentNeeded && lineIds.includes(l.id)) && (
         <label className="flex items-center gap-2 border-t border-border px-5 py-2.5 text-xs text-foreground">
           <input type="checkbox" className="h-3.5 w-3.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
           <span>Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)</span>
@@ -150,12 +160,21 @@ export type Extras = { chargeIds: string[]; schoolFeeYear?: string; total: numbe
 export function AlsoCollect({ studentId, value, onChange }: { studentId: string; value: Extras; onChange: (v: Extras) => void }) {
   const summary = useQuery({ queryKey: ['desk', 'summary', studentId], queryFn: () => fetchSummary(studentId) });
   const owed = useOwed(studentId, summary.data);
+  const [touched, setTouched] = useState(false);
+  const total = (next: Omit<Extras, 'total'>) => owed.payable.filter((c) => next.chargeIds.includes(c.id)).reduce((t, c) => t + c.amount, 0)
+    + (owed.fees.find((f) => f.academicYear === next.schoolFeeYear)?.amount ?? 0);
+  // The year's school fee gates reserving: it is ticked at first, so "Reserve and collect" takes it
+  // first as the server asks (F6: unticked, the walk-in family's reservation was refused for it).
+  const firstFee = owed.fees[0]?.academicYear;
+  useEffect(() => {
+    if (!touched && firstFee && value.schoolFeeYear === undefined) {
+      const next = { ...value, schoolFeeYear: firstFee };
+      onChange({ ...next, total: total(next) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstFee, touched]);
   if (!owed.payable.length && !owed.fees.length) return null;
-  const change = (next: Omit<Extras, 'total'>) => onChange({
-    ...next,
-    total: owed.payable.filter((c) => next.chargeIds.includes(c.id)).reduce((t, c) => t + c.amount, 0)
-      + (owed.fees.find((f) => f.academicYear === next.schoolFeeYear)?.amount ?? 0),
-  });
+  const change = (next: Omit<Extras, 'total'>) => { setTouched(true); onChange({ ...next, total: total(next) }); };
   const toggleCharge = (id: string) => change({ ...value, chargeIds: value.chargeIds.includes(id) ? value.chargeIds.filter((x) => x !== id) : [...value.chargeIds, id] });
   return (
     <fieldset className="mb-3 rounded-lg border border-border p-3">
