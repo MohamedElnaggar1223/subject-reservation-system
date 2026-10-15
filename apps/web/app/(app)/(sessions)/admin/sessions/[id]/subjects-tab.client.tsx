@@ -115,7 +115,7 @@ const pct = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
 
 export default function SubjectsTab({ session, viewerRole }: { session: SessionDetail; viewerRole: string }): React.JSX.Element {
   const canEdit = (viewerRole === ROLES.ADMIN || viewerRole === ROLES.COORDINATOR) && session.status !== 'closed';
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: offersKey(session.id), queryFn: () => fetchOffers(session.id) });
+  const { data, dataUpdatedAt, isLoading, isError, refetch } = useQuery({ queryKey: offersKey(session.id), queryFn: () => fetchOffers(session.id) });
   const [drawer, setDrawer] = useState<{ offerId: string } | { addable: AddableRow } | null>(null);
   const [adding, setAdding] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -170,7 +170,7 @@ export default function SubjectsTab({ session, viewerRole }: { session: SessionD
         <p className="text-xs text-muted-foreground"><Badge tone="info">not published yet</Badge> <span>The board has not published this fee yet: families can reserve, not pay, until it is confirmed on the Fees tab.</span></p>
       )}
       {drawer && (
-        <SubjectDrawer session={session} data={data} target={drawer} canEdit={canEdit} onClose={() => setDrawer(null)}
+        <SubjectDrawer session={session} data={data} sheetAt={dataUpdatedAt} target={drawer} canEdit={canEdit} onClose={() => setDrawer(null)}
           onCreated={(offerId) => setDrawer({ offerId })} onPreview={(o) => setPreviewing(o)} />
       )}
       {adding && <AddSubject session={session} onClose={() => setAdding(false)} onPick={(a) => { setAdding(false); setDrawer({ addable: a }); }} />}
@@ -452,16 +452,29 @@ function newState(a: AddableRow): FormState {
   };
 }
 
+/**
+ * The sheet's row as a Save or a Replace a teacher read it back (`readBack`), with the time the sheet's
+ * cache took it. The form is made again from this row: the sheet's own query hands the same row to the
+ * drawer only in a later render (React Query notifies its observers on a timer), so a form made from the
+ * drawer's copy at once could start from the row before the change — the teacher who left still ticked,
+ * sent back by the next Save (F6's review, finding 2).
+ */
+type ReadBack = { row: OfferRow | null; at: number };
+
 /** The drawer: one subject's form (an existing row, or a subject being added), saved whole. */
-function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onPreview }: {
-  session: SessionDetail; data: OffersData; target: { offerId: string } | { addable: AddableRow }; canEdit: boolean;
+function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCreated, onPreview }: {
+  session: SessionDetail; data: OffersData; sheetAt: number; target: { offerId: string } | { addable: AddableRow }; canEdit: boolean;
   onClose: () => void; onCreated: (offerId: string) => void; onPreview: (o: OfferRow) => void;
 }) {
   const [version, setVersion] = useState(0);
   const [saved, setSaved] = useState<string | null>(null);
   // What was typed on the form before a Replace a teacher, carried into the form made again after it.
   const [carry, setCarry] = useState<Carry | null>(null);
-  const offer = 'offerId' in target ? data.offers.find((o) => o.id === target.offerId) ?? null : null;
+  const [readBack, setReadBack] = useState<ReadBack | null>(null);
+  const targetId = 'offerId' in target ? target.offerId : null;
+  const listed = targetId ? data.offers.find((o) => o.id === targetId) ?? null : null;
+  // The row read back after this drawer's own change, until the sheet's copy is as new as it.
+  const offer = readBack?.row && readBack.row.id === targetId && sheetAt < readBack.at ? readBack.row : listed;
   const addable = 'addable' in target ? target.addable : null;
   if ('offerId' in target && !offer) return null;
   const title = offer ? offer.subject.name : addable!.name;
@@ -473,16 +486,18 @@ function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onP
       {saved && <Notice tone="success">{saved}</Notice>}
       <SubjectForm key={`${offer?.id ?? addable!.id}:${version}`} session={session} shares={data.shares} offer={offer} addable={addable} canEdit={canEdit}
         carry={carry}
-        onSaved={(message, createdId) => {
+        onSaved={(message, back, createdId) => {
           setSaved(message);
           setCarry(null);
+          setReadBack(back);
           setVersion((v) => v + 1);
           if (createdId) onCreated(createdId);
         }}
-        // A teacher replaced: the form is made again from the offer as it is now (the review of d3f62cf,
-        // item 2) — kept, its old ticks would send the teacher who left back with the next Save. What
-        // else was typed on it comes across (F6, the follow-ups' queued note): only the teachers are read again.
-        onReplaced={(edits) => { setCarry(edits); setVersion((v) => v + 1); }}
+        // A teacher replaced: the form is made again from the offer as it is now — the row the replacement
+        // read back (the review of d3f62cf, item 2; F6's review, finding 2) — kept, its old ticks would send
+        // the teacher who left back with the next Save. What else was typed on it comes across (F6, the
+        // follow-ups' queued note): only the teachers are read again.
+        onReplaced={(edits, back) => { setCarry(edits); setReadBack(back); setVersion((v) => v + 1); }}
         onPreview={onPreview} onRemoved={onClose} />
     </Drawer>
   );
@@ -490,7 +505,7 @@ function SubjectDrawer({ session, data, target, canEdit, onClose, onCreated, onP
 
 function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved, onReplaced, onPreview, onRemoved }: {
   session: SessionDetail; shares: Shares; offer: OfferRow | null; addable: AddableRow | null; canEdit: boolean; carry: Carry | null;
-  onSaved: (message: string, createdId?: string) => void; onReplaced: (edits: Carry) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
+  onSaved: (message: string, back: ReadBack, createdId?: string) => void; onReplaced: (edits: Carry, back: ReadBack) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: catalogue } = useCatalogue();
@@ -553,10 +568,14 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
     ...(reserved ? { linesStand: f.linesStand } : {}),
     ...(f.reason.trim() ? { reason: f.reason.trim() } : {}),
   });
-  const refresh = () => Promise.all([
-    queryClient.invalidateQueries({ queryKey: offersKey(session.id) }), queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }),
-    queryClient.invalidateQueries({ queryKey: ['sessions', session.id, 'preview'] }),
-  ]);
+  const refresh = async (offerId: string | null): Promise<ReadBack> => {
+    const [sheet] = await Promise.all([
+      readSheet(queryClient, session.id),
+      queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }),
+      queryClient.invalidateQueries({ queryKey: ['sessions', session.id, 'preview'] }),
+    ]);
+    return { row: offerId ? sheet.offers.find((o) => o.id === offerId) ?? null : null, at: sheetTime(queryClient, session.id) };
+  };
   const save = useMutation({
     mutationFn: async () => {
       if (offer) return { created: null, r: await apiResponse(api.v1.sessions[':id'].offers[':offerId'].form.$put({ param: { id: session.id, offerId: offer.id }, json: body() })) };
@@ -571,14 +590,14 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
       return { created: made.id, r: null };
     },
     onSuccess: async ({ created, r }) => {
-      await refresh();
-      if (created) onSaved('Added. Its papers and their fees, if the Catalogue gives it any, can be set below.', created);
-      else onSaved(r?.changed ? 'Saved.' : 'Nothing to change.');
+      const back = await refresh(created ?? offer?.id ?? null);
+      if (created) onSaved('Added. Its papers and their fees, if the Catalogue gives it any, can be set below.', back, created);
+      else onSaved(r?.changed ? 'Saved.' : 'Nothing to change.', back);
     },
   });
   const remove = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers[':offerId'].$delete({ param: { id: session.id, offerId: offer!.id } })),
-    onSuccess: async () => { await refresh(); onRemoved(); },
+    onSuccess: async () => { await refresh(null); onRemoved(); },
   });
   const invalid = fee === null || (asksZeroReason && f.zeroReason.trim().length < 5) || (reserved > 0 && !f.linesStand);
   const ro = !canEdit;
@@ -818,7 +837,7 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
           <Button type="submit" disabled={invalid || save.isPending}>{save.isPending ? 'Saving…' : offer ? 'Save' : 'Add subject'}</Button>
         </div>
       )}
-      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} onReplaced={() => onReplaced(base ? typedSince(base, f) : {})} />}
+      {replacing && offer && <ReplaceTeacher session={session} offer={offer} onClose={() => setReplacing(false)} onReplaced={(back) => onReplaced(base ? typedSince(base, f) : {}, back)} />}
       {removing && offer && (
         <Modal title="Remove this subject" onClose={() => setRemoving(false)}>
           <div className="space-y-4">
@@ -855,7 +874,14 @@ function PaperLine({ name, full, code, reservations, value, choices, fee, subjec
   );
 }
 
-function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: SessionDetail; offer: OfferRow; onClose: () => void; onReplaced: () => void }) {
+/** The sheet fetched now and put in the cache; typed by its fetcher. */
+const readSheet = (queryClient: ReturnType<typeof useQueryClient>, sessionId: string) =>
+  queryClient.fetchQuery({ queryKey: offersKey(sessionId), queryFn: () => fetchOffers(sessionId), staleTime: 0 });
+/** When the sheet's cache last took a response. */
+const sheetTime = (queryClient: ReturnType<typeof useQueryClient>, sessionId: string) =>
+  queryClient.getQueryState(offersKey(sessionId))?.dataUpdatedAt ?? 0;
+
+function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: SessionDetail; offer: OfferRow; onClose: () => void; onReplaced: (back: ReadBack) => void }) {
   const queryClient = useQueryClient();
   const { data: teachers } = useQuery({ queryKey: ['teachers'], queryFn: fetchTeachers });
   const [from, setFrom] = useState(offer.teachers[0]?.teacherId ?? '');
@@ -863,19 +889,22 @@ function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: Sess
   const [reason, setReason] = useState('');
   // What happened to this year's classes (F1's follow-up, `groupsFollowed`): said before closing.
   const [classSaid, setClassSaid] = useState<FollowSentence[] | null>(null);
+  const [back, setBack] = useState<ReadBack | null>(null);
   const go = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
       param: { id: session.id, offerId: offer.id }, json: { fromTeacherId: from, toTeacherId: to, reason: reason.trim() },
     })),
     onSuccess: async (r) => {
-      await queryClient.invalidateQueries({ queryKey: offersKey(session.id) });
+      // The subject's row as it is now, read here and handed to the form made again (F6's review, finding 2).
+      const sheet = await readSheet(queryClient, session.id);
+      const read: ReadBack = { row: sheet.offers.find((o) => o.id === offer.id) ?? null, at: sheetTime(queryClient, session.id) };
       const said = followSentences(r.groupsFollowed, { one: false, teacherName: (id) => (teachers ?? []).find((t) => t.id === id)?.name });
-      if (said.length) setClassSaid(said);
-      else { onClose(); onReplaced(); }
+      if (said.length) { setBack(read); setClassSaid(said); }
+      else { onClose(); onReplaced(read); }
     },
   });
   // Closed after a replacement: the subject's form behind is made again from the offer as it is now.
-  const close = () => { onClose(); if (go.isSuccess) onReplaced(); };
+  const close = () => { onClose(); if (go.isSuccess && back) onReplaced(back); };
   return (
     <Modal title="Replace a teacher" onClose={close}>
       <div className="space-y-4">

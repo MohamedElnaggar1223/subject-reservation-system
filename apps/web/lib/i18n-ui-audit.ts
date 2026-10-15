@@ -65,7 +65,7 @@ export const uiAuditArabic: Record<string, string> = {
     'قاعدة تُرفع لطالب واحد أو لأسرة واحدة — سعر أو استرداد أو موعد أو شرط أو خطة سداد. تسري حيث تنطبق قاعدتها، وكل شيء مُسجَّل في سجل التدقيق.',
 
   // ── The Finance Workbench (its sentences split around the date and the amount) ──
-  'Window closed — the family has until': 'أُغلقت النافذة — أمام الأسرة حتى',
+  'Session closed — the family has until': 'أُغلقت الجلسة — أمام الأسرة حتى',
   'to submit the reference; then it lapses on its own.': 'لتقديم المرجع؛ وبعدها يسقط من تلقاء نفسه.',
   'Confirm or reject before the board deadline,': 'أكّد أو ارفض قبل موعد المجلس،',
   '— after it this payment is closed automatically.': '— وبعده تُغلق هذه الدفعة تلقائيًا.',
@@ -141,6 +141,15 @@ export const uiAuditArabic: Record<string, string> = {
   'Each session carries its own refund policy, shown on its header (for June: 100% to week 2 · 50% in week 3 · 0% from week 4). These windows apply only to reservations made before the reservations were reworked, in October 2026.':
     'لكل جلسة سياسة استرداد خاصة بها تظهر في رأسها (ليونيو: 100% حتى الأسبوع 2 · 50% في الأسبوع 3 · 0% من الأسبوع 4). وهذه النوافذ تنطبق فقط على الحجوزات التي سبقت إعادة بناء الحجز في أكتوبر 2026.',
   'No refund windows: the sessions’ own refund policies apply.': 'لا نوافذ استرداد: تنطبق سياسات الاسترداد الخاصة بكل جلسة.',
+
+  // ── The family's home: the list of the family's other pages (its name for a screen reader) ──
+  'Everything else': 'كل ما عدا ذلك',
+
+  // ── Escrow: a partial hand-over waiting for its approval ──
+  'Partially Fulfilled': 'نُفِّذ جزئيًا',
+  'Fulfilled': 'نُفِّذ',
+  'Part of the cash is handed over; a second person approves it (not the one who released it). The rest can still be released or rejected.':
+    'سُلِّم جزء من المبلغ نقدًا؛ ويعتمده شخص ثانٍ (غير من سلّمه). ويمكن بعدُ تسليم الباقي أو رفضه.',
 
   // ── The import review: a one-paper line ──
   'Retake — one paper only is always a retake; name the sitting it follows below.':

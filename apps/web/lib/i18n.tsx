@@ -1874,6 +1874,9 @@ function ownedByReact(el: Element): boolean {
   return false;
 }
 
+/** Elements whose text is not prose for a reader: code, scripts and styles, templates, form values. */
+const NOT_TEXT = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'CODE', 'PRE', 'TEXTAREA']);
+
 /** Translates what React owns; returns whether something was left for a later pass (not hydrated yet). */
 function localizeDom(language: Language): boolean {
   if (typeof document === 'undefined') return false;
@@ -1887,11 +1890,12 @@ function localizeDom(language: Language): boolean {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (parent.closest('[data-i18n-skip="true"]')) return NodeFilter.FILTER_REJECT;
+        // Never text to translate, and never React's: Next's own script tags sit in <body> without a
+        // fiber, so testing ownership first kept `waiting` true on every page and the provider re-walked
+        // the whole page every 100 ms, a hundred times after each load (F6's review, finding 1).
+        if (NOT_TEXT.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
         if (!ownedByReact(parent)) {
           waiting = true;
-          return NodeFilter.FILTER_REJECT;
-        }
-        if (['SCRIPT', 'STYLE', 'CODE', 'PRE', 'TEXTAREA'].includes(parent.tagName)) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;

@@ -1,0 +1,20 @@
+{
+ "label": "control-old-code",
+ "browserNowUtc": "2026-11-16T23:00:00.000Z",
+ "cairo": "17/11/2026, 01:00:00",
+ "instalments": [
+  {
+   "text": "Instalment 1 of 3 — Physics Instalment · due 18 Oct 2026",
+   "ticked": true
+  },
+  {
+   "text": "Instalment 2 of 3 — Physics Instalment · due 17 Nov 2026",
+   "ticked": false
+  },
+  {
+   "text": "Instalment 3 of 3 — Physics Instalment · due 17 Dec 2026",
+   "ticked": false
+  }
+ ],
+ "collectButton": "Collect\nEGP 8,283"
+}

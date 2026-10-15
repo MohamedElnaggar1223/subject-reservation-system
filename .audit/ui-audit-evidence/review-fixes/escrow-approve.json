@@ -1,0 +1,46 @@
+{
+ "partial": {
+  "id": "683ad288-cced-4e05-94de-59385a9379ea",
+  "beforeApprove": {
+   "status": "partially_fulfilled",
+   "requested": 10000,
+   "released": 4000,
+   "approved": false,
+   "walletBalance": 14850
+  },
+  "buttons_ar": [
+   "موافقة",
+   "تنفيذ",
+   "رفض"
+  ],
+  "buttons_en": [
+   "Approve",
+   "Fulfill",
+   "Reject"
+  ],
+  "screenSaid": "Approved: the cash handed over is signed for.",
+  "buttonsAfter": [
+   "Fulfill",
+   "Reject"
+  ],
+  "afterApprove": {
+   "status": "partially_fulfilled",
+   "requested": 10000,
+   "released": 4000,
+   "approved": true,
+   "walletBalance": 14850
+  }
+ },
+ "full": {
+  "id": "b7aeef34-1356-405f-bd00-a1e1c7db5bc1",
+  "beforeApprove": {
+   "status": "fulfilled",
+   "requested": 600,
+   "released": 600,
+   "approved": false,
+   "walletBalance": 3610
+  },
+  "screenSaid": "Approved: the cash handed over is signed for.",
+  "afterApprove": "not in the queue"
+ }
+}

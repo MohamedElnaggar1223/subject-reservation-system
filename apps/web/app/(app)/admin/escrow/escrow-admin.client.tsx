@@ -29,12 +29,17 @@ const fetchWithdrawals = () => apiResponse(api.v1.escrow.admin.withdrawals.$get(
 type WithdrawalRequest = Awaited<ReturnType<typeof fetchWithdrawals>>[number];
 
 /**
- * Cash already handed over waits for a second person's signature (maker-checker, D-C, MA-17): a request
- * fulfilled, or declined after a partial hand-over, is in this queue for its approval — not to be
- * fulfilled or rejected again (F6: both buttons showed on it, and no Approve).
+ * Cash already handed over waits for a second person's signature (maker-checker, D-C, MA-17): the
+ * approval covers every hand-over so far, as the server reads it (`approveWithdrawalRequest`) — a request
+ * fulfilled, partly fulfilled, or declined after a partial hand-over, not yet approved. A later hand-over
+ * clears the approval and it is asked again (F6: none of these showed Approve; F6's review, finding 4:
+ * a partial hand-over still did not).
  */
 const awaitsApproval = (r: WithdrawalRequest) =>
-  !r.approvedBy && (r.status === 'fulfilled' || (r.status === 'rejected' && (r.releasedAmount ?? 0) > 0));
+  !r.approvedBy && (r.releasedAmount ?? 0) > 0
+  && (r.status === 'fulfilled' || r.status === 'partially_fulfilled' || r.status === 'rejected');
+/** Still to hand over: a request waiting, or one partly paid out. */
+const stillToRelease = (r: WithdrawalRequest) => r.status === 'pending' || r.status === 'partially_fulfilled';
 
 // --- Styles ---
 
@@ -186,8 +191,8 @@ export default function EscrowAdminClient() {
                   </div>
 
                   {/* Status badge */}
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${awaitsApproval(req) ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : STATUS_STYLES[req.status] ?? 'bg-muted text-muted-foreground'}`}>
-                    {awaitsApproval(req) ? 'Cash released — approval pending' : labelFor(WITHDRAWAL_STATUS_LABELS, req.status)}
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${awaitsApproval(req) && !stillToRelease(req) ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : STATUS_STYLES[req.status] ?? 'bg-muted text-muted-foreground'}`}>
+                    {awaitsApproval(req) && !stillToRelease(req) ? 'Cash released — approval pending' : labelFor(WITHDRAWAL_STATUS_LABELS, req.status)}
                   </span>
                 </div>
 
@@ -213,16 +218,22 @@ export default function EscrowAdminClient() {
                   </p>
                 )}
 
-                {/* Actions: what this request is waiting for (F6) — its hand-over, or the second signature. */}
-                {awaitsApproval(req) ? (
+                {/* Actions: what this request is waiting for (F6) — the second signature on the cash handed
+                    over so far, the rest of its hand-over, or both (a partial hand-over). */}
+                {awaitsApproval(req) && (
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm text-muted-foreground">The cash is handed over; a second person approves it (not the one who released it).</p>
+                    <p className="text-sm text-muted-foreground">
+                      {stillToRelease(req)
+                        ? 'Part of the cash is handed over; a second person approves it (not the one who released it). The rest can still be released or rejected.'
+                        : 'The cash is handed over; a second person approves it (not the one who released it).'}
+                    </p>
                     <Button disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(req.id)}>Approve</Button>
                   </div>
-                ) : (
+                )}
+                {stillToRelease(req) && (
                   <div className="mt-4 flex gap-2">
                     <Button
-                      className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white"
+                      className="flex-1"
                       onClick={() => { setFulfillTarget(req); setFulfillAmount(remaining.toFixed(2)); setActionError(''); }}
                     >
                       Fulfill
@@ -310,7 +321,7 @@ export default function EscrowAdminClient() {
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                className="flex-1 font-semibold"
                 onClick={() =>
                   fulfillMutation.mutate({
                     id: fulfillTarget.id,

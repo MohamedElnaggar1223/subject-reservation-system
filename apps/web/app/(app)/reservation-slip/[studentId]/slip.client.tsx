@@ -17,7 +17,9 @@ const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed
  */
 function linesToPrint<L extends { id: string; status: string }>(sessions: { lines: L[] }[], ids: string[]): L[] {
   if (ids.length) return sessions.flatMap((x) => x.lines).filter((l) => ids.includes(l.id));
-  const latest = [...sessions].reverse().find((x) => x.lines.some((l) => LIVE.includes(l.status)));
+  // The statement lists a student's sessions newest first (statement.services: by start date, latest
+  // first), so the first with a live reservation is the latest (F6's review, finding 3: reversed, it was the oldest).
+  const latest = sessions.find((x) => x.lines.some((l) => LIVE.includes(l.status)));
   return latest ? latest.lines.filter((l) => LIVE.includes(l.status)) : [];
 }
 

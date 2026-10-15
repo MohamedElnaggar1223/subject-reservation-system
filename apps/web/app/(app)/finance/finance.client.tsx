@@ -372,7 +372,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                     {/* MO-10: what is due once the window has closed */}
                     {pay.status === 'pending' && pay.referenceDueAt && (
                       <p className="text-xs mt-1 text-amber-700 dark:text-amber-400">
-                        <span>Window closed — the family has until</span> <InstantText iso={String(pay.referenceDueAt)} /> <span>to submit the reference; then it lapses on its own.</span>
+                        <span>Session closed — the family has until</span> <InstantText iso={String(pay.referenceDueAt)} /> <span>to submit the reference; then it lapses on its own.</span>
                       </p>
                     )}
                     {(() => {
@@ -574,7 +574,6 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                     isFinanceAdmin ? (
                       <Button
                         size="sm"
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white"
                         disabled={approveWithdrawalMutation.isPending}
                         onClick={() => approveWithdrawalMutation.mutate(w.id)}
                       >
@@ -690,7 +689,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
+                className="flex-1 font-bold"
                 disabled={
                   confirmMutation.isPending ||
                   (confirmTarget.paymentMethod === 'in_school' && !instrument)
@@ -749,7 +748,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                 Cancel
               </Button>
               <Button
-                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
+                className="flex-1 font-bold"
                 disabled={fulfillMutation.isPending || !(parseFloat(amountInput) > 0)}
                 onClick={() =>
                   fulfillMutation.mutate({

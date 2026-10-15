@@ -1,0 +1,122 @@
+[
+ {
+  "lang": "en",
+  "role": "anon",
+  "path": "/sign-in",
+  "finalPath": "/sign-in",
+  "passesToIdle": 1,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "en",
+  "role": "anon",
+  "path": "/sign-up",
+  "finalPath": "/sign-up",
+  "passesToIdle": 1,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "en",
+  "role": "admin",
+  "path": "/",
+  "finalPath": "/",
+  "passesToIdle": 4,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "en",
+  "role": "parent_b",
+  "path": "/",
+  "finalPath": "/",
+  "passesToIdle": 2,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "en",
+  "role": "admin",
+  "path": "/academic/years",
+  "finalPath": "/academic/years",
+  "passesToIdle": 1,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "en",
+  "role": "admin",
+  "path": "/today",
+  "finalPath": "/today",
+  "passesToIdle": 1,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "ar",
+  "role": "anon",
+  "path": "/sign-in",
+  "finalPath": "/sign-in",
+  "passesToIdle": 2,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "ar",
+  "role": "anon",
+  "path": "/sign-up",
+  "finalPath": "/sign-up",
+  "passesToIdle": 2,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "ar",
+  "role": "admin",
+  "path": "/",
+  "finalPath": "/",
+  "passesToIdle": 7,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "ar",
+  "role": "parent_b",
+  "path": "/",
+  "finalPath": "/",
+  "passesToIdle": 4,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "ar",
+  "role": "admin",
+  "path": "/academic/years",
+  "finalPath": "/academic/years",
+  "passesToIdle": 2,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ },
+ {
+  "lang": "ar",
+  "role": "admin",
+  "path": "/today",
+  "finalPath": "/today",
+  "passesToIdle": 2,
+  "passesIn12sAfterIdle": 0,
+  "lastPassMsAfterIdle": 0,
+  "hydrationErrors": 0
+ }
+]

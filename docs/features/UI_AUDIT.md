@@ -87,7 +87,7 @@ step is there but costs a search, a guess or a scroll, or a WCAG AA failure; **L
 
 | Principle | Finding | Sev | Fix |
 |---|---|---|---|
-| Arabic, errors | React's hydration warning on every page read in Arabic (70 of 71 Arabic screens in the before drive; Next's dev overlay "1 Issue"): the language provider's first render read localStorage, which the server does not have — the server rendered English, the browser's first render Arabic (since 2c3d27f, 30 May) | H | **The cause fixed:** the language lives in a cookie the root layout reads, so the server renders the page in the reader's language and direction and the first render agrees (`lib/language.ts`, `app/layout.tsx`, `lib/i18n.tsx`); an earlier localStorage-only choice is carried into the cookie once. After: no screen in either language logs a hydration error, and an Arabic page arrives right-to-left from the server (no flash of a left-to-right layout) |
+| Arabic, errors | React's hydration warning on every page read in Arabic (67 of the 75 Arabic records in `drive-before.json` — §5 says what the other eight are; Next's dev overlay "1 Issue"): the language provider's first render read localStorage, which the server does not have — the server rendered English, the browser's first render Arabic (since 2c3d27f, 30 May) | H | **The cause fixed:** the language lives in a cookie the root layout reads, so the server renders the page in the reader's language and direction and the first render agrees (`lib/language.ts`, `app/layout.tsx`, `lib/i18n.tsx`); an earlier localStorage-only choice is carried into the cookie once. After: no screen in either language logs a hydration error, and an Arabic page arrives right-to-left from the server (no flash of a left-to-right layout; the words the page translator handles are still English until hydration, §4.1) |
 | WCAG 1.4.3 contrast | the sidebar's lit item and the "IG" tile: white on the bright teal, 2.92:1 (every staff screen); the subtitle and role at 50% (4.17:1); the stage titles at 40% (3.11:1) | M | the lit item's text takes the sidebar's own deep teal (`--sidebar-primary-foreground` set to the `--sidebar` value: 5.98:1); the subtitle and role at 70% (7.0:1), the stage titles at 60% (5.46:1). No new colour: a token takes another token's value |
 | WCAG 4.1.2 names | the sidebar's collapse button and the phone's menu button had no name (axe `button-name` on all 71 screens) | M | "Collapse the menu" / "Expand the menu" and "Open the menu", with `aria-expanded`; the phone's menu button 40 px (it was 36) |
 | WCAG 2.5.3 label in name | the sign-in pages' language button was named "Switch language" while it shows "العربية" | M | its visible word is its name, marked `lang` in the other language; "Switch language" stays its tooltip |
@@ -137,7 +137,7 @@ again only for what F6a left open.
 | Principle | Finding | Sev | Fix / reason |
 |---|---|---|---|
 | Aesthetic and minimal | Mathematics A.S./A.L. read "P1 (Teacher A) · P2 (Teacher A) · P3 (Teacher A) · P4 (Teacher A) · M1 (Teacher A) · S1 (Teacher A)": a unit taught by the subject's own teachers repeated them | L | a unit names its teachers only when they are its own: "P1 · P2 · P3 · P4 · M1 · S1" (the Teachers column names Teacher A once) |
-| Queued (follow-ups' review) | rebuilding the subject's form after a Replace a teacher discarded what was typed on it before | M | **kept**: what was typed (offered as, fees, papers, units' offers and sittings, grade-10 core, course start, notes) is carried into the form made again; only its teachers are read again (a kept tick could send the teacher who left back with the next Save). The dialog says so: "Anything else you changed on the subject's form stays; its teachers are read again after the replacement." |
+| Queued (follow-ups' review) | rebuilding the subject's form after a Replace a teacher discarded what was typed on it before | M | **kept**: what was typed (offered as, fees, papers, units' offers and sittings, grade-10 core, course start, notes) is carried into the form made again; only its teachers are read again (a kept tick could send the teacher who left back with the next Save). The dialog says so: "Anything else you changed on the subject's form stays; its teachers are read again after the replacement." The form is made again from the row the replacement reads back, not from the drawer's copy, which arrives a render later (§4.3, the review's finding 2) |
 | Next step | "Set this subject's papers on the Catalogue" opened the Catalogue's first tab; the papers are set on its Qualifications tab | L | the link opens that tab |
 
 **Fees [s07]**
@@ -231,7 +231,7 @@ officer and the next step:
 
 | Principle | Finding | Sev | Fix / reason |
 |---|---|---|---|
-| Owner's standard / money shown | for a family on three instalments, "To collect now" ticked all three — "Collect EGP 24,850" for a plan whose first instalment falls due in three days | H | each plan's next instalment (and any already due) ticked; the later ones listed, unticked: "Collect EGP 8,283". The officer can tick the rest. The API, the payment and the receipts are unchanged |
+| Owner's standard / money shown | for a family on three instalments, "To collect now" ticked all three — "Collect EGP 24,850" for a plan whose first instalment falls due in three days | H | each plan's next instalment (and any already due) ticked; the later ones listed, unticked: "Collect EGP 8,283". The officer can tick the rest. "Already due" is the school's day in Cairo (§4.3, finding 7). The API, the payment and the receipts are unchanged |
 | Owner's standard (queued: step 4) | the parent-consent tick ("Refund policy and declaration read and signed by the parent") showed for every waiting line, also those the family had reserved itself with both consents | M | shown — and sent — only when a ticked line carries the school's consent alone (a grade-10 line the school reserved). The summary gains `familyConsentNeeded` per line, read from `consentStanding` as the checkout reads it; a new 08o scenario and its control (§10) |
 | Owner's standard | a walk-in family whose school fee gates reserving: the fee unticked in "Also collect now", so "Reserve and collect" was refused for it; and three more "Collect fee — Cash / Credit / InstaPay" buttons in the header, a third place to take the same fee | M | the fee ticked first in "Also collect now" (the button reads "Reserve and collect EGP 30,000"); the header keeps the fee's badge and drops its three buttons ("To collect now" collects the fee alone, with its instrument) |
 | Desk-first (memory) | the student record's "Payments and receipts at the desk" opened an empty desk: the officer searched again | M | it opens the desk on that student (`/desk?student=`): one input and one click fewer |
@@ -285,17 +285,18 @@ officer and the next step:
 
 | Principle | Finding | Sev | Fix / reason |
 |---|---|---|---|
-| Truth / next step | requests whose cash was already handed over (status fulfilled, or declined after a partial hand-over) wait in this queue for the second signature, yet showed "Fulfill" and "Reject" and no "Approve" | H | such a request reads "Cash released — approval pending", says a second person approves it, and offers **Approve** (the admin may: `POST …/approve` is the admin's and the finance admin's); the others keep Fulfill and Reject |
+| Truth / next step | requests whose cash was already handed over (status fulfilled, or declined after a partial hand-over) wait in this queue for the second signature, yet showed "Fulfill" and "Reject" and no "Approve" | H | such a request reads "Cash released — approval pending", says a second person approves it, and offers **Approve** (the admin may: `POST …/approve` is the admin's and the finance admin's); the others keep Fulfill and Reject. A partly fulfilled request shows both: Approve for the cash handed over so far, Fulfill and Reject for the rest (§4.3, finding 4). Partial hand-overs are approved here and on the Finance Workbench, which already offered it |
 | Consistency | "10000.00 EGP", "9/27/2026, 5:18:29 AM" | M | "EGP 10,000", "27 Sep 2026 05:18" (the shared `Money`, `InstantText`) |
 | Hono RPC | a hand-written request type and a `useQuery<…>` generic | M | the fetcher's type (generics 16 → 15) |
-| WCAG 1.4.3 | white on emerald-600, 3.65:1 | M | emerald-700, 5.36:1 (the tone palette's own) |
+| WCAG 1.4.3 | white on emerald-600, 3.65:1 | M | the project's primary button (first emerald-700 with an emerald-800 hover, a shade main never used: §4.3, finding 6) |
 
 ### 3.19 Finance Workbench `/finance` [s45]
 
 | Principle | Finding | Sev | Fix / reason |
 |---|---|---|---|
 | Consistency | "8800.00 EGP", "Requested 600.00 EGP", "10/15/2026, 7:41:55 AM", "9/27/2026" | M | the shared `Money`, `Day` and `InstantText`; the sentences split around them, each part with its Arabic |
-| WCAG 1.4.3 | amber-600 notes (3.2:1) and white on emerald-600 buttons (3.65:1) | M | amber-700 and emerald-700 |
+| WCAG 1.4.3 | amber-600 notes (3.2:1) and white on emerald-600 buttons (3.65:1) | M | amber-700; the buttons the project's primary (first emerald-700/800, a shade main never used: §4.3, finding 6) |
+| Forms' words | "Window closed — the family has until …" (the pre-rework word) | L | "Session closed — …" (§4.3, finding 5) |
 
 ### 3.20 Daily Takings `/takings` [s46]
 
@@ -345,7 +346,7 @@ the entries screens are judged with an entry on them; the shell's fixes were alr
 |---|---|---|---|
 | Forms' words | the receipt said "Council" and "Registration fee" | M | "Board", "Board fee" — the sheet's and the forms' words |
 | Consistency | "EGP 14000.00" | M | "EGP 14,000" |
-| Empty state / print | the slip opened without its reservations (a bookmark, the record) printed an empty slip at EGP 0 and sent it to the printer by itself | M | it prints the student's live reservations of their latest session; with none it says "Nothing to print" and does not open the print dialog |
+| Empty state / print | the slip opened without its reservations (a bookmark, the record) printed an empty slip at EGP 0 and sent it to the printer by itself | M | it prints the student's live reservations of their latest session (the first in the statement's newest-first list: §4.3, finding 3); with none it says "Nothing to print" and does not open the print dialog |
 | Sentences | the slip's column "Line" | L | "Subject" |
 | Arabic | "قيد أول, في المدرسة" (an English comma between two Arabic phrases) | L | a neutral "·" |
 
@@ -438,8 +439,8 @@ the cycle follow-ups' review), the records it keeps for the owner, and the lead'
 | Q1 | The Arabic hydration warning, at its cause — the language provider's initialiser since 2c3d27f (30 May); "1 Issue" on the Arabic drawer pages (F6a's review) | **fixed at both its causes** (§4.1). After: no hydration error on any of the 77 Arabic records | §3.0, §3.13, §4.1 |
 | Q2 | Three hand-cast API responses in `desk.client.tsx` (C's review) | **fixed**: the school fee's answer takes its own type (the header's three fee buttons that used it are gone, §3.12); the three statuses read through `labelFor(map, value)` | §3.12 |
 | Q3 | The import review offers "First entry" on a one-paper line, which the plan always makes a retake (F6a's review) | **fixed** (§4.2) | §4.2 |
-| Q4 | F4's Arabic refusal reads "للمرشح the candidate" when the candidate has no name (F6a's review) | **fixed** in the rule (`i18n-sessions.ts`): "… للمرشح أُرسل إلى المجلس …" without a name, and the name when there is one — read through the translator's own functions (`drive/sentences-check.ts`) | trail 20:28:51Z |
-| Q5 | F1's Arabic clash reason: English names isolated only up to the em dash; an English comma in the date (the follow-ups' review) | **fixed** (`i18n-scheduling.ts`): a Latin run carries across " — " before Latin ("Biology 11 — Teacher B", "Term 1 — first" whole), and the day reads "الأربعاء، 21 أكتوبر 2026" | trail 20:28:51Z |
+| Q4 | F4's Arabic refusal reads "للمرشح the candidate" when the candidate has no name (F6a's review) | **fixed** in the rule (`i18n-sessions.ts`): "… للمرشح أُرسل إلى المجلس …" without a name, and the name when there is one — read through the translator's own functions (`drive/sentences-check.ts`). No committed test: the web has no test harness; the script is the proof | trail 20:28:51Z |
+| Q5 | F1's Arabic clash reason: English names isolated only up to the em dash; an English comma in the date (the follow-ups' review) | **fixed** (`i18n-scheduling.ts`): a Latin run carries across " — " before Latin ("Biology 11 — Teacher B", "Term 1 — first" whole), and the day reads "الأربعاء، 21 أكتوبر 2026". No committed test (the web has no test harness): proven by `drive/sentences-check.ts` | trail 20:28:51Z |
 | Q6 | The Sent log names a class by its teacher on the day it is read, not at send time — if cheap (the follow-ups' review) | **fixed** (it was cheap): the words the MESSAGE_SENT audit row keeps; an 08s scenario and its control | §3.17 |
 | Q7 | Rebuilding the subject's form after a Replace a teacher discards what was typed (the follow-ups' review) | **fixed**: what was typed is carried into the rebuilt form; only its teachers are read again; the dialog says so | §3.4 |
 | Q8 | Two document nits: CYCLE_FOLLOWUPS §9's year-picker bullet, SCHEDULING §8's "its teacher today" (the follow-ups' review) | **fixed** in both documents; with them the follow-ups' comment naming a function that does not exist (`message-audience.services.ts`) | trail 20:39:33Z |
@@ -463,20 +464,51 @@ the cycle follow-ups' review), the records it keeps for the owner, and the lead'
 | L2 | The admin's landing: "Closed to new reservations" twice on a closed card | **once**, as a heading above the closed sessions still in progress | §3.1 |
 | L3 | The Session dates dialog's "other dates" (the board's eleven dates and the notes) above Save | **behind a disclosure** that says how many are set and opens by itself when one is; on Board Series too | §3.7 |
 
-### 4.1 The hydration warning's two causes
+### 4.1 The hydration warning's two causes, and the translator's retry
 
 1. **The provider's first render.** `I18nProvider`'s state initialiser read localStorage, which the server does
    not have: the server rendered English, the browser's first render Arabic, and React threw away the tree
    (reproduced first on `/sign-in`: the language button's "Switch language" / "تغيير اللغة"). The language now
    lives in a cookie (`language`, a year, `SameSite=Lax`) that the root layout reads (`app/layout.tsx`,
    `lib/language.ts`): the server renders `<html lang dir>` and the first state in the reader's language, so
-   an Arabic page also arrives right to left with no flash. A choice made before (localStorage only) is
-   carried into the cookie once, after hydration.
+   an Arabic page arrives right to left from the server, the strings read through `t()` already Arabic. That
+   is true of the direction, not of every word: most of a page's words are put into Arabic by the page
+   translator (the dictionaries), which runs only in the browser, so on a slow load they show in English until
+   React has hydrated and the translator has passed. A choice made before (localStorage only) is carried into
+   the cookie once, after hydration. The cost: the root layout reads a cookie, so every route renders per
+   request — the sign-in and sign-up pages included, which could be served static before (the signed-in pages
+   already were per request: each reads the session). The expected price of a server that knows the reader's
+   language.
 2. **The page translator.** On `/students` the warning remained: `localizeDom` rewrote the list's server HTML
    inside a Suspense boundary before React hydrated it. It now touches only what React owns (the element's
    fiber attached) and looks again every 100 ms, up to 10 s, while part of a page waits to hydrate — hydrating
    mutates nothing, so the mutation observer alone would not see it. Control (trail 05:40:04Z): with the check
    disabled, four loads of `/students` in Arabic gave four hydration errors; restored, none.
+3. **The translator's retry, found by F6's review.** The ownership test came before the skip of `SCRIPT` and
+   `STYLE`: Next's own script tags in `<body>` never belong to React, so every page always had something
+   "waiting", and the translator walked the whole page every 100 ms until its limit — about a hundred passes
+   after each load, in both languages. `SCRIPT`, `STYLE`, `NOSCRIPT` and `TEMPLATE` (with `CODE`, `PRE`,
+   `TEXTAREA`) are now passed over before the ownership test (`NOT_TEXT` in `lib/i18n.tsx`). Measured
+   (`review-fixes/translator-passes-*.json`, `drive/translator-passes.mjs`, which counts the translator's walks
+   of the page): in the 12 s after the network went idle, 90–96 passes before, **0** after, on `/sign-in`,
+   `/sign-up`, the admin's landing, the family's home, `/academic/years` and `/today`, English and Arabic;
+   1–7 passes up to idle. No hydration error on any of them, nor on `/students` in Arabic (the Suspense case,
+   four loads).
+
+### 4.3 F6's review (Opus 5.5, of 925e36c): the seven findings
+
+"Merge after fixes 1, 2, 3"; all seven fixed in one round, each driven, with its control where the old code
+could be put back. Evidence under `.audit/ui-audit-evidence/review-fixes/`, scripts under `drive/`.
+
+| # | Finding | Fix | Proof |
+|---|---|---|---|
+| 1 | The page translator re-walked the page every 100 ms, a hundred times after each load (blocker) | §4.1 point 3 | passes after idle 90–96 → 0 on six pages, both languages; no hydration error, `/students` included |
+| 2 | After Replace a teacher, the form was made again from the drawer's copy of the row, which React Query delivers a render later: it could tick the teacher who left, and the next Save send him back (blocker) | the Save and the Replace each read the sheet back themselves (`queryClient.fetchQuery`, typed by its fetcher) and the form is made again from that row, used until the sheet's own copy is as new (`dataUpdatedAt`) | Physics A.S./A.L., a note typed first, React Query's notification delayed 300 ms so the late delivery is certain: the old code ticked the teacher who left and the Save sent him back (control red); the fix ticked the new teacher, kept the note, and the Save kept the new teacher; the same at normal timing (`replace-teacher-*.json`). Dev data put back |
+| 3 | The slip opened without ids printed the oldest session (the statement lists sessions newest first; the code took the last) | the first session with a live reservation | a student with live reservations in June 2027 and November 2026 – January 2027: before, November; after, June 2027 (`slip-two-sessions-*.json`) |
+| 4 | Escrow's Approve never clicked; partly fulfilled requests, which the server approves, had no Approve | Approve on every hand-over awaiting its second signature, partial ones included, beside Fulfill and Reject for the rest; "Partially Fulfilled", "Fulfilled" in Arabic | clicked: EGP 4,000 of a EGP 10,000 request released by the officer, the admin's card showed Approve · Fulfill · Reject (EN, AR); Approve → "Approved: the cash handed over is signed for.", the request partly fulfilled and approved, Fulfill and Reject left; a fulfilled EGP 600 request approved left the queue (`escrow-approve.json`, `escrow-partial-*.jpg`) |
+| 5 | "Window closed — …" on the Finance Workbench; the home's "Everything else" list name without Arabic | "Session closed — …" (أُغلقت الجلسة); "كل ما عدا ذلك" | parent B's home names the list in both languages (`vocabulary.json`) |
+| 6 | `hover:bg-emerald-800`, a shade main never used | the five buttons F6 had moved to emerald-700/800 take the project's primary button | `drive/new-shades.py`: every colour class in `apps/web` against main — none new |
+| 7 | The desk read "already due" by the UTC date | the school's day (`schoolDateString`, Africa/Cairo) | the browser's clock at 16 Nov 23:00 UTC (17 Nov in Cairo), instalment 2 due 17 Nov: before unticked, "Collect EGP 8,283"; after ticked, "Collect EGP 16,566" (`desk-due-*.json`) |
 
 ### 4.2 The import review's entry choice on a one-paper line
 
@@ -543,8 +575,9 @@ RESERVATIONS_REWORK.md §11's step-4 method: what the person must type, click or
 ## 7. Decisions and why
 
 1. **The language in a cookie, not a silenced warning.** `suppressHydrationWarning` would have hidden 67
-   mismatches and left the server rendering English to an Arabic reader; reading the cookie in the root layout
-   removes the mismatch and the left-to-right flash together (§4.1).
+   mismatches and left the server building an Arabic reader's page left to right; reading the cookie in the
+   root layout removes the mismatch and the left-to-right flash together (§4.1). Its cost, accepted: every
+   route renders per request.
 2. **The translator waits for React** rather than racing it: touching server HTML React has not hydrated was
    the second cause (§4.1).
 3. **Contrast through the project's own values.** The sidebar's lit item takes the sidebar's own deep teal
@@ -590,6 +623,8 @@ RESERVATIONS_REWORK.md §11's step-4 method: what the person must type, click or
 | A refusal on an auth form is drawn in English and translated a moment later (§3.32) | the DOM translator's way; in Arabic a screen reader may hear the English sentence before the Arabic. The fix is the auth errors through `t()` keys — every auth form's error path |
 | `lib/hono-server.ts` warns "Cookie … not found" on every server render for a visitor | a server log, not a screen — the same misreading as the session helper's; left to whoever next touches the server client |
 | Hidden screens | not audited (the brief): they come back with the switch |
+| A committed test for F4's and F1's Arabic sentences (§4, Q4 and Q5) | the web has no test harness; `drive/sentences-check.ts` runs the translator's own functions on both sentences and is their proof |
+| The words the page translator handles show in English until hydration (§4.1) | the cookie gives the server the reader's direction and the `t()` strings; the dictionaries' words are put into Arabic in the browser. Rendering them on the server would mean the translator running there — a change to how every screen is translated |
 
 ## 9. Questions for the owner
 
@@ -720,3 +755,12 @@ trail and the evidence.
   1 todo, both. CI run 38810433498 green on 0b71cb4 (21:48Z). §10 written.
 - 21:49Z — the proof committed (a509bdd) and pushed; CI run 38812765664 green on it (22:05Z). My dev servers
   stopped; the import staged in `igcse_ui_dev` (§4.2) left there, uncommitted. Handed to the lead's review.
+- 22:45Z (16 Oct, 01:45 Cairo) — F6's Opus 5.5 review of 925e36c: "merge after fixes 1, 2, 3", seven
+  findings. Dev servers started again (API pnpm pid 2400, web pnpm pid 2402).
+- 22:46–23:14Z — the seven fixed in one round (§4.3), each driven and, where the old code could be put back,
+  controlled: the translator's retry (22:52Z), Replace a teacher's read-back (23:00Z), the slip's session
+  (23:04Z), Escrow's Approve on partial hand-overs, clicked (23:08Z), the primary buttons (23:08Z), the two
+  words (23:09Z), the desk's Cairo day (23:11Z). The document's hydration counts made one set (67 of 75
+  Arabic records); the direction-only "no flash", the per-request rendering and the untested Arabic
+  sentences written down (§4.1, §7, §8). Both type-checks green in the worktree; `useQuery<` generics 15.
+- Next: commit; the full suite in local time and UTC; the whole after drive; CI.

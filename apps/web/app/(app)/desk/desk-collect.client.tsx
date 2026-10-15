@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, schoolDateString } from '@repo/validations';
 import { Notice } from '~/components/ui/tone';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import {
@@ -48,14 +48,16 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     // An instalment plan is paid over time: only each plan's next instalment (and any already due) is
     // ticked at first, not the whole plan (F6: the desk offered all three instalments, EGP 24,850, for a
     // plan whose first falls due in three days). The officer can still tick the rest.
-    const today = new Date().toISOString().slice(0, 10);
+    // "Already due" is read in the school's day (Cairo), as the desk's Today and the Money tab read it, not
+    // the UTC date: between 22:00 and midnight UTC the two differ (F6's review, finding 7).
+    const today = schoolDateString(new Date());
     const nextOfPlan = new Map<string, string>();
     for (const c of [...payable].filter((x) => x.kind === 'instalment').sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)))) {
       const plan = c.registration?.id ?? c.id;
       if (!nextOfPlan.has(plan)) nextOfPlan.set(plan, c.id);
     }
     const laterInstalments = new Set(payable
-      .filter((c) => c.kind === 'instalment' && nextOfPlan.get(c.registration?.id ?? c.id) !== c.id && !(c.dueAt && String(c.dueAt).slice(0, 10) <= today))
+      .filter((c) => c.kind === 'instalment' && nextOfPlan.get(c.registration?.id ?? c.id) !== c.id && !(c.dueAt && schoolDateString(new Date(c.dueAt)) <= today))
       .map((c) => `c:${c.id}`));
     return { lines, provisional, payable, requested, fees, laterInstalments, loading: charges.isLoading };
   }, [charges.data, charges.isLoading, summary]);
