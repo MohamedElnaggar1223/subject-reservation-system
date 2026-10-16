@@ -848,8 +848,8 @@ DISCOVERY.md and the owner's direction of 14 Oct. Each is applied by the follow-
     exists; default empty, the app's name shown until it is set), no logo until the school provides
     one; the sentence under it stays the family's words.
 16. **Entry Lists' rule source reads the handbook's name alone** ("Cambridge Handbook 2026"): the
-    stored text is changed by a one-off update on the template and the owner's database and in
-    F4's seed for new installs.
+    stored text is changed by the custom migration 0061_rule_source_notes (idempotent, an audit row
+    per change) on every database, new or existing; 0057's seed stays as it was applied.
 
 
 ---
