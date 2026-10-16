@@ -1,0 +1,43 @@
+Pager usage is off.
+       email       | role  
+-------------------+-------
+ admin@igcse.local | admin
+(1 row)
+
+ code |                   name                   |  council  | qualification_level | mapped | course_fee | registration_fee | is_active 
+------+------------------------------------------+-----------+---------------------+--------+------------+------------------+-----------
+ 0400 | Art & Design                             | cambridge | igcse               | f      |    1300.00 |           300.00 | t
+ 0413 | Physical Education                       | cambridge | igcse               | f      |     900.00 |           300.00 | t
+ 0417 | Information and Communication Technology | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0450 | Business Studies                         | cambridge | igcse               | f      |    1100.00 |           300.00 | t
+ 0452 | Accounting                               | cambridge | igcse               | f      |    1100.00 |           300.00 | t
+ 0455 | Economics                                | cambridge | igcse               | f      |    1100.00 |           300.00 | t
+ 0460 | Geography                                | cambridge | igcse               | f      |    1100.00 |           300.00 | t
+ 0470 | History                                  | cambridge | igcse               | f      |    1100.00 |           300.00 | t
+ 0478 | Computer Science                         | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0500 | English Language                         | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0520 | French                                   | cambridge | igcse               | f      |    1000.00 |           300.00 | t
+ 0544 | Arabic Language                          | cambridge | igcse               | f      |     900.00 |           300.00 | t
+ 0580 | Mathematics                              | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0610 | Biology                                  | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0620 | Chemistry                                | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0625 | Physics                                  | cambridge | igcse               | f      |    1200.00 |           300.00 | t
+ 0680 | Environmental Management                 | cambridge | igcse               | f      |    1000.00 |           300.00 | t
+(17 rows)
+
+         id         |             name             | session_type | series_year | status |       start_date       |        end_date        
+--------------------+------------------------------+--------------+-------------+--------+------------------------+------------------------
+ sess_june-2026     | June 2026                    | june         |        2026 | active | 2026-02-01 00:00:00+00 | 2026-04-30 23:59:59+00
+ sess_november-2026 | November 2026 – January 2027 | winter       |        2026 | draft  | 2026-07-01 00:00:00+00 | 2026-09-30 23:59:59+00
+(2 rows)
+
+ qualifications 
+----------------
+              0
+(1 row)
+
+ board_series 
+--------------
+            0
+(1 row)
+

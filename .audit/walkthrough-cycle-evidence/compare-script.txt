@@ -1,0 +1,240 @@
+Pager usage is off.
+Output format is unaligned.
+Tuples only is on.
+setting|reminders.enabled|true
+setting|school.name|"Demo International School"
+staff|admin|1
+staff|coordinator|1
+staff|finance_officer|1
+staff|teacher|33
+teacher|person|33
+teacher|provider|1
+subject|0400|Art & Design|cambridge|igcse|f|-|-
+subject|0413|Physical Education|cambridge|igcse|f|-|-
+subject|0417|Information and Communication Technology|cambridge|igcse|f|-|-
+subject|0450|Business Studies|cambridge|igcse|f|-|-
+subject|0452|Accounting|cambridge|igcse|f|-|-
+subject|0455|Economics|cambridge|igcse|f|-|-
+subject|0457|Global Perspectives|cambridge|igcse|t|0457|-
+subject|0460|Geography|cambridge|igcse|f|-|-
+subject|0470|History|cambridge|igcse|f|-|-
+subject|0478|Computer Science|cambridge|igcse|f|-|-
+subject|0500|English Language|cambridge|igcse|f|-|-
+subject|0520|French|cambridge|igcse|f|-|-
+subject|0544|Arabic Language|cambridge|igcse|f|-|-
+subject|0580|Mathematics|cambridge|igcse|f|-|-
+subject|0610|Biology|cambridge|igcse|f|-|-
+subject|0620|Chemistry|cambridge|igcse|f|-|-
+subject|0625|Physics|cambridge|igcse|f|-|-
+subject|0653|Combined Science|cambridge|igcse|t|0653|-
+subject|0680|Environmental Management|cambridge|igcse|t|0680|-
+subject|0970|Biology|cambridge|igcse|t|0970|-
+subject|0971|Chemistry|cambridge|igcse|t|0971|-
+subject|0972|Physics|cambridge|igcse|t|0972|-
+subject|0983|ICT|cambridge|igcse|t|0983|-
+subject|0984|Computer Science|cambridge|igcse|t|0984|-
+subject|0986|Business Studies|cambridge|igcse|t|0986|-
+subject|3180|Arabic|cambridge|igcse|t|3180|-
+subject|4HB1|Human Biology|pearson_edexcel|igcse|t|4HB1|-
+subject|4MA1|Mathematics|pearson_edexcel|igcse|t|4MA1|-
+subject|7156|French|cambridge|igcse|t|7156|-
+subject|7159|German|cambridge|igcse|t|7159|-
+subject|ARABIC-AL|Arabic A.L.|pearson_edexcel|a_level|t|YAA01|-
+subject|CHEM-AS|Chemistry A.S.|cambridge|as_level|t|9701|-
+subject|CS-ASAL|Computer Science A.S./A.L.|cambridge|as_level|t|9618|-
+subject|ESL-OXFORD|English as a Second Language|oxford|igcse|t|ESL-OXFORD|-
+subject|FRENCH-ASAL|French A.S./A.L.|cambridge|as_level|t|9898|-
+subject|GLOBAL-CIT|Global Citizenship|cambridge|igcse|t|GLOBAL-CIT|-
+subject|IAL-BIOLOGY|Biology A.S./A.L.|pearson_edexcel|a_level|t|-|WBI11 WBI12 WBI13 WBI14 WBI15 WBI16
+subject|IAL-MATHS|Mathematics A.S./A.L.|pearson_edexcel|a_level|t|-|WMA11 WMA12 WMA13 WMA14 WME01 WST01
+subject|PHYS-ASAL|Physics A.S./A.L.|cambridge|as_level|t|9702|-
+subject|PSY-AL|Psychology A.L.|cambridge|a_level|t|9990|-
+subject|PSY-OXFORD|Psychology|oxford|igcse|t|PSY-OXFORD|-
+award|cambridge|0457|igcse|syllabus_option|Global Perspectives|-|-
+award|cambridge|0653|igcse|syllabus_option|Combined Science|0653/41:required|CX=All papers
+award|cambridge|0680|igcse|syllabus_option|Environmental Management|-|-
+award|cambridge|0970|igcse|syllabus_option|Biology|0970/41:required|CX=All papers
+award|cambridge|0971|igcse|syllabus_option|Chemistry|0971/41:required|CX=All papers
+award|cambridge|0972|igcse|syllabus_option|Physics|0972/41:required|CX=All papers
+award|cambridge|0983|igcse|syllabus_option|ICT|0983/01:required|DY=All papers
+award|cambridge|0984|igcse|syllabus_option|Computer Science|-|AX=All papers
+award|cambridge|0986|igcse|syllabus_option|Business Studies|-|AX=All papers
+award|cambridge|3180|igcse|syllabus_option|Arabic|3180/01:required 3180/02:required|A=All papers
+award|cambridge|7156|igcse|syllabus_option|French|-|X=All papers
+award|cambridge|7159|igcse|syllabus_option|German|-|Y=All papers
+award|cambridge|9618|a_level|syllabus_option|Computer Science (A Level)|-|AY=A.L. BY=A.2. (Carry forward)(cf)
+award|cambridge|9618|as_level|syllabus_option|Computer Science (AS Level)|-|SY=A.S.
+award|cambridge|9701|a_level|syllabus_option|Chemistry (A Level)|-|AX=A.L. BY=A.2. (Carry forward)(cf)
+award|cambridge|9701|as_level|syllabus_option|Chemistry (AS Level)|-|S1=A.S.
+award|cambridge|9702|a_level|syllabus_option|Physics (A Level)|-|AX=A.L. BX=A.2. (Carry forward)(cf)
+award|cambridge|9702|as_level|syllabus_option|Physics (AS Level)|-|S1=A.S.
+award|cambridge|9898|a_level|syllabus_option|French (A Level)|-|AX=A.L.
+award|cambridge|9898|as_level|syllabus_option|French (AS Level)|-|S1=A.S.
+award|cambridge|9990|a_level|syllabus_option|Psychology (A Level)|-|-
+award|cambridge|GLOBAL-CIT|igcse|syllabus_option|Global Citizenship|-|-
+award|oxford|ESL-OXFORD|igcse|qualification|English as a Second Language|-|-
+award|oxford|PSY-OXFORD|igcse|qualification|Psychology|-|-
+award|pearson_edexcel|4HB1|igcse|qualification|Human Biology|-|-
+award|pearson_edexcel|4MA1|igcse|qualification|Mathematics A|4MA1/1H:required 4MA1/2H:required|-
+award|pearson_edexcel|9AA0|a_level|qualification|Arabic (GCE A Level)|-|-
+award|pearson_edexcel|XBI11|as_level|units_cash_in|Biology (AS)|WBI11:required WBI12:required WBI13:required|-
+award|pearson_edexcel|XMA01|as_level|units_cash_in|Mathematics (AS)|WDM11:optional WMA11:required WMA12:required WME01:optional WST01:optional|-
+award|pearson_edexcel|YAA01|a_level|units_cash_in|Arabic (International A Level)|-|-
+award|pearson_edexcel|YBI11|a_level|units_cash_in|Biology (A Level)|WBI11:required WBI12:required WBI13:required WBI14:required WBI15:required WBI16:required|-
+award|pearson_edexcel|YMA01|a_level|units_cash_in|Mathematics (A Level)|WDM11:optional WMA11:required WMA12:required WMA13:required WMA14:required WME01:optional WME02:optional WST01:optional WST02:optional|-
+unit|cambridge|0653/41|Paper 41/42|igcse|component
+unit|cambridge|0970/41|Paper 41/42|igcse|component
+unit|cambridge|0971/41|Paper 41/42|igcse|component
+unit|cambridge|0972/41|Paper 41/42|igcse|component
+unit|cambridge|0983/01|Theory Paper|igcse|component
+unit|cambridge|3180/01|Paper 1|igcse|component
+unit|cambridge|3180/02|Paper 2|igcse|component
+unit|pearson_edexcel|4MA1/1H|1H|igcse|component
+unit|pearson_edexcel|4MA1/2H|2H|igcse|component
+unit|pearson_edexcel|WBI11|Unit 1|as|unit
+unit|pearson_edexcel|WBI12|Unit 2|as|unit
+unit|pearson_edexcel|WBI13|Unit 3|as|unit
+unit|pearson_edexcel|WBI14|Unit 4|a2|unit
+unit|pearson_edexcel|WBI15|Unit 5|a2|unit
+unit|pearson_edexcel|WBI16|Unit 6|a2|unit
+unit|pearson_edexcel|WDM11|D1|as|unit
+unit|pearson_edexcel|WMA11|P1|as|unit
+unit|pearson_edexcel|WMA12|P2|as|unit
+unit|pearson_edexcel|WMA13|P3|a2|unit
+unit|pearson_edexcel|WMA14|P4|a2|unit
+unit|pearson_edexcel|WME01|M1|as|unit
+unit|pearson_edexcel|WME02|M2|a2|unit
+unit|pearson_edexcel|WST01|S1|as|unit
+unit|pearson_edexcel|WST02|S2|a2|unit
+session|June 2026|june|2026|closed|2026-02-01
+session|June 2027|june|2027|active|2026-11-01
+session|November 2026 – January 2027|winter|2026|draft|2026-07-01
+offer|0457|open|12000.00|Teacher 17/online
+offer|0653|open|12000.00|Teacher 11/in_school
+offer|0680|open|12000.00|Teacher 14/in_school
+offer|0970|open|12000.00|Teacher 4/in_school, Teacher 5/in_school, Teacher 6/in_school
+offer|0971|open|12000.00|Teacher 8/in_school, Teacher 9/in_school, Teacher 10/in_school
+offer|0972|open|12000.00|Teacher 23/in_school
+offer|0983|open|12000.00|External Team/in_school
+offer|0984|open|12000.00|External Team/in_school
+offer|0986|open|12000.00|Teacher 7/in_school
+offer|3180|open|12000.00|Teacher 1/in_school, Teacher 2/in_school, Teacher 3/in_school
+offer|4HB1|open|12000.00|Teacher 19/in_school
+offer|4MA1|open|12000.00|Teacher 20/in_school, Teacher 21/in_school, Teacher 22/in_school
+offer|7156|open|12000.00|Teacher 15/in_school
+offer|7159|open|12000.00|Teacher 16/in_school
+offer|ARABIC-AL|open|12000.00|Teacher 25/in_school
+offer|CHEM-AS|open|15000.00|Teacher 28/in_school
+offer|CS-ASAL|open|15000.00|External Team/in_school
+offer|ESL-OXFORD|open|12000.00|Teacher 12/in_school, Teacher 13/in_school
+offer|FRENCH-ASAL|open|15000.00|Teacher 29/in_school
+offer|GLOBAL-CIT|open|12000.00|Teacher 18/in_school
+offer|IAL-BIOLOGY|open|4000.00|Teacher 27/in_school
+offer|IAL-MATHS|open|4000.00|Teacher 30/in_school, Teacher 31/in_school
+offer|PHYS-ASAL|open|15000.00|Teacher 32/in_school
+offer|PSY-AL|open|15000.00|Teacher 33/in_school
+offer|PSY-OXFORD|open|12000.00|Teacher 24/in_school
+item|0457|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|0653|one_paper|Paper 41/42 only (retake)|self_study_only|4000.00|t|entry|-|cambridge june 2027
+item|0653|whole|Whole subject|open|-|f|entry|-|cambridge june 2027
+item|0680|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|0970|one_paper|Paper 41/42 only (retake)|self_study_only|4000.00|t|entry|-|cambridge june 2027
+item|0970|whole|Whole subject|open|-|f|entry|-|cambridge june 2027
+item|0971|one_paper|Paper 41/42 only (retake)|self_study_only|4000.00|t|entry|-|cambridge june 2027
+item|0971|whole|Whole subject|open|-|f|entry|-|cambridge june 2027
+item|0972|one_paper|Paper 41/42 only (retake)|self_study_only|4000.00|t|entry|-|cambridge june 2027
+item|0972|whole|Whole subject|open|-|f|entry|-|cambridge june 2027
+item|0983|one_paper|Theory Paper only (retake)|self_study_only|4000.00|t|entry|-|cambridge june 2027
+item|0983|whole|Whole subject|open|-|f|entry|-|cambridge june 2027
+item|0984|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|0986|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|3180|one_paper|Paper 1 only (retake)|retake_only|4000.00|t|entry|-|cambridge june 2027
+item|3180|one_paper|Paper 2 only (retake)|retake_only|4000.00|t|entry|-|cambridge june 2027
+item|3180|whole|Whole subject|open|-|f|entry|-|cambridge june 2027
+item|4HB1|whole|Whole subject|open|-|f|-|-|pearson_edexcel june 2027
+item|4MA1|one_paper|1H only (retake)|self_study_only|4000.00|f|entry|-|pearson_edexcel june 2027
+item|4MA1|one_paper|2H only (retake)|self_study_only|4000.00|f|entry|-|pearson_edexcel june 2027
+item|4MA1|whole|Whole subject|open|-|f|entry|-|pearson_edexcel june 2027
+item|7156|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|7159|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|ARABIC-AL|qualification|Arabic GCE (9AA0)|open|-|f|qualification|Teacher 26/in_school|pearson_edexcel june 2027
+item|ARABIC-AL|whole|Arabic IAL (YAA01)|open|-|f|qualification|Teacher 25/in_school|pearson_edexcel june 2027
+item|CHEM-AS|route|A.2. (Carry forward)|closed|-|t|route|-|cambridge june 2027
+item|CHEM-AS|route|A.L.|open|-|f|route|-|cambridge june 2027
+item|CHEM-AS|route|A.S.|open|-|f|route|-|cambridge june 2027
+item|CS-ASAL|route|A.2. (Carry forward)|open|-|t|route|-|cambridge june 2027
+item|CS-ASAL|route|A.L.|open|-|f|route|-|cambridge june 2027
+item|CS-ASAL|route|A.S.|open|-|f|route|-|cambridge june 2027
+item|ESL-OXFORD|whole|Whole subject|open|-|f|-|-|oxford june 2027
+item|FRENCH-ASAL|route|A.L.|open|-|f|route|-|cambridge june 2027
+item|FRENCH-ASAL|route|A.S.|open|-|f|route|-|cambridge june 2027
+item|GLOBAL-CIT|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|IAL-BIOLOGY|unit|Unit 1|self_study_only|-|f|-|-|pearson_edexcel june 2027
+item|IAL-BIOLOGY|unit|Unit 2|self_study_only|-|f|-|-|pearson_edexcel june 2027
+item|IAL-BIOLOGY|unit|Unit 3|self_study_only|-|f|-|-|pearson_edexcel june 2027
+item|IAL-BIOLOGY|unit|Unit 4|self_study_only|-|f|-|-|pearson_edexcel june 2027
+item|IAL-BIOLOGY|unit|Unit 5|open|-|f|-|Teacher 27/in_school|pearson_edexcel june 2027
+item|IAL-BIOLOGY|unit|Unit 6|open|-|f|-|Teacher 27/in_school|pearson_edexcel june 2027
+item|IAL-MATHS|unit|M1|open|-|f|-|Teacher 31/in_school, Teacher 30/in_school|pearson_edexcel june 2027
+item|IAL-MATHS|unit|P1|open|-|f|-|Teacher 30/online|pearson_edexcel june 2027
+item|IAL-MATHS|unit|P2|open|-|f|-|Teacher 30/online|pearson_edexcel june 2027
+item|IAL-MATHS|unit|P3|open|-|f|-|Teacher 30/in_school|pearson_edexcel june 2027
+item|IAL-MATHS|unit|P4|open|-|f|-|Teacher 30/in_school|pearson_edexcel june 2027
+item|IAL-MATHS|unit|S1|open|-|f|-|Teacher 31/in_school, Teacher 30/in_school|pearson_edexcel june 2027
+item|PHYS-ASAL|route|A.2. (Carry forward)|self_study_only|-|t|route|-|cambridge june 2027
+item|PHYS-ASAL|route|A.L.|closed|-|f|route|-|cambridge june 2027
+item|PHYS-ASAL|route|A.S.|open|-|f|route|-|cambridge june 2027
+item|PSY-AL|whole|Whole subject|open|-|f|-|-|cambridge june 2027
+item|PSY-OXFORD|whole|Whole subject|open|-|f|-|-|oxford june 2027
+fee|cambridge|june|2027|qualification|0457 igcse|9850.00|t
+fee|cambridge|june|2027|option|0653 CX|10850.00|f
+fee|cambridge|june|2027|qualification|0653 igcse|10850.00|f
+fee|cambridge|june|2027|qualification|0680 igcse|9850.00|t
+fee|cambridge|june|2027|option|0970 CX|10850.00|f
+fee|cambridge|june|2027|qualification|0970 igcse|10850.00|f
+fee|cambridge|june|2027|option|0971 CX|10850.00|f
+fee|cambridge|june|2027|qualification|0971 igcse|10850.00|f
+fee|cambridge|june|2027|option|0972 CX|10850.00|f
+fee|cambridge|june|2027|qualification|0972 igcse|10850.00|f
+fee|cambridge|june|2027|option|0983 DY|12950.00|f
+fee|cambridge|june|2027|qualification|0983 igcse|12950.00|f
+fee|cambridge|june|2027|option|0984 AX|9850.00|f
+fee|cambridge|june|2027|option|0986 AX|9850.00|f
+fee|cambridge|june|2027|option|3180 A|9850.00|f
+fee|cambridge|june|2027|qualification|3180 igcse|9850.00|f
+fee|cambridge|june|2027|option|7156 X|12550.00|f
+fee|cambridge|june|2027|option|7159 Y|12550.00|f
+fee|cambridge|june|2027|option|9618 AY|16950.00|f
+fee|cambridge|june|2027|option|9618 BY|12450.00|f
+fee|cambridge|june|2027|option|9618 SY|11400.00|f
+fee|cambridge|june|2027|option|9701 AX|18600.00|f
+fee|cambridge|june|2027|option|9701 BY|11400.00|f
+fee|cambridge|june|2027|option|9701 S1|14100.00|f
+fee|cambridge|june|2027|option|9702 AX|18600.00|f
+fee|cambridge|june|2027|option|9702 BX|11400.00|f
+fee|cambridge|june|2027|option|9702 S1|14100.00|f
+fee|cambridge|june|2027|option|9898 AX|18600.00|t
+fee|cambridge|june|2027|option|9898 S1|14100.00|t
+fee|cambridge|june|2027|qualification|9990 a_level|18600.00|t
+fee|cambridge|june|2027|qualification|GLOBAL-CIT igcse|9850.00|t
+fee|oxford|june|2027|qualification|ESL-OXFORD igcse|9500.00|t
+fee|oxford|june|2027|qualification|PSY-OXFORD igcse|9500.00|t
+fee|pearson_edexcel|june|2027|qualification|4HB1 igcse|9840.00|t
+fee|pearson_edexcel|june|2027|qualification|4MA1 igcse|9200.00|f
+fee|pearson_edexcel|june|2027|qualification|9AA0 a_level|18300.00|t
+fee|pearson_edexcel|june|2027|unit|WBI11|4790.00|t
+fee|pearson_edexcel|june|2027|unit|WBI12|4790.00|t
+fee|pearson_edexcel|june|2027|unit|WBI13|4550.00|t
+fee|pearson_edexcel|june|2027|unit|WBI14|4550.00|t
+fee|pearson_edexcel|june|2027|unit|WBI15|4450.00|f
+fee|pearson_edexcel|june|2027|unit|WBI16|4450.00|f
+fee|pearson_edexcel|june|2027|unit|WMA11|4800.00|f
+fee|pearson_edexcel|june|2027|unit|WMA12|4800.00|f
+fee|pearson_edexcel|june|2027|unit|WMA13|4800.00|f
+fee|pearson_edexcel|june|2027|unit|WMA14|4800.00|f
+fee|pearson_edexcel|june|2027|unit|WME01|4450.00|f
+fee|pearson_edexcel|june|2027|unit|WST01|4450.00|f
+fee|pearson_edexcel|june|2027|qualification|YAA01 a_level|18300.00|f
+series|cambridge|june|2027||2027-02-21 21:59:00+00|2027-03-21 21:59:00+00
+series|oxford|june|2027||2027-02-21 21:59:00+00|
+series|pearson_edexcel|june|2027||2027-02-13 21:59:00+00|

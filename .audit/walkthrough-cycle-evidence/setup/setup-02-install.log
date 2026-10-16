@@ -1,0 +1,23 @@
+Scope: all 9 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1211
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1211, reused 1136, downloaded 0, added 116
+Progress: resolved 1211, reused 1136, downloaded 0, added 298
+Progress: resolved 1211, reused 1136, downloaded 0, added 513
+Progress: resolved 1211, reused 1136, downloaded 0, added 677
+Progress: resolved 1211, reused 1136, downloaded 0, added 841
+Progress: resolved 1211, reused 1136, downloaded 0, added 897
+Progress: resolved 1211, reused 1136, downloaded 0, added 999
+Progress: resolved 1211, reused 1136, downloaded 0, added 1110
+Progress: resolved 1211, reused 1136, downloaded 0, added 1204
+Progress: resolved 1211, reused 1136, downloaded 0, added 1205
+Progress: resolved 1211, reused 1136, downloaded 0, added 1211, done
+
+devDependencies:
++ prettier 3.7.4
++ turbo 2.7.2
++ typescript 5.9.2
+
+Done in 11.5s

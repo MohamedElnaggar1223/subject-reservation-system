@@ -1,0 +1,28 @@
+
+> turborepo-hono-nextjs-expo@ build /private/tmp/f8-clone
+> turbo run build "--filter=@repo/db" "--filter=@repo/validations" "--filter=@repo/storage"
+
+• turbo 2.7.2
+• Packages in scope: @repo/db, @repo/storage, @repo/validations
+• Running build in 3 packages
+• Remote caching disabled
+@repo/storage:build: cache miss, executing bad4e316a6e0aa81
+@repo/db:build: cache miss, executing d83ab8e4b48e8b35
+@repo/validations:build: cache miss, executing 67676c2aa099f79c
+@repo/db:build: 
+@repo/db:build: > @repo/db@0.0.0 build /private/tmp/f8-clone/packages/db
+@repo/db:build: > tsc && tsc-alias
+@repo/db:build: 
+@repo/storage:build: 
+@repo/storage:build: > @repo/storage@0.0.0 build /private/tmp/f8-clone/packages/storage
+@repo/storage:build: > tsc && tsc-alias
+@repo/storage:build: 
+@repo/validations:build: 
+@repo/validations:build: > @repo/validations@0.0.0 build /private/tmp/f8-clone/packages/validations
+@repo/validations:build: > tsc && tsc-alias
+@repo/validations:build: 
+
+ Tasks:    3 successful, 3 total
+Cached:    0 cached, 3 total
+  Time:    2.658s 
+
