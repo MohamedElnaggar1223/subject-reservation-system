@@ -1,0 +1,4 @@
+ Test Files  43 passed (43)
+      Tests  842 passed | 1 todo (843)
+   Start at  02:32:48
+   Duration  428.33s (transform 1.49s, setup 57ms, collect 5.70s, tests 416.20s, environment 3ms, prepare 1.24s)

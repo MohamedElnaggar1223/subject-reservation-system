@@ -73,6 +73,11 @@ items), the parent's Timetables and the student's My Timetable — "Before" read
 roles and "Hidden" 22, 17, 3 and 4; "After" is unchanged. Each F1 screen still opens by its URL (driven:
 `.audit/scheduling-evidence/final-merge/`; docs/features/SCHEDULING.md §14).
 
+**Since the lead's decisions of 16 Oct 2026** (FEATURES_PLAN.md §6, 5, 7, 8, 13; docs/features/CYCLE_DECISIONS.md): Candidates is
+in the cycle for the admin and the coordinator, under "Entries to the board" before Exam Entries; Subjects and Payments are on the
+admin's list (hidden, reachable by URL). The admin's sidebar reads 23 items (19 hidden), the coordinator's 15 (12 hidden). Board
+Services stays with its remark rows hidden by the switch; Exam Deadlines lists only the dates that stop entries.
+
 A member of staff linked to a teacher record also had My Teaching, Forecast Grades and Invigilation;
 they are on every staff list (hidden). The reasons below are the plan's list (FEATURES_PLAN.md §1 F6b,
 "The cycle") where it names the screen, and the owner's words where it is silent; **in doubt** marks a
@@ -86,20 +91,20 @@ screen kept because the doubt was real.
 | Today `/today` | first | **hidden** | the school's day |
 | Students `/students` | Academic | Reserve and pay | the student record a reservation reads: the grade decides what a student may reserve ("recorded on the student's page before they can register"), leaving refuses new lines |
 | Sections, Course Enrolment, Academic Year, Calendar, Bell Schedules, Rooms `/academic/*` | Academic | **hidden** | named outside in the plan |
-| Exam Deadlines `/exams/deadlines` | Exams | Entries to the board | the series' deadlines |
-| Candidates `/exams/candidates` | Exams | **hidden** | named outside (see §8, Q1) |
+| Exam Deadlines `/exams/deadlines` | Exams | Entries to the board | the series' deadlines (since 16 Oct 2026 the dates that stop entries only, §8 Q6) |
+| Candidates `/exams/candidates` | Exams | Entries to the board (since 16 Oct 2026; hidden before) | the entry lists refuse an entry without a candidate's details: a step of the hand-off (§8, Q1, decided) |
 | Exam Entries `/exams/entries`, Entry Lists `/exams/entry-lists` | Exams | Entries to the board | the entries derived from the lines and the boards' lists |
 | Forecast Grades, Exam Timetable, Exam Days, Exam Results, Certificates | Exams | **hidden** | named outside |
 | Exam Catalogue `/exams/catalogue` | Exams | Set up | the subjects' papers on the Catalogue |
 | Board Series `/exams/series` | Exams | Set up | the boards' dates (F6a also sets them from the session) |
-| Board Services `/exams/services` | Exams | Set up | **in doubt**: the services a reservation can carry and their fees per series (RESERVATIONS_REWORK.md §1 lists Services among the admin's screens); its remark services belong to remarks, which are outside (§8, Q3) |
+| Board Services `/exams/services` | Exams | Set up | the services a reservation can carry and their fees per series (RESERVATIONS_REWORK.md §1 lists Services among the admin's screens); its remark-service rows hidden by the switch since 16 Oct 2026 (§8, Q3, decided) |
 | The Desk `/desk` | Management | Reserve and pay | the desk reserves on the family's behalf and takes the money |
 | Team `/admin/team` | Management | Set up | the staff who run the desk and the teacher records the session names ("Teaches as") |
 | Day-one Import `/imports` | Management | Set up | named in the cycle |
 | Settings `/settings` | Management | Set up | "the settings behind them" |
 | Sessions `/admin/sessions` | Management | Set up | the session: its sheet, teachers, fees, Money and To verify tabs |
-| Subjects `/admin/subjects` | Management | Set up | **in doubt**: the subject list and each subject's teacher pool, which the session's form draws its teachers from; its fee columns predate the session's fees (§8, Q4) |
-| Payments `/admin/payments` | Management | Reserve and pay | the bank-transfer confirmations: paying |
+| Subjects `/admin/subjects` | Management | **hidden** since 16 Oct 2026 (Set up before) | the Catalogue is the subject list and the session's form joins its teachers to the pool; its fee columns contradict the session's fees (§8, Q4, decided) |
+| Payments `/admin/payments` | Management | **hidden** since 16 Oct 2026 (Reserve and pay before) | no new payment uses the old bank transfer; InstaPay is confirmed on the Finance Workbench |
 | Escrow `/admin/escrow` | Management | Follow up | the wallet's withdrawal requests: drops and refunds |
 | Finance Workbench `/finance` | Management | Money | named in the cycle |
 | Charges `/charges` | Management | Reserve and pay | instalments and charges, pushed or asked for |
@@ -120,8 +125,8 @@ screen kept because the doubt was real.
 | Today | first | **hidden** | the school's day |
 | Students | Academic | Reserve and pay | the student record (grade, leaving) a reservation reads; the coordinator corrects a cohort |
 | Sections, Course Enrolment, Academic Year, Calendar, Bell Schedules, Rooms | Academic | **hidden** | named outside |
-| Exam Deadlines, Exam Entries, Entry Lists | Exams | Entries to the board | the entries and the series' deadlines |
-| Candidates, Forecast Grades, Exam Timetable, Exam Days, Exam Results, Certificates | Exams | **hidden** | named outside |
+| Exam Deadlines, Candidates (since 16 Oct 2026), Exam Entries, Entry Lists | Exams | Entries to the board | the entries, the candidates' details they need, and the series' deadlines |
+| Forecast Grades, Exam Timetable, Exam Days, Exam Results, Certificates | Exams | **hidden** | named outside |
 | Exam Catalogue, Board Series, Board Services | Exams | Set up | the papers and the boards' dates; Board Services **in doubt** as for the admin |
 | Sessions, Day-one Import, Settings | School | Set up | the session's sheet (the coordinator keeps subjects, teachers and items), the import, the settings |
 | Exceptions | School | Follow up | the academic gates are the coordinator's to grant |
@@ -434,17 +439,24 @@ number appears in this branch.
    entry without a candidate number, legal name, date of birth or UCI, which are recorded on Candidates.
    Built: hidden from the sidebar, reachable from Entry Lists' and Exam Entries' fix links (steps of the
    cycle). Should Candidates be in the cycle's sidebar?
+   **Decided 16 Oct 2026** (FEATURES_PLAN.md §6, 5): yes — off the admin's and coordinator's lists, under "Entries to the board" before Exam Entries (CYCLE_DECISIONS.md §1).
 2. **My Exams for families.** Hidden: its parts are the exam timetable, the statement of entry the school
    publishes with it, and results. Once entries are sent, should families see their statement of entry?
+   **Decided 16 Oct 2026** (§6, 6): My Exams stays hidden; once the school sends its first entries through the system, the statement of entry alone (not the timetable or the results) is shown to families — queued for that moment.
 3. **Board Services.** Kept (in doubt): the services a reservation can carry with their fees per series;
    remark services among them belong to remarks. Keep it in the cycle?
+   **Decided 16 Oct 2026** (§6, 7): kept; its remark-service rows are hidden while the switch is on (`remarksHidden()`; the API untouched).
 4. **Subjects (`/admin/subjects`).** Kept (in doubt): the subject list and each subject's teacher pool,
    which the session's form draws from; its fee columns predate the session's fees.
+   **Decided 16 Oct 2026** (§6, 8): hidden from the sidebar (on the admin's list), reachable by URL.
 5. **"Subjects this year" on the Student 360** (course enrolment) — its link is hidden, the block stays
    (point 4 allows only links). Hide the block too?
+   **Decided 16 Oct 2026** (§6, 9): the block stays, titled "This year's subjects and teachers" / مواد هذا العام ومعلموها; its link stays hidden.
 6. **Exam Deadlines** lists every board date — forecasts due, results day, certificates — not only the
    entry deadlines; their links are hidden, their rows stay. Show only the entry dates?
+   **Decided 16 Oct 2026** (§6, 10): yes — the entry and retake deadlines, and the exams' start where it is the cut-off (no entry deadline); the other rows hidden by the switch (`entryDatesOnly()`).
 7. **History** for families: kept (in doubt) as the reservations' record of drops and refunds. Keep it?
+   **Decided 16 Oct 2026** (§6, 11): kept — no change.
 
 ---
 
