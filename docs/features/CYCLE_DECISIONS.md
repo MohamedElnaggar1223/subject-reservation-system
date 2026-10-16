@@ -396,11 +396,14 @@ teacher.
 | `pnpm --filter web check-types` | c3ccc36's content | green | session log |
 | `pnpm --filter @repo/api test`, local time (Africa/Cairo) | c3ccc36 | 43 files, **842 passed**, 1 todo (main 19dabff: 839; three scenarios added) | `gates/suite-local-c3ccc36.txt` |
 | the same with `TZ=UTC` | c3ccc36 | 43 files, **842 passed**, 1 todo | `gates/suite-utc-c3ccc36.txt` |
+| both type-checks (the review round) | 57ec766's content | green | session log, trail 15:13Z |
+| the suite, local time, from an empty database migrated through 0061 | 57ec766 | 43 files, **843 passed**, 1 todo (08p's new scenario) | `gates/suite-local-57ec766.txt` |
+| the same with `TZ=UTC` | 57ec766 | 43 files, **843 passed**, 1 todo | `gates/suite-utc-57ec766.txt` |
 | `useQuery<…>` generics in `apps/web/app` | — | 15 (unchanged) | `grep -rn "useQuery<" apps/web/app` |
 | No file over 300 KB under `.audit`; no mobile number in the trail or the documents | — | none | CI's gate 0 |
 
-The commits after c3ccc36 change only the documents, the trail and the evidence. The suite and the type-checks are
-c3ccc36's. One earlier full run (on the work in progress, while the browser drive ran) timed out three 08s tests at
+The commits between c3ccc36 and dd68598 change only the documents, the trail and the evidence. 57ec766 is the review
+round, and the commits after it change only the documents, the trail and the evidence again. One earlier full run (on the work in progress, while the browser drive ran) timed out three 08s tests at
 30 s; 08s alone passed (40), and both full runs on c3ccc36 ran with nothing else on the machine.
 
 ---
@@ -559,3 +562,8 @@ with two qualifications (step 1), and the self-study-only subject, Chemistry (st
 - 15:05Z: the desk's transfer dialogs in Arabic: the record dialog's description was taken by "EGP (.+)" (red).
   15:06Z: the decisions' rules asked first, the dialogs given Arabic, driven again (`desk-transfer-ar/`).
 - Items 5 and 6: this document (§9, §3).
+- 15:13Z: both type-checks green; 57ec766 committed and pushed. The suite on 57ec766 in local time (15:22Z) and with
+  `TZ=UTC` (15:30Z), 843 passed each; CI run 38922344500 green on 57ec766 (15:31Z).
+- The dev servers are still running for the lead's drive: API on 3181 (pnpm 86464), web on 3180 (pnpm 86466),
+  database `igcse_decisions_dev`. Student B1 now holds the exception "self-study on a first entry", and its InstaPay
+  payment of 8,800 is rejected, with the transfer found later recorded and undone.
