@@ -1,0 +1,14 @@
+$ docker exec igcse-walk-db createdb -U audit igcse_walk_dev
+$ docker exec igcse-walk-db psql -U audit -l
+                                                   List of databases
+      Name      | Owner | Encoding | Locale Provider |  Collate   |   Ctype    | Locale | ICU Rules | Access privileges 
+----------------+-------+----------+-----------------+------------+------------+--------+-----------+-------------------
+ igcse_audit    | audit | UTF8     | libc            | en_US.utf8 | en_US.utf8 |        |           | 
+ igcse_walk_dev | audit | UTF8     | libc            | en_US.utf8 | en_US.utf8 |        |           | 
+ postgres       | audit | UTF8     | libc            | en_US.utf8 | en_US.utf8 |        |           | 
+ template0      | audit | UTF8     | libc            | en_US.utf8 | en_US.utf8 |        |           | =c/audit         +
+                |       |          |                 |            |            |        |           | audit=CTc/audit
+ template1      | audit | UTF8     | libc            | en_US.utf8 | en_US.utf8 |        |           | =c/audit         +
+                |       |          |                 |            |            |        |           | audit=CTc/audit
+(5 rows)
+
