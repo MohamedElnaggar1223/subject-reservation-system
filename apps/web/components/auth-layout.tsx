@@ -3,6 +3,27 @@
 import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { useI18n } from "~/lib/i18n";
+import { useSchoolName } from "~/components/school-name";
+
+/**
+ * The brand's words: the school's name, when the admin has set it on Settings, above the app's name (the
+ * lead's decision of 16 Oct 2026, 15); the app's name alone until then. The name is the school's own (data).
+ */
+export function BrandNames({ small = false }: { small?: boolean }) {
+  const schoolName = useSchoolName();
+  return (
+    <span className="flex min-w-0 flex-col">
+      {schoolName && (
+        <span dir="auto" data-i18n-skip="true" className={cn("font-display font-bold leading-tight tracking-tight text-white", small ? "text-base" : "text-lg")}>
+          {schoolName}
+        </span>
+      )}
+      <span className={cn("font-display tracking-tight", schoolName ? "text-xs font-semibold text-white/80" : cn("font-bold text-white", small ? "text-base" : "text-lg"))}>
+        IGCSE Reserve
+      </span>
+    </span>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  Geometric pattern rendered purely with CSS divs                   */
@@ -59,9 +80,7 @@ function DefaultBranding() {
               />
             </svg>
           </div>
-          <span className="font-display text-lg font-bold tracking-tight text-white">
-            IGCSE Reserve
-          </span>
+          <BrandNames />
         </div>
       </div>
 
@@ -119,9 +138,7 @@ function MobileHeader() {
             />
           </svg>
         </div>
-        <span className="font-display text-base font-bold tracking-tight text-white">
-          IGCSE Reserve
-        </span>
+        <BrandNames small />
       </div>
     </div>
   );

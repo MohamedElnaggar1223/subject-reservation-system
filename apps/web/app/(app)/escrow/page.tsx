@@ -20,7 +20,7 @@ import { apiResponse } from '@repo/validations';
 import EscrowClient from './escrow.client';
 
 export const metadata = {
-  title: 'Escrow — IGCSE Reservation',
+  title: 'Balance — IGCSE Reservation',
 };
 
 export default async function EscrowPage(): Promise<React.JSX.Element> {

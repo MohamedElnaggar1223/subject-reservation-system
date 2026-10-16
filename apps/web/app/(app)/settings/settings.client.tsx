@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, COUNCIL_LABELS, ENTRY_ROUTES, ENTRY_ROUTE_LABELS, refundPolicySentence, RefundPolicySchema, type RefundPolicy, type Role } from '@repo/validations';
+import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, COUNCIL_LABELS, ENTRY_ROUTES, ENTRY_ROUTE_LABELS, SCHOOL_NAME_MAX, refundPolicySentence, RefundPolicySchema, type RefundPolicy, type Role } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { useI18n } from '~/lib/i18n';
@@ -29,6 +29,8 @@ type Setting = Awaited<ReturnType<typeof fetchSettings>>[number];
  * listed twice (F0b added it again), so its setting showed twice and React warned of a duplicate key.
  */
 const GROUPS: { id: string; title: string; hint: string }[] = [
+  // The lead's decision of 16 Oct 2026 (15): the school's name on the sign-in page — first, as the families see it first.
+  { id: 'school', title: 'The school', hint: 'Its name, as the sign-in and sign-up pages show it.' },
   { id: 'eligibility', title: 'Who may register', hint: 'Which students may register for which exam series.' },
   { id: 'school_fee', title: 'School fee', hint: 'When the annual school fee gates registration.' },
   { id: 'pricing', title: 'Prices', hint: 'How a reservation’s price is made from the course fee and the board’s fee.' },
@@ -52,6 +54,7 @@ type Centres = Record<string, { centreNumber: string | null; route: 'direct' | '
 /** The value as a person reads it. */
 function describeValue(s: Setting, value: unknown): string {
   if (s.input === 'boolean') return value === true ? 'On' : 'Off';
+  if (s.input === 'text') return typeof value === 'string' && value.trim() ? value : "Not set: the sign-in page shows the app's name alone";
   if (s.input === 'choice') return s.choices.find((c) => c.value === value)?.label ?? String(value);
   if (s.input === 'weekdays' && Array.isArray(value)) {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
@@ -301,13 +304,27 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
                 {s.unit && <span>{s.unit === 'percent' ? '%' : s.unit === 'hour' ? ':00, Cairo time' : s.unit}</span>}
               </label>
             )}
+            {s.input === 'text' && (
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  aria-label={s.label}
+                  dir="auto"
+                  maxLength={SCHOOL_NAME_MAX}
+                  value={typeof draft === 'string' ? draft : ''}
+                  onChange={(e) => setDraft(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground">Empty: the app&apos;s name alone.</p>
+              </div>
+            )}
             {s.input === 'refundPolicy' && <RefundPolicyEditor value={draft as RefundPolicy} onChange={setDraft} />}
             {s.input === 'centres' && <CentresInput value={(draft ?? {}) as Centres} onChange={setDraft} />}
           </fieldset>
 
           {s.key === 'eligibility.graduateRetakes' && s.value === true && draft === false && (
             <Notice tone="warning">
-              Turning this off expires the waiting registrations graduates already made for the October, November and January series; their open checkouts are closed, any wallet money returned, and families told.
+              Turning this off expires the waiting registrations graduates already made for the October, November and January series; their open checkouts are closed, any money from the balance put back, and families told.
             </Notice>
           )}
 

@@ -7,7 +7,7 @@
  *
  * Words, as the rest of the app has them: a session الجلسة, the links sheet الكشف, a reservation حجز,
  * a board المجلس, a sitting الدورة, the statement كشف الحساب, the school fee المصاريف الدراسية, the
- * wallet المحفظة, the desk المكتب.
+ * balance الرصيد (the lead's decision of 16 Oct 2026, 14; was the wallet), the desk المكتب.
  */
 
 export const uiAuditArabic: Record<string, string> = {
@@ -70,7 +70,7 @@ export const uiAuditArabic: Record<string, string> = {
   'Confirm or reject before the board deadline,': 'أكّد أو ارفض قبل موعد المجلس،',
   '— after it this payment is closed automatically.': '— وبعده تُغلق هذه الدفعة تلقائيًا.',
   'Releases': 'يُفرج عن',
-  'to escrow on return': 'إلى الرصيد عند الإعادة',
+  'to the balance on return': 'إلى الرصيد عند الإعادة',
   'Requested on': 'طُلب في',
 
   'Nothing to print': 'لا شيء للطباعة',
@@ -98,8 +98,7 @@ export const uiAuditArabic: Record<string, string> = {
   'by InstaPay': 'عبر إنستاباي',
   'at the school desk': 'في مكتب المدرسة',
 
-  // ── The wallet (the family's escrow) ──
-  'Wallet': 'المحفظة',
+  // ── The family's balance with the school ("Wallet" until the lead's decision of 16 Oct 2026, 14) ──
   'Charges & Instalments': 'الرسوم والأقساط',
   'Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.':
     'مبالغ تحتفظ بها المدرسة لكل ابن — استردادات وأرصدة — تُستخدم في دفعة لاحقة، أو تُنقل إلى ابن آخر، أو تُسترد.',

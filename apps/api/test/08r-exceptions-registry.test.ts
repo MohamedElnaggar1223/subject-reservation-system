@@ -291,15 +291,20 @@ describe('08r: the exceptions registry', () => {
 
   it("the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis", async () => {
     const ss = await subject(adm, 'XR-SS', 'Self-study only (AS, registry)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', isOfferedAtSchool: false });
-    const reserve = async (studentId: string) =>
-      (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, ...(await reservationOf(june, [ss])) } }))).registrations[0]!.id;
+    // A first entry in self-study on a subject not taught this cycle is the exception "self-study on a
+    // first entry" (the lead's decision of 16 Oct 2026, FEATURES_PLAN.md §6, 1): granted to the family
+    // before each line (a family's grant, so the student's own exceptions below stay theirs alone).
+    const reserve = async (studentId: string, familyId: string) => {
+      await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', familyId, reason: 'the subject is not taught this cycle' } }));
+      return (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, ...(await reservationOf(june, [ss])) } }))).registrations[0]!.id;
+    };
     const lineOf = (id: string) => one<{ p: number; course: number; board: number; ids: string[]; cp: number; bp: number }>(
       `select price_at_registration::float as p, course_fee_at_registration::float as course, registration_fee_at_registration::float as board,
               pricing_basis->'exceptionIds' as ids, (pricing_basis->>'coursePercent')::float as cp, (pricing_basis->>'boardPercent')::float as bp
        from registration where id = $1`, [id]);
     // The settings' shares: 50% of the course fee, the board fee in full (A-16).
     const plain = await onboard(officer, 'xr-ss-plain', 12);
-    const plainLine = await reserve(plain.studentId);
+    const plainLine = await reserve(plain.studentId, plain.parent.id);
     expect(await lineOf(plainLine)).toMatchObject({ p: 1000, course: 500, board: 500, cp: 50, bp: 100, ids: [] });
     // Never one line (the review of step C, item 3): priceLine passes no line id and a grant
     // re-prices a line only for price.* — a line-scoped share would be granted and applied nowhere.
@@ -312,7 +317,7 @@ describe('08r: the exceptions registry', () => {
     // One student: 30% of the course fee.
     const f = await onboard(officer, 'xr-ss-student', 12);
     const mine = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyCoursePercent', studentId: f.studentId, scope: { sessionId: june }, value: 30, reason: 'studies abroad, taught by the school online' } }));
-    expect(await lineOf(await reserve(f.studentId))).toMatchObject({ p: 800, course: 300, board: 500, cp: 30, bp: 100, ids: [mine.id] });
+    expect(await lineOf(await reserve(f.studentId, f.parent.id))).toMatchObject({ p: 800, course: 300, board: 500, cp: 30, bp: 100, ids: [mine.id] });
     // A family: 60% of the board fee, for each child.
     const g = await onboard(officer, 'xr-ss-family', 12);
     const sib = await apiResponse(officer.api.v1.links['desk-onboard'].$post({
@@ -320,7 +325,7 @@ describe('08r: the exceptions registry', () => {
     }));
     const fam = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyBoardPercent', familyId: g.parent.id, value: 60, reason: 'two children sitting abroad' } }));
     for (const s of [g.studentId, sib.student.id]) {
-      expect(await lineOf(await reserve(s))).toMatchObject({ p: 800, course: 500, board: 300, cp: 50, bp: 60, ids: [fam.id] });
+      expect(await lineOf(await reserve(s, g.parent.id))).toMatchObject({ p: 800, course: 500, board: 300, cp: 50, bp: 60, ids: [fam.id] });
     }
   });
 

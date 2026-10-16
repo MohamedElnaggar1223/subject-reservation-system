@@ -48,16 +48,21 @@ export const OUTSIDE_THE_CYCLE: Readonly<Record<Role, readonly string[]>> = {
     '/today', // the school's day
     '/teaching', '/exams/forecasts', '/exams/invigilation', // teaching (an admin who teaches)
     '/academic/sections', '/academic/enrolment', '/academic/years', '/academic/calendar', '/academic/bells', '/academic/rooms',
-    '/exams/candidates', '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
+    // Candidates is a step of the hand-off since the lead's decision of 16 Oct 2026 (5): not on this list.
+    '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
     '/remarks-desk', '/results-entry',
     '/admin/reports', '/admin/audit',
+    // The lead's decisions of 16 Oct 2026 (8, 13): Subjects — the Catalogue is the subject list and the session's
+    // form joins its teachers to the pool, its fee columns contradict the session's fees; Payments — no new payment
+    // uses the old bank transfer, InstaPay is confirmed on the Finance Workbench. Both reachable by URL.
+    '/admin/subjects', '/admin/payments',
     ...TIMETABLE_SCREENS, // F1: the timetable
   ],
   coordinator: [
     '/today',
     '/teaching', '/exams/forecasts', '/exams/invigilation',
     '/academic/sections', '/academic/enrolment', '/academic/years', '/academic/calendar', '/academic/bells', '/academic/rooms',
-    '/exams/candidates', '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
+    '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
     ...TIMETABLE_SCREENS,
   ],
   finance_admin: [
@@ -104,7 +109,9 @@ export const CYCLE_STAGES: readonly { titleKey: string; hrefs: readonly string[]
   { titleKey: 'nav.cycleReserve', hrefs: ['/desk', '/students', '/charges', '/admin/payments'] },
   { titleKey: 'nav.cycleFollowUp', hrefs: ['/admin/exceptions', '/admin/messages', '/admin/escrow'] },
   { titleKey: 'nav.cycleMoney', hrefs: ['/finance', '/takings'] },
-  { titleKey: 'nav.cycleBoard', hrefs: ['/exams/deadlines', '/exams/entries', '/exams/entry-lists'] },
+  // Candidates (the lead's decision of 16 Oct 2026, 5): the entry lists refuse an entry without a candidate
+  // number, legal name, date of birth or UCI — a step of the hand-off, before the entries.
+  { titleKey: 'nav.cycleBoard', hrefs: ['/exams/deadlines', '/exams/candidates', '/exams/entries', '/exams/entry-lists'] },
   { titleKey: 'nav.account', hrefs: ['/notifications', '/profile'] },
 ];
 
@@ -147,6 +154,26 @@ export function leadsOutsideTheCycle(href: string): boolean {
  */
 export function timetableHidden(): boolean {
   return leadsOutsideTheCycle('/my-timetable');
+}
+
+/**
+ * Whether the remarks are hidden (the Remarks Desk is on the lists above while the switch is on). Board
+ * Services stays in the cycle — the services a reservation can carry and their fees per series are the
+ * cycle's money — but its remark services belong to the remarks: the screen hides their rows while this is
+ * true (the lead's decision of 16 Oct 2026, 7). The API is untouched; the switch off shows them again.
+ */
+export function remarksHidden(): boolean {
+  return leadsOutsideTheCycle('/remarks-desk');
+}
+
+/**
+ * Whether Exam Deadlines lists only the dates that stop entries — the entry and retake deadlines, and the
+ * exams' start where it is the cut-off (a sitting with no entry deadline) — while the switch is on (the
+ * lead's decision of 16 Oct 2026, 10): forecasts, arrangements, the timetable, results and certificates are
+ * outside the cycle, their screens on the lists above.
+ */
+export function entryDatesOnly(): boolean {
+  return leadsOutsideTheCycle('/exams/results');
 }
 
 /** Where a role lands after sign-in while the switch is on. */

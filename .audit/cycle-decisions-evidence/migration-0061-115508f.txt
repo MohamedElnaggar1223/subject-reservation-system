@@ -1,0 +1,35 @@
+Migration 0061_rule_source_notes, the proof run again on the final code (115508f) at 2026-10-16T16:06:22Z, on a fresh copy
+of igcse_template_dev.
+main's set: 122 files, byte-identical to 19dabff's packages/db/drizzle: True
+the branch's 0057 blob a0dcda3 = 19dabff's a0dcda3: True
+igcse_decisions_mig = CREATE DATABASE … TEMPLATE igcse_template_dev; it holds 34 migrations.
+
+1. Migrated with main 19dabff's set:
+   migrations: 61
+   cambridge | From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026). Check each rule against the current handbook.
+   oxford | OxfordAQA's entry rules were not researched (DISCOVERY_RESEARCH.md §2 lists only its series and entry routes).
+   pearson_edexcel | From DISCOVERY_RESEARCH.md §2 (Pearson key dates 2026/27, IAL information manual). IAL unit results are banked under the UCI.
+   audit rows (EXAM_BOARD_RULE_UPDATED, no user): 0
+
+2. Migrated with the branch's set (0061 the one pending):
+   migrations: 62
+   cambridge | Cambridge Handbook 2026. Check each rule against the current handbook.
+   oxford | OxfordAQA's entry rules were not researched: only its series and entry routes are known.
+   pearson_edexcel | Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI.
+   audit rows (EXAM_BOARD_RULE_UPDATED, no user): 3
+   the audit rows:
+   cambridge | From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026). Check each rule against the current handbook. -> Cambridge Handbook 2026. Check each rule against the current handbook. | The rule source names the board's documents alone (the lead's decision of 16 Oct 2026, 16; migration 0061)
+   oxford | OxfordAQA's entry rules were not researched (DISCOVERY_RESEARCH.md §2 lists only its series and entry routes). -> OxfordAQA's entry rules were not researched: only its series and entry routes are known. | The rule source names the board's documents alone (the lead's decision of 16 Oct 2026, 16; migration 0061)
+   pearson_edexcel | From DISCOVERY_RESEARCH.md §2 (Pearson key dates 2026/27, IAL information manual). IAL unit results are banked under the UCI. -> Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI. | The rule source names the board's documents alone (the lead's decision of 16 Oct 2026, 16; migration 0061)
+   0061 recorded with hash 20a17a226494fc6e…; the file's sha256 20a17a226494fc6e…
+
+3. A second migrate, then 0061's statement by hand:
+   migrations after the second migrate: 62
+   the statement by hand: INSERT 0 0
+   migrations: 62
+   cambridge | Cambridge Handbook 2026. Check each rule against the current handbook.
+   oxford | OxfordAQA's entry rules were not researched: only its series and entry routes are known.
+   pearson_edexcel | Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI.
+   audit rows (EXAM_BOARD_RULE_UPDATED, no user): 3
+
+Done at 2026-10-16T16:06:26Z.

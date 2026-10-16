@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     default: "IGCSE Subject Reservation",
     template: "%s | IGCSE Reservation",
   },
-  description: "IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and escrow.",
+  description: "IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and balances.",
 };
 
 export default async function RootLayout({

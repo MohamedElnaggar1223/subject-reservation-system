@@ -230,8 +230,37 @@ describe('08u: the session in the school\'s words — one form per subject, the 
       ['P3', ['in_school'], ['first in_school', 'retake in_school', 'retake self_study']],
       ['M1', ['in_school', 'in_school'], ['first in_school', 'retake in_school', 'retake self_study']],
       // A self-study entry names no teacher on the family's form (the row says "self-study"), whatever the read lists.
-      ['S1', ['in_school'], ['first self_study', 'retake self_study']],
+      // Self study is a second entry (the lead's decision of 16 Oct 2026, FEATURES_PLAN.md §6, 1): S1 takes no first entry.
+      ['S1', ['in_school'], ['retake self_study']],
     ]);
+  });
+
+  it("decision 2 (16 Oct 2026): a unit of a units-cash-in award (an IAL's) sits in October, January or June — the form refuses November for it, nothing moved, and takes January; a unit that enters no cash-in award keeps every month its board sits", async () => {
+    // The IAL subject of the scenario above, on the winter sheet: the sheet's read says its units are an IAL's.
+    let o = (await list(winter)).offers.find((x) => x.subject.name === `Mathematics A.S./A.L. (08u ${RUN})`)!;
+    expect(o.items.map((i) => [i.label, i.ialUnit, i.series?.month])).toEqual([
+      ['P1', true, 'october'], ['P2', true, 'october'], ['P3', true, 'october'], ['P4', true, 'october'], ['M1', true, 'october'], ['S1', true, 'october'],
+    ]);
+    const p3 = o.items.find((i) => i.label === 'P3')!;
+    const unitForm = (month: 'november' | 'january'): FormJson => ({ ...asIs(o), items: [{ itemId: p3.id, availability: 'open', courseFee: 4500, teachers: [], seriesMonth: month }] });
+    const before = await auditCount([o.id, p3.id]);
+    expect(await refused(save(coordinator, winter, o.id, unitForm('november'))))
+      .toEqual({ status: 400, error: `Mathematics A.S./A.L. (08u ${RUN}) — P3: an IAL unit sits in October, January or June, not November` });
+    expect((await offerRow(winter, o.id)).items.find((i) => i.id === p3.id)!.series?.month).toBe('october');
+    expect(await auditCount([o.id, p3.id])).toBe(before);
+    expect(await apiResponse(save(coordinator, winter, o.id, unitForm('january')))).toMatchObject({ changed: true, itemsChanged: 1 });
+    o = await offerRow(winter, o.id);
+    expect(o.items.find((i) => i.id === p3.id)!.series?.month).toBe('january');
+    // Units the catalogue ties to no cash-in award: November, a month the board sits, is taken.
+    const [n1, n2] = [await unit('pearson_edexcel', 'UNV1', 'Unit A', 'as', 'unit'), await unit('pearson_edexcel', 'UNV2', 'Unit B', 'as', 'unit')];
+    const plain = await subject(adm, `U08-NV-${RUN}`, `Units with no cash-in (08u ${RUN})`, { course: 2000, registration: 4790 }, { council: 'pearson_edexcel', qualificationLevel: 'as_level' });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: plain }, json: { boardCode: 'pearson_edexcel', qualificationId: null, unitIds: [n1, n2], reason: '08u: units of no award' } }));
+    const made = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: winter }, json: { subjectId: plain, courseFee: 2000, teachers: [{ teacherId: t1, mode: 'in_school' }] } })))!;
+    const row = await offerRow(winter, made.id);
+    expect(row.items.map((i) => [i.label, i.ialUnit, i.series?.month])).toEqual([['Unit A', false, 'october'], ['Unit B', false, 'october']]);
+    expect(await apiResponse(save(coordinator, winter, made.id, { ...asIs(row), items: [{ itemId: row.items[0]!.id, availability: 'open', courseFee: null, teachers: [], seriesMonth: 'november' }] })))
+      .toMatchObject({ changed: true, itemsChanged: 1 });
+    expect((await offerRow(winter, made.id)).items[0]!.series?.month).toBe('november');
   });
 
   it('two units moved to another sitting in one save carry their reservations, each line with its own audit row (the series move, every move at once)', async () => {

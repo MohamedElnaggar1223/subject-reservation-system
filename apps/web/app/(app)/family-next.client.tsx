@@ -309,7 +309,7 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
                 { href: '/registrations', label: 'My Registrations' },
                 { href: '/school-fee', label: 'School Fee' },
                 { href: '/charges-due', label: 'Charges & Instalments' },
-                { href: '/escrow', label: 'Wallet', extra: escrowFree > 0 ? <><Money amount={escrowFree} /> <span>available</span></> : null },
+                { href: '/escrow', label: 'Balance', extra: escrowFree > 0 ? <><Money amount={escrowFree} /> <span>available</span></> : null },
                 { href: '/links', label: 'Linked Children' },
               ]
             : [

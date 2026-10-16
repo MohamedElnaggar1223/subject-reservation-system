@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { apiResponse, academicYearStartOf, academicYearLabel } from '@repo/validations';
+import { apiResponse, academicYearStartOf, academicYearLabel, SETTINGS, SETTING_KEYS } from '@repo/validations';
 import { admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, schoolToday, clientFor, type Client, reservationOf } from './helpers';
 
 /**
@@ -25,7 +25,7 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
   const Y = academicYearStartOf();
 
   afterAll(async () => {
-    await sql(`delete from school_setting where key in ('calendar.schoolWeekdays', 'schoolFee.graduatesExempt')`);
+    await sql(`delete from school_setting where key in ('calendar.schoolWeekdays', 'schoolFee.graduatesExempt', 'school.name')`);
   });
 
   beforeAll(async () => {
@@ -51,6 +51,8 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       expect(byKey['calendar.schoolWeekdays']).toMatchObject({ value: [0, 1, 2, 3, 4], canEdit: false });
       const mine = Object.fromEntries((await apiResponse(coordinator.api.v1.settings.$get())).map((s) => [s.key, s.canEdit]));
       expect(mine).toEqual({
+        // The lead's decision of 16 Oct 2026 (15): the school's name on the sign-in page is the admin's.
+        'school.name': false,
         'eligibility.graduateRetakes': false,
         'schoolFee.graduatesExempt': false,
         'schoolFee.newYearWithoutSchedule': false,
@@ -120,6 +122,43 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       await apiResponse(put(finadmin, 'schoolFee.graduatesExempt', false));
       await apiResponse(put(finadmin, 'schoolFee.graduatesExempt', true));
       expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'SETTING_CHANGED' and user_id in ($1, $2, $3)`, [coordinator.id, adm.id, finadmin.id])).n)).toBe(4);
+    });
+  });
+
+  describe("the school's name (the lead's decision of 16 Oct 2026, 15)", () => {
+    const put = (who: Client, value: unknown) =>
+      who.api.v1.settings[':key'].$put({ param: { key: 'school.name' }, json: { value, reason: 'F0a: the sign-in page carries the school\'s name' } });
+
+    it("empty by default; the admin's alone to set, checked and audited; read by every visitor from the public read the sign-in page asks; emptied, the app's name stands alone again", async () => {
+      const visitor = await clientFor();
+      const parent = (await family('school-name')).parent;
+      const publicRead = async (api: Client['api']) => apiResponse(api.v1.settings.public.$get());
+      expect(await publicRead(visitor)).toEqual({ schoolName: '' });
+      expect((await apiResponse(officer.api.v1.settings.$get())).find((s) => s.key === 'school.name')).toMatchObject({ value: '', isDefault: true, input: 'text', group: 'school', canEdit: false });
+      // Nobody but the admin; a value that is not a name is refused; nothing written.
+      for (const who of [coordinator, finadmin, officer, teacher, gate, parent]) expect((await refused(put(who, 'Placeholder School'))).status).toBe(403);
+      expect((await refused(put(adm, 'x'.repeat(121)))).status).toBe(400);
+      expect((await refused(put(adm, 42))).status).toBe(400);
+      expect(await sql(`select 1 from school_setting where key = 'school.name'`)).toEqual([]);
+      // Set: trimmed, audited with before and after, read by a visitor and by a family alike.
+      expect(await apiResponse(put(adm, '  Placeholder International School  '))).toMatchObject({ value: 'Placeholder International School', isDefault: false });
+      expect(await one(`select previous_data, new_data from audit_log where action = 'SETTING_CHANGED' and entity_id = 'school.name' and user_id = $1`, [adm.id]))
+        .toEqual({ previous_data: { value: '' }, new_data: { value: 'Placeholder International School', reason: 'F0a: the sign-in page carries the school\'s name' } });
+      for (const api of [visitor, parent.api]) expect(await publicRead(api)).toEqual({ schoolName: 'Placeholder International School' });
+      // The public read carries the name alone, never another setting — even with every setting the school has set:
+      // a row for each key not set yet is written straight to the store (its default value, no hook run), then removed.
+      const stored = (await sql<{ key: string }>(`select key from school_setting`)).map((r) => r.key);
+      const added = SETTING_KEYS.filter((k) => !stored.includes(k));
+      for (const k of added) await sql(`insert into school_setting (key, value, updated_at) values ($1, $2::jsonb, now())`, [k, JSON.stringify(SETTINGS[k].default)]);
+      try {
+        expect((await sql<{ n: number }>(`select count(*)::int as n from school_setting`))[0]!.n).toBeGreaterThanOrEqual(SETTING_KEYS.length);
+        expect(await publicRead(visitor)).toStrictEqual({ schoolName: 'Placeholder International School' });
+      } finally {
+        if (added.length) await sql(`delete from school_setting where key in $1`, [added]);
+      }
+      // Emptied: the app's name alone again.
+      await apiResponse(put(adm, ''));
+      expect(await publicRead(visitor)).toEqual({ schoolName: '' });
     });
   });
 

@@ -76,7 +76,7 @@ function useActions() {
       description={pending.kind === 'revoke'
         ? `${pending.label}: it stops applying now. A plan's line expires and its deposits are settled as a drop today; a re-price it made on an unpaid line is undone.`
         : pending.kind === 'release'
-          ? `${pending.label}: every deposit goes back to the family's escrow, the unpaid instalments are cancelled, and the line stays payable in full by its usual date.`
+          ? `${pending.label}: every deposit goes back to the family's balance, the unpaid instalments are cancelled, and the line stays payable in full by its usual date.`
           : `${pending.label}: from now on it applies as it is scoped.`}
       label={pending.kind === 'confirm' ? 'Note (optional)' : 'Reason'}
       minLength={pending.kind === 'confirm' ? 0 : 3}

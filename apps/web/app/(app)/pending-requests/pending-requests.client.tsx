@@ -172,7 +172,7 @@ function ChangeRequestCard({ request }: { request: ChangeRequest }) {
           <span className="text-muted-foreground text-xs">Financial impact</span>
           <p className={`font-semibold ${isCredit ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
             {isCredit
-              ? `+${absImpact.toFixed(2)} EGP escrow credit`
+              ? `+${absImpact.toFixed(2)} EGP to the balance`
               : `-${absImpact.toFixed(2)} EGP additional payment needed`}
           </p>
         </div>

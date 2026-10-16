@@ -190,7 +190,7 @@ export default async function Home(): Promise<JSX.Element> {
     },
     {
       href: '/escrow',
-      title: 'Escrow Balance',
+      title: 'Balance',
       description: 'View balance and request withdrawals',
       icon: (
         <svg className="size-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

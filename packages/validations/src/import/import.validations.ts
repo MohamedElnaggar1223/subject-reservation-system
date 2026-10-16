@@ -213,7 +213,7 @@ export const IMPORT_PROBLEM_CODES = Object.keys(IMPORT_PROBLEMS) as ImportProble
 export const IMPORT_NOTES = {
   no_money: { finding: 'IS-07', title: 'No money in this file', meaning: 'No prices, payments or receipts: nothing is paid by this import. Lines it makes are priced from the session’s fee grids and wait for payment; money before the system comes from the money record, as history only.' },
   two_series_one_tab: { finding: 'IS-05', title: 'One tab holds several exam series', meaning: 'Each series and level is mapped on its own.' },
-  roster_tab_ignored: { finding: 'A-04', title: 'Per-unit roster tabs are not imported', meaning: 'Tabs that list students by unit without emails (the hand-made rosters) are class lists, not registrations.' },
+  roster_tab_ignored: { finding: 'A-04', title: 'Per-unit roster tabs are not imported', meaning: 'Tabs that list students by unit without emails (the hand-made rosters) are group lists, not registrations.' },
   year_not_set_up: { title: 'Academic year not set up', meaning: 'The year the classes are in is not on the Academic year screen: sections and course enrolments are not made for it (cohorts and history are).' },
   money_history_only: { finding: 'F-01', title: 'Money is imported as history only', meaning: 'Each row is kept as a record of what happened before the system. Nothing is paid, refunded or credited: no payment, receipt or balance changes.' },
 } as const;

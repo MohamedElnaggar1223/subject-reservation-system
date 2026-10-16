@@ -43,6 +43,7 @@ and the fixes were re-proven on the real servers.
 | Role gates, every endpoint | `04-authz-matrix.test.ts`: each /v1 route called as anonymous, student, parent, finance officer, finance admin, admin | Matches the reviewed policy in `apps/api/test/authz-policy.tsv`; now enforced. This proves the gate that runs before a record is looked up |
 | Checks after the lookup | `05-object-access.test.ts` with real records | A student cannot read even their own family's payments; staff cannot create remark requests; another family's records are refused |
 | Anonymous access | matrix | Only `GET /v1/health` and `/v1/health/ready` answer |
+| Anonymous access: the school's name (16 Oct 2026) | matrix and `08f-foundation-structure.test.ts` | `GET /v1/settings/public` answers every visitor with `{ schoolName }` alone — the one setting `school.name`, read by its key, never a filtered copy of the settings — because the sign-in page shows the school's name before anyone signs in (the lead's decision 15; docs/features/CYCLE_DECISIONS.md) |
 | One family reaching another | `05` | Every attempt refused, no state changed (after RF-13) |
 | Links | `05` | A pending link grants nothing; another family's student cannot approve a link addressed to someone else |
 | Privilege escalation | `06-auth-surface.test.ts` | Sign-up refuses injected role and student fields; update-user and profile update ignore them; better-auth's admin endpoints refuse everyone but an admin; account setup cannot switch a role |

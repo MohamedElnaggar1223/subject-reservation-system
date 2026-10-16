@@ -751,7 +751,7 @@ function ChangeRequestsSection() {
                   <p className="text-xs text-muted-foreground">Impact</p>
                   <p className={`text-sm font-bold ${isCredit ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
                     {isCredit
-                      ? `+${formatPrice(Math.abs(cr.priceDifference))} escrow`
+                      ? `+${formatPrice(Math.abs(cr.priceDifference))} to the balance`
                       : `${formatPrice(cr.priceDifference)} to pay`}
                   </p>
                 </div>

@@ -25,6 +25,8 @@ type GrantedRole = (typeof GRANTED_ROLES)[number];
 type Grant = string;
 
 const SELF_SERVICE: Grant[] = [
+  // What every visitor reads, signed in or not: the school's name (the lead's decision of 16 Oct 2026, 15).
+  'GET /v1/settings/public',
   'GET /v1/session',
   'GET /v1/users/me',
   'PUT /v1/users/me',

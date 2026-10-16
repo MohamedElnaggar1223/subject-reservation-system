@@ -62,7 +62,7 @@ export function MappingTab({ id, v, editable, isAdmin }: { id: string; v: Import
                     {!t.yearSetUp && <Badge tone="warning">Year not set up: no sections or enrolments</Badge>}
                   </>
                 ) : (
-                  <span className="text-muted-foreground">{t.kind === 'roster' ? 'A per-unit class list without emails — not imported' : 'Not a registration tab — not imported'}</span>
+                  <span className="text-muted-foreground">{t.kind === 'roster' ? 'A per-unit group list without emails — not imported' : 'Not a registration tab — not imported'}</span>
                 )}
               </li>
             ))}

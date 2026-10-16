@@ -15,11 +15,11 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
-  apiResponse, itemDisplayLabel, sessionSeriesMonths, IGCSE_NEVER_MONTHS, ROLES, type Availability, type SeriesMonth,
+  apiResponse, itemDisplayLabel, sessionSeriesMonths, IGCSE_NEVER_MONTHS, IAL_UNIT_MONTHS, ROLES, type Availability, type SeriesMonth,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
@@ -121,11 +121,19 @@ export default function SubjectsTab({ session, viewerRole }: { session: SessionD
   const [copying, setCopying] = useState(false);
   const [previewing, setPreviewing] = useState<OfferRow | null>(null);
   if (isLoading) return <LoadingState />;
-  if (isError || !data) return <ErrorState onRetry={() => refetch()} />;
+  if (!data) return <ErrorState onRetry={() => refetch()} />;
   const provisional = data.offers.some((o) => o.items.some((i) => i.availability !== 'closed' && i.boardFee.provisional));
 
   return (
     <div className="space-y-4">
+      {/* A read of the sheet that failed once it had loaded (a refetch, or the read-back after a saved change: F6's
+          second review, note b) keeps the sheet as last read and its open form, rather than replace the screen. */}
+      {isError && (
+        <Notice tone="warning">
+          <span>The sheet could not be read again just now: it shows the subjects as last read.</span>{' '}
+          <button type="button" className="font-semibold underline underline-offset-2" onClick={() => refetch()}>Try again</button>
+        </Notice>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground"><span>{data.offers.length}</span> <span>{data.offers.length === 1 ? 'subject' : 'subjects'}</span></p>
         {canEdit && data.offers.length > 0 && (
@@ -459,46 +467,65 @@ function newState(a: AddableRow): FormState {
  * drawer's copy at once could start from the row before the change — the teacher who left still ticked,
  * sent back by the next Save (F6's review, finding 2).
  */
-type ReadBack = { row: OfferRow | null; at: number };
+type ReadBack = { row: OfferRow | null; at: number; failed?: boolean };
 
 /** The drawer: one subject's form (an existing row, or a subject being added), saved whole. */
 function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCreated, onPreview }: {
   session: SessionDetail; data: OffersData; sheetAt: number; target: { offerId: string } | { addable: AddableRow }; canEdit: boolean;
   onClose: () => void; onCreated: (offerId: string) => void; onPreview: (o: OfferRow) => void;
 }) {
+  const queryClient = useQueryClient();
   const [version, setVersion] = useState(0);
   const [saved, setSaved] = useState<string | null>(null);
   // What was typed on the form before a Replace a teacher, carried into the form made again after it.
   const [carry, setCarry] = useState<Carry | null>(null);
   const [readBack, setReadBack] = useState<ReadBack | null>(null);
+  // The name of a subject just added, for the drawer's title while it waits for the sheet (an Add whose read-back failed).
+  const [addedName, setAddedName] = useState<string | null>(null);
   const targetId = 'offerId' in target ? target.offerId : null;
   const listed = targetId ? data.offers.find((o) => o.id === targetId) ?? null : null;
   // The row read back after this drawer's own change, until the sheet's copy is as new as it.
   const offer = readBack?.row && readBack.row.id === targetId && sheetAt < readBack.at ? readBack.row : listed;
   const addable = 'addable' in target ? target.addable : null;
-  if ('offerId' in target && !offer) return null;
-  const title = offer ? offer.subject.name : addable!.name;
+  // A read-back that failed after a change that succeeded (F6's second review, note b): the change is reported as
+  // made, the sheet's query was invalidated instead, and until the sheet's copy is newer than the change there is
+  // no form — one made from the copy before the change would send its old values back with the next Save
+  // (F6's review, finding 2). Once the copy is newer, the form is made again from it.
+  const waiting = !!readBack?.failed && sheetAt <= readBack.at;
+  useEffect(() => {
+    if (readBack?.failed && sheetAt > readBack.at) { setReadBack(null); setVersion((v) => v + 1); }
+  }, [readBack, sheetAt]);
+  if ('offerId' in target && !offer && !waiting) return null;
+  const title = offer ? offer.subject.name : addable?.name ?? addedName ?? '';
   const subtitle = offer
     ? <><bdi data-i18n-skip="true">{offer.subject.boardName}</bdi> · <bdi data-i18n-skip="true" className="font-mono">{offer.subject.code}</bdi> · <span>{offer.lines}</span> <span>{offer.lines === 1 ? 'reservation' : 'reservations'}</span></>
-    : <><span>Add subject</span> · <bdi data-i18n-skip="true" className="font-mono">{addable!.code}</bdi></>;
+    : addable ? <><span>Add subject</span> · <bdi data-i18n-skip="true" className="font-mono">{addable.code}</bdi></> : null;
   return (
     <Drawer title={title} subtitle={subtitle} onClose={onClose}>
       {saved && <Notice tone="success">{saved}</Notice>}
-      <SubjectForm key={`${offer?.id ?? addable!.id}:${version}`} session={session} shares={data.shares} offer={offer} addable={addable} canEdit={canEdit}
-        carry={carry}
-        onSaved={(message, back, createdId) => {
-          setSaved(message);
-          setCarry(null);
-          setReadBack(back);
-          setVersion((v) => v + 1);
-          if (createdId) onCreated(createdId);
-        }}
-        // A teacher replaced: the form is made again from the offer as it is now — the row the replacement
-        // read back (the review of d3f62cf, item 2; F6's review, finding 2) — kept, its old ticks would send
-        // the teacher who left back with the next Save. What else was typed on it comes across (F6, the
-        // follow-ups' queued note): only the teachers are read again.
-        onReplaced={(edits, back) => { setCarry(edits); setReadBack(back); setVersion((v) => v + 1); }}
-        onPreview={onPreview} onRemoved={onClose} />
+      {waiting ? (
+        <Notice tone="warning">
+          <p>The sheet could not be read again just now: the subject&apos;s form comes back once it is.</p>
+          <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => queryClient.refetchQueries({ queryKey: offersKey(session.id) })}>Read the sheet again</Button>
+        </Notice>
+      ) : (
+        <SubjectForm key={`${offer?.id ?? addable?.id ?? 'saved'}:${version}`} session={session} shares={data.shares} offer={offer} addable={addable} canEdit={canEdit}
+          carry={carry}
+          onSaved={(message, back, createdId) => {
+            setSaved(message);
+            setCarry(null);
+            setReadBack(back);
+            // A failed read-back waits for the sheet (above) rather than make the form from the copy before the change.
+            if (!back.failed) setVersion((v) => v + 1);
+            if (createdId) { setAddedName(addable?.name ?? null); onCreated(createdId); }
+          }}
+          // A teacher replaced: the form is made again from the offer as it is now — the row the replacement
+          // read back (the review of d3f62cf, item 2; F6's review, finding 2) — kept, its old ticks would send
+          // the teacher who left back with the next Save. What else was typed on it comes across (F6, the
+          // follow-ups' queued note): only the teachers are read again.
+          onReplaced={(edits, back) => { setCarry(edits); setReadBack(back); if (!back.failed) setVersion((v) => v + 1); }}
+          onPreview={onPreview} onRemoved={onClose} />
+      )}
     </Drawer>
   );
 }
@@ -529,6 +556,17 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
   const pool = [...new Set([...(offer?.teachers.map((t) => t.teacherId) ?? []), ...(addable?.teachers.map((t) => t.teacherId) ?? []), ...f.teachers.map((t) => t.teacherId)])];
   // The sittings a unit may be entered in: the session's months its board sits.
   const months = sessionSeriesMonths(session.sessionType, session.seriesYear).filter((m) => !board || board.seriesMonths.includes(m.month));
+  /**
+   * A unit's own sittings: an IGCSE unit never October or January; a unit of a units-cash-in award (an IAL's)
+   * only the board's IAL months — October, January, June (the lead's decision of 16 Oct 2026, 2) — with the
+   * sitting it is in now kept on the list if it is another, so the list says where it is.
+   */
+  const unitMonths = (u: ItemRow) => {
+    const level = u.units[0]?.level;
+    const own = months.filter((m) => !(level === 'igcse' && IGCSE_NEVER_MONTHS.includes(m.month)));
+    if (!u.ialUnit) return own;
+    return own.filter((m) => IAL_UNIT_MONTHS.includes(m.month) || m.month === (u.series?.month as string | undefined));
+  };
 
   // "Its N reservations stand": what this save would stop while it has reservations.
   const closing: { name: string; n: number }[] = [];
@@ -557,7 +595,7 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
     items: [
       ...s.papers.map((i) => itemRow(i, false, false)),
       ...s.routes.map((i) => itemRow(i, false, false)),
-      ...s.units.map((i) => itemRow(i, true, months.length > 1)),
+      ...s.units.map((i) => itemRow(i, true, unitMonths(i).length > 1)),
       ...s.qualifications.map((i) => itemRow(i, true, false)),
       ...Object.entries(f.papers).filter(([, p]) => p.availability !== 'closed')
         .map(([unitId, p]) => ({ paperUnitId: unitId, availability: p.availability, courseFee: p.courseFee === '' ? null : Number(p.courseFee) })),
@@ -569,12 +607,15 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
     ...(f.reason.trim() ? { reason: f.reason.trim() } : {}),
   });
   const refresh = async (offerId: string | null): Promise<ReadBack> => {
-    const [sheet] = await Promise.all([
-      readSheet(queryClient, session.id),
-      queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }),
+    const [back] = await Promise.all([
+      readBack(queryClient, session.id, offerId),
+      // The sessions' list and the rest under ['sessions'], not this sheet: its key is under the prefix, and an
+      // invalidation would start a refetch with the query's retries that the read-back then joined (a save during
+      // an outage waited about 7 s before it said anything: the review of dd68598, item 3). readBack reads it.
+      queryClient.invalidateQueries({ queryKey: SESSIONS_KEY, predicate: (q) => !(q.queryKey[1] === session.id && q.queryKey[2] === 'offers') }),
       queryClient.invalidateQueries({ queryKey: ['sessions', session.id, 'preview'] }),
     ]);
-    return { row: offerId ? sheet.offers.find((o) => o.id === offerId) ?? null : null, at: sheetTime(queryClient, session.id) };
+    return back;
   };
   const save = useMutation({
     mutationFn: async () => {
@@ -750,14 +791,15 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
                     <TeacherPicker compact value={st.teachers} onChange={(teachers) => setItem(u.id, { teachers })} pool={[...pool, ...u.teachers.map((t) => t.teacherId)]} />
                   </div>
                 )}
-                {months.length > 1 && st.availability !== 'closed' && (
-                  <div className="flex items-center gap-2">
+                {unitMonths(u).length > 1 && st.availability !== 'closed' && (
+                  <div className="flex flex-wrap items-center gap-2">
                     <label htmlFor={`sf-sit-${u.id}`} className="text-xs text-muted-foreground">Sitting</label>
                     <select id={`sf-sit-${u.id}`} className={INPUT_CLASS.replace('w-full', 'w-64')} value={st.seriesMonth} disabled={ro} onChange={(e) => setItem(u.id, { seriesMonth: e.target.value as SeriesMonth })}>
-                      {months.filter((m) => !(code?.level === 'igcse' && IGCSE_NEVER_MONTHS.includes(m.month))).map((m) => (
+                      {unitMonths(u).map((m) => (
                         <option key={m.month} value={m.month}>{`${board?.name ?? ''} ${MONTH_LABEL[m.month]} ${m.year}`}</option>
                       ))}
                     </select>
+                    {u.ialUnit && <span className="text-xs text-muted-foreground">An IAL unit sits in October, January or June.</span>}
                   </div>
                 )}
               </div>
@@ -874,12 +916,34 @@ function PaperLine({ name, full, code, reservations, value, choices, fee, subjec
   );
 }
 
-/** The sheet fetched now and put in the cache; typed by its fetcher. */
-const readSheet = (queryClient: ReturnType<typeof useQueryClient>, sessionId: string) =>
-  queryClient.fetchQuery({ queryKey: offersKey(sessionId), queryFn: () => fetchOffers(sessionId), staleTime: 0 });
 /** When the sheet's cache last took a response. */
 const sheetTime = (queryClient: ReturnType<typeof useQueryClient>, sessionId: string) =>
   queryClient.getQueryState(offersKey(sessionId))?.dataUpdatedAt ?? 0;
+
+/**
+ * The sheet read back after this screen's own change (a Save, an Add, a Remove, a Replace a teacher), put in
+ * the cache and typed by its fetcher, with the row the form is made again from (F6's review, finding 2). F6's
+ * second review left two notes, both here:
+ * (a) a fetch of the sheet already running — a refetch on the window's focus, started before the change —
+ *     is what fetchQuery would hand back, the sheet from before the change stamped newer: it is cancelled
+ *     first, so the read is a request made after the change;
+ * (b) the change has succeeded whatever the read does: a read that fails is not the change's failure — the
+ *     sheet's query is invalidated instead (it refetches), and the drawer makes the form again once that
+ *     copy is newer than the change (`failed`, SubjectDrawer).
+ */
+async function readBack(queryClient: ReturnType<typeof useQueryClient>, sessionId: string, offerId: string | null): Promise<ReadBack> {
+  const asked = Date.now();
+  await queryClient.cancelQueries({ queryKey: offersKey(sessionId) });
+  try {
+    // One attempt (no retries): a read that fails says so at once, and the sheet's own refetch takes the retries.
+    const sheet = await queryClient.fetchQuery({ queryKey: offersKey(sessionId), queryFn: () => fetchOffers(sessionId), staleTime: 0, retry: false });
+    return { row: offerId ? sheet.offers.find((o) => o.id === offerId) ?? null : null, at: sheetTime(queryClient, sessionId) };
+  } catch (err) {
+    console.warn('[sheet] the read-back after a saved change failed; the sheet will refetch:', err instanceof Error ? err.message : err);
+    void queryClient.invalidateQueries({ queryKey: offersKey(sessionId) });
+    return { row: null, at: asked, failed: true };
+  }
+}
 
 function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: SessionDetail; offer: OfferRow; onClose: () => void; onReplaced: (back: ReadBack) => void }) {
   const queryClient = useQueryClient();
@@ -887,7 +951,7 @@ function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: Sess
   const [from, setFrom] = useState(offer.teachers[0]?.teacherId ?? '');
   const [to, setTo] = useState('');
   const [reason, setReason] = useState('');
-  // What happened to this year's classes (F1's follow-up, `groupsFollowed`): said before closing.
+  // What happened to this year's groups (F1's follow-up, `groupsFollowed`): said before closing.
   const [classSaid, setClassSaid] = useState<FollowSentence[] | null>(null);
   const [back, setBack] = useState<ReadBack | null>(null);
   const go = useMutation({
@@ -896,8 +960,7 @@ function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: Sess
     })),
     onSuccess: async (r) => {
       // The subject's row as it is now, read here and handed to the form made again (F6's review, finding 2).
-      const sheet = await readSheet(queryClient, session.id);
-      const read: ReadBack = { row: sheet.offers.find((o) => o.id === offer.id) ?? null, at: sheetTime(queryClient, session.id) };
+      const read = await readBack(queryClient, session.id, offer.id);
       const said = followSentences(r.groupsFollowed, { one: false, teacherName: (id) => (teachers ?? []).find((t) => t.id === id)?.name });
       if (said.length) { setBack(read); setClassSaid(said); }
       else { onClose(); onReplaced(read); }
@@ -908,7 +971,7 @@ function ReplaceTeacher({ session, offer, onClose, onReplaced }: { session: Sess
   return (
     <Modal title="Replace a teacher" onClose={close}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">{"Every reservation, paper and this year's class of the teacher who leaves moves to the other, audited."}</p>
+        <p className="text-sm text-muted-foreground">{"Every reservation, paper and this year's group of the teacher who leaves moves to the other, audited."}</p>
         <p className="text-sm text-muted-foreground">Anything else you changed on the subject’s form stays; its teachers are read again after the replacement.</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
         {classSaid ? (

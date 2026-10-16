@@ -268,7 +268,8 @@ export const importArabic: Record<string, string> = {
   'Classes are in': 'الفصول في عام',
   '(not set up)': '(غير مُعَدّ)',
   'Year not set up: no sections or enrolments': 'العام غير مُعَدّ: لا فصول ولا التحاق',
-  'A per-unit class list without emails — not imported': 'قائمة فصل لكل وحدة بلا بريد إلكتروني — لا تُستورد',
+  // A teaching group is "group" / مجموعة (the lead's decision of 16 Oct 2026, 12).
+  'A per-unit group list without emails — not imported': 'قائمة مجموعة لكل وحدة بلا بريد إلكتروني — لا تُستورد',
   'Not a registration tab — not imported': 'ليست ورقة تسجيل — لا تُستورد',
   'Whose grades': 'صفوف أي عام',
   "The grade column is each student's grade in one academic year; 9 means they start grade 10 the year after.": 'عمود الصف هو صف كل طالب في عام دراسي واحد؛ 9 تعني أنه يبدأ الصف العاشر في العام التالي.',
@@ -481,7 +482,7 @@ export const importArabic: Record<string, string> = {
   'One tab holds several exam series': 'ورقة واحدة تحتوي عدة دورات امتحان',
   'Each series and level is mapped on its own.': 'تُطابَق كل دورة ومستوى على حدة.',
   'Per-unit roster tabs are not imported': 'أوراق قوائم الوحدات لا تُستورد',
-  'Tabs that list students by unit without emails (the hand-made rosters) are class lists, not registrations.': 'الأوراق التي تسرد الطلاب حسب الوحدة بلا بريد (القوائم اليدوية) قوائم فصول وليست تسجيلات.',
+  'Tabs that list students by unit without emails (the hand-made rosters) are group lists, not registrations.': 'الأوراق التي تسرد الطلاب حسب الوحدة بلا بريد (القوائم اليدوية) قوائم مجموعات وليست تسجيلات.',
   'Academic year not set up': 'العام الدراسي غير مُعَدّ',
   'The year the classes are in is not on the Academic year screen: sections and course enrolments are not made for it (cohorts and history are).':
     'العام الذي فيه الفصول ليس في شاشة العام الدراسي: لا تُنشأ له فصول ولا التحاق (بينما تُسجل الدفعات والسجل السابق).',
@@ -494,8 +495,8 @@ export const importArabic: Record<string, string> = {
   'How the school’s level codes are read from the units each entry covers.': 'كيف تُقرأ رموز مستوى المدرسة من الوحدات التي يشملها كل قيد.',
   'The coordinator’s answers every import’s review starts from.': 'إجابات المنسق التي تبدأ منها مراجعة كل استيراد.',
   'What "Carry forward on …" means in the sheet': 'معنى "Carry forward on …" في الجدول',
-  "The school's sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today's rule allows studying outside school only on a retake or a subject the school does not teach. The day-one import starts every review from this answer.":
-    'يعلّم جدول المدرسة بعض الأسطر دراسة ذاتية لمواد تدرّسها المدرسة أيضًا (IS-03). تسمح قاعدة اليوم بالدراسة خارج المدرسة فقط عند الإعادة أو لمادة لا تدرّسها المدرسة. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
+  "The school's sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today's rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student's exception. The day-one import starts every review from this answer.":
+    'يعلّم جدول المدرسة بعض الأسطر دراسة ذاتية لمواد تدرّسها المدرسة أيضًا (IS-03). تسمح قاعدة اليوم بالدراسة خارج المدرسة عند الإعادة فقط، أو في A.2. يُرحَّل إليه A.S.: وأي قيد أول آخر بدراسة ذاتية استثناءٌ للطالب. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
   'Staff wrote "Carry forward on June 2022" on some A2 rows (IMPORT_SPIKE.md IS-02, DISCOVERY.md Q-02): an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.':
     'كتب الموظفون "Carry forward on June 2022" على بعض أسطر A2 (IS-02، Q-02): نتيجة AS مُرحّلة إلى القيد، أو دفعة مُرحّلة. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
 
@@ -720,6 +721,8 @@ export function translateImportText(text: string): string | null {
     [/^(.+) and (.+) cannot be reserved together$/, (m) => `لا يمكن حجز ${m[1]} و${m[2]} معًا`],
     [/^(.+) is closed in this session$/, (m) => `${m[1]} مغلقة في هذه الجلسة`],
     [/^(.+) is self-study only: the school does not teach it this cycle$/, (m) => `${m[1]} دراسة ذاتية فقط: لا تدرّسها المدرسة هذه الدورة`],
+    // The forms' rule, self study on a second entry only (the lead's decision of 16 Oct 2026, 1).
+    [/^(.+) is self study on a second entry only: name the earlier sitting, or ask for the exception$/, (m) => `${m[1]} دراسة ذاتية في القيد الثاني فقط: سمِّ الدورة السابقة، أو اطلب الاستثناء`],
     [/^(.+) carries an earlier sitting forward: name the series it is carried from$/, (m) => `${m[1]} يحمل دورة سابقة: سمِّ الدورة المحمولة منها`],
     [/^(.+): no enrolment while it is turned off$/, (m) => `${m[1]}: لا التحاق ما دامت معطّلة`],
     [/^(\w+) (\d{4}) is not a sitting of (.+) before this one: name another sitting on the line$/, (m) => `${monthAr(m[1]!)} ${m[2]} ليست دورة لـ ${m[3]} قبل هذه: سمِّ دورة أخرى في السطر`],

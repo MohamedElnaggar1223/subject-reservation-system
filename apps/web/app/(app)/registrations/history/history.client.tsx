@@ -130,7 +130,7 @@ function ChangeRequestEntry({ cr }: { cr: ChangeRequestAudit }) {
           <p className={isCredit ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>
             Financial impact:{' '}
             {isCredit
-              ? `+${formatPrice(Math.abs(cr.priceDifference))} escrow credit`
+              ? `+${formatPrice(Math.abs(cr.priceDifference))} to the balance`
               : `${formatPrice(cr.priceDifference)} additional payment`}
           </p>
         )}

@@ -1,0 +1,64 @@
+{
+ "mode": "b",
+ "tag": "fixed",
+ "before": "Read-back drive b control 02:05:47",
+ "typed": "Read-back drive b fixed 02:09:53",
+ "after": "Read-back drive b fixed 02:09:53",
+ "keptWhatWasSaved": true,
+ "savedShown": true,
+ "errorShown": [],
+ "duringOutage": {
+  "waitingNoticeShown": false,
+  "screenReplacedByError": false
+ },
+ "requests": [
+  {
+   "at": 66,
+   "what": "GET answered"
+  },
+  {
+   "at": 668,
+   "what": "GET answered"
+  },
+  {
+   "at": 2867,
+   "what": "PUT the form"
+  },
+  {
+   "at": 2902,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 3909,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 5912,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 9919,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 9924,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 10960,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 12967,
+   "what": "GET answered"
+  }
+ ],
+ "errors": [
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED"
+ ]
+}

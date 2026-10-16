@@ -181,7 +181,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
         {cancelMutation.isPending ? 'Cancelling…' : 'Cancel this checkout'}
       </Button>
       <p className="mt-1 text-xs text-muted-foreground text-center">
-        Only if you have not paid. Escrow applied to it goes back to the balance.
+        Only if you have not paid. What your balance paid toward it goes back to the balance.
       </p>
       {cancelError && <p className="mt-2 text-xs text-destructive text-center">{cancelError}</p>}
     </>
@@ -279,7 +279,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               </h1>
               <p className="text-sm text-muted-foreground text-center">
                 {completed
-                  ? 'Your registrations have been confirmed — no payment was required because escrow covered the full amount.'
+                  ? 'Your registrations have been confirmed — no payment was required because your balance covered the full amount.'
                   : 'Your payment is pending. Follow the instructions below to complete it.'}
               </p>
             </div>
@@ -288,7 +288,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {completed && (
               <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-5 text-center">
                 <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300 mb-1">
-                  Paid from escrow
+                  Paid from your balance
                 </p>
                 <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">
                   <Money amount={(result.escrowAmountApplied ?? 0)} />
@@ -385,7 +385,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                 <Money amount={amountDue} />
                 {escrowToApply > 0 && (
                   <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 ml-1">
-                    (+ <Money amount={escrowToApply} /> <span>escrow</span>)
+                    (+ <Money amount={escrowToApply} /> <span>from your balance</span>)
                   </span>
                 )}
               </span>
@@ -532,7 +532,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               <div className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground font-display">Apply Escrow Balance</h2>
+                    <h2 className="text-sm font-semibold text-foreground font-display">Use your balance</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       <span>Available:</span> <Money amount={summary.escrowBalance} />
                     </p>
@@ -626,7 +626,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               </div>
               {escrowToApply > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
-                  <span>Escrow applied</span>
+                  <span>From your balance</span>
                   <span>- <Money amount={escrowToApply} /></span>
                 </div>
               )}
@@ -666,7 +666,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {initiateMutation.isPending
               ? 'Processing...'
               : amountDue === 0 && escrowToApply > 0
-                ? <><span>Confirm</span> <Money amount={escrowToApply} /> <span>from escrow</span></>
+                ? <><span>Confirm</span> <Money amount={escrowToApply} /> <span>from your balance</span></>
                 // "Pay EGP 14,350 at the school desk" (F6: was "Pay 14350.00 EGP via Pay at School").
                 : <><span>Pay</span> <Money amount={amountDue} /> <span>{selectedMethod === 'instapay' ? 'by InstaPay' : 'at the school desk'}</span></>}
           </Button>

@@ -13,7 +13,7 @@ import { apiResponse } from '@repo/validations';
 import TransferClient from './transfer.client';
 
 export const metadata = {
-  title: 'Transfer Escrow — IGCSE Reservation',
+  title: 'Move balance — IGCSE Reservation',
 };
 
 export default async function TransferPage(): Promise<React.JSX.Element> {

@@ -7,7 +7,7 @@
  * number, a date or a policy's parts.
  *
  * Words: an exception استثناء, a policy قاعدة, a scope نطاق, a family الأسرة, a line سطر, a charge
- * رسم, an instalment قسط, the held wallet المحفظة المحجوزة, a one-shot gate (once) مرة واحدة, the
+ * رسم, an instalment قسط, the held balance الرصيد المحجوز, a one-shot gate (once) مرة واحدة, the
  * course fee رسوم التدريس, the board fee رسوم المجلس. Names, codes and amounts are data.
  */
 
@@ -91,8 +91,8 @@ export const moneyArabic: Record<string, string> = {
   'As 2026-2027.': 'بصيغة 2026-2027.',
   'Instalments': 'الأقساط',
   'They add up to the line\'s price': 'مجموعها سعر السطر',
-  '; each is paid into the held wallet, and the line is paid from them at the last. The last date is at the latest the session\'s end or the line\'s deadline, whichever is earlier.':
-    '؛ يُدفع كل قسط في المحفظة المحجوزة، ويُسدَّد السطر منها عند آخرها. وآخر موعد هو نهاية الجلسة أو موعد السطر، أيهما أسبق.',
+  '; each is paid into the held balance, and the line is paid from them at the last. The last date is at the latest the session\'s end or the line\'s deadline, whichever is earlier.':
+    '؛ يُدفع كل قسط في الرصيد المحجوز، ويُسدَّد السطر منها عند آخرها. وآخر موعد هو نهاية الجلسة أو موعد السطر، أيهما أسبق.',
   'Due': 'الاستحقاق',
   'Amount (EGP)': 'المبلغ (جنيه)',
   'Remove': 'إزالة',
@@ -209,7 +209,7 @@ export const moneyArabic: Record<string, string> = {
   'Refund': 'استرداد',
   'Accept the request': 'قبول الطلب',
   'Cancel the charge': 'إلغاء الرسم',
-  'Refund to escrow': 'استرداد إلى الرصيد',
+  'Refund to the balance': 'استرداد إلى الرصيد',
   'Collect': 'تحصيل',
   'Collecting…': 'جارٍ التحصيل…',
   'Paid with': 'طريقة الدفع',
@@ -399,7 +399,7 @@ const SENTENCES_AR: Record<string, string> = {
   '{who} may hold a second live line on the same unit or award in {scope} (once)': 'يمكن لـ {who} الاحتفاظ بسطر ثانٍ قائم على الوحدة أو الشهادة نفسها في {scope} (مرة واحدة)',
   '{who} may reserve {scope} in grade 10 without every core subject': 'يمكن لـ {who} حجز {scope} في الصف العاشر دون كل المواد الأساسية',
   '{who} may sit {scope} in grade 10': 'يمكن لـ {who} الجلوس في {scope} في الصف العاشر',
-  '{who} pays {scope} in {value}, each into the held wallet; the line is paid from them at the last': 'يدفع {who} {scope} على {value}، كلٌّ منها في المحفظة المحجوزة؛ ويُسدَّد السطر منها عند آخرها',
+  '{who} pays {scope} in {value}, each into the held balance; the line is paid from them at the last': 'يدفع {who} {scope} على {value}، كلٌّ منها في الرصيد المحجوز؛ ويُسدَّد السطر منها عند آخرها',
 };
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -446,7 +446,7 @@ export function translateMoneyText(text: string, exact: (t: string) => string | 
     // The confirmation dialogs (the policy's label first).
     [/^(.+): it stops applying now\. A plan's line expires and its deposits are settled as a drop today; a re-price it made on an unpaid line is undone\.$/,
       (m) => `${exact(m[1]!) ?? m[1]}: يتوقف تطبيقه الآن. ينتهي سطر الخطة وتُسوّى ودائعها كسحب اليوم؛ ويُلغى ما أجراه من تعديل سعر على سطر غير مدفوع.`],
-    [/^(.+): every deposit goes back to the family's escrow, the unpaid instalments are cancelled, and the line stays payable in full by its usual date\.$/,
+    [/^(.+): every deposit goes back to the family's balance, the unpaid instalments are cancelled, and the line stays payable in full by its usual date\.$/,
       (m) => `${exact(m[1]!) ?? m[1]}: تعود كل وديعة إلى رصيد الأسرة، وتُلغى الأقساط غير المدفوعة، ويبقى السطر قابلًا للدفع كاملًا بموعده المعتاد.`],
     [/^(.+): from now on it applies as it is scoped\.$/, (m) => `${exact(m[1]!) ?? m[1]}: يُطبَّق من الآن بنطاقه.`],
     [/^A price exception on (.+), whose unit is now reserved under another subject: it applies only to that row's lines — re-scope it to the new item \(revoke and grant again\) or confirm it as it is$/,
@@ -463,7 +463,7 @@ export function translateMoneyText(text: string, exact: (t: string) => string | 
     // The Charges screen's dialogs (the charge's description first).
     [/^(.+): the family is told it is due, and it can be paid\.$/, (m) => `${m[1]}: تُبلَّغ الأسرة باستحقاقه ويمكن دفعه.`],
     [/^(.+): nothing is owed for it any more; the family is told\.$/, (m) => `${m[1]}: لم يعد مستحقًا؛ وتُبلَّغ الأسرة.`],
-    [/^(.+): the amount goes to the family's escrow\. A paper receipt that is out comes back first\.$/, (m) => `${m[1]}: يذهب المبلغ إلى رصيد الأسرة. ويُعاد الإيصال الورقي المسلَّم أولًا.`],
+    [/^(.+): the amount goes to the family's balance\. A paper receipt that is out comes back first\.$/, (m) => `${m[1]}: يذهب المبلغ إلى رصيد الأسرة. ويُعاد الإيصال الورقي المسلَّم أولًا.`],
     // The desk: the fee collected though the registration was refused.
     [/^The (\d{4}-\d{4}) school fee \(EGP (.+)\) was collected; the subjects were not registered: (.+)$/,
       (m) => `حُصّلت الرسوم المدرسية لعام ${m[1]} (${m[2]} جنيه)؛ ولم تُسجَّل المواد: ${exact(m[3]!) ?? m[3]}`],

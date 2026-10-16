@@ -102,10 +102,10 @@ export default function TakingsClient(): React.JSX.Element {
               <p className="text-xs text-muted-foreground">Money in</p>
               <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.moneyIn)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                all instruments · plus {formatPrice(data.totals.escrowApplied)} paid from escrow
+                all instruments · plus {formatPrice(data.totals.escrowApplied)} paid from balances
                 {data.totals.correctedTotal > 0 && (
                   <> · {formatPrice(data.totals.correctedTotal)} corrected out
-                    {data.totals.correctedEscrow > 0 && <> (and {formatPrice(data.totals.correctedEscrow)} escrow)</>}</>
+                    {data.totals.correctedEscrow > 0 && <> (and {formatPrice(data.totals.correctedEscrow)} to balances)</>}</>
                 )}
                 {data.totals.lateTransferTotal > 0 && <> · incl. {formatPrice(data.totals.lateTransferTotal)} transfers found later</>}
               </p>
@@ -213,7 +213,7 @@ export default function TakingsClient(): React.JSX.Element {
               <div className="px-4 py-3 border-b border-border">
                 <h2 className="text-sm font-semibold text-foreground">Transfers found later</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Found on the bank statement after their payment had closed, and added to the family&apos;s escrow. Included in money in.
+                  Found on the bank statement after their payment had closed, and added to the family&apos;s balance. Included in money in.
                 </p>
               </div>
               <table className="w-full min-w-[640px] text-sm">
@@ -223,7 +223,7 @@ export default function TakingsClient(): React.JSX.Element {
                       <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{time(r.lateTransferAt)}</td>
                       <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
                       <td className="px-4 py-2.5 text-card-foreground">
-                        InstaPay <span className="font-mono">{r.verificationReference}</span> — credited to escrow
+                        InstaPay <span className="font-mono">{r.verificationReference}</span> — added to the balance
                         {r.lateTransferAmount !== r.amount && <> (the payment was for {formatPrice(r.amount)})</>}
                       </td>
                       <td className="px-4 py-2.5 text-card-foreground">{r.lateTransferByUser?.name ?? '—'}</td>
@@ -255,7 +255,7 @@ export default function TakingsClient(): React.JSX.Element {
                         Confirmed this day by {r.confirmedByUser?.name ?? '—'}; reversed{' '}
                         {r.reversedAt ? new Date(r.reversedAt).toLocaleDateString() : ''} by {r.reversedByUser?.name ?? '—'}
                         {' '}({instrumentLabel(r.instrumentUsed ?? r.paymentMethod)}
-                        {r.escrowAmountApplied > 0 ? `; ${formatPrice(r.escrowAmountApplied)} from escrow, returned` : ''})
+                        {r.escrowAmountApplied > 0 ? `; ${formatPrice(r.escrowAmountApplied)} from the balance, returned` : ''})
                       </td>
                       <td className="px-4 py-2.5 text-right font-medium text-muted-foreground line-through whitespace-nowrap">{formatPrice(r.amount)}</td>
                     </tr>
@@ -271,7 +271,7 @@ export default function TakingsClient(): React.JSX.Element {
                             <>
                               Reversed this day by {r.reversedByUser?.name ?? '—'}: confirmed{' '}
                               {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : ''}, a month already closed, so corrected on this day
-                              {r.escrowAmountApplied > 0 ? ` (${formatPrice(r.escrowAmountApplied)} from escrow, returned)` : ''}
+                              {r.escrowAmountApplied > 0 ? ` (${formatPrice(r.escrowAmountApplied)} from the balance, returned)` : ''}
                             </>
                           ) : (
                             <>

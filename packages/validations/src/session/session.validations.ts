@@ -57,6 +57,14 @@ export function sessionSeriesMonths(type: string, year: number): { month: Series
 export const IGCSE_NEVER_MONTHS: readonly SeriesMonth[] = ['october', 'january'];
 export const IGCSE_NEVER_MESSAGE = 'IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series';
 
+/**
+ * The months a board sits a unit of a units-cash-in award (a Pearson International A Level's units, which
+ * the family's form lists one by one): October, January and June — the lead's decision of 16 Oct 2026
+ * (FEATURES_PLAN.md §6, 2; the school's forms say "November" loosely). A winter session's form offers such
+ * a unit October and January; an IGCSE subject keeps every month its board sits.
+ */
+export const IAL_UNIT_MONTHS: readonly SeriesMonth[] = ['october', 'january', 'june'];
+
 const LEVEL_WORDS: Record<string, string> = { igcse: 'IGCSE', as_level: 'AS', a_level: 'A Level' };
 
 /** How a session's label reads: "IGCSE" for a converted June IGCSE window, "October AS" for an October AS one. */

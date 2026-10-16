@@ -80,8 +80,8 @@ export const coreArabic: Record<string, string> = {
   'A reason is required.': 'السبب مطلوب.',
   'Could not load the settings': 'تعذر تحميل الإعدادات',
   'e.g. Agreed at the staff meeting on 3 October': 'مثال: تم الاتفاق في اجتماع الموظفين يوم 3 أكتوبر',
-  'Turning this off expires the waiting registrations graduates already made for the October, November and January series; their open checkouts are closed, any wallet money returned, and families told.':
-    'إيقاف هذا الخيار يُنهي التسجيلات المنتظرة التي قام بها الخريجون لدورات أكتوبر ونوفمبر ويناير؛ وتُغلق عمليات الدفع المفتوحة لها، ويُعاد أي مبلغ إلى المحفظة، وتُبلَّغ الأسر.',
+  'Turning this off expires the waiting registrations graduates already made for the October, November and January series; their open checkouts are closed, any money from the balance put back, and families told.':
+    'إيقاف هذا الخيار يُنهي التسجيلات المنتظرة التي قام بها الخريجون لدورات أكتوبر ونوفمبر ويناير؛ وتُغلق عمليات الدفع المفتوحة لها، ويُعاد ما أُخذ من الرصيد، وتُبلَّغ الأسر.',
   'Graduates may retake after grade 12': 'يحق للخريجين الإعادة بعد الصف 12',
   'A student who has finished grade 12 may still register for the October, November and January series of the academic year right after it (retakes to improve grades), never the June after it. Turning this off expires the waiting registrations graduates already made for those series.':
     'يحق للطالب الذي أنهى الصف 12 التسجيل في دورات أكتوبر ونوفمبر ويناير في العام الدراسي التالي مباشرة (إعادة لتحسين الدرجات)، وليس في يونيو التالي. إيقاف هذا الخيار يُنهي التسجيلات المنتظرة التي قام بها الخريجون لتلك الدورات.',
@@ -171,7 +171,7 @@ export const coreArabic: Record<string, string> = {
   'Year': 'السنة',
   'Becomes:': 'تصبح:',
   "Waiting registrations the corrected series no longer allows (a student's grade in that year) expire now; their open checkouts are closed, any wallet money returned, and families told. Confirmed registrations are not touched.":
-    'التسجيلات المنتظرة التي لم تعد الدورة المصححة تسمح بها (حسب صف الطالب في ذلك العام) تنتهي الآن؛ وتُغلق عمليات الدفع المفتوحة لها، ويُعاد أي مبلغ إلى المحفظة، وتُبلَّغ الأسر. لا تتأثر التسجيلات المؤكدة.',
+    'التسجيلات المنتظرة التي لم تعد الدورة المصححة تسمح بها (حسب صف الطالب في ذلك العام) تنتهي الآن؛ وتُغلق عمليات الدفع المفتوحة لها، ويُعاد ما أُخذ من الرصيد، وتُبلَّغ الأسر. لا تتأثر التسجيلات المؤكدة.',
   'e.g. The window was entered as June 2026; it is for June 2027': 'مثال: أُدخلت النافذة على أنها يونيو 2026، وهي ليونيو 2027',
   'Series corrected:': 'تم تصحيح الدورة:',
   'Waiting registrations expired:': 'التسجيلات المنتظرة المنتهية:',

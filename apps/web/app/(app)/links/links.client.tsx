@@ -414,8 +414,8 @@ export default function LinksClient(): React.JSX.Element {
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             When a parent is linked to your account, they can register subjects on
-            your behalf, view your registration history, and manage your escrow
-            balance. You can approve or reject link requests at any time.
+            your behalf, view your registration history, and see your balance with
+            the school. You can approve or reject link requests at any time.
           </p>
         </div>
       )}

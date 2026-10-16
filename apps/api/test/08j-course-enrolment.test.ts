@@ -153,7 +153,10 @@ describe('F0b: course enrolment', () => {
     });
 
     it('from registrations: the teacher each registration names, and self-study where it was taken outside school', async () => {
-      // s3 preregisters English with teacher A, and Physics (not taught here, so outside school).
+      // s3 preregisters English with teacher A, and Physics (not taught here, so outside school). A first
+      // entry in self-study on a subject not taught this cycle is the student's exception since the lead's
+      // decision of 16 Oct 2026 (FEATURES_PLAN.md §6, 1): granted first.
+      await apiResponse(adm.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', studentId: s.s3!.studentId, reason: '08j: Physics is not taught here this cycle' } }));
       await apiResponse(s.s3!.parent.api.v1.registrations.preregister.$post({
         json: { sessionId: june, ...(await reservationOf(june, [subj.ENG!, subj.PHY!], { teachers: { [subj.ENG!]: tA } })), studentId: s.s3!.studentId },
       }));

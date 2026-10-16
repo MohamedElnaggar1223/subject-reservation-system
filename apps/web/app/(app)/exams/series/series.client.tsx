@@ -351,7 +351,7 @@ export function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: 
               </div>
             )}
             <p className="basis-full text-xs text-muted-foreground">
-              Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board&apos;s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams&apos; start is the cut-off.
+              Past it, every payment still unconfirmed for this series closes on its own (money from the balance put back, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board&apos;s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams&apos; start is the cut-off.
             </p>
           </div>
         ) : (

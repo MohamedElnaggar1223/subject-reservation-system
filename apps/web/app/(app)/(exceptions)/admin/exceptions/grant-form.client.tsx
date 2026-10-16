@@ -316,7 +316,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
           <p className="mb-3 text-xs text-muted-foreground">
             <span>They add up to the line's price</span>
             {line && <> (<Money amount={line.priceAtRegistration} />)</>}
-            <span>; each is paid into the held wallet, and the line is paid from them at the last. The last date is at the latest the session's end or the line's deadline, whichever is earlier.</span>
+            <span>; each is paid into the held balance, and the line is paid from them at the last. The last date is at the latest the session's end or the line's deadline, whichever is earlier.</span>
           </p>
           <div className="space-y-2">
             {rows.map((r, i) => (

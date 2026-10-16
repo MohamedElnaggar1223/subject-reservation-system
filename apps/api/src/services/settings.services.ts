@@ -32,6 +32,14 @@ export async function getSetting<K extends SettingKey>(key: K, executor: Executo
   return (parsed.success ? parsed.data : SETTINGS[key].default) as SettingValue<K>;
 }
 
+/**
+ * What any visitor may read, signed in or not (GET /v1/settings/public): the school's name for the
+ * sign-in, sign-up and account pages (the lead's decision of 16 Oct 2026, 15). Nothing else is public.
+ */
+export async function publicSettings() {
+  return { schoolName: await getSetting('school.name') };
+}
+
 /** Every setting the caller may read, with its value and whether they may change it. */
 export async function listSettings(role: string | null | undefined) {
   const rows = await db.query.schoolSetting.findMany();
