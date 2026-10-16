@@ -50,19 +50,43 @@ for shot_name, title, do, form in SHEET_STEPS:
 group('The fees, from the boards\' lists')
 step('The Fees tab', f'<p>{L("Fees")}: one grid per sitting the sheet uses — Cambridge International June 2027, OxfordAQA June 2027, Pearson Edexcel June 2027 — each row a code the subjects read, {L("No fee")} until set.</p>', img='p2-24-fees-empty')
 step('Paste the Cambridge list', f'''<p>{L("Paste the fee list")}, paste the list\'s rows as the board writes them — syllabus, option, fee — {L("Read the list")}: every line is matched or said "not recognised". Keep {L("These are the board\'s published fees")} ticked when it is the board\'s list for this sitting (untick it for last year\'s: the rows stay "provisional" until {L("Confirm all")}). {L("Add these fees")}.</p>
-<pre>3180 A 9,850       0970 CX 10,850     0986 AX 9,850      0971 CX 10,850
-0653 CX 10,850     0984 AX 9,850      7156 X 12,550      7159 Y 12,550
-0983 DY 12,950     0972 CX 10,850
-3180 9,850         0970 10,850        0971 10,850        0653 10,850
-0983 12,950        0972 10,850
-9701 S1 14,100     9701 BY 11,400     9701 AX 18,600
-9702 S1 14,100     9702 BX 11,400     9702 AX 18,600
-9618 SY 11,400     9618 BY 12,450     9618 AY 16,950</pre>
-<p>The second block repeats each syllabus that has a one-paper retake on its own: a one-paper retake reads the syllabus\'s fee (a finding). The demo pastes the June 2026 list as if it were June 2027\'s (June 2027\'s was not published when the forms were made); the Computer Science AS row is pasted under 9618, the current AS code, where the list still writes 9608.</p>''',
+<pre>3180 A 9,850
+0970 CX 10,850
+0986 AX 9,850
+0971 CX 10,850
+0653 CX 10,850
+0984 AX 9,850
+7156 X 12,550
+7159 Y 12,550
+0983 DY 12,950
+0972 CX 10,850
+3180 9,850
+0970 10,850
+0971 10,850
+0653 10,850
+0983 12,950
+0972 10,850
+9701 S1 14,100
+9701 BY 11,400
+9701 AX 18,600
+9702 S1 14,100
+9702 BX 11,400
+9702 AX 18,600
+9618 SY 11,400
+9618 BY 12,450
+9618 AY 16,950</pre>
+<p>One fee per line, as above. Lines 11 to 16 repeat each syllabus that has a one-paper retake, on its own: a one-paper retake reads the syllabus\'s fee (a finding). The demo pastes the June 2026 list as if it were June 2027\'s (June 2027\'s was not published when the forms were made); the Computer Science AS row is pasted under 9618, the current AS code, where the list still writes 9608.</p>''',
      form=Q('Cambridge Registration Fees June 2026 (Year 11 & 12): IGCSE Biology 0970 CX 10,850 · AS Level 9700/9701/9702 S1/S2 14,100 · A2 Level BY/CT 11,400 · A Level AX/HX 18,600 · AS Computer Science 9608 SY 11,400 · A2 9618 BY/CT 12,450 · A Level 9618 AY 16,950'), img='p2-25-fees-paste-cambridge')
-step('Paste the Edexcel list', '''<pre>WMA11 4,800   WMA12 4,800   WMA13 4,800   WMA14 4,800
-WME01 4,450   WST01 4,450   WBI15 4,450   WBI16 4,450
-4MA1 9,200    YAA01 18,300</pre><p>Mathematics O.L. is the two papers of the list (4,600 each); Arabic IAL its two units (WAA01 8,950 + WAA02 9,350).</p>''',
+step('Paste the Edexcel list', '''<pre>WMA11 4,800
+WMA12 4,800
+WMA13 4,800
+WMA14 4,800
+WME01 4,450
+WST01 4,450
+WBI15 4,450
+WBI16 4,450
+4MA1 9,200
+YAA01 18,300</pre><p>Mathematics O.L. is the two papers of the list (4,600 each); Arabic IAL its two units (WAA01 8,950 + WAA02 9,350).</p>''',
      form=Q('Edexcel June 2026: IAL Mathematics P1–P4 WMA11–WMA14 4,800 each; M1, M2, S1 4,450 each · IAL Biology Paper 5, Paper 6 WBI15, WBI16 4,450 each · IGCSE Mathematics one row per paper 4,600 each · IAL Arabic WAA01 / WAA02 8,950 / 9,350'), img='p2-25-fees-paste-pearson_edexcel')
 step('The rows no list has: typed, "not published yet"', f'<p>A row still {L("No fee")} is typed in its {L("Amount")} box; leave {L("These are the board\'s published fees")} unticked and {L("Save fees")}: it is "provisional" — families can reserve the subject, not pay for it, until {L("Confirm all")}. The demo types placeholders for Environmental Management, Global Perspectives, Global Citizenship, French and Psychology A level, the Oxford subjects, Human Biology, Biology IAL units 1–4 and Arabic GCE.</p>', img='p2-26-fees-typed')
 step('Cambridge June 2027, priced', '<p>Provisional rows first (to confirm when the board publishes), then the confirmed ones.</p>', img='p2-27-fees-cambridge')

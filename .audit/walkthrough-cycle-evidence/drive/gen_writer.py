@@ -78,7 +78,7 @@ def build():
         body.append('</section>')
     nav.append('<h2><a href="#findings">What the screens could not do</a></h2><h2><a href="#demo">Rebuilding the demo</a></h2>')
     acc = ''.join(f'<tr><td>{a}</td><td><code>{e}</code></td><td><code>{pw}</code></td></tr>' for a, e, pw in ACCOUNTS)
-    findings = ''.join(f'<div class="finding"><b>{html.escape(t)}.</b> {html.escape(d)}</div>' for t, d in FINDINGS)
+    findings = ''.join(f'<div class="finding"><b>{html.escape(t)}{"" if t.endswith(".") else "."}</b> {html.escape(d)}</div>' for t, d in FINDINGS)
     page = f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The June 2027 cycle, from a clean clone to the families — a walkthrough</title>
