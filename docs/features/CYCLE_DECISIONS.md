@@ -399,6 +399,10 @@ teacher.
 | both type-checks (the review round) | 57ec766's content | green | session log, trail 15:13Z |
 | the suite, local time, from an empty database migrated through 0061 | 57ec766 | 43 files, **843 passed**, 1 todo (08p's new scenario) | `gates/suite-local-57ec766.txt` |
 | the same with `TZ=UTC` | 57ec766 | 43 files, **843 passed**, 1 todo | `gates/suite-utc-57ec766.txt` |
+| both type-checks, again after the resume | 115508f's content (57ec766's code) | green | session log, trail 16:07Z |
+| the suite, local time, again after the resume | 115508f | 43 files, **843 passed**, 1 todo | `gates/suite-local-115508f.txt` |
+| the same with `TZ=UTC` | 115508f | 43 files, **843 passed**, 1 todo | `gates/suite-utc-115508f.txt` |
+| 0061 on a fresh template copy, again after the resume | 115508f | 61 → 62, three notes changed, three audit rows; a second run changes nothing | `migration-0061-115508f.txt` |
 | `useQuery<…>` generics in `apps/web/app` | — | 15 (unchanged) | `grep -rn "useQuery<" apps/web/app` |
 | No file over 300 KB under `.audit`; no mobile number in the trail or the documents | — | none | CI's gate 0 |
 
@@ -567,3 +571,9 @@ with two qualifications (step 1), and the self-study-only subject, Chemistry (st
 - The dev servers are still running for the lead's drive: API on 3181 (pnpm 86464), web on 3180 (pnpm 86466),
   database `igcse_decisions_dev`. Student B1 now holds the exception "self-study on a first entry", and its InstaPay
   payment of 8,800 is rejected, with the transfer found later recorded and undone.
+- 15:48Z: CI run 38924987623 green on 115508f.
+- 16:04Z: resumed on the coordinator's message (the harness had lost its connection while the local-time suite ran).
+  The worktree read from lead-env with a temporary index: nothing differs from 115508f and nothing is untracked, so
+  every item was committed. Neither suite run on 57ec766 had been cut: each ended with its summary.
+- 16:06Z: the migration proof again on a fresh template copy (`migration-0061-115508f.txt`). 16:07Z: both
+  type-checks. 16:15Z and 16:22Z: the suite again in local time and with `TZ=UTC` on 115508f, 843 passed each.
