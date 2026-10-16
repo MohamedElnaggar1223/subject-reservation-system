@@ -1,0 +1,35 @@
+
+> @repo/db@0.0.0 seed /private/tmp/f8-clone/packages/db
+> tsx seed.ts
+
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (12) from ../../apps/api/.env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+--- Starting database seed ---
+
+Seeding 17 subjects...
+  [subject] 0500 - English Language (created if missing)
+  [subject] 0580 - Mathematics (created if missing)
+  [subject] 0544 - Arabic Language (created if missing)
+  [subject] 0625 - Physics (created if missing)
+  [subject] 0620 - Chemistry (created if missing)
+  [subject] 0610 - Biology (created if missing)
+  [subject] 0478 - Computer Science (created if missing)
+  [subject] 0450 - Business Studies (created if missing)
+  [subject] 0455 - Economics (created if missing)
+  [subject] 0470 - History (created if missing)
+  [subject] 0460 - Geography (created if missing)
+  [subject] 0400 - Art & Design (created if missing)
+  [subject] 0520 - French (created if missing)
+  [subject] 0452 - Accounting (created if missing)
+  [subject] 0417 - Information and Communication Technology (created if missing)
+  [subject] 0680 - Environmental Management (created if missing)
+  [subject] 0413 - Physical Education (created if missing)
+
+Seeding 2 registration sessions...
+  [session] June 2026 (june) - active (created if missing)
+  [session] November 2026 – January 2027 (winter) - draft (created if missing)
+
+Looking for user admin@igcse.local to promote to admin...
+  Promoted admin@igcse.local to admin.
+
+--- Seed complete ---

@@ -1,0 +1,2 @@
+$ docker run -d --name igcse-walk-db -e POSTGRES_USER=audit -e POSTGRES_PASSWORD=auditpass -e POSTGRES_DB=igcse_audit -p 127.0.0.1:5434:5432 postgres:17.5
+14bd17362f4d1f9a655de731187ce57eb7207dd3f233498089886716a585711d

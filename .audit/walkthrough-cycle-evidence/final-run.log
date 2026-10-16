@@ -1,0 +1,1987 @@
+[19:59:42Z] api stopped: 92682 92676 92654
+[19:59:43Z] database recreated
+[19:59:44Z] migrated: 62
+[19:59:44Z] api started: pid 2802
+[19:59:46Z] run p1-signup.mjs
+shot p1-sign-in-fresh 45 KB q72
+shot p1-sign-up-choose 50 KB q72
+IGCSE Reserve
+The school's subject reservations, in one place.
+
+One account for the family, in place of a form for every subject.
+
+Reserve each child's subjects
+Pay at the school desk or by InstaPay
+See every receipt, and what is still owed
+العربية
+Parent Registration
+
+Create your account, then link each child and reserve their subjects.
+
+Full Name
+Email Address
+Password
+
+Minimum 8 characters required
+
+Confirm Password
+Create Parent Account
+After you create the account
+Link each child's account — your child accepts the link
+Reserve their subjects
+Pay at the school desk or by InstaPay
+Back to account type
+
+Already have an account? Sign in
+[
+  '|text|name|Enter your full name',
+  '|email|email|parent@example.com',
+  '|password|password|At least 8 characters',
+  '|password|confirmPassword|Confirm your password'
+]
+shot p1-sign-up-admin-filled 60 KB q72
+url http://localhost:3190/sign-up/parent/complete
+shot p1-sign-up-admin-done 43 KB q72
+Welcome back, School Admin
+
+Your children’s subjects and payments, and the next step for each.
+
+Start by linking your child
+
+You need a linked child before you can reserve subjects or pay fees. If your child already has an account, ask for the link; otherwise the school office sets both up for you in one visit.
+
+Link my child
+errors []
+[20:00:26Z] seeded: 19 rows;   Promoted admin@igcse.local to admin.
+[20:00:48Z] June 2026 closed by the scheduler
+[20:00:48Z] run p1-first.mjs
+shot p1-11-sign-in-admin 46 KB q72
+landed http://localhost:3190/
+shot p1-12-admin-home 43 KB q72
+Welcome back, School Admin
+
+The reservation cycle: where each session stands, and what comes next.
+
+November 2026 – January 2027
+Draft
+
+Being prepared: not open to families yet. Families reserve from 1 Jul 2026 to 1 Oct 2026.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+No subjects on the sheet yet.
+Add the subjects
+shot p1-13-sessions-after-seed 49 KB q72
+Sessions
+
+0 open · 1 draft · 2 in all
+
+All
+June
+Winter
+New session
+November 2026 – January 2027
+Draft
+
+Families reserve 1 Jul 2026 – 1 Oct 2026
+Course starts 1 Jul 2026
+Payment due 1 Oct 2026
+
+Open
+No subjects on the sheet yet.
+June 2026
+Closed
+
+Families reserve 1 Feb 2026 – 1 May 2026
+Course starts 1 Feb 2026
+Payment due 1 May 2026
+
+Open
+0 subjects · 0 boards
+shot p1-14-catalogue-after-seed 101 KB q72
+shot p1-15-settings-school-name 78 KB q72
+shot p1-16-settings-school-name-saved 92 KB q72
+shot p1-17-sign-in-with-school-name 46 KB q72
+errors []
+[20:01:07Z] run p2a-team.mjs
+shot p2-01-team 57 KB q72
+shot p2-02-team-coordinator 60 KB q72
+shot p2-03-team-finance-officer 70 KB q72
+shot p2-04-team-teacher 74 KB q72
+Team & Accounts
+
+Create accounts and assign roles. Anyone on the staff can also teach: link their account to a teacher record and they get the teaching screens for their own lessons.
+
+Name
+Email
+Temp. password
+Role
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+Teaches as
+Does not teach
+New teacher record (this name)
+
+Runs the desk: payments, receipts and registrations on a family’s behalf.
+
+Create Account
+Staff
+Students
+Parents
+Name	Email	Role	Teaches as
+Teacher 33	teacher33@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+Teacher 33
+Unlink
+
+Teacher 32	teacher32@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+Teacher 32
+Unlink
+
+Teacher 31	teacher31@igcse.local	
+Admin
+Finance A
+shot p2-05-team-list 84 KB q72
+errors []
+[20:01:45Z] run p2b-catalogue.mjs
+shot p2-06-subjects-import 111 KB q72
+Subject Management
+
+41 subjects total  · 41 active
+
+Export CSV
+Close Import
+New Subject
+Import subjects from Excel
+
+Paste rows as: name, code, council, level, courseFee, registrationFee, core Paste cells straight from Excel (tab separated), or use commas. Prices may include thousands separators. Council: Pearson Edexcel, Cambridge, or Oxford. Level: IGCSE, AS Level, or A Level. Core: yes/no. Every row is reported back — nothing imports silently.
+
+Imported 24 subject(s).
+Import
+All boards
+Pearson Edexcel
+Cambridge International
+OxfordAQA
+All Statuses
+Active
+Inactive
+Subject	Board	Level	Fees	Cor
+shot p2-07-subjects-imported 89 KB q72
+shot p2-08-subjects-samples-deactivated 100 KB q72
+shot p2-09-catalogue-starter-sets 99 KB q72
+shot p2-10-catalogue-add-paper 93 KB q72
+shot p2-11-catalogue-add-award 94 KB q72
+shot p2-12-catalogue-award-papers 95 KB q72
+shot p2-13-catalogue-option-carry-forward 90 KB q72
+shot p2-14-catalogue-a-level-routes 87 KB q72
+shot p2-15-catalogue-map-biology 84 KB q72
+shot p2-16-catalogue-map-ial-maths 78 KB q72
+shot p2-17-catalogue-mapped 97 KB q72
+Exam catalogue
+
+The boards, the awards they issue, the units or papers that count toward each, and what every subject families register for enters with its board. The school's level codes are worked out from these, never typed.
+
+Load a starter set from the research
+
+Adds what is missing; changes nothing already there. Check it against the board's current specification.
+
+Pearson IAL Mathematics
+Pearson IAL Biology
+Pearson Edexcel
+
+Edexcel Online
+
+Edit
+January
+June
+October
+November
+
+8 awards · 17 units · 5 subjects
+
+Cambridge International
+
+Cambridge Direct
+
+Edit
+June
+November
+
+22 awards · 7 units · 34 subjects
+
+OxfordAQA
+
+Centre Services
+
+Edit
+January
+June
+November
+
+2 awards · 0 units · 2 subjects
+
+"A.S./A.2." on a single AS unit means: An AS entry of a student who also sits A2 units in that series. Change it on the Settings page when the coordinator confirms what the school means.
+
+Subjects families register
+16
+ 
+to map
+Qualifications
+32
+Units and papers
+24
+
+16 subjects are not mapped yet
+
+These registrable subjects do not yet say what they enter with the board (the AS and A Level subjects that existed before the catalogue may be whole awards, single units or paper sets). Registration works either way; exam entries need the mapping.
+Search
+Only subjects not mapped yet
+Subject	Board	Enters	Counts toward	School's code	Actions
+
+
+Biology
+
+0610 · IGCSE · Not offered
+
+	Cambridge International	Not mapped	—	
+O.L.
+	Map it
+
+
+Biology
+
+0970 · IGCSE
+
+	Cambridge International	
+
+0970 Biolog
+errors []
+[20:04:16Z] run p2c-settings.mjs
+shot p2-18-settings-self-study 93 KB q72
+shot p2-19-settings-refund-policy 93 KB q72
+errors []
+[20:04:24Z] run p2d-session.mjs
+shot p2-20-new-session 65 KB q72
+session url http://localhost:3190/admin/sessions/5a9b5569-fa66-43bb-ab74-d84a6e0ac340
+shot p2-21-session-empty-sheet 49 KB q72
+← Sessions
+June 2027
+Draft
+
+Reserve 1 Nov 2026 08:00 – 15 Feb 2027 23:00
+Course starts 1 Nov 2026
+Due 30 Nov 2026 23:00
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+
+Edit
+Open now
+Correct the sitting
+
+No sittings yet: a subject's sitting is added with the subject.
+
+Subjects
+Fees
+Money
+Grade 10
+To verify
+
+0 subjects
+
+No subjects on this sheet yet
+
+Bring last cycle's subjects with their teachers and fees, then change what differs; or add the subjects one by one.
+
+Add subjects
+errors []
+[20:04:32Z] run p2e-sheet.mjs
+shot p2-22-add-subject-search 42 KB q72
+shot p2-23-add-subject-form 48 KB q68
+shot p2-s01-3180 66 KB q68
+01 3180 added
+shot p2-s02-0970 61 KB q68
+02 0970 added
+shot p2-s03-0986 55 KB q68
+03 0986 added
+shot p2-s04-0971 62 KB q68
+04 0971 added
+shot p2-s05-0653 59 KB q68
+05 0653 added
+shot p2-s06-0984 58 KB q68
+06 0984 added
+shot p2-s07-esl-oxford 60 KB q68
+07 ESL-OXFORD added
+shot p2-s08-0680 56 KB q68
+08 0680 added
+shot p2-s09-7156 54 KB q68
+09 7156 added
+shot p2-s10-7159 54 KB q68
+10 7159 added
+shot p2-s11-0457 55 KB q68
+11 0457 added
+shot p2-s12-global-cit 55 KB q68
+12 GLOBAL-CIT added
+shot p2-s13-4hb1 55 KB q68
+13 4HB1 added
+shot p2-s14-0983 59 KB q68
+14 0983 added
+shot p2-s15-4ma1 66 KB q68
+15 4MA1 added
+shot p2-s16-0972 59 KB q68
+16 0972 added
+shot p2-s17-psy-oxford 54 KB q68
+17 PSY-OXFORD added
+shot p2-s18-arabic-al 49 KB q68
+18 ARABIC-AL added
+shot p2-s19-ial-biology 82 KB q68
+19 IAL-BIOLOGY added
+shot p2-s20-chem-as 67 KB q68
+20 CHEM-AS added
+shot p2-s21-cs-asal 68 KB q68
+21 CS-ASAL added
+shot p2-s22-french-asal 61 KB q68
+22 FRENCH-ASAL added
+shot p2-s23-ial-maths 112 KB q68
+23 IAL-MATHS added
+shot p2-s24-phys-asal 68 KB q68
+24 PHYS-ASAL added
+shot p2-s25-psy-al 50 KB q68
+25 PSY-AL added
+shot p2-s18b-arabic-al-two-qualifications 68 KB q68
+errors []
+[20:06:46Z] run p2f-fees-dates.mjs
+shot p2-24-fees-empty 81 KB q72
+shot p2-25-fees-paste-cambridge 78 KB q72
+shot p2-25-fees-paste-pearson_edexcel 75 KB q72
+shot p2-26-fees-typed 86 KB q72
+shot p2-27-fees-cambridge 89 KB q72
+shot p2-27b-fees-pearson 96 KB q72
+shot p2-28-dates-cambridge 91 KB q72
+shot p2-29-dates-set 93 KB q72
+shot p2-29b-sheet-as-al 102 KB q72
+errors []
+[20:07:21Z] run p2g-preview-open.mjs
+shot p2-30-preview-biology 83 KB q72
+shot p2-31-preview-ial-maths 82 KB q72
+shot p2-32-preview-physics-al 84 KB q72
+shot p2-33-home-before-opening 69 KB q72
+Welcome back, School Admin
+
+The reservation cycle: where each session stands, and what comes next.
+
+November 2026 – January 2027
+Draft
+
+Being prepared: not open to families yet. Families reserve from 1 Jul 2026 to 1 Oct 2026.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+No subjects on the sheet yet.
+Add the subjects
+June 2027
+Draft
+
+Being prepared: not open to families yet. Families reserve from 1 Nov 2026 to 15 Feb 2027.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+10 board fees not published yet
+Families can reserve these subjects, not pay for them, until the fee is confirmed.
+Confirm the fees
+ENTRIES TO THE BOARD
+Pearson Edexcel June 2027: entries by 13 Feb 2027
+Cambridge International June 2027: entries by 21 Feb 2027
+OxfordAQA June 2027: entries by 21 Feb 2027
+shot p2-34-open-now 76 KB q72
+shot p2-35-session-open 93 KB q72
+shot p2-36-reminders-on 91 KB q72
+errors []
+[20:07:49Z] run p34a-family-start.mjs
+shot p4-01-parent-sign-up 61 KB q72
+shot p4-02-parent-home-no-child 42 KB q72
+parent after sign-up http://localhost:3190/
+shot p3-01-student-sign-up 60 KB q72
+shot p3-02-student-home 45 KB q72
+Welcome back, Student One
+
+Your subjects, payments and requests, and the next step for each. · Grade 11
+
+What comes next
+
+Your reservations and requests, and what each one needs.
+
+My statement
+June 2027 is open for reservations until 15 Feb 2027.
+Reserve subjects
+Reserve subjects
+›
+My Registrations
+›
+My requests
+›
+Linked Parents
+›
+shot p4-03-link-child 50 KB q72
+shot p4-04-link-awaiting 55 KB q72
+shot p3-03-link-request 54 KB q72
+shot p3-04-link-approved 48 KB q72
+shot p4-05-parent-home-next-step 50 KB q72
+Welcome back, Parent One
+
+Your children’s subjects and payments, and the next step for each.
+
+What comes next
+
+For each of your children, the next step of the reservation.
+
+The family statement
+Student One · Grade 11
+June 2027 is open for reservations until 15 Feb 2027.
+Reserve subjects
+Reserve subjects
+›
+My Registrations
+›
+School Fee
+›
+Charges & Instalments
+›
+Balance
+›
+Linked Children
+›
+errors []
+[20:08:22Z] run p4b-reserve.mjs
+shot p4-06-reserve-page 72 KB q72
+shot p4-07a-reserve-biology 67 KB q72
+shot p4-07b-reserve-maths-physics 67 KB q72
+shot p4-07c-reserve-consents 64 KB q72
+shot p4-08-reserved 71 KB q72
+Reserve
+
+Choose your child and the session, tick what they will sit, and pay by exam series.
+
+Reserved: 3 reservations awaiting payment. Pay by exam series on the next screen.
+
+Pay now →
+See the statement
+Reserve more
+Child
+Choose…
+Student One · Grade 11
+Session
+Choose…
+June 2027
+
+Reservations close 15 Feb 2027
+
+Tick what you want to sit. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+O.L.
+Arabic Cambridge International
+	All papers			
+	Paper 1 only (retake) Retakes only			
+	Paper 2 only (retake) Retakes only			
+Biology Cambridge International
+	All papers already reserved			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Business Studies Cambridge International
+	All papers			
+Chemistry Cambridge International
+	All papers			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Combined Science Cambridge International
+	All papers			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Computer Science Cambridge International
+	All papers			
+English as a Second Language OxfordAQA
+	All papers			
+Environmental Management Cambridge International
+	All papers			
+French Cambridge International
+	All papers			
+German Cambridge International
+	All papers			
+Global Perspectives Cambridge International
+	All papers			
+Global Citizenship Cambridge International
+	All pap
+errors []
+[20:08:40Z] run p4c-pay.mjs
+shot p4-09-home-pay-now 50 KB q72
+shot p4-10-checkout-by-board 48 KB q72
+shot p4-11-checkout-instapay 58 KB q72
+shot p4-12-instapay-details 59 KB q72
+shot p4-13-instapay-reference-sent 53 KB q72
+shot p4-14-registrations-pay-selected 59 KB q72
+shot p4-15-pay-at-desk-reference 48 KB q72
+Payment Initiated
+
+Your payment is pending. Follow the instructions below to complete it.
+
+Pay at the School Finance Desk
+
+SCH-B45F4BC0
+
+Quote this reference (or the student's name) at the desk. Your registrations are confirmed as soon as the finance officer records your payment.
+
+Cancel this checkout
+
+Only if you have not paid. What your balance paid toward it goes back to the balance.
+
+Amount due
+EGP 21,200
+Back to Registrations
+errors []
+[20:09:05Z] run p2h-desk.mjs
+shot p2-37-desk-today 45 KB q72
+shot p2-38-desk-new-family 68 KB q72
+shot p2-39-desk-family-onboarded 78 KB q72
+shot p2-40a-desk-ticked 67 KB q72
+shot p2-40-desk-reserve-and-collect 62 KB q72
+shot p2-41-desk-collected 85 KB q72
+The Desk
+
+Find a student — see everything, do everything, in one place.
+
++ New family
+TODAY · 16 OCT 2026
+
+Collected today
+
+EGP 60,900
+
+2 payments
+
+Daily takings
+
+Due today
+
+EGP 0
+
+0 items due today
+Next due 30 Nov 2026: EGP 60,900
+
+Open the Money tab
+
+Overdue
+
+EGP 0
+
+0 items past their due date
+
+Open the Money tab
+
+Reserved 3 reservations. Collected EGP 60,900 in 2 payments, one per entry deadline.
+Dismiss
+Student TwoGrade 11 · STU-20261016-7FBBF
+At school
+Started grade 10 in 2025/26
+Academic record
+Statement
+
+Parents: Parent Two
+
+Owes now
+
+EGP 0
+
+Balance
+
+EGP 0
+
+Close
+Reserve at the desk
+Session
+Pick an open session…
+June 2027
+
+Reserved 3 reservations. Collected EGP 60,900 in 2 payments, one per entry deadline.
+
+Receipts to hand over: RCP-B6E39BFCB7, RCP-375D9A36AD, RCP-E8B30B4509
+
+Print the reservation slip
+
+A retake is set when the system knows the earlier sitting. For a new family choose "retake" and name the sitting: it is recorded and listed on the session's To verify tab. A teacher may be left as "no preference". A line on a provisional board fee (ⓟ) is reserved now and collected once the fee is confirmed.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+O.L.
+Arabic Cambridge International
+	All papers			
+	Paper 1 only (retake) Retakes only			
+	Paper 2 only (retake) Retakes only			
+Biology Cambridge International
+	All papers			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Business Studies Cambridge International
+	All papers			
+Chemistry Cambridge Interna
+shot p2-42-reservation-slip 67 KB q72
+shot p2-43-desk-statement 89 KB q72
+The Desk
+
+Find a student — see everything, do everything, in one place.
+
++ New family
+TODAY · 16 OCT 2026
+
+Collected today
+
+EGP 60,900
+
+2 payments
+
+Daily takings
+
+Due today
+
+EGP 0
+
+0 items due today
+Next due 30 Nov 2026: EGP 60,900
+
+Open the Money tab
+
+Overdue
+
+EGP 0
+
+0 items past their due date
+
+Open the Money tab
+
+Reserved 3 reservations. Collected EGP 60,900 in 2 payments, one per entry deadline.
+Dismiss
+Student TwoGrade 11 · STU-20261016-7FBBF
+At school
+Started grade 10 in 2025/26
+Academic record
+Hide statement
+
+Parents: Parent Two
+
+Owes now
+
+EGP 0
+
+Balance
+
+EGP 0
+
+Close
+Reserve at the desk
+Session
+Pick an open session…
+June 2027
+
+Reserved 3 reservations. Collected EGP 60,900 in 2 payments, one per entry deadline.
+
+Receipts to hand over: RCP-B6E39BFCB7, RCP-375D9A36AD, RCP-E8B30B4509
+
+Print the reservation slip
+
+A retake is set when the system knows the earlier sitting. For a new family choose "retake" and name the sitting: it is recorded and listed on the session's To verify tab. A teacher may be left as "no preference". A line on a provisional board fee (ⓟ) is reserved now and collected once the fee is confirmed.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+O.L.
+Arabic Cambridge International
+	All papers			
+	Paper 1 only (retake) Retakes only			
+	Paper 2 only (retake) Retakes only			
+Biology Cambridge International
+	All papers			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Business Studies Cambridge International
+	All papers			
+Chemistry Cambridge International
+	All papers already reserved			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Combined Science Cambridge International
+	All papers			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Computer Science Cambridge International
+	All papers			
+English as a Second Language OxfordAQA
+	All papers			
+Environmental Management Cambridge International
+	All papers			
+French Cambridge International
+	All papers			
+German Cambridge International
+	All papers			
+Global Perspectives Cambridge International
+	All papers			
+Global Citizenship Cambridge International
+	All papers			
+Human Biology Pearson Edexcel
+	All papers			
+ICT Cambridge International
+	All papers			
+	Theory Paper only (retake) Self-study only (not taught this cycle)			
+Mathematics Pearson Edexcel
+	All papers already reserved			
+	1H only (retake) Self-study only (not taught this cycle)			
+	2H only (retake) Self-study only (not taught this cycle)			
+Physics Cambridge International
+	All papers already reserved			
+	Paper 41/42 only (retake) Self-study only (not taught this cycle)			
+Psychology OxfordAQA
+	All papers			
+A.S. / A.L.
+Arabic A.L. Pearson Edexcel
+	Arabic GCE (9AA0)			
+	Arabic IAL (YAA01)			
+Biology A.S./A.L. Pearson Edexcel
+	Unit 1 Self-study only (not taught this cycle)			
+	Unit 2 Self-study only (not taught this cycle)			
+	Unit 3 Self-study only (not taught this cycle)			
+	Unit 4 Self-study only (not taught this cycle)			
+	Unit 5			
+	Unit 6			
+Chemistry A.S. Cambridge International
+	A.L.			
+	A.S.			
+Computer Science A.S./A.L. Cambridge International
+	A.L.			
+	A.2. (Carry forward)			
+	A.S.			
+French A.S./A.L. Cambridge International
+	A.L.			
+	A.S.			
+Mathematics A.S./A.L. Pearson Edexcel
+	P1			
+	P2			
+	P3			
+	P4			
+	M1			
+	S1			
+Physics A.S./A.L. Cambridge International
+	A.2. (Carry forward) Self-study only (not taught this cycle)			
+	A.S.			
+Psychology A.L. Cambridge International
+	All papers			
+
+0 reservations · EGP 0
+
+Due 30 Nov 2026
+
+Refund policy and declaration read and signed by the parent
+Reserve only
+Paid with
+Cash
+Credit / Debit Card
+InstaPay (at desk)
+Other
+Balance to use (EGP)
+Reserve and collect
+EGP 0
+Statement
+Show ended reservations (expired, rejected)
+Student Two
+
+Grade 11 · STU-20261016-7FBBF
+
+Price
+
+EGP 60,900
+
+Paid
+
+EGP 60,900
+
+Outstanding
+
+EGP 0
+
+Balance
+
+EGP 0
+
+June 2027
+SUBJECT	PRICE	PAID	OUTSTANDING	DUE	RECEIPT	STATUS	
+
+Chemistry
+First entry, in school · Teacher 9 · Cambridge International June 2027
+	EGP 22,850
+course 12,00
+shot p2-44-desk-receipts-to-hand-over 78 KB q72
+shot p2-45-receipt-print 49 KB q72
+errors []
+[20:09:41Z] run p2i-workbench.mjs
+shot p2-48-workbench-to-confirm 64 KB q72
+shot p2-49-workbench-confirm-instapay 60 KB q72
+shot p2-50-workbench-confirm-cash 64 KB q72
+shot p2-51-workbench-receipts 67 KB q72
+Finance Workbench
+
+Everything waiting on the finance desk. Search a student, parent, or payment reference.
+
+Payment confirmed for Student One. Registrations released.
+Dismiss
+Payments to confirm (0)
+
+No payments waiting. All caught up.
+
+Receipts (3)
+
+RCP-0CBDA9D94A
+
+Hand to parent
+
+Student One · Physics (0972) · June 2027
+
+Mark Handed Over
+
+RCP-25110B75B2
+
+Hand to parent
+
+Student One · Biology (0970) · June 2027
+
+Mark Handed Over
+
+RCP-31D8DF1935
+
+Hand to parent
+
+Student One · Mathematics (4MA1) · June 2027
+
+Mark Handed Over
+Cash refunds to hand out (0)
+
+No withdrawal requests waiting.
+errors []
+[20:09:58Z] run p34b-request.mjs
+shot p3-05-student-reserve 73 KB q72
+shot p3-05b-student-reserve-retake 70 KB q72
+shot p3-06-student-sent-to-parent 67 KB q72
+Reserve
+
+Tick what you will sit; your parent approves and pays.
+
+Sent to your parent for approval: 2 reservations.
+
+See the statement
+Reserve more
+Session
+Choose…
+June 2027
+
+Reservations close 15 Feb 2027
+
+Tick what you want to sit. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+O.L.
+Arabic Cambridge International
+	All papers already reserved			
+	Paper 1 only (retake) Retakes only			
+	Paper 2 only (retake) Retakes only			
+Bi
+shot p3-07-student-home-waiting 43 KB q72
+Welcome back, Student One
+
+Your subjects, payments and requests, and the next step for each. · Grade 11
+
+What comes next
+
+Your reservations and requests, and what each one needs.
+
+My statement
+2 subjects are waiting for your parent’s approval
+Reserve subjects
+›
+My Registrations
+›
+My requests
+›
+Linked Parents
+›
+shot p4-16-parent-home-approval 49 KB q72
+Welcome back, Parent One
+
+Your children’s subjects and payments, and the next step for each.
+
+What comes next
+
+For each of your children, the next step of the reservation.
+
+The family statement
+Student One · Grade 11
+2 subjects are waiting for your approval
+Approve
+Reserve subjects
+›
+My Registrations
+›
+School Fee
+›
+Charges & Instalments
+›
+Balance
+›
+Linked Children
+›
+shot p4-17-approvals 45 KB q72
+shot p4-18-approved 40 KB q72
+Registrations Approved
+
+2 registrations approved successfully. Proceed to payment to finalize.
+
+Proceed to Payment
+Later
+No subject requests
+
+None of your children are waiting on a subject-registration approval.
+errors []
+[20:10:27Z] run p2j-follow-up.mjs
+shot p2-52-to-verify 100 KB q72
+← Sessions
+June 2027
+Open
+
+Reserve 1 Nov 2026 08:00 – 15 Feb 2027 23:00
+Course starts 1 Nov 2026
+Due 30 Nov 2026 23:00
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4 · fixed: a family has agreed to it
+
+Deadlines
+Pearson Edexcel June 2027: entries by 13 Feb 2027
+Cambridge International June 2027: entries by 21 Feb 2027 · retakes by 21 Mar 2027
+OxfordAQA June 2027: entries by 21 Feb 2027
+Subjects
+Fees
+Grade 10
+To verify
+
+Retakes and carried sittings declared by a family or at the desk. Verified: the reservation stands. Not confirmed: a reservation not yet paid ends and the family may reserve a first entry; a paid one stands as a first entry before the board’s first-entry deadline, and is dropped with its refund after it.
+
+Check against the results on record
+To verify
+Answered
+STUDENT	RESERVATION	DECLARED SITTING	DECLARED BY	PAID	ANSWER BY	
+
+Student One
+STU-20261016-30407
+	Chemistry — Paper 41/42 only (retake)
+Retake · self-study · EGP 12,850
+	Cambridge International June 2026	The family
+Student One · 16 Oct 2026
+	not yet	21 Feb 2027
+129 days left
+	Verify Not confirmed
+
+Student One
+STU-20261016-30407
+	Physics
+Retake · self-study · EGP 16,850
+	Cambridge International June 2026	The family
+Parent One · 16 Oct 2026
+	paid	21 Feb 2027
+129 days left
+	Verify Not confirmed
+
+Student Two
+STU-20261016-7FBBF
+	Physics
+Retake · self-study · EGP 16,850
+	Cambridge International June 2026	The desk
+Finance Officer One · 16 Oct 2026
+	paid	21 Feb 2027
+129 days left
+	Verify Not confirmed
+shot p2-53-verify-sitting 74 KB q72
+shot p2-54-to-verify-answered 94 KB q72
+shot p2-55-exception-grant 74 KB q72
+shot p2-56-exception-granted 71 KB q72
+Exceptions
+
+One rule lifted for one student or one family — a price, a refund, a deadline, a gate, a payment plan. Each takes effect where its rule applies; everything is audited.
+
+Grant an exception
+Student
+Pick a student…
+Student One (Grade 11)
+For
+This student
+The whole family
+Policy
+Self-study share of the course fee
+Self-study share of the board fee
+Retake in school: share of the course fee
+One-paper retake: share of its course fee
+Discount (%)
+Discount (EGP)
+Custom price
+Refund percent
+Course start for refunds
+Session window extension
+Payment due date
+Late board entry — off (setting)
+School fee waiver
+Self-study on a first entry
+An item not open to them
+First entry without a required item
+No prior sitting, or outside the carry-forward period
+Two items of one exclusive group
+A second line on one entry in a series
+Grade 10 without a core subject
+Grade 10: sit a series other than June
+Instalment plan
+Date
+Scope
+
+Required: choose what it is for.
+
+Session
+Any
+June 2027
+November 2026 – January 2027
+June 2026
+One reservation
+Any
+Chemistry · June 2027 · EGP 12850
+Arabic · June 2027 · EGP 21850
+Mathematics · June 2027 · EGP 21200
+Biology · June 2027 · EGP 22850
+Physics · June 2027 · EGP 16850
+One charge
+Any
+Reason
+Valid until (optional)
+
+IT WILL APPLY AS
+
+Student One owes Arabic · June 2027 by … (never past its deadline)
+
+Granted
+
+1 due dates moved.
+
+Grant
+Granted
+Active
+Used
+Lapsed
+Revoked
+All
+For	Policy	Scope	Value	Reason	Status	
+Actions
+
+Student One	Payment due date	Arabic · 
+shot p2-57-money-tab 114 KB q72
+shot p2-58-money-unpaid 87 KB q72
+shot p2-59-remind-dialog 85 KB q72
+shot p2-60-remind-sent 83 KB q72
+shot p2-61-message-unpaid-families 106 KB q64
+shot p2-62-message-sent 55 KB q72
+Messages
+
+Families read these in their notifications (and by email); nobody can delete one. Reminders go out on their own, once each.
+
+New message
+Sent
+Reminders
+Texts
+Sent and scheduled
+All
+Sent by staff
+Reminders
+Before messages
+WHEN	TO	MESSAGE	IN THE APP	EMAIL	STATUS	
+16 Oct 2026 23:11
+School Admin
+	
+Unpaid in June 2027 — Parents and students
+2 people
+	
+June 2027: what is still to pay
+	
+2
+ 
+sent
+	
+2
+ 
+sent
+	Sent	
+Deliveries
+
+16 Oct 2026 23:11
+School Admin
+	
+Not yet due in June 2027 (1 chosen) — Parents and students
+2 people
+	
+Payment due
+Template: Payment due
+	
+2
+ 
+sent
+	
+2
+ 
+sent
+	Sent	
+Deliveries
+errors []
+[20:11:21Z] run p34c-drop.mjs
+shot p3-08-student-registrations 74 KB q72
+shot p3-09-student-request-drop 68 KB q72
+shot p3-10-student-pending-requests 41 KB q72
+shot p4-19-parent-home-drop-request 53 KB q72
+shot p4-20-approvals-drop-request 49 KB q72
+shot p4-21-approve-drop 43 KB q72
+shot p4-22-drop-bring-receipt 80 KB q72
+Children's Registrations
+
+5 registrations total
+
+Full History
++ Register More
+All
+Pending Parent Approval
+Pending Payment
+Confirmed
+Dropped
+Rejected
+June 2027· Student One (Grade 11)
+active
+EGP 95,600
+2 awaiting payment
+Select All
+Pay Selected
+Pay All
+Chemistry
+0971 · Cambridge International
+Pending Payment
+EGP 12,850
+Revert Approval
+Arabic
+3180 · Cambridge International
+Pending Payment
+EGP 21,850
+Revert Approval
+Mathematics
+4MA1 · Pearson Edexcel
+Confirmed
+EGP 21,200
+Receipt RCP-31D8DF1935 — keep it safe, it must be returned if you drop or swap this subject. View
+Drop
+Swap
+Biology
+0970 · Cambridge International
+Confirmed
+EGP 22,850
+Receipt RCP-25110B75B2 — keep it safe, it must be returned if you drop or swap this subject. View
+Drop
+Swap
+Physics
+0972 · Cambridge International
+Dropped — Return Receipt to School
+EGP 16,850
+Bring paper receipt RCP-0CBDA9D94A back to the school finance desk to release your EGP 16,850 refund. The drop only completes once the school has it.
+shot p2-63-desk-take-back-receipt 75 KB q72
+shot p2-64-desk-refund-to-balance 74 KB q72
+The Desk
+
+Find a student — see everything, do everything, in one place.
+
++ New family
+TODAY · 16 OCT 2026
+
+Collected today
+
+EGP 121,800
+
+4 payments
+
+Daily takings
+
+Due today
+
+EGP 0
+
+0 items due today
+Next due 30 Nov 2026: EGP 12,850
+
+Open the Money tab
+
+Overdue
+
+EGP 0
+
+0 items past their due date
+
+Open the Money tab
+
+Receipt returned — any pending drop refund is released.
+Dismiss
+Student OneGrade 11 · STU-20261016-30407
+At school
+Started grade 10 in 2025/26
+Academic record
+Statement
+
+Parents: Parent One
+
+Owes now
+
+EGP 34,700
+
+Balance
+
+EGP 16,850
+
++ Reserve
+
+Active exceptions: Payment due date
+
+To collect now
+Paid with
+Cash
+Credit / Debit Card
+InstaPay (at desk)
+Other
+Collect
+EGP 34,700
+Chemistry
+subject waiting for payment · June 2027
+EGP 12,850
+Arabic
+subject waiting for payment · June 2027
+EGP 21,850
+Registrations
+Chemistry0971(outside)
+June 2027
+	Pending Payment	EGP 12,850	—
+
+Arabic3180
+June 2027 · Teacher 2
+Payment due date
+	Pending Payment	EGP 21,850	—
+
+Mathematics4MA1
+June 2027 · Teacher 21
+	Confirmed	EGP 21,200	
+With Parent
+Print
+
+
+Biology0970
+June 2027 · Teacher 4
+	Confirmed	EGP 22,850	
+With Parent
+Print
+
+
+Physics0972(outside)
+June 2027
+	Dropped	EGP 16,850	
+Returned to School
+Print
+Recent payments
+16 Oct 2026	Reservations · Cash · SCH-B45F4BC0	Completed	EGP 21,200	
+16 Oct 2026	Reservations · InstaPay	Completed	EGP 39,700	
+shot p4-23-statement-after-drop 99 KB q72
+shot p4-24-balance 43 KB q72
+Your balance with the school
+
+Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.
+
+Transfer Funds
+Request Withdrawal
+
+Student One
+
+Grade 11
+
+EGP 16,850
+
+Select a child above to view their transaction history.
+View withdrawal request history
+errors []
+[20:12:12Z] run p2l-entries.mjs
+shot p2-65-entries-preview 90 KB q72
+shot p2-66-entries-made 101 KB q72
+Exam entries
+
+What each candidate is entered for with the board in a series, made from the paid reservations and cash-ins. Tick entries to mark them as sent to the board or to withdraw them; each row says what the board would refuse.
+
+Board series
+Cambridge International June 2027
+OxfordAQA June 2027
+Pearson Edexcel June 2027
+Cambridge International June 2026
+The board's entry list
+
+Entry deadline
+
+21 Feb 2027 23:59
+128
+ 
+days left
+
+Retake deadline
+
+21 Mar 2027 23:59
+156
+ 
+days left
+
+The board's fee today
+
+Standard fee
+
+Derive entries from reservations
+
+Each paid reservation becomes its entry with the board: a Cambridge syllabus with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.
+
+Preview
+
+Made 3 new entries.
+Dismiss
+
+Add an entry by hand
+
+For what the reservations cannot make: a paid cash-in whose line does not say the award, a cash-in with no unit sat this series, or the unit of a choice (“one of M1, S1, D1”).
+
+Add an entry
+Entries
+
+3 entries · 0 ready for the board · 3 not sent yet
+
+Show withdrawn entries
+0 ticked
+Mark as sent
+Withdraw
+	Entry	Option and tier	Retake and carry forward	Forecast grade	Status	What the board would refuse	
+Actions
+
+	
+No candidate number
+Student One
+1 entry
+Only this candidate
+Candidate details
+
+	
+0970
+Biology
+
+Award
+
+	
+Choose…
+CX
+	
+Retake
+Carry forward:
+No
+	Missing	Draft
+
+If sent today: Standard fee
+
+	
+No centre number for this board (Settings)
+No candidate number in this series
+No legal name as on ID
+No date of birth
+No gender recorded
+No forecast grade (the board requires it)
+	
+Details
+Withdraw
+
+	
+No candidate number
+Student Two
+2 entries
+Only this candidate
+Candidate details
+
+	
+0971
+Chemistry
+
+Award
+
+	
+Choose…
+CX
+	
+Retake
+Carry forward:
+No
+	Missing	Draft
+
+If sent today: Standard fee
+
+	
+No centre number for this board (Settings)
+No candidate number in this series
+No legal name as on ID
+No date of birth
+No gender recorded
+No forecast grade (the bo
+shot p2-67-candidates 92 KB q72
+shot p2-68-candidate-details 93 KB q72
+shot p2-69-candidate-numbers 105 KB q72
+shot p2-70a-settings-centre-number 95 KB q72
+shot p2-70-entry-list 96 KB q72
+Entry lists
+
+Each series' entries in the board portal's columns, with everything the board would refuse. Fix what is flagged, then download the rows that are ready.
+
+Board series
+Cambridge International June 2027
+OxfordAQA June 2027
+Pearson Edexcel June 2027
+Cambridge International June 2026
+
+Entry deadline
+
+21 Feb 2027 23:59
+128
+ 
+days left
+
+Retake deadline
+
+21 Mar 2027 23:59
+156
+ 
+days left
+
+The board's fee today
+
+Standard fee
+
+Centre number
+
+EG999
+
+Entry route
+
+Directly with the board
+
+Rows
+
+3 entries · 0 ready
+
+The columns are assumed
+
+The boards' own templates are not in hand yet, so each column below is our reading of the board portal's fields, marked “assumed”. Check the columns and their order against the board's template before uploading the file. Column names stay as the board's portal writes them.
+Every row
+3
+Ready
+0
+No forecast grade (the board requires it)
+3
+Download for the board's portal
+Only ready rows
+(0)
+All rows
+(3)
+Download CSV
+Candidate
+(school record, not in the file)
+	What the board would refuse	Centre numberassumed	Candidate numberassumed	Candidate name (as on ID)assumed	Date of birth (DD/MM/YYYY)assumed	Gender (M/F)assumed	UCI (optional)assumed	Syllabus codeassumed	Option codeassumed	Tierassumed	Retake (Y/N)assumed	Previous centre numberassumed	Previous candidate numberassumed	Carried forward from (series)assumed	Forecast gradeassumed	Access arrangementsassumed
+Student One	
+No forecast grade (the board requires it)
+
+Fix on:
+Forecast grades
+
+	EG999	0001	ONE, Student	02/07/2010	M	—	0970	CX	—	N	—	—	—	—	—
+Student Two	
+No forecast grade (the board requires it)
+
+Fix on:
+Forecast grades
+
+	EG999	0002	TWO, Student	14/03/2010	F	—	0971	CX	—	N	—	—	—	—	—
+Student Two	
+No forecast grade (the board requires it)
+
+Fix on:
+Forecast grades
+
+	EG999	0002	TWO, Student	14/03/2010	F	—	0972	CX	—	Y	—	—	—	—	—
+Paid reservations with no entry
+
+A family paid for these, but nothing is entered with the board for them yet.
+
+Every paid reservation in this series has its entries.
+
+The board's rules · Cambridge International
+
+What the check above and the fee sentences on the Entries screen follow. Each was set from the board's handbook; change one when the handbook says otherwise.
+
+Change the rules
+A forecast grade is required on every entry.
+Once sent, a forecast grade is fixed: the board takes no change to it.
+Every award entry needs an option code.
+A UCI is not required.
+A candidate number is fixed once entries are sent.
+After the entry deadline, a change to a sent entry is taken, with a fee.
+A change to a sent entry costs a fee from the entry deadline
+
+Cambridge charges a late fee for every change made after the entry deadline.
+
+A withdrawn entry is refunded by the board up to the entry deadline
+
+Assumed (not in the research): after the entry deadline Cambridge keeps the entry fee for a withdrawn entry — check the Cambridge Handbook.
+
+Marks carry forward to an entry within 13 months
+The results file names each candidate by candidate number
+
+Cambridge Han
+errors []
+[20:12:48Z] run p2m-import.mjs
+shot p2-71-import-upload 78 KB q72
+staged 07d22175-4806-44d1-aa8d-a4e9ded164f3
+shot p2-72-import-review 75 KB q72
+Day-one import
+june-2027-placeholder-sheet.xlsx
+
+The school's registration sheet
+Waiting for review
+·
+Staged
+16 Oct 2026
+by
+School Admin
+
+Put this file aside
+Commit 1 family
+
+ROWS
+
+3
+
+3 to import · 0 left out
+
+FAMILIES READY
+
+1
+
+0 committed
+
+FAMILIES HELD BACK
+
+0
+
+0 rows to fix
+
+A COMMIT WOULD MAKE
+
+1 new student accounts
+1 new parent accounts
+1 parent–child links
+3 registrations kept as history
+1 money history notes
+About this file: No money in this file · Academic year not set up
+Problems
+Rows
+3
+People and conflicts
+Mapping
+Subject not in the catalogue
+Check it
+1 line
+A fee note
+IS-08
+For information
+1 line
+Self-study on a first entry of a subject the school teaches
+IS-03
+For information
+1 line
+A unit or paper set registered on its own
+IS-01
+For information
+1 line
+series selects 2
+shot p2-73-import-mapping 102 KB q72
+shot p2-74-import-line 92 KB q72
+June 2027, row 4
+Close
+Problems
+A fee note — Retake Self Study 50% fees (All Papers) From June 2026
+Kept as money history (a percentage, never a payment).
+Self-study on a retake — a retake of June 2026 (named on the sheet or the line, to verify)
+A sitting before is known (the student’s history) or named on the line: a retake in self-study, at the self-study share.
+The line in the session
+Session
+June 2027
+Subject and item
+Chemistry — Whole subject
+Board series
+Cambridge International June 2027
+Entry
+Retake, self-study
+Sitting it follows
+June 2026 Declared by the desk — listed to verify
+Teacher
+None (self-study)
+Price
+EGP 16,850
+course 12,000 × 50% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Arabic — Whole subject · Cambridge International June 2027
+Arabic — Paper 1 only (retake) · Cambridge International June 2027
+Arabic — Paper 2 only (retake) · Cambridge International June 2027
+Arabic A.L. — Arabic GCE (9AA0) · Pearson Edexcel June 2027
+Arabic A.L. — Arabic IAL (YAA01) · Pearson Edexcel June 2027
+Biology — Whole subject · Cambridge International June 2027
+Biology — Paper 41/42 only (retake) · Cambridge International June 2027
+Biology A.S./A.L. — Unit 1 · Pearson Edexc
+shot p2-75-import-problems 72 KB q72
+Day-one import
+june-2027-placeholder-sheet.xlsx
+
+The school's registration sheet
+Waiting for review
+·
+Staged
+16 Oct 2026
+by
+School Admin
+
+Put this file aside
+Commit 1 family
+
+ROWS
+
+3
+
+3 to import · 0 left out
+
+FAMILIES READY
+
+1
+
+0 committed
+
+FAMILIES HELD BACK
+
+0
+
+0 rows to fix
+
+A COMMIT WOULD MAKE
+
+1 new student accounts
+1 new parent accounts
+1 parent–child links
+3 lines awaiting payment
+1 money history notes
+About this file: No money in this file · Academic year not set up
+Problems
+Rows
+3
+People and conflicts
+Mapping
+Subject not in the catalogue
+Check it
+1 line
+A fee note
+IS-08
+For information
+1 line
+Self-study on a retake
+IS-03
+For information
+1 line
+A unit or paper set registered on its own
+IS-01
+For information
+1 line
+shot p2-76-import-commit 59 KB q72
+shot p2-77-import-result 67 KB q72
+Day-one import
+june-2027-placeholder-sheet.xlsx
+
+The school's registration sheet
+Committed
+·
+Staged
+16 Oct 2026
+by
+School Admin
+·
+committed
+16 Oct 2026
+by
+School Admin
+
+ROWS
+
+3
+
+3 to import · 0 left out
+
+FAMILIES READY
+
+0
+
+1 committed
+
+FAMILIES HELD BACK
+
+0
+
+0 rows to fix
+
+A COMMIT WOULD MAKE
+
+Nothing new
+About this file: No money in this file · Academic year not set up
+Problems
+Rows
+3
+People and conflicts
+Mapping
+Result
+
+1 families committed
+
+1 student accounts
+1 parent accounts
+1 parent–child links
+3 lines awaiting payment
+1 money history notes
+
+Every record made points back to its line of the file. See them on Students, Sections and Course enrolment. Accounts made here have no password yet: each family sets one with “Forgot password” on the sign-in page, using the email on the account.
+
+Show the committed rows
+errors []
+[20:13:20Z] run p34d-end.mjs
+shot p3-11-student-statement 97 KB q72
+shot p3-12-student-notifications 104 KB q72
+Notifications
+8
+All
+Mark all read
+📝
+DROP / SWAP PROCESSED
+1m ago
+
+Your drop request was approved
+
+Your request to drop Physics was approved. EGP 16850.00 (100% of the course fee and the board fee) will be credited once the subject's receipt is returned to the school
+
+⏰
+PAYMENT REMINDER
+2m ago
+
+June 2027: what is still to pay
+
+Dear Parent One,
+
+Student One still owes EGP 12,850 for June 2027, due by 30 November 2026. Pay in the app (Home → Pay now) or at the school desk.
+
+⏰
+PAYMENT REMINDER
+2m ago
+
+Payment due — June 2027 · موعد الدفع — June 2027
+
+Dear Parent One, EGP 12,850 for Student One (Chemistry — Paper 41/42 only (retake)) is due on 30 November 2026. You can pay in the app or at the school's finance desk.
+
+عزيزي ولي الأمر Parent One، مبلغ 12,850 جنيه الخاص بـ Student One (Chemistry — Paper 41/42 only (retake)) مستحق في 30 نوفمبر 2026. يمكنكم الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+
+✅
+REGISTRATION APPROVED
+3m ago
+
+Registration request approved
+
+Your registration request for June 2027 was approved by Parent One. Payment can now be completed.
+
+💳
+PAYMENT CONFIRMED
+3m ago
+
+Payment confirmed — June 2027
+
+Payment of EGP 21200.00 via in_school has been confirmed for your registration in June 2027. Your subjects are now fully registered.
+
+💳
+PAYMENT CONFIRMED
+3m ago
+
+Payment confirmed — June 2027
+
+Payment of EGP 39700.00 via instapay has been confirmed for your registration in June 2027. Your subjects are now fully registered.
+
+📋
+NEW REGISTRATION REQUEST
+4m ago
+
+
+shot p4-25-parent-notifications 105 KB q72
+Notifications
+10
+All
+Mark all read
+💰
+ESCROW BALANCE UPDATED
+1m ago
+
+Escrow balance credited for Student One
+
+EGP 16850.00 was credited to Student One's escrow. New balance: EGP 16850.00. Reason: Receipt returned — drop refund released to escrow
+
+📝
+DROP / SWAP PROCESSED
+1m ago
+
+Student One's drop request was approved
+
+Student One's request to drop Physics was approved. EGP 16850.00 (100% of the course fee and the board fee) will be credited once the subject's receipt is returned to the school
+
+🔄
+DROP / SWAP REQUEST
+2m ago
+
+Action Required: Student One requested a subject drop
+
+Student One has requested to drop Physics. Financial impact: EGP 16850.00 will be credited to your child's escrow upon approval.
+
+⏰
+PAYMENT REMINDER
+2m ago
+
+June 2027: what is still to pay
+
+Dear Parent One,
+
+Student One still owes EGP 12,850 for June 2027, due by 30 November 2026. Pay in the app (Home → Pay now) or at the school desk.
+
+⏰
+PAYMENT REMINDER
+2m ago
+
+Payment due — June 2027 · موعد الدفع — June 2027
+
+Dear Parent One, EGP 12,850 for Student One (Chemistry — Paper 41/42 only (retake)) is due on 30 November 2026. You can pay in the app or at the school's finance desk.
+
+عزيزي ولي الأمر Parent One، مبلغ 12,850 جنيه الخاص بـ Student One (Chemistry — Paper 41/42 only (retake)) مستحق في 30 نوفمبر 2026. يمكنكم الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+
+✅
+REGISTRATION APPROVED
+3m ago
+
+Registration approved for Student One
+
+Student One's registration request for June 2027 was approved. Payment can now be completed.
+
+📋
+NEW REGISTRATION REQUEST
+3m ago
+
+Action Required: Student One submitted a registration request
+
+Student One has requested to register 2 subject(s) for June 2027. Total: EGP 34700.00. Your approval is needed.
+
+💳
+PAYMENT CONFIRMED
+3m ago
+
+Payment confirmed — June 2027
+
+Payment of EGP 21200.00 via in_school has been confirmed for Student One's registration.
+
+💳
+PAYMENT CONFIRMED
+3m ago
+
+Payment confirmed — June 2027
+
+Payment of EGP 39700.00 via instapay has been confirmed for Student One's registration.
+
+🔗
+LINK REQUEST DECISION
+5m ago
+
+Link Request Approved
+
+Student One has approved your link request. You can now manage their registrations and payments.
+shot p4-26-parent-receipt 49 KB q72
+shot p4-27-parent-home-arabic 42 KB q72
+shot p4-28-parent-statement-arabic 84 KB q72
+shot p4-29-parent-reserve-arabic 60 KB q72
+shot p2-78-admin-home-cycle-running 80 KB q72
+Welcome back, School Admin
+
+The reservation cycle: where each session stands, and what comes next.
+
+June 2027
+Open
+
+Open: families reserve until 15 Feb 2027. Payment due 30 Nov 2026.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+10 board fees not published yet
+Families can reserve these subjects, not pay for them, until the fee is confirmed.
+Confirm the fees
+SITTINGS TO VERIFY
+1 declared sitting to verify
+Verify them
+WHAT FAMILIES ARE DOING
+10 reservations
+·
+5 paid
+·
+5 unpaid
+(EGP 83,200 outstanding)
+See who has not paid
+ENTRIES TO THE BOARD
+Pearson Edexcel June 2027: entries by 13 Feb 2027
+Exam entries
+Cambridge International June 2027: entries by 21 Feb 2027
+Exam entries
+OxfordAQA June 2027: entries by 21 Feb 2027
+Exam entries
+November 2026 – January 2027
+Draft
+
+Being prepared: not open to families yet. Families reserve from 1 Jul 2026 to 1 Oct 2026.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+No subjects on the sheet yet.
+Add the subjects
+errors []
+[20:14:02Z] done:      162 shots

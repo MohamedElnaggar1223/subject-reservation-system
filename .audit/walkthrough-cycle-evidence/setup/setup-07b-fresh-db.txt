@@ -1,0 +1,70 @@
+Pager usage is off.
+ migrations_applied 
+--------------------
+                 62
+(1 row)
+
+          t           | count 
+----------------------+-------
+ user                 |     0
+ exam_board           |     3
+ qualification        |     0
+ exam_unit            |     0
+ subject              |     0
+ registration_session |     0
+ board_series         |     0
+ board_service        |    15
+ exam_board_rule      |     3
+ teacher              |     0
+ school_setting       |     0
+ reminder_rule        |     5
+ message_template     |     7
+ academic_year        |     0
+(14 rows)
+
+      code       |          name           |               series_months                
+-----------------+-------------------------+--------------------------------------------
+ cambridge       | Cambridge International | ["june", "november"]
+ oxford          | OxfordAQA               | ["january", "june", "november"]
+ pearson_edexcel | Pearson Edexcel         | ["january", "june", "october", "november"]
+(3 rows)
+
+   board_code    |       kind        |       code        |                          label                           
+-----------------+-------------------+-------------------+----------------------------------------------------------
+ cambridge       | remark            | 1                 | Service 1 — clerical re-check
+ cambridge       | remark            | 1S                | Service 1S — clerical re-check with a copy of the script
+ cambridge       | remark            | 2                 | Service 2 — review of marking
+ cambridge       | remark            | 2S                | Service 2S — review of marking with a copy of the script
+ cambridge       | certificate_split | certificate_split | Certificate split
+ oxford          | remark            | clerical_recheck  | Clerical re-check
+ oxford          | remark            | review_of_marking | Review of marking
+ oxford          | remark            | access_to_scripts | Access to scripts
+ pearson_edexcel | remark            | review_of_marking | Review of marking
+ pearson_edexcel | remark            | clerical_recheck  | Clerical re-check
+ pearson_edexcel | remark            | access_to_scripts | Access to scripts
+ pearson_edexcel | remark            | priority_review   | Priority review of marking
+ pearson_edexcel | cash_in           | cash_in           | Cash-in (claim the award)
+ pearson_edexcel | late_cash_in      | late_cash_in      | Late cash-in
+ pearson_edexcel | certificate_split | certificate_split | Certificate split
+(15 rows)
+
+            kind            |  offsets_days  | repeat_every_days |  until   |    channels    | active 
+----------------------------+----------------+-------------------+----------+----------------+--------
+ declared_retakes_to_verify | {-14,-7,-3,-1} |                   | verified | {in_app}       | t
+ entry_deadline             | {-14,-1}       |                   | deadline | {in_app}       | t
+ payment_due                | {-7,-3,0,3}    |                 3 | paid     | {in_app,email} | t
+ school_fee_due             | {-14,-7,0}     |                 7 | paid     | {in_app,email} | t
+ session_closing            | {-14,-7,-1}    |                   | closed   | {in_app,email} | t
+(5 rows)
+
+                   name                   
+------------------------------------------
+ Board entry deadline (staff)
+ Declared retakes to verify (coordinator)
+ Payment due
+ Payment overdue
+ Reservations closing
+ School fee due
+ School fee overdue
+(7 rows)
+

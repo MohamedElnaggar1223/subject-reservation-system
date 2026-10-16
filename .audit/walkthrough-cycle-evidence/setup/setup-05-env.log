@@ -1,0 +1,12 @@
+# Local development (the F8 walkthrough's clone). Never committed: .env is gitignored.
+NODE_ENV=development
+PORT=3191
+DATABASE_URL=postgresql://audit:auditpass@127.0.0.1:5434/igcse_walk_dev
+BETTER_AUTH_SECRET=<generated: openssl rand -base64 32>
+BETTER_AUTH_URL=http://localhost:3191
+CORS_ORIGINS=http://localhost:3190
+APP_URL=http://localhost:3190
+SCHOOL_BANK_NAME=Example Bank
+SCHOOL_ACCOUNT_NAME=Example School
+SCHOOL_ACCOUNT_NUMBER=0000000000000000
+NEXT_PUBLIC_API_URL=http://localhost:3191
