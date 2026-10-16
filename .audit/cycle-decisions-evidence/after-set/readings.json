@@ -1,0 +1,78 @@
+{
+ "d15-settings": {
+  "enStatus": 200,
+  "en": [
+   "The school",
+   "Who may register",
+   "School fee",
+   "Prices",
+   "Payment",
+   "Refunds",
+   "Declared sittings",
+   "Exceptions",
+   "Reminders",
+   "Exam catalogue",
+   "Day-one import",
+   "Exam entries",
+   "Calendar"
+  ],
+  "enBytes": 284202,
+  "arStatus": 200,
+  "ar": [
+   "المدرسة",
+   "من يحق له التسجيل",
+   "المصاريف الدراسية",
+   "الأسعار",
+   "دفعة",
+   "الاسترداد",
+   "الدورات المُصرَّح بها",
+   "الاستثناءات",
+   "التذكيرات",
+   "دليل الامتحانات",
+   "استيراد بدء التشغيل",
+   "قيود الامتحانات",
+   "التقويم"
+  ],
+  "dir": "rtl",
+  "arBytes": 271085
+ },
+ "d15-sign-in": {
+  "enStatus": 200,
+  "en": "Placeholder International School\nIGCSE Reserve\nThe school's subject reservations, in one place.\n\nOne account for the family, in place of a form for every subject.\n\nReserve each child's subjects\nPay at the school desk or by InstaPay\nSee every receipt, and what ",
+  "enBytes": 41439,
+  "arStatus": 200,
+  "ar": "Placeholder International School\nحجز IGCSE\nحجوزات المواد في المدرسة، في مكان واحد.\n\nحساب واحد للأسرة بدلًا من استمارة لكل مادة.\n\nاحجز مواد كل ابن\nادفع في مكتب المدرسة أو عبر إنستاباي\nاطّلع على كل إيصال وعلى ما بقي مستحقًا\nEnglish\nمرحبًا بعودتك\n\nسجّل الدخول إلى",
+  "dir": "rtl",
+  "arBytes": 32838
+ },
+ "d15-sign-in-phone": {
+  "enStatus": 200,
+  "en": "Placeholder International School\nIGCSE Reserve\nالعربية\nWelcome back\n\nSign in to your IGCSE account to manage your subject reservations.\n\nEmail address\nPassword\nForgot password?\nSign in\n\nDon't have an ",
+  "enBytes": 18389,
+  "arStatus": 200,
+  "ar": "Placeholder International School\nحجز IGCSE\nEnglish\nمرحبًا بعودتك\n\nسجّل الدخول إلى حساب IGCSE لإدارة حجوزات المواد.\n\nالبريد الإلكتروني\nكلمة المرور\nنسيت كلمة المرور؟\nتسجيل الدخول\n\nليس لديك حساب؟ إنشاء ح",
+  "dir": "rtl",
+  "arBytes": 15522
+ },
+ "d15-sign-up": {
+  "enStatus": 200,
+  "en": "Placeholder International School\nIGCSE Reserve\nThe school's subject reservations, in one place.\n\nOne account for the family, in place of a form for every subject.\n\nReserve each child's subjects\nPay at",
+  "enBytes": 45009,
+  "arStatus": 200,
+  "ar": "Placeholder International School\nحجز IGCSE\nحجوزات المواد في المدرسة، في مكان واحد.\n\nحساب واحد للأسرة بدلًا من استمارة لكل مادة.\n\nاحجز مواد كل ابن\nادفع في مكتب المدرسة أو عبر إنستاباي\nاطّلع على كل إيصا",
+  "dir": "rtl",
+  "arBytes": 33764
+ },
+ "d15-forgot-password": {
+  "enStatus": 200,
+  "en": "Placeholder International School\nIGCSE Reserve\nAccount\nrecovery.\n\nIt happens to everyone. We will help you get back into your account quickly and securely.\n\nالعربية\nForgot your password?\n\nNo worries. ",
+  "enBytes": 32511,
+  "arStatus": 200,
+  "ar": "Placeholder International School\nحجز IGCSE\nالحساب\nالاسترداد.\n\nهذا يحدث للجميع. سنساعدك على العودة إلى حسابك بسرعة وأمان.\n\nEnglish\nنسيت كلمة المرور؟\n\nلا تقلق. أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإع",
+  "dir": "rtl",
+  "arBytes": 27967
+ },
+ "_errors": {
+  "2026-10-16T01:58:01.906Z": []
+ }
+}

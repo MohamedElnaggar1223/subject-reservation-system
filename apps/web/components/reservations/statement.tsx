@@ -77,7 +77,7 @@ export function StatementView({ query, money = true, teacherChange = false }: {
           <Total label="Family total" amount={data.totals.price} />
           <Total label="Paid" amount={data.totals.paid} />
           <Total label="Outstanding" amount={data.totals.outstanding} tone={data.totals.outstanding > 0 ? 'warning' : undefined} />
-          <Total label="Escrow" amount={data.totals.escrowFree} hint={data.totals.escrowHeld > 0 ? <><span>held</span> <Money amount={data.totals.escrowHeld} /></> : undefined} />
+          <Total label="Balance" amount={data.totals.escrowFree} hint={data.totals.escrowHeld > 0 ? <><span>held</span> <Money amount={data.totals.escrowHeld} /></> : undefined} />
         </div>
       )}
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -121,7 +121,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
             <div><p className="text-xs text-muted-foreground">Price</p><p className="font-semibold"><Money amount={s.totals.price} /></p></div>
             <div><p className="text-xs text-muted-foreground">Paid</p><p className="font-semibold"><Money amount={s.totals.paid} /></p></div>
             <div><p className="text-xs text-muted-foreground">Outstanding</p><p className={`font-semibold ${s.totals.outstanding > 0 ? 'text-amber-700 dark:text-amber-400' : ''}`}><Money amount={s.totals.outstanding} /></p></div>
-            <div><p className="text-xs text-muted-foreground">Escrow</p><p className="font-semibold"><Money amount={s.escrow.free} /></p>
+            <div><p className="text-xs text-muted-foreground">Balance</p><p className="font-semibold"><Money amount={s.escrow.free} /></p>
               {s.escrow.held > 0 && <p className="text-xs text-muted-foreground"><span>held</span> <Money amount={s.escrow.held} /></p>}</div>
           </div>
         )}
@@ -273,7 +273,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                 </div>
                 <div className="text-end">
                   <Money amount={p.total} className="font-semibold" />
-                  {p.escrowApplied > 0 && <div className="text-xs text-muted-foreground"><span>from escrow</span> <Money amount={p.escrowApplied} /></div>}
+                  {p.escrowApplied > 0 && <div className="text-xs text-muted-foreground"><span>from the balance</span> <Money amount={p.escrowApplied} /></div>}
                   <div><Badge tone={p.status === 'completed' ? 'success' : p.status === 'refunded' ? 'neutral' : 'warning'}>{p.status === 'completed' ? 'Paid' : p.status === 'refunded' ? 'Reversed' : 'In progress'}</Badge></div>
                 </div>
               </li>

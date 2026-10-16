@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import { admin, staff, onboard, subject, refused, one, sql, audited, money, notified, type Client } from './helpers';
+import { admin, staff, onboard, subject, refused, one, sql, audited, money, notified, CONSENT, type Client } from './helpers';
 
 /**
  * The reservations rework, step 1 (RESERVATIONS_REWORK.md §3.4, §8): what a line costs.
@@ -10,6 +10,9 @@ import { admin, staff, onboard, subject, refused, one, sql, audited, money, noti
  *   subject's retake and on an untaught subject's first entry — the "50% of the total" rule had
  *   no test; a retake in school at 100%; a one-paper retake at its own course fee and the
  *   qualification's board fee, refused together with the whole subject.
+ * - Since the lead's decision of 16 Oct 2026 (FEATURES_PLAN.md §6, 1) a first entry in self-study on a
+ *   subject offered "Retake (Self Study ONLY)" is the student's exception "self-study on a first entry"
+ *   alone: the scenarios that price one grant it first (`firstInSelfStudy`); the rule has its own below.
  * - The pricing settings change new lines only: the basis is frozen on the line.
  * - Price exceptions apply in today's order (custom, percent, fixed) and are recorded.
  * - Board fees provisional until confirmed: reserved, not payable at the checkout or the desk;
@@ -56,6 +59,9 @@ describe('08p: pricing policies', () => {
 
   const fee = (seriesId: string, rows: { keyKind: 'subject' | 'qualification'; keyId: string; amount: number; provisional?: boolean }[]) =>
     apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: rows.map((r) => ({ ...r, provisional: r.provisional ?? false })) } }));
+  /** The student's exception "self-study on a first entry" (finance's grant): the only way to a first entry on the untaught subject (decision 1). */
+  const firstInSelfStudy = (studentId: string) =>
+    apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', studentId, reason: '08p: a first entry in self-study on the untaught subject' } }));
 
   beforeAll(async () => {
     adm = await admin('p08');
@@ -115,6 +121,7 @@ describe('08p: pricing policies', () => {
     const [first] = await reserve(a.studentId, session, [{ offerItemId: taughtWhole, attempt: 'first', mode: 'in_school', teacherId }]);
     const [inSchoolRetake] = await reserve(b.studentId, session, [{ offerItemId: taughtWhole, mode: 'in_school', teacherId, ...retake }]);
     const [selfRetake] = await reserve(c.studentId, session, [{ offerItemId: taughtWhole, mode: 'self_study', ...retake }]);
+    await firstInSelfStudy(d.studentId);
     const [selfFirst] = await reserve(d.studentId, session, [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }]);
     expect(await priceOf(first!.id)).toMatchObject({ course: 14000, board: 9200, price: 23200 });
     expect(await priceOf(inSchoolRetake!.id)).toMatchObject({ course: 14000, board: 9200, price: 23200 });
@@ -122,6 +129,59 @@ describe('08p: pricing policies', () => {
     expect(await priceOf(selfFirst!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200 });
     // Not "50% of the total" (11,600): the board's fee is paid in full.
     expect((await priceOf(selfFirst!.id)).basis).toMatchObject({ v: 1, attempt: 'first', mode: 'self_study', courseFeeBase: 14000, coursePercent: 50, boardFeeBase: 9200, boardPercent: 100, total: 16200 });
+  });
+
+  it('decision 1 (16 Oct 2026): self study is a second entry only — a first entry in self-study on a "Retake (Self Study ONLY)" subject is refused, through the API as at the desk, and so on a unit or a route marked self study only, but not on the A.2. route that carries an earlier sitting forward; the family\'s read and the preview offer the same; the student\'s exception lets one through and is used; a retake in self-study is taken as before', async () => {
+    const f = await onboard(officer, `p08-d1-${RUN}`, 11);
+    const g = await onboard(officer, `p08-d1g-${RUN}`, 11);
+    const first = { offerItemId: untaught, attempt: 'first' as const, mode: 'self_study' as const };
+    const refusal = `Untaught (08p ${RUN}) is self study on a second entry only: name the earlier sitting, or ask for the exception`;
+    // The family's read and staff's preview: retakes in self-study, no first entry (the option "First entry, self-study" is gone).
+    const fam = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: session, studentId: f.studentId } }));
+    const pre = await apiResponse(adm.api.v1.registrations.offers.preview.$get({ query: { sessionId: session } }));
+    for (const read of [fam, pre]) {
+      const item = read.offers.flatMap((o) => o.items).find((i) => i.id === untaught)!;
+      expect(item.prices.map((p) => [p.attempt, p.mode, p.total])).toEqual([['retake', 'self_study', 16200]]);
+    }
+    // A taught subject's read is unchanged: a first entry in school, retakes in school and in self-study.
+    expect(fam.offers.flatMap((o) => o.items).find((i) => i.id === taughtWhole)!.prices.map((p) => `${p.attempt} ${p.mode}`)).toEqual(['first in_school', 'retake in_school', 'retake self_study']);
+    // Refused by the family's own reservation and by the desk, in the rule's words; nothing made.
+    expect(await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: session, studentId: f.studentId, lines: [first], consent: CONSENT } })))
+      .toEqual({ status: 400, error: refusal });
+    expect(await refused(officer.api.v1.registrations.desk.$post({ json: { sessionId: session, studentId: f.studentId, lines: [first], consent: CONSENT } })))
+      .toEqual({ status: 400, error: refusal });
+    await expect(reserve(f.studentId, session, [first])).rejects.toThrow(refusal);
+    expect(await sql(`select id from registration where student_id = $1`, [f.studentId])).toEqual([]);
+    // A retake in self-study naming its sitting: taken, at the self-study share.
+    const [retake] = await reserve(f.studentId, session, [{ offerItemId: untaught, mode: 'self_study', attempt: 'retake', priorSittingSeriesId: priorJune, priorSittingSource: 'declared_by_desk' }]);
+    expect(await priceOf(retake!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200 });
+    // The student's exception "self-study on a first entry" (finance's grant) is the only way: it lets one through and is used by it.
+    const gate = await firstInSelfStudy(g.studentId);
+    const [line] = await reserve(g.studentId, session, [first]);
+    expect(await priceOf(line!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200, basis: { attempt: 'first', mode: 'self_study' } });
+    expect(await one(`select status, used_for as used from exception where id = $1`, [gate.id])).toEqual({ status: 'used', used: { registrationIds: [line!.id] } });
+
+    // A taught subject's items marked self study only: a unit and a route that carries nothing forward (A.S.) take
+    // no first entry in self-study either; the A.2. route carrying the AS sitting forward (the Physics form's
+    // "A.2. (Self Study 50% fees …)", its own entry after the AS) does.
+    const mixed = await subject(adm, `RWP-M-${RUN}`, `Mixed (08p ${RUN})`, { course: 6000, registration: 3000 });
+    await fee(series, [{ keyKind: 'subject', keyId: mixed, amount: 3000 }]);
+    const item = (label: string, kind: 'unit' | 'route', extra: { needsPriorSeries?: boolean } = {}) =>
+      ({ label, kind, enters: { kind: 'subject' as const }, boardSeriesId: series, availability: 'self_study_only' as const, requiredInSeries: false, ...extra });
+    const m = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: session }, json: { subjectId: mixed, courseFee: 6000, teachers: [{ teacherId, mode: 'in_school' }], items: [item('Unit 1', 'unit'), item('A.S.', 'route'), item('A.2. (carry forward)', 'route', { needsPriorSeries: true })] },
+    })))!;
+    const [unitItem, asRoute, a2Route] = m.items as [string, string, string];
+    const h = await onboard(officer, `p08-d1h-${RUN}`, 11);
+    const read = (await apiResponse(h.parent.api.v1.registrations.offers.$get({ query: { sessionId: session, studentId: h.studentId } }))).offers.flatMap((o) => o.items);
+    expect([unitItem, asRoute, a2Route].map((id) => read.find((i) => i.id === id)!.prices.map((p) => `${p.attempt} ${p.mode}`)))
+      .toEqual([['retake self_study'], ['retake self_study'], ['first self_study', 'retake self_study']]);
+    for (const [id, label] of [[unitItem, 'Unit 1'], [asRoute, 'A.S.']] as const) {
+      await expect(reserve(h.studentId, session, [{ offerItemId: id, attempt: 'first', mode: 'self_study' }]))
+        .rejects.toThrow(`Mixed (08p ${RUN}) — ${label} is self study on a second entry only: name the earlier sitting, or ask for the exception`);
+    }
+    const [carried] = await reserve(h.studentId, session, [{ offerItemId: a2Route, attempt: 'first', mode: 'self_study', priorSittingSeriesId: priorJune, priorSittingSource: 'declared_by_desk' }]);
+    expect((await priceOf(carried!.id)).basis).toMatchObject({ attempt: 'first', mode: 'self_study', coursePercent: 50 });
   });
 
   it("a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry", async () => {
@@ -139,6 +199,8 @@ describe('08p: pricing policies', () => {
   it('the pricing settings change new lines only: a line keeps the price and the basis it was given', async () => {
     const before = await onboard(officer, `p08-set-a-${RUN}`, 11);
     const after = await onboard(officer, `p08-set-b-${RUN}`, 11);
+    await firstInSelfStudy(before.studentId);
+    await firstInSelfStudy(after.studentId);
     const [old] = await reserve(before.studentId, session, [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }]);
     const setPercent = (value: number) => apiResponse(finadmin.api.v1.settings[':key'].$put({ param: { key: 'pricing.selfStudyCoursePercent' }, json: { value, reason: '08p: a policy change' } }));
     await setPercent(40);
@@ -160,6 +222,8 @@ describe('08p: pricing policies', () => {
     const self = await onboard(officer, `p08-pct-s-${RUN}`, 11);
     const retaker = await onboard(officer, `p08-pct-r-${RUN}`, 11);
     const none = await onboard(officer, `p08-pct-n-${RUN}`, 11);
+    await firstInSelfStudy(self.studentId);
+    await firstInSelfStudy(none.studentId);
     const grant = (studentId: string, key: 'pricing.selfStudyCoursePercent' | 'pricing.selfStudyBoardPercent' | 'pricing.retakeTaughtCoursePercent' | 'pricing.onePaperCoursePercent', value: number) =>
       ({ id: `test-${key}-${studentId}`, policyKey: key, value, valueDate: null, oneShot: false, scope: { sessionId: session } });
     const held: Record<string, ReturnType<typeof grant>[]> = {

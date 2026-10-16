@@ -26,6 +26,14 @@ const BOARD_NOTES: Record<string, string> = {
     'تفرض Cambridge رسم تأخير على كل تغيير بعد آخر موعد للقيد.',
   'Assumed (not in the research): after the entry deadline Cambridge keeps the entry fee for a withdrawn entry — check the Cambridge Handbook.':
     'مفترض (ليس في البحث): بعد آخر موعد للقيد تحتفظ Cambridge برسم القيد المسحوب - راجع دليل Cambridge.',
+  // The seeded notes as 0057 writes them since the lead's decision of 16 Oct 2026 (16): the documents' names
+  // alone. The older texts stay below until the one-off update has run on every database.
+  'Cambridge Handbook 2026. Check each rule against the current handbook.':
+    'دليل Cambridge 2026. راجع كل قاعدة مع الدليل الحالي.',
+  'Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI.':
+    'مواعيد Pearson الرئيسية 2026/27، دليل معلومات IAL. تُحفظ نتائج وحدات IAL تحت رقم UCI.',
+  "OxfordAQA's entry rules were not researched: only its series and entry routes are known.":
+    'لم تُبحث قواعد القيد لدى OxfordAQA: المعروف دوراتها وطرق القيد فقط.',
   'From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026). Check each rule against the current handbook.':
     'من DISCOVERY_RESEARCH.md §2 (دليل Cambridge 2026). راجع كل قاعدة مع الدليل الحالي.',
   'Pearson charges an amendment fee for an option change after the high-late fee date.':

@@ -1,0 +1,36 @@
+{
+ "mode": "b",
+ "tag": "control",
+ "before": "Read-back drive b control 02:05:15",
+ "typed": "Read-back drive b control 02:05:47",
+ "after": null,
+ "keptWhatWasSaved": false,
+ "savedShown": false,
+ "errorShown": [],
+ "requests": [
+  {
+   "at": 54,
+   "what": "GET answered"
+  },
+  {
+   "at": 212,
+   "what": "GET answered"
+  },
+  {
+   "at": 2381,
+   "what": "PUT the form"
+  },
+  {
+   "at": 2407,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 2408,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  }
+ ],
+ "errors": [
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED"
+ ]
+}

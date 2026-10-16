@@ -156,7 +156,7 @@ export const sessionsArabic: Record<string, string> = {
   'Its board fee is read for the subject row; an item entering a unit or an award is made from the catalogue when the subject is added.':
     'تُقرأ رسوم المجلس لصف المادة؛ أما البند الذي يقيد وحدة أو مؤهلًا فيُنشأ من الكتالوج عند إضافة المادة.',
   'Replace a teacher': 'استبدال معلم',
-  'Every line, item and this year\'s class of the teacher who leaves moves to the other, audited.': 'تنتقل كل أسطر المعلم المغادر وبنوده وفصله هذا العام إلى الآخر، مع التسجيل.',
+  'Every line, item and this year\'s class of the teacher who leaves moves to the other, audited.': 'تنتقل كل أسطر المعلم المغادر وبنوده ومجموعته هذا العام إلى الآخر، مع التسجيل.',
   'Who leaves': 'من يغادر',
   'Who takes over': 'من يتولى',
   'Replace': 'استبدال',
@@ -297,8 +297,8 @@ export const sessionsArabic: Record<string, string> = {
   // ── Board series (retakes) ──
   'Retakes until': 'الإعادات حتى',
   'Retakes until (your clock)': 'الإعادات حتى (بتوقيتك)',
-  'Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board\'s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams\' start is the cut-off.':
-    'بعده تُغلق تلقائيًا كل دفعة غير مؤكدة لهذه الدورة (ويعود مال المحفظة وتُبلَّغ الأسر) وينتهي كل تسجيل ما زال منتظرًا. ويمكن أن يقع والجلسة مفتوحة: ما يُقيَّد في هذه الدورة يتوقف عنده ويستمر باقي الجلسة. وإعادة الدورة السابقة للمجلس تمتد حتى موعد الإعادات حين يحدده المجلس (كامبريدج). وإن تُرك الموعد فارغًا فبداية الامتحانات هي الحد.',
+  'Past it, every payment still unconfirmed for this series closes on its own (money from the balance put back, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board\'s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams\' start is the cut-off.':
+    'بعده تُغلق تلقائيًا كل دفعة غير مؤكدة لهذه الدورة (ويعود ما أُخذ من الرصيد وتُبلَّغ الأسر) وينتهي كل تسجيل ما زال منتظرًا. ويمكن أن يقع والجلسة مفتوحة: ما يُقيَّد في هذه الدورة يتوقف عنده ويستمر باقي الجلسة. وإعادة الدورة السابقة للمجلس تمتد حتى موعد الإعادات حين يحدده المجلس (كامبريدج). وإن تُرك الموعد فارغًا فبداية الامتحانات هي الحد.',
 
   // ── A change refused because its students kept changing (lib/student-locks.ts) ──
   'The students with lines here changed while this change was running (new reservations kept arriving): nothing was changed. Try again.':
@@ -408,8 +408,9 @@ export const sessionsArabic: Record<string, string> = {
   'Nothing to change.': 'لا شيء يتغيّر.',
   'A subject with reservations cannot be removed: set it to "Not offered this cycle" instead (its reservations stand).':
     'لا يمكن حذف مادة لها حجوزات: اجعلها "غير معروضة هذه الدورة" بدلًا من ذلك (تبقى حجوزاتها).',
-  "Every reservation, paper and this year's class of the teacher who leaves moves to the other, audited.":
-    'ينتقل كل حجز وكل ورقة وفصل هذا العام للمعلم المغادر إلى الآخر، مع التدقيق.',
+  // A teaching group is "group" / مجموعة (the lead's decision of 16 Oct 2026, 12).
+  "Every reservation, paper and this year's group of the teacher who leaves moves to the other, audited.":
+    'ينتقل كل حجز وكل ورقة ومجموعة هذا العام للمعلم المغادر إلى الآخر، مع التدقيق.',
   // The preview of the family's form.
   "The family's form": 'نموذج الأسرة',
   'What a family sees for': 'ما تراه الأسرة لمادة',
@@ -496,6 +497,9 @@ export function translateSessionsText(text: string): string | null {
     // generateItems' label for a one-paper retake ("Paper 4 only (retake)"): the paper's name is data.
     [/^(Paper \S+|Theory paper|\S+) only \(retake\)$/, (m) => `${m[1]} فقط (إعادة)`],
     [/^(January|June|October|November) is not a sitting of this session$/, (m) => `${MONTHS_AR[m[1]!]} ليست دورة من دورات هذه الجلسة`],
+    // An IAL unit's sitting (the lead's decision of 16 Oct 2026, 2); the subject and the unit are data.
+    [/^(.+) — (.+): an IAL unit sits in October, January or June, not (January|June|October|November)$/,
+      (m) => `${m[1]} — ${m[2]}: تُعقد وحدة IAL في أكتوبر أو يناير أو يونيو، لا في ${MONTHS_AR[m[3]!]}`],
     [/^Copy from a session of the same kind \(June from June, winter from winter\)$/, () => 'انسخ من جلسة من النوع نفسه (يونيو من يونيو، والشتاء من الشتاء)'],
     [/^IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series$/, () => 'لا تُعقد IGCSE في أكتوبر ولا يناير: يُقيَّد بند IGCSE في دورة يونيو أو نوفمبر'],
     [/^(\d+) checkouts? still open would pay for two deadlines after this move — confirm or cancel (?:it|them) first$/, (m) => `${m[1]} عملية دفع مفتوحة ستدفع لموعدين بعد هذا النقل — أكّدها أو ألغها أولًا`],

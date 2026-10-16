@@ -179,7 +179,7 @@ export const POLICIES = {
     oneShot: false, grantRoles: [ROLES.COORDINATOR, ROLES.ADMIN], hook: 'mayRegisterFor', status: 'live',
   },
   'plan.instalments': {
-    group: 'plan', label: 'Instalment plan', sentence: '{who} pays {scope} in {value}, each into the held wallet; the line is paid from them at the last',
+    group: 'plan', label: 'Instalment plan', sentence: '{who} pays {scope} in {value}, each into the held balance; the line is paid from them at the last',
     valueType: 'schedule', scopes: ['line'], nullScope: null,
     oneShot: false, grantRoles: FINANCE, hook: 'instalment charges, the held wallet and the capture', status: 'live',
   },

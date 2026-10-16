@@ -24,7 +24,7 @@ import {
 } from '../import/import.validations';
 import { RefundPolicySchema, DEFAULT_REFUND_POLICIES } from '../session/session.validations';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification' | 'exams' | 'reminders' | 'import';
+export type SettingGroup = 'school' | 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification' | 'exams' | 'reminders' | 'import';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -36,8 +36,8 @@ export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   editableBy: readonly Role[];
   /** The register entry the setting answers, when it stands in for an owner decision. */
   source?: string;
-  /** How the screen offers it ('centres', F4: a centre number and entry route per exam board). */
-  input: 'boolean' | 'choice' | 'weekdays' | 'number' | 'refundPolicy' | 'centres';
+  /** How the screen offers it ('centres', F4: a centre number and entry route per exam board; 'text', a line of words). */
+  input: 'boolean' | 'choice' | 'weekdays' | 'number' | 'refundPolicy' | 'centres' | 'text';
   choices?: readonly { value: string; label: string }[];
   /** For a number: its bounds and unit as the screen shows them. */
   min?: number;
@@ -89,7 +89,22 @@ function defineSetting<S extends z.ZodTypeAny>(d: SettingDefinition<S>): Setting
 
 export const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
+/** The longest school name the setting takes (the sign-in page's line). */
+export const SCHOOL_NAME_MAX = 120;
+
 export const SETTINGS = {
+  // The lead's decision of 16 Oct 2026 (FEATURES_PLAN.md §6, 15): the sign-in page carries the school's
+  // name. Read by every visitor through GET /v1/settings/public (the sign-in, sign-up and account pages).
+  'school.name': defineSetting({
+    schema: z.string().trim().max(SCHOOL_NAME_MAX, `The school's name is at most ${SCHOOL_NAME_MAX} characters`),
+    default: '',
+    group: 'school',
+    label: "The school's name",
+    description:
+      "Shown on the sign-in, sign-up and account pages, above the app's name, so a family knows the account is their school's. Empty: the app's name alone. A logo waits until the school provides one.",
+    editableBy: [ROLES.ADMIN],
+    input: 'text',
+  }),
   'eligibility.graduateRetakes': defineSetting({
     schema: z.boolean(),
     default: true,
@@ -163,7 +178,7 @@ export const SETTINGS = {
     group: 'import',
     label: 'Self-study on a subject the school teaches',
     description:
-      'The school\'s sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today\'s rule allows studying outside school only on a retake or a subject the school does not teach. The day-one import starts every review from this answer.',
+      'The school\'s sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today\'s rule allows studying outside school only on a retake: a first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
     editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
     source: 'IS-03',
     input: 'choice',

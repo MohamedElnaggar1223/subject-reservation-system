@@ -9,7 +9,7 @@
  *
  * Words, as the rest of the app has them: a session الجلسة, the links sheet الكشف (F6a), a board
  * المجلس, an entry القيد, a declared sitting دورة مُصرَّح بها, the statement كشف الحساب, the school
- * fee المصاريف الدراسية, the wallet المحفظة, the desk المكتب, the Money tab تبويب المال.
+ * fee المصاريف الدراسية, the balance الرصيد, the desk المكتب, the Money tab تبويب المال.
  */
 
 export const focusArabic: Record<string, string> = {
@@ -127,7 +127,7 @@ export const focusArabic: Record<string, string> = {
   'drop or swap request waiting': 'طلب حذف أو تبديل قيد الانتظار',
   'drop or swap requests waiting': 'طلبات حذف أو تبديل قيد الانتظار',
   'My requests': 'طلباتي',
-  'In the wallet:': 'في المحفظة:',
+  'In the balance:': 'في الرصيد:',
   'available': 'متاح',
 
   // ── The desk's "Today" ──

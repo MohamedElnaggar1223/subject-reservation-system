@@ -1,0 +1,35 @@
+{
+ "mode": "a",
+ "tag": "control",
+ "before": "Read-back drive b fixed 02:02:31",
+ "typed": "Read-back drive a control 02:03:07",
+ "after": "Read-back drive a control 02:03:07",
+ "keptWhatWasSaved": true,
+ "savedShown": false,
+ "errorShown": [
+  "CancelledError"
+ ],
+ "requests": [
+  {
+   "at": 55,
+   "what": "GET answered"
+  },
+  {
+   "at": 795,
+   "what": "GET answered"
+  },
+  {
+   "at": 64020,
+   "what": "GET held 4 s, answered with the sheet as it was when asked"
+  },
+  {
+   "at": 64473,
+   "what": "PUT the form"
+  },
+  {
+   "at": 64543,
+   "what": "GET answered"
+  }
+ ],
+ "errors": []
+}

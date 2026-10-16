@@ -22,6 +22,7 @@ import { Badge, Notice } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { Field, INPUT_CLASS, Modal, Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { fetchBoardSeries, SeriesName, MONTH_LABEL } from '~/app/(app)/exams/exams-shared';
+import { remarksHidden } from '~/lib/reservation-focus';
 
 const fetchServices = (boardSeriesId?: string) => apiResponse(api.v1['board-services'].$get({ query: boardSeriesId ? { boardSeriesId } : {} }));
 type ServiceRow = Awaited<ReturnType<typeof fetchServices>>[number];
@@ -30,12 +31,19 @@ const SERVICES_KEY = ['board-services'] as const;
 const KIND_LABEL: Record<string, string> = { remark: 'Remark', cash_in: 'Cash-in', late_cash_in: 'Late cash-in', certificate_split: 'Certificate split' };
 const RULE_LABEL: Record<RefundRule, string> = { none: 'No refund', full: 'Refunded in full', less_fixed: 'Refunded less a fixed amount' };
 
+/**
+ * A service's row is shown unless it is a remark while the remarks are outside the cycle (the lead's
+ * decision of 16 Oct 2026, 7: Board Services stays, its remark services hidden by F6b's switch). Hidden
+ * rows are neither drawn nor sent with a save, so a save never touches them; the API is unchanged.
+ */
+const shown = (s: { kind: string }) => !(s.kind === 'remark' && remarksHidden());
+
 export default function ServicesClient({ viewerRole }: { viewerRole: string | null }): React.JSX.Element {
   const keepsCatalogue = viewerRole === 'admin' || viewerRole === 'coordinator';
   const keepsFees = viewerRole === 'admin' || viewerRole === 'finance_admin';
   const all = useQuery({ queryKey: SERVICES_KEY, queryFn: () => fetchServices() });
   const series = useQuery({ queryKey: ['board-series', 'services'], queryFn: () => fetchBoardSeries() });
-  const boards = useMemo(() => [...new Map((all.data ?? []).map((s) => [s.boardCode, s.boardName])).entries()], [all.data]);
+  const boards = useMemo(() => [...new Map((all.data ?? []).filter(shown).map((s) => [s.boardCode, s.boardName])).entries()], [all.data]);
   const [board, setBoard] = useState('');
   const current = board || boards[0]?.[0] || '';
   const [editing, setEditing] = useState<ServiceRow | null>(null);
@@ -46,7 +54,7 @@ export default function ServicesClient({ viewerRole }: { viewerRole: string | nu
 
   if (all.isLoading) return <Page><LoadingState /></Page>;
   if (all.isError || !all.data) return <Page><ErrorState onRetry={() => all.refetch()} /></Page>;
-  const services = all.data.filter((s) => s.boardCode === current);
+  const services = all.data.filter((s) => s.boardCode === current && shown(s));
 
   return (
     <Page>
@@ -122,7 +130,9 @@ function Page({ children }: { children: React.ReactNode }) {
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Board services</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Remarks, cash-in and certificate splits: what each board offers, what it costs in a series and until when, and what comes back on a changed grade.
+          {remarksHidden()
+            ? 'Cash-in and certificate splits: what each board offers, what it costs in a series and until when.'
+            : 'Remarks, cash-in and certificate splits: what each board offers, what it costs in a series and until when, and what comes back on a changed grade.'}
         </p>
       </div>
       {children}
@@ -144,7 +154,7 @@ function SeriesGrid({ seriesId, keepsDates, keepsFees, name }: {
   const [error, setError] = useState('');
   useEffect(() => {
     if (!grid.data) return;
-    setDraft(Object.fromEntries(grid.data.filter((s) => s.isActive).map((s) => [s.id, {
+    setDraft(Object.fromEntries(grid.data.filter((s) => s.isActive && shown(s)).map((s) => [s.id, {
       deadline: toLocal(s.deadline),
       fees: Object.fromEntries(SERVICE_LEVELS.map((l) => [l, String(s.fees.find((f) => f.level === l)?.amount ?? '')])) as Record<ServiceLevel, string>,
       confirmed: s.fees.length > 0 && s.fees.every((f) => !f.provisional),
@@ -153,7 +163,7 @@ function SeriesGrid({ seriesId, keepsDates, keepsFees, name }: {
 
   const save = useMutation({
     mutationFn: async (what: 'dates' | 'fees') => {
-      const rows = grid.data!.filter((s) => s.isActive);
+      const rows = grid.data!.filter((s) => s.isActive && shown(s));
       if (what === 'dates') {
         return apiResponse(api.v1['board-services'].deadlines.$put({ json: {
           boardSeriesId: seriesId, reason: reason.trim(),
@@ -177,7 +187,7 @@ function SeriesGrid({ seriesId, keepsDates, keepsFees, name }: {
 
   if (grid.isLoading) return <LoadingState />;
   if (grid.isError || !grid.data) return <ErrorState onRetry={() => grid.refetch()} />;
-  const rows = grid.data.filter((s) => s.isActive);
+  const rows = grid.data.filter((s) => s.isActive && shown(s));
   const set = (id: string, patch: Partial<Draft>) => setDraft((d) => ({ ...d, [id]: { ...d[id]!, ...patch } }));
 
   return (

@@ -128,7 +128,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       apiResponse(api.v1.payments[':id']['record-transfer'].$post({ param: { id }, json: { notes, reference, amount } })),
     onSuccess: (d) => {
       setTransferTarget(null);
-      done(`Transfer ${d.reference} recorded — ${formatPrice(d.creditedToEscrow)} added to the student's escrow. The family has been told.`);
+      done(`Transfer ${d.reference} recorded — ${formatPrice(d.creditedToEscrow)} added to the student's balance. The family has been told.`);
     },
     onError: fail,
   });
@@ -139,7 +139,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       apiResponse(api.v1.payments[':id']['undo-transfer'].$post({ param: { id }, json: { reason } })),
     onSuccess: (d) => {
       setUndoTransferTarget(null);
-      done(`Transfer undone — ${formatPrice(d.debitedFromEscrow)} taken back from the student's escrow. The payment can be recorded again.`);
+      done(`Transfer undone — ${formatPrice(d.debitedFromEscrow)} taken back from the student's balance. The payment can be recorded again.`);
     },
     onError: fail,
   });
@@ -295,7 +295,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Escrow</p>
+                  <p className="text-xs text-muted-foreground">Balance</p>
                   <p className="text-lg font-bold text-foreground" dir="ltr">{formatPrice(summary.escrow.freeBalance)}</p>
                   {summary.escrow.heldBalance > 0 && (
                     <p className="text-xs text-violet-700 dark:text-violet-400">+{formatPrice(summary.escrow.heldBalance)} held</p>
@@ -510,7 +510,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                           </Button>
                         )}
                         {p.lateTransferAt && (
-                          <span className="text-xs text-muted-foreground">Transfer found — credited to escrow</span>
+                          <span className="text-xs text-muted-foreground">Transfer found — added to the balance</span>
                         )}
                         {isFinanceAdmin && p.lateTransferAt && new Date(p.lateTransferAt).toDateString() === new Date().toDateString() && (
                           <Button
@@ -565,7 +565,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       {undoTransferTarget && (
         <ReasonModal
           title="Undo this transfer found later?"
-          description={`${undoTransferTarget.label}. Its amount is taken back from the student's escrow and it leaves today's takings; the payment can then be recorded again. Possible only today, and only while that escrow is unspent.`}
+          description={`${undoTransferTarget.label}. Its amount is taken back from the student's balance and it leaves today's takings; the payment can then be recorded again. Possible only today, and only while that amount is unspent.`}
           label="Why it was recorded by mistake"
           placeholder="e.g. Wrong family — the transfer belongs to another student"
           confirmLabel="Undo Transfer"
@@ -580,10 +580,10 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       {transferTarget && (
         <ReasonModal
           title="Record a transfer found later?"
-          description={`${transferTarget.label}${transferTarget.reference ? ` (the family gave reference ${transferTarget.reference})` : ''}. The payment had already closed, so its subjects stay as they are; the amount that arrived is added to the student's escrow, to use on a later payment or take back as cash. This cannot be undone. Recorded in the audit trail and in today's takings.`}
+          description={`${transferTarget.label}${transferTarget.reference ? ` (the family gave reference ${transferTarget.reference})` : ''}. The payment had already closed, so its subjects stay as they are; the amount that arrived is added to the student's balance, to use on a later payment or take back as cash. This cannot be undone. Recorded in the audit trail and in today's takings.`}
           label="Where it was found"
           placeholder="e.g. On the 28 Sep bank statement, sent 27 Sep"
-          confirmLabel="Add to Escrow"
+          confirmLabel="Add to the balance"
           minLength={5}
           isPending={transferMutation.isPending}
           // Both from the statement: the family's reference may be the one that was not found.

@@ -59,7 +59,7 @@ export const reservationsArabic: Record<string, string> = {
   'I confirm that the information given is true, complete and accurate.': 'أؤكد أن المعلومات المقدمة صحيحة وكاملة ودقيقة.',
   'Reserve only': 'حجز فقط',
   'Paid with': 'طريقة الدفع',
-  'Escrow to apply (EGP)': 'المبلغ من المحفظة (جنيه)',
+  'Balance to use (EGP)': 'المبلغ من الرصيد (جنيه)',
   'Reserve and collect': 'حجز وتحصيل',
   'now': 'الآن',
   'Reserving…': 'جارٍ الحجز…',
@@ -117,7 +117,7 @@ export const reservationsArabic: Record<string, string> = {
   'Family total': 'إجمالي الأسرة',
   'Paid': 'المدفوع',
   'Outstanding': 'المتبقي',
-  'Escrow': 'المحفظة',
+  'Escrow': 'الرصيد',
   'held': 'محتجز',
   'Show ended lines (expired, rejected)': 'إظهار الأسطر المنتهية (منتهية الصلاحية، مرفوضة)',
   'No children linked yet': 'لا يوجد أبناء مرتبطون بعد',
@@ -143,7 +143,7 @@ export const reservationsArabic: Record<string, string> = {
   'Remark': 'إعادة التصحيح',
   'Preregistration': 'تسجيل مسبق',
   'deadline': 'الموعد',
-  'from escrow': 'من المحفظة',
+  'from the balance': 'من الرصيد',
   'Reversed': 'مُلغاة',
   'In progress': 'جارية',
   'Change the teacher': 'تغيير المعلم',
@@ -290,25 +290,26 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^That teacher does not teach (.+) this cycle: choose one of the subject's teachers on the session$/, (m) => `هذا المعلم لا يدرّس ${m[1]} هذه الدورة: اختر أحد معلمي المادة في الجلسة`],
   [/^Nobody teaches (.+) this cycle: it can only be self-study$/, (m) => `لا أحد يدرّس ${m[1]} هذه الدورة: لا تكون إلا دراسة ذاتية`],
   [/^This line is no longer reserved: its teacher cannot be changed$/, () => 'لم يعد هذا السطر محجوزًا: لا يمكن تغيير معلمه'],
-  // What happened to the student's class after a teacher change (lib/groups-followed.ts; the desk's
-  // teacher change and the Session screen's Replace a teacher). A class is فصل, as the replacement's
-  // own sentence says it; the class's and the teacher's names are data, kept left-to-right.
-  [/^The student moves to the class (.+)\.$/, (m) => `ينتقل الطالب إلى فصل ${iso(m[1]!)}.`],
-  [/^(\d+) students? moves? to the class (.+)\.$/, (m) => `ينتقل ${studentsAr(Number(m[1]))} إلى فصل ${iso(m[2]!)}.`],
-  [/^The whole class (.+) goes to (.+): the student stays in it\.$/, (m) => `ينتقل فصل ${iso(m[1]!)} كله إلى ${teacherAr(m[2]!)}: ويبقى الطالب فيه.`],
-  [/^The whole class (.+) waits for a teacher: the student stays in it\.$/, (m) => `ينتظر فصل ${iso(m[1]!)} كله معلمًا: ويبقى الطالب فيه.`],
-  [/^The whole class (.+) waits for a teacher\.$/, (m) => `ينتظر فصل ${iso(m[1]!)} كله معلمًا.`],
-  [/^The whole class (.+) goes to (.+)\.$/, (m) => `ينتقل فصل ${iso(m[1]!)} كله إلى ${teacherAr(m[2]!)}.`],
-  [/^The student leaves the class (.+) after today: self-study from now\.$/, (m) => `يغادر الطالب فصل ${iso(m[1]!)} بعد اليوم: دراسة ذاتية من الآن.`],
-  [/^(\d+) students? leaves? the class (.+) after today: self-study from now\.$/, (m) => `يغادر ${studentsAr(Number(m[1]))} فصل ${iso(m[2]!)} بعد اليوم: دراسة ذاتية من الآن.`],
-  [/^No class of this subject is without a teacher yet: the student stays in (.+) and waits to be placed\.$/,
-    (m) => `لا فصل في هذه المادة بلا معلم بعد: يبقى الطالب في ${iso(m[1]!)} وينتظر توزيعه.`],
-  [/^No class of this subject is without a teacher yet: (\d+) students? stays? in (.+) and waits? to be placed\.$/,
-    (m) => `لا فصل في هذه المادة بلا معلم بعد: يبقى ${studentsAr(Number(m[1]))} في ${iso(m[2]!)} و${waitAr(Number(m[1]))}.`],
-  [/^(.+) has no class of this subject yet: the student stays in (.+) and waits to be placed\.$/,
-    (m) => `ليس لدى ${teacherAr(m[1]!)} فصل في هذه المادة بعد: يبقى الطالب في ${iso(m[2]!)} وينتظر توزيعه.`],
-  [/^(.+) has no class of this subject yet: (\d+) students? stays? in (.+) and waits? to be placed\.$/,
-    (m) => `ليس لدى ${teacherAr(m[1]!)} فصل في هذه المادة بعد: يبقى ${studentsAr(Number(m[2]))} في ${iso(m[3]!)} و${waitAr(Number(m[2]))}.`],
+  // What happened to the student's group after a teacher change (lib/groups-followed.ts; the desk's
+  // teacher change and the Session screen's Replace a teacher). A teaching group is "group" / مجموعة
+  // everywhere (the lead's decision of 16 Oct 2026, 12; F1's مجموعة تدريس agrees); a section (11A) is
+  // فصل. The group's and the teacher's names are data, kept left-to-right.
+  [/^The student moves to the group (.+)\.$/, (m) => `ينتقل الطالب إلى مجموعة ${iso(m[1]!)}.`],
+  [/^(\d+) students? moves? to the group (.+)\.$/, (m) => `ينتقل ${studentsAr(Number(m[1]))} إلى مجموعة ${iso(m[2]!)}.`],
+  [/^The whole group (.+) goes to (.+): the student stays in it\.$/, (m) => `تنتقل مجموعة ${iso(m[1]!)} كلها إلى ${teacherAr(m[2]!)}: ويبقى الطالب فيها.`],
+  [/^The whole group (.+) waits for a teacher: the student stays in it\.$/, (m) => `تنتظر مجموعة ${iso(m[1]!)} كلها معلمًا: ويبقى الطالب فيها.`],
+  [/^The whole group (.+) waits for a teacher\.$/, (m) => `تنتظر مجموعة ${iso(m[1]!)} كلها معلمًا.`],
+  [/^The whole group (.+) goes to (.+)\.$/, (m) => `تنتقل مجموعة ${iso(m[1]!)} كلها إلى ${teacherAr(m[2]!)}.`],
+  [/^The student leaves the group (.+) after today: self-study from now\.$/, (m) => `يغادر الطالب مجموعة ${iso(m[1]!)} بعد اليوم: دراسة ذاتية من الآن.`],
+  [/^(\d+) students? leaves? the group (.+) after today: self-study from now\.$/, (m) => `يغادر ${studentsAr(Number(m[1]))} مجموعة ${iso(m[2]!)} بعد اليوم: دراسة ذاتية من الآن.`],
+  [/^No group of this subject is without a teacher yet: the student stays in (.+) and waits to be placed\.$/,
+    (m) => `لا مجموعة في هذه المادة بلا معلم بعد: يبقى الطالب في ${iso(m[1]!)} وينتظر توزيعه.`],
+  [/^No group of this subject is without a teacher yet: (\d+) students? stays? in (.+) and waits? to be placed\.$/,
+    (m) => `لا مجموعة في هذه المادة بلا معلم بعد: يبقى ${studentsAr(Number(m[1]))} في ${iso(m[2]!)} و${waitAr(Number(m[1]))}.`],
+  [/^(.+) has no group of this subject yet: the student stays in (.+) and waits to be placed\.$/,
+    (m) => `ليس لدى ${teacherAr(m[1]!)} مجموعة في هذه المادة بعد: يبقى الطالب في ${iso(m[2]!)} وينتظر توزيعه.`],
+  [/^(.+) has no group of this subject yet: (\d+) students? stays? in (.+) and waits? to be placed\.$/,
+    (m) => `ليس لدى ${teacherAr(m[1]!)} مجموعة في هذه المادة بعد: يبقى ${studentsAr(Number(m[2]))} في ${iso(m[3]!)} و${waitAr(Number(m[2]))}.`],
   [/^The move was refused: the student stays in (.+)\.$/, (m) => `رُفض النقل: يبقى الطالب في ${iso(m[1]!)}.`],
   [/^The move was refused: (\d+) students? stays? in (.+)\.$/, (m) => `رُفض النقل: يبقى ${studentsAr(Number(m[1]))} في ${iso(m[2]!)}.`],
 ];
@@ -317,7 +318,7 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
 function iso(name: string): string {
   return `\u2068${name}\u2069`;
 }
-/** A teacher as the class sentences name one: a name (data), or the new teacher the screen could not name. */
+/** A teacher as the group sentences name one: a name (data), or the new teacher the screen could not name. */
 function teacherAr(name: string): string {
   return name === 'The new teacher' ? 'المعلم الجديد' : iso(name);
 }

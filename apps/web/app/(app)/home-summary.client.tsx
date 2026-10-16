@@ -220,7 +220,7 @@ export default function HomeSummaryCard(): React.JSX.Element | null {
             .filter((c) => c.escrow.freeBalance > 0 || c.escrow.heldBalance > 0)
             .map((c) => (
               <p key={c.student.id}>
-                {data.children.length > 1 ? `${c.student.name}: ` : 'Wallet: '}
+                {data.children.length > 1 ? `${c.student.name}: ` : 'Balance: '}
                 {formatPrice(c.escrow.freeBalance)} available
                 {c.escrow.heldBalance > 0 && (
                   <> · {formatPrice(c.escrow.heldBalance)} held for preregistered subjects</>

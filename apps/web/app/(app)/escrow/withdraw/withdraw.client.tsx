@@ -96,7 +96,7 @@ export default function WithdrawClient() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Request Withdrawal</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Withdraw cash from a child&apos;s escrow balance. Admin will process your request.
+          Withdraw cash from a child&apos;s balance with the school. The admin processes your request.
         </p>
       </div>
 

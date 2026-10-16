@@ -4,6 +4,10 @@
 ALTER TABLE "exam_entry" ADD COLUMN "withdrawn_with_line" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "exam_entry" ADD COLUMN "staff_set" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
 
+-- The rules' source notes name the boards' documents alone, not the research file (the lead's decision of
+-- 16 Oct 2026, FEATURES_PLAN.md §6, 16: a staff screen showed "From DISCOVERY_RESEARCH.md §2 (…)"). Edited
+-- here for new installs only; a database that ran 0057 before keeps its rows until the one-off update in
+-- docs/features/CYCLE_DECISIONS.md §16 is run on it (an admin's own edit of a note is left alone).
 -- F4 (exam-entry management; regenerated at F4's final merge after main's 0055 —
 -- it was 0051 on the branch, 0042 on the frozen branch): each board's rules for entries, seeded from the
 -- research (DISCOVERY_RESEARCH.md §2) and editable by the coordinator and the
@@ -29,7 +33,7 @@ SELECT 'cambridge', true, true, true, false,
   'entry_deadline',
   'Assumed (not in the research): after the entry deadline Cambridge keeps the entry fee for a withdrawn entry — check the Cambridge Handbook.',
   'candidate_number',
-  'From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026). Check each rule against the current handbook.'
+  'Cambridge Handbook 2026. Check each rule against the current handbook.'
 WHERE EXISTS (SELECT 1 FROM "exam_board" WHERE "code" = 'cambridge')
 ON CONFLICT ("board_code") DO NOTHING;
 --> statement-breakpoint
@@ -50,7 +54,7 @@ SELECT 'pearson_edexcel', false, false, false, true,
   'high_late_fee_from',
   'Pearson refunds an entry automatically up to the high-late fee date; after it the entry fee is kept.',
   'uci',
-  'From DISCOVERY_RESEARCH.md §2 (Pearson key dates 2026/27, IAL information manual). IAL unit results are banked under the UCI.'
+  'Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI.'
 WHERE EXISTS (SELECT 1 FROM "exam_board" WHERE "code" = 'pearson_edexcel')
 ON CONFLICT ("board_code") DO NOTHING;
 --> statement-breakpoint
@@ -68,6 +72,6 @@ SELECT 'oxford', false, false, false, false,
   'entry_deadline',
   'Not researched: assumed that the entry fee is kept after the entry deadline — check with OxfordAQA.',
   'candidate_number',
-  'OxfordAQA''s entry rules were not researched (DISCOVERY_RESEARCH.md §2 lists only its series and entry routes).'
+  'OxfordAQA''s entry rules were not researched: only its series and entry routes are known.'
 WHERE EXISTS (SELECT 1 FROM "exam_board" WHERE "code" = 'oxford')
 ON CONFLICT ("board_code") DO NOTHING;

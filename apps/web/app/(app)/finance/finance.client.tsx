@@ -183,7 +183,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       setRejectPaymentTarget(null);
       afterAction(
         `Payment rejected for ${student?.name ?? 'student'}; the family has been told.` +
-          (r.escrowReturned > 0 ? ` ${r.escrowReturned.toFixed(2)} EGP returned to escrow.` : '') +
+          (r.escrowReturned > 0 ? ` ${r.escrowReturned.toFixed(2)} EGP returned to the balance.` : '') +
           (r.registrationsExpired > 0 ? ' The window has closed, so the subjects are released.' : ''),
         student?.id
       );
@@ -221,7 +221,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       const w = rejectTarget;
       setRejectTarget(null);
       setWithdrawalNotes('');
-      afterAction('Withdrawal rejected — unreleased amount returned to escrow.', w?.escrow.studentId);
+      afterAction('Withdrawal rejected — unreleased amount returned to the balance.', w?.escrow.studentId);
     },
     onError: (err: Error) => setActionError(err.message),
   });
@@ -236,7 +236,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
   const returnReceiptMutation = useMutation({
     mutationFn: (id: string) =>
       apiResponse(api.v1.receipts[':id'].return.$post({ param: { id }, json: {} })),
-    onSuccess: () => afterAction('Receipt returned — any pending drop refund has been released to escrow.'),
+    onSuccess: () => afterAction('Receipt returned — any pending drop refund has been released to the balance.'),
     onError: (err: Error) => setActionError(err.message),
   });
 
@@ -393,7 +393,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                       <p className="text-lg font-bold text-foreground"><Money amount={totalAmount} /></p>
                       {pay.escrowAmountApplied > 0 && (
                         <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                          <span>Incl.</span> <Money amount={pay.escrowAmountApplied} /> <span>escrow</span>
+                          <span>Incl.</span> <Money amount={pay.escrowAmountApplied} /> <span>from the balance</span>
                         </p>
                       )}
                     </div>
@@ -464,7 +464,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                 </p>
                 {r.status === 'return_required' && r.refundAmountOnReturn != null && (
                   <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-                    <span>Releases</span> <Money amount={r.refundAmountOnReturn} /> <span>to escrow on return</span>
+                    <span>Releases</span> <Money amount={r.refundAmountOnReturn} /> <span>to the balance on return</span>
                   </p>
                 )}
               </div>
@@ -607,7 +607,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       {rejectPaymentTarget && (
         <ReasonModal
           title="Reject this payment?"
-          description={`${rejectPaymentTarget.paymentMethod === 'instapay' && !rejectPaymentTarget.verificationReference ? `The parent has not submitted a transfer reference yet and may be transferring right now — reject only a checkout they abandoned (started ${new Date(rejectPaymentTarget.createdAt).toLocaleString()}). ` : ''}${rejectPaymentTarget.student.name} — ${(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied).toFixed(2)} EGP by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${rejectPaymentTarget.escrowAmountApplied.toFixed(2)} EGP applied from escrow goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
+          description={`${rejectPaymentTarget.paymentMethod === 'instapay' && !rejectPaymentTarget.verificationReference ? `The parent has not submitted a transfer reference yet and may be transferring right now — reject only a checkout they abandoned (started ${new Date(rejectPaymentTarget.createdAt).toLocaleString()}). ` : ''}${rejectPaymentTarget.student.name} — ${(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied).toFixed(2)} EGP by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${rejectPaymentTarget.escrowAmountApplied.toFixed(2)} EGP applied from the balance goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
           label="Reason (sent to the family)"
           placeholder="e.g. No transfer with this reference on the bank statement"
           confirmLabel="Reject Payment"
@@ -771,7 +771,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
           <div className="bg-card rounded-xl shadow-xl border border-border max-w-md w-full p-6">
             <h2 className="text-lg font-bold text-foreground font-display mb-1">Reject Withdrawal</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              The unreleased held amount will be returned to the student&apos;s escrow. A reason is required.
+              The unreleased held amount will be returned to the student&apos;s balance. A reason is required.
             </p>
 
             <div className="mb-4">

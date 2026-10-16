@@ -1,0 +1,534 @@
+{
+ "d05-08-13-admin-sidebar": {
+  "enStatus": 200,
+  "en": [
+   "/ Home",
+   "/admin/sessions Sessions",
+   "/exams/catalogue Exam Catalogue",
+   "/admin/subjects Subjects",
+   "/exams/series Board Series",
+   "/exams/services Board Services",
+   "/admin/school-fees School Fees",
+   "/settings Settings",
+   "/imports Day-one Import",
+   "/admin/team Team",
+   "/desk The Desk",
+   "/students Students",
+   "/charges Charges",
+   "/admin/payments Payments",
+   "/admin/exceptions Exceptions",
+   "/admin/messages Messages",
+   "/admin/escrow Escrow",
+   "/finance Finance Workbench",
+   "/takings Daily Takings",
+   "/exams/deadlines Exam Deadlines",
+   "/exams/entries Exam Entries",
+   "/exams/entry-lists Entry Lists",
+   "/notifications Notifications",
+   "/profile Profile"
+  ],
+  "enBytes": 14774,
+  "arStatus": 200,
+  "ar": [
+   "/ الرئيسية",
+   "/admin/sessions الجلسات",
+   "/exams/catalogue دليل الامتحانات",
+   "/admin/subjects المواد",
+   "/exams/series دورات المجالس",
+   "/exams/services خدمات المجالس",
+   "/admin/school-fees المصاريف الدراسية",
+   "/settings الإعدادات",
+   "/imports استيراد بدء التشغيل",
+   "/admin/team الفريق",
+   "/desk المكتب",
+   "/students الطلاب",
+   "/charges الرسوم الأخرى",
+   "/admin/payments المدفوعات",
+   "/admin/exceptions الاستثناءات",
+   "/admin/messages الرسائل",
+   "/admin/escrow الرصيد",
+   "/finance مكتب المالية",
+   "/takings إيرادات اليوم",
+   "/exams/deadlines مواعيد الامتحانات",
+   "/exams/entries قيود الامتحانات",
+   "/exams/entry-lists قوائم القيد",
+   "/notifications الإشعارات",
+   "/profile الملف الشخصي"
+  ],
+  "dir": "rtl",
+  "arBytes": 12329
+ },
+ "d05-coordinator-sidebar": {
+  "enStatus": 200,
+  "en": [
+   "/ Home",
+   "/admin/sessions Sessions",
+   "/exams/catalogue Exam Catalogue",
+   "/exams/series Board Series",
+   "/exams/services Board Services",
+   "/settings Settings",
+   "/imports Day-one Import",
+   "/students Students",
+   "/admin/exceptions Exceptions",
+   "/exams/deadlines Exam Deadlines",
+   "/exams/entries Exam Entries",
+   "/exams/entry-lists Entry Lists",
+   "/notifications Notifications",
+   "/profile Profile"
+  ],
+  "enBytes": 15732,
+  "arStatus": 200,
+  "ar": [
+   "/ الرئيسية",
+   "/admin/sessions الجلسات",
+   "/exams/catalogue دليل الامتحانات",
+   "/exams/series دورات المجالس",
+   "/exams/services خدمات المجالس",
+   "/settings الإعدادات",
+   "/imports استيراد بدء التشغيل",
+   "/students الطلاب",
+   "/admin/exceptions الاستثناءات",
+   "/exams/deadlines مواعيد الامتحانات",
+   "/exams/entries قيود الامتحانات",
+   "/exams/entry-lists قوائم القيد",
+   "/notifications الإشعارات",
+   "/profile الملف الشخصي"
+  ],
+  "dir": "rtl",
+  "arBytes": 12564
+ },
+ "d07-board-services": {
+  "enStatus": 200,
+  "en": [
+   "Review of marking\tRemark\tper paper · by level\tRefunded in full\tthe family or the desk\t",
+   "Clerical re-check\tRemark\tper paper · by level\tRefunded in full\tthe family or the desk\t",
+   "Access to scripts\tRemark\tper paper · by level\tRefunded in full\tthe family or the desk\t",
+   "Priority review of marking\tRemark\tper paper · by level\tRefunded in full\tthe family or the desk\t",
+   "Cash-in (claim the award)\tCash-in\tper request\tRefunded in full\tthe family or the desk\t",
+   "Late cash-in\tLate cash-in\tper request\tRefunded in full\tthe family or the desk\t",
+   "Certificate split\tCertificate split\tper request\tRefunded in full\tthe family or the desk\t"
+  ],
+  "enBytes": 78670,
+  "arStatus": 200,
+  "ar": [
+   "مراجعة التصحيح\tإعادة تصحيح\tلكل ورقة · حسب المستوى\tيُسترد كاملًا\tالأسرة أو المكتب\t",
+   "مراجعة إدارية\tإعادة تصحيح\tلكل ورقة · حسب المستوى\tيُسترد كاملًا\tالأسرة أو المكتب\t",
+   "الاطلاع على أوراق الإجابة\tإعادة تصحيح\tلكل ورقة · حسب المستوى\tيُسترد كاملًا\tالأسرة أو المكتب\t",
+   "مراجعة التصحيح العاجلة\tإعادة تصحيح\tلكل ورقة · حسب المستوى\tيُسترد كاملًا\tالأسرة أو المكتب\t",
+   "طلب الشهادة (Cash-in)\tطلب الشهادة (Cash-in)\tلكل طلب\tيُسترد كاملًا\tالأسرة أو المكتب\t",
+   "طلب الشهادة المتأخر\tطلب الشهادة المتأخر\tلكل طلب\tيُسترد كاملًا\tالأسرة أو المكتب\t",
+   "فصل الشهادة\tفصل الشهادة\tلكل طلب\tيُسترد كاملًا\tالأسرة أو المكتب\t"
+  ],
+  "dir": "rtl",
+  "arBytes": 64791
+ },
+ "d09-student-record": {
+  "enStatus": 200,
+  "en": [
+   "Today",
+   "Cohort",
+   "Section this year",
+   "Subjects this year",
+   "Exam series open now",
+   "Section history",
+   "Changes to the record"
+  ],
+  "enBytes": 72727,
+  "arStatus": 200,
+  "ar": [
+   "اليوم",
+   "الدفعة",
+   "الفصل هذا العام",
+   "مواد هذا العام",
+   "دورات الامتحانات المفتوحة الآن",
+   "سجل الفصول",
+   "التغييرات على السجل"
+  ],
+  "dir": "rtl",
+  "arBytes": 63883
+ },
+ "d10-exam-deadlines": {
+  "enStatus": 200,
+  "en": [
+   "Thu 5 Nov 2026 Forecast grades due Cambridge International June 2027 In 20 days 1 forecast grades missing",
+   "Tue 10 Nov 2026 Access arrangements due Cambridge International June 2027 In 25 days Nothing outstanding",
+   "November 2026",
+   "Today · Fri 16 Oct 2026",
+   "Thu 5 Nov 2026 Forecast grades due Cambridge International June 2027 In 20 days 1 forecast grades missing",
+   "Tue 10 Nov 2026 Access arrangements due Cambridge International June 2027 In 25 days Nothing outstanding",
+   "January 2027",
+   "Fri 8 Jan 2027 Exams start Pearson Edexcel January 2027 In 84 days No timetable imported yet",
+   "Thu 28 Jan 2027 Exams end Pearson Edexcel January 2027 In 104 days Nothing outstanding",
+   "February 2027",
+   "Sat 20 Feb 2027 Hard stop 14:00 Entry deadline (the school's hard stop) After this time nothing more is entered, paid or confirmed for the s",
+   "Thu 25 Feb 2027 Hard stop 14:00 Entry deadline (the school's hard stop) After this time nothing more is entered, paid or confirmed for the s",
+   "March 2027",
+   "Sat 20 Mar 2027 Hard stop 14:00 Retake deadline (the hard stop for a retake of the previous series) After this time nothing more is entered,",
+   "April 2027",
+   "Mon 26 Apr 2027 Exams start Cambridge International June 2027 In 192 days No timetable imported yet",
+   "May 2027",
+   "Mon 10 May 2027 Exams start Pearson Edexcel June 2027 In 206 days No timetable imported yet",
+   "June 2027",
+   "Tue 15 Jun 2027 Exams end Cambridge International June 2027 In 242 days Nothing outstanding",
+   "Sun 20 Jun 2027 Exams end Pearson Edexcel June 2027 In 247 days Nothing outstanding",
+   "August 2027",
+   "Tue 10 Aug 2027 Results released Cambridge International June 2027 In 298 days No results imported yet",
+   "October 2027",
+   "Wed 20 Oct 2027 Certificates available Cambridge International June 2027 In 369 days No certificates received yet"
+  ],
+  "enBytes": 182139,
+  "arStatus": 200,
+  "ar": [
+   "الخميس 5 نوفمبر 2026 موعد الدرجات المتوقعة Cambridge International يونيو 2027 بعد 20 يومًا درجات متوقعة ناقصة: 1",
+   "الثلاثاء 10 نوفمبر 2026 موعد ترتيبات الإتاحة Cambridge International يونيو 2027 بعد 25 يومًا لا شيء متبقٍ",
+   "نوفمبر 2026",
+   "اليوم · الجمعة 16 أكتوبر 2026",
+   "الخميس 5 نوفمبر 2026 موعد الدرجات المتوقعة Cambridge International يونيو 2027 بعد 20 يومًا درجات متوقعة ناقصة: 1",
+   "الثلاثاء 10 نوفمبر 2026 موعد ترتيبات الإتاحة Cambridge International يونيو 2027 بعد 25 يومًا لا شيء متبقٍ",
+   "يناير 2027",
+   "الجمعة 8 يناير 2027 بدء الامتحانات Pearson Edexcel يناير 2027 بعد 84 يومًا لم يُستورد جدول بعد",
+   "الخميس 28 يناير 2027 انتهاء الامتحانات Pearson Edexcel يناير 2027 بعد 104 يومًا لا شيء متبقٍ",
+   "فبراير 2027",
+   "السبت 20 فبراير 2027 الحد النهائي 14:00 آخر موعد للقيد (الحد النهائي للمدرسة) بعد هذا الوقت لا يُقيَّد ولا يُدفع ولا يُؤكَّد شيء آخر للدورة.",
+   "الخميس 25 فبراير 2027 الحد النهائي 14:00 آخر موعد للقيد (الحد النهائي للمدرسة) بعد هذا الوقت لا يُقيَّد ولا يُدفع ولا يُؤكَّد شيء آخر للدورة",
+   "مارس 2027",
+   "السبت 20 مارس 2027 الحد النهائي 14:00 آخر موعد للإعادة (الحد النهائي لإعادة الدورة السابقة) بعد هذا الوقت لا يُقيَّد ولا يُدفع ولا يُؤكَّد ش",
+   "أبريل 2027",
+   "الاثنين 26 أبريل 2027 بدء الامتحانات Cambridge International يونيو 2027 بعد 192 يومًا لم يُستورد جدول بعد",
+   "مايو 2027",
+   "الاثنين 10 مايو 2027 بدء الامتحانات Pearson Edexcel يونيو 2027 بعد 206 يومًا لم يُستورد جدول بعد",
+   "يونيو 2027",
+   "الثلاثاء 15 يونيو 2027 انتهاء الامتحانات Cambridge International يونيو 2027 بعد 242 يومًا لا شيء متبقٍ",
+   "الأحد 20 يونيو 2027 انتهاء الامتحانات Pearson Edexcel يونيو 2027 بعد 247 يومًا لا شيء متبقٍ",
+   "أغسطس 2027",
+   "الثلاثاء 10 أغسطس 2027 إعلان النتائج Cambridge International يونيو 2027 بعد 298 يومًا لم تُستورد نتائج بعد",
+   "أكتوبر 2027",
+   "الأربعاء 20 أكتوبر 2027 توفر الشهادات Cambridge International يونيو 2027 بعد 369 يومًا لم تُستلم شهادات بعد"
+  ],
+  "dir": "rtl",
+  "arBytes": 150207
+ },
+ "d12-desk-teacher-change": {
+  "en": "The student moves to the class Biology 11 — Teacher B.",
+  "enBytes": 54207,
+  "ar": "ينتقل الطالب إلى فصل ⁨Biology 11 — Teacher B⁩.",
+  "dir": "rtl",
+  "arBytes": 47102
+ },
+ "d12-messages-section": {
+  "en": "Who\nEveryone or a grade\nA list in the system\nChosen people\nList\nA session's unpaid families\nA section\nA teaching group\nThe reservers of a subject\nThe holders of a charge\nSection\nChoose a section\n11A\n12A\nTo\nParents and students\nParents\nStudents",
+  "enBytes": 10861,
+  "ar": "إلى من\nالجميع أو صف\nقائمة في النظام\nأشخاص مختارون\nالقائمة\nالأسر غير المسددة في جلسة\nفصل\nمجموعة تدريس\nمن حجزوا مادة\nأصحاب رسم\nالقسم\nاختر قسمًا\n11A\n12A\nإلى\nأولياء الأمور والطلاب\nأولياء الأمور\nالطلاب",
+  "dir": "rtl",
+  "arBytes": 9911
+ },
+ "d01-preview-chemistry": {
+  "en": [
+   "First entry, self-study (not taught this cycle)",
+   "Retake, self-study — name the sitting",
+   "First entry, self-study (not taught this cycle) · EGP 17,850",
+   "Retake, self-study — name the sitting · EGP 17,850"
+  ],
+  "enBytes": 79835,
+  "ar": [
+   "قيد أول، دراسة ذاتية (لا تُدرَّس هذه الدورة) · 17,850 جنيه",
+   "إعادة، دراسة ذاتية — سمِّ الدورة · 17,850 جنيه"
+  ],
+  "dir": "rtl",
+  "arBytes": 68020
+ },
+ "d03-preview-arabic-al": {
+  "en": [
+   "Teacher B",
+   "Teacher A"
+  ],
+  "enBytes": 76231,
+  "ar": [
+   "Teacher B",
+   "Teacher A"
+  ],
+  "dir": "rtl",
+  "arBytes": 63842
+ },
+ "d01-03-reserve-parent": {
+  "enStatus": 200,
+  "en": [
+   "Chemistry Cambridge International Self-study only (not taught this cycle)",
+   "All papers — self-study First entry, self-study (not taught this cycle) Retake, self-study — name the sitting EGP 17,850",
+   "Arabic A.L. Pearson Edexcel",
+   "Arabic IAL (YAA01) Teacher A First entry, in school Retake, in school — name the sitting Retake, self-study — name the sitting EGP 13,800"
+  ],
+  "enBytes": 75014,
+  "arStatus": 200,
+  "ar": [
+   "Chemistry Cambridge International دراسة ذاتية فقط (لا تُدرَّس هذه الدورة)",
+   "كل الأوراق — دراسة ذاتية قيد أول، دراسة ذاتية (لا تُدرَّس هذه الدورة) إعادة، دراسة ذاتية — سمِّ الدورة 17,850 جنيه",
+   "Arabic A.L. Pearson Edexcel",
+   "Arabic IAL (YAA01) Teacher A قيد أول، في المدرسة إعادة، في المدرسة — سمِّ الدورة إعادة، دراسة ذاتية — سمِّ الدورة 13,800 جنيه"
+  ],
+  "dir": "rtl",
+  "arBytes": 61342
+ },
+ "d02-winter-ial-units": {
+  "en": [
+   "Pearson Edexcel October 2026 | Pearson Edexcel November 2026 | Pearson Edexcel January 2027",
+   "Pearson Edexcel October 2026 | Pearson Edexcel November 2026 | Pearson Edexcel January 2027",
+   "Pearson Edexcel October 2026 | Pearson Edexcel November 2026 | Pearson Edexcel January 2027",
+   "Pearson Edexcel October 2026 | Pearson Edexcel November 2026 | Pearson Edexcel January 2027",
+   "Pearson Edexcel October 2026 | Pearson Edexcel November 2026 | Pearson Edexcel January 2027",
+   "Pearson Edexcel October 2026 | Pearson Edexcel November 2026 | Pearson Edexcel January 2027"
+  ],
+  "enBytes": 72593,
+  "ar": [
+   "Pearson Edexcel أكتوبر 2026 | Pearson Edexcel نوفمبر 2026 | Pearson Edexcel يناير 2027",
+   "Pearson Edexcel أكتوبر 2026 | Pearson Edexcel نوفمبر 2026 | Pearson Edexcel يناير 2027",
+   "Pearson Edexcel أكتوبر 2026 | Pearson Edexcel نوفمبر 2026 | Pearson Edexcel يناير 2027",
+   "Pearson Edexcel أكتوبر 2026 | Pearson Edexcel نوفمبر 2026 | Pearson Edexcel يناير 2027",
+   "Pearson Edexcel أكتوبر 2026 | Pearson Edexcel نوفمبر 2026 | Pearson Edexcel يناير 2027",
+   "Pearson Edexcel أكتوبر 2026 | Pearson Edexcel نوفمبر 2026 | Pearson Edexcel يناير 2027"
+  ],
+  "dir": "rtl",
+  "arBytes": 61466
+ },
+ "d16-entry-lists": {
+  "enStatus": 200,
+  "en": [
+   "What the check above and the fee sentences on the Entries screen follow. Each was set from the board's handbook; change one when the handbook says otherwise.",
+   "A withdrawn entry is refunded by the board up to the entry deadlineAssumed (not in the research): after the entry deadline Cambridge keeps the entry fee for a withdrawn entry — check the Cambridge Handbook.",
+   "Assumed (not in the research): after the entry deadline Cambridge keeps the entry fee for a withdrawn entry — check the Cambridge Handbook.",
+   "From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026). Check each rule against the current handbook."
+  ],
+  "enBytes": 168587,
+  "arStatus": 200,
+  "ar": [
+   "ما يتبعه الفحص أعلاه وجمل الرسوم في شاشة القيود. كل قاعدة مأخوذة من دليل المجلس؛ غيّرها حين يقول الدليل غير ذلك.",
+   "يرد المجلس رسم القيد المسحوب حتى آخر موعد للقيدمفترض (ليس في البحث): بعد آخر موعد للقيد تحتفظ Cambridge برسم القيد المسحوب - راجع دليل Cambridge.",
+   "مفترض (ليس في البحث): بعد آخر موعد للقيد تحتفظ Cambridge برسم القيد المسحوب - راجع دليل Cambridge.",
+   "من DISCOVERY_RESEARCH.md §2 (دليل Cambridge 2026). راجع كل قاعدة مع الدليل الحالي."
+  ],
+  "dir": "rtl",
+  "arBytes": 118601
+ },
+ "d15-settings": {
+  "enStatus": 200,
+  "en": [
+   "Who may register",
+   "School fee",
+   "Prices",
+   "Payment",
+   "Refunds",
+   "Declared sittings",
+   "Exceptions",
+   "Reminders",
+   "Exam catalogue",
+   "Day-one import",
+   "Exam entries",
+   "Calendar"
+  ],
+  "enBytes": 227120,
+  "arStatus": 200,
+  "ar": [
+   "من يحق له التسجيل",
+   "المصاريف الدراسية",
+   "الأسعار",
+   "دفعة",
+   "الاسترداد",
+   "الدورات المُصرَّح بها",
+   "الاستثناءات",
+   "التذكيرات",
+   "دليل الامتحانات",
+   "استيراد بدء التشغيل",
+   "قيود الامتحانات",
+   "التقويم"
+  ],
+  "dir": "rtl",
+  "arBytes": 273870
+ },
+ "d15-sign-in": {
+  "enStatus": 200,
+  "en": "IGCSE Reserve\nThe school's subject reservations, in one place.\n\nOne account for the family, in place of a form for every subject.\n\nReserve each child's subjects\nPay at the school desk or by InstaPay\nSee every receipt, and what is still owed\nالعربية\nWelcome bac",
+  "enBytes": 40469,
+  "arStatus": 200,
+  "ar": "حجز IGCSE\nحجوزات المواد في المدرسة، في مكان واحد.\n\nحساب واحد للأسرة بدلًا من استمارة لكل مادة.\n\nاحجز مواد كل ابن\nادفع في مكتب المدرسة أو عبر إنستاباي\nاطّلع على كل إيصال وعلى ما بقي مستحقًا\nEnglish\nمرحبًا بعودتك\n\nسجّل الدخول إلى حساب IGCSE لإدارة حجوزات المواد.",
+  "dir": "rtl",
+  "arBytes": 31254
+ },
+ "d15-sign-in-phone": {
+  "enStatus": 200,
+  "en": "IGCSE Reserve\nالعربية\nWelcome back\n\nSign in to your IGCSE account to manage your subject reservations.\n\nEmail address\nPassword\nForgot password?\nSign in\n\nDon't have an account? Create one",
+  "enBytes": 16813,
+  "arStatus": 200,
+  "ar": "حجز IGCSE\nEnglish\nمرحبًا بعودتك\n\nسجّل الدخول إلى حساب IGCSE لإدارة حجوزات المواد.\n\nالبريد الإلكتروني\nكلمة المرور\nنسيت كلمة المرور؟\nتسجيل الدخول\n\nليس لديك حساب؟ إنشاء حساب",
+  "dir": "rtl",
+  "arBytes": 13358
+ },
+ "d15-sign-up": {
+  "enStatus": 200,
+  "en": "IGCSE Reserve\nThe school's subject reservations, in one place.\n\nOne account for the family, in place of a form for every subject.\n\nReserve each child's subjects\nPay at the school desk or by InstaPay\nS",
+  "enBytes": 44046,
+  "arStatus": 200,
+  "ar": "حجز IGCSE\nحجوزات المواد في المدرسة، في مكان واحد.\n\nحساب واحد للأسرة بدلًا من استمارة لكل مادة.\n\nاحجز مواد كل ابن\nادفع في مكتب المدرسة أو عبر إنستاباي\nاطّلع على كل إيصال وعلى ما بقي مستحقًا\nEnglish\nإنش",
+  "dir": "rtl",
+  "arBytes": 32169
+ },
+ "d15-forgot-password": {
+  "enStatus": 200,
+  "en": "IGCSE Reserve\nAccount\nrecovery.\n\nIt happens to everyone. We will help you get back into your account quickly and securely.\n\nالعربية\nForgot your password?\n\nNo worries. Enter your email address and we w",
+  "enBytes": 30810,
+  "arStatus": 200,
+  "ar": "حجز IGCSE\nالحساب\nالاسترداد.\n\nهذا يحدث للجميع. سنساعدك على العودة إلى حسابك بسرعة وأمان.\n\nEnglish\nنسيت كلمة المرور؟\n\nلا تقلق. أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة التعيين.\n\nالبريد الإلكتروني\nإ",
+  "dir": "rtl",
+  "arBytes": 26472
+ },
+ "d14-parent-sidebar": {
+  "enStatus": 200,
+  "en": [
+   "/ Home",
+   "/register Reserve Subjects",
+   "/registrations My Registrations",
+   "/registrations/history History",
+   "/approvals Approvals",
+   "/statement Statement",
+   "/school-fee School Fee",
+   "/charges-due Charges & Instalments",
+   "/escrow Wallet",
+   "/links Linked Children",
+   "/notifications Notifications",
+   "/profile Profile",
+   "/register Reserve subjects›",
+   "/registrations My Registrations›",
+   "/school-fee School Fee›",
+   "/charges-due Charges & Instalments›",
+   "/escrow WalletEGP 14,850 available›",
+   "/links Linked Children›"
+  ],
+  "enBytes": 14212,
+  "arStatus": 200,
+  "ar": [
+   "/ الرئيسية",
+   "/register حجز المواد",
+   "/registrations تسجيلاتي",
+   "/registrations/history السجل",
+   "/approvals الموافقات",
+   "/statement كشف الحساب",
+   "/school-fee المصاريف الدراسية",
+   "/charges-due الرسوم والأقساط",
+   "/escrow المحفظة",
+   "/links الأبناء المرتبطون",
+   "/notifications الإشعارات",
+   "/profile الملف الشخصي",
+   "/register احجز المواد›",
+   "/registrations تسجيلاتي›",
+   "/school-fee المصاريف الدراسية›",
+   "/charges-due الرسوم والأقساط›",
+   "/escrow المحفظة14,850 جنيه متاح›",
+   "/links الأبناء المرتبطون›"
+  ],
+  "dir": "rtl",
+  "arBytes": 11531
+ },
+ "d14-parent-home": {
+  "enStatus": 200,
+  "en": [
+   "The family statement",
+   "Approve",
+   "Reserve subjects",
+   "Preregister",
+   "Preregister",
+   "Reserve subjects›",
+   "My Registrations›",
+   "School Fee›",
+   "Charges & Instalments›",
+   "WalletEGP 14,850 available›",
+   "Linked Children›"
+  ],
+  "enBytes": 43080,
+  "arStatus": 200,
+  "ar": [
+   "كشف حساب الأسرة",
+   "موافقة",
+   "احجز المواد",
+   "سجّل مسبقًا",
+   "سجّل مسبقًا",
+   "احجز المواد›",
+   "تسجيلاتي›",
+   "المصاريف الدراسية›",
+   "الرسوم والأقساط›",
+   "المحفظة14,850 جنيه متاح›",
+   "الأبناء المرتبطون›"
+  ],
+  "dir": "rtl",
+  "arBytes": 32094
+ },
+ "d14-parent-balance-page": {
+  "enStatus": 200,
+  "en": [
+   "Wallet",
+   "Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.",
+   "Student Placeholder C1",
+   "Grade 11",
+   "EGP 0",
+   "Student Placeholder C2",
+   "Grade 12",
+   "EGP 14,850"
+  ],
+  "enBytes": 21920,
+  "arStatus": 200,
+  "ar": [],
+  "dir": "rtl",
+  "arBytes": 13358
+ },
+ "d14-parent-statement": {
+  "enStatus": 200,
+  "enBytes": 90906,
+  "arStatus": 200,
+  "dir": "rtl",
+  "arBytes": 74740,
+  "en": [
+   "Escrow",
+   "Escrow"
+  ],
+  "ar": [
+   "الرصيد",
+   "الرصيد",
+   "الرصيد"
+  ]
+ },
+ "d14-desk": {
+  "enStatus": 200,
+  "enBytes": 67268,
+  "arStatus": 200,
+  "dir": "rtl",
+  "arBytes": 59589,
+  "en": [
+   "Escrow"
+  ],
+  "ar": [
+   "الرصيد"
+  ]
+ },
+ "d14-admin-balance-withdrawals": {
+  "enStatus": 200,
+  "enBytes": 97976,
+  "arStatus": 200,
+  "ar": [
+   "الرصيد"
+  ],
+  "dir": "rtl",
+  "arBytes": 84711,
+  "en": [
+   "Escrow",
+   "Pending and partially-fulfilled escrow withdrawals — oldest first.",
+   "Escrow Balance",
+   "Escrow Balance",
+   "Escrow Balance",
+   "Escrow Balance"
+  ]
+ },
+ "_errors": {
+  "2026-10-16T00:50:24.582Z": [
+   "d12-desk-teacher-change: page.selectOption: Timeout 30000ms exceeded."
+  ],
+  "2026-10-16T00:51:50.242Z": []
+ }
+}

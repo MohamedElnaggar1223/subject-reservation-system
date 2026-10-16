@@ -587,13 +587,16 @@ describe('08n: the line rules (§3.5)', () => {
     expect(physOffer).toBeTruthy();
   });
 
-  it('self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting', async () => {
+  it('self-study on a first entry is refused where the school teaches the subject, and where it is "Retake (Self Study ONLY)" (the lead\'s decision of 16 Oct 2026); a retake in self-study is taken there; a retake names its sitting', async () => {
     const f = await onboard(officer, `n08r-self-${RUN}`, 12);
     await expect(reserve(f.studentId, june, [{ offerItemId: taught, attempt: 'first', mode: 'self_study' }]))
       .rejects.toThrow('Subjects can only be taken outside school when retaking or when the school does not offer them');
     await expect(reserve(f.studentId, june, [{ offerItemId: selfOnly, attempt: 'first', mode: 'in_school', teacherId }]))
       .rejects.toThrow(/self-study only/);
-    const [line] = await reserve(f.studentId, june, [{ offerItemId: selfOnly, attempt: 'first', mode: 'self_study' }]);
+    // Decision 1 (FEATURES_PLAN.md §6): the untaught subject's first entry in self-study is the student's exception alone (08p).
+    await expect(reserve(f.studentId, june, [{ offerItemId: selfOnly, attempt: 'first', mode: 'self_study' }]))
+      .rejects.toThrow(`Not taught (08n rules ${RUN}) is self study on a second entry only: name the earlier sitting, or ask for the exception`);
+    const [line] = await reserve(f.studentId, june, [{ offerItemId: selfOnly, attempt: 'retake', mode: 'self_study', priorSittingSeriesId: camNovRecent, priorSittingSource: 'declared_by_desk' }]);
     expect((await lineOf(line!.id)).mode).toBe('self_study');
     await expect(reserve(f.studentId, june, [{ offerItemId: taught, attempt: 'retake', mode: 'self_study' }]))
       .rejects.toThrow(/names the sitting it follows/);

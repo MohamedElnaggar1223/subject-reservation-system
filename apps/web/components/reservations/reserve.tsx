@@ -84,6 +84,16 @@ const ym = (month: string, year: number) => year * 12 + (MONTH_ORDER[month] ?? 0
 const LEVEL_GROUP: Record<string, string> = { igcse: 'O.L.', as_level: 'A.S. / A.L.', a_level: 'A.S. / A.L.' };
 const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self_study_only: 'Self-study only (not taught this cycle)' };
 
+/** The board as the school's forms write it beside a qualification ("Edexcel YAA01"). */
+const FORM_BOARD: Record<string, string> = { pearson_edexcel: 'Edexcel', cambridge: 'Cambridge', oxford: 'Oxford' };
+/**
+ * What follows a teacher's name on a subject whose qualifications the family chooses through the teacher
+ * (Arabic A Level, Edexcel — the form's "T1 (Edexcel YAA01)", "T2 (Edexcel 9AA01)"): the qualification the
+ * row enters, as the form names it (the lead's decision of 16 Oct 2026, 3; a label only). Elsewhere nothing.
+ */
+const qualificationOfTeacher = (o: Offer, it: Item) =>
+  o.items.some((x) => x.kind === 'qualification') && it.qualification ? ` (${FORM_BOARD[o.subject.boardCode] ?? o.subject.boardName} ${it.qualification.code})` : '';
+
 const entryKey = (p: { attempt: string; mode: string }) => `${p.attempt}|${p.mode}`;
 /** A sitting is known when the student sat it: a confirmed line (a dropped one was never sat, so it is declared). */
 /**
@@ -403,7 +413,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
               </select>
             </div>
             <div>
-              <label htmlFor="desk-escrow" className="mb-1 block text-xs font-medium text-foreground">Escrow to apply (EGP)</label>
+              <label htmlFor="desk-escrow" className="mb-1 block text-xs font-medium text-foreground">Balance to use (EGP)</label>
               <input id="desk-escrow" type="number" min="0" step="0.01" inputMode="decimal" className={INPUT_CLASS.replace('w-full', 'w-32')} value={escrow} onChange={(e) => setEscrow(e.target.value)} placeholder="0" />
             </div>
             <Button disabled={!ready || pending || total - provisionalTotal <= 0} onClick={() => { setFailure(null); deskMutation.mutate(true); }}>
@@ -476,9 +486,9 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
                 : it.teachers.length > 1 ? (
                   <select aria-label="Teacher" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-48')} value={p.teacherId ?? ''} onChange={(e) => setPick(it, { teacherId: e.target.value || null })}>
                     <option value="">No preference</option>
-                    {it.teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.mode === 'online' ? ' (online)' : ''}</option>)}
+                    {it.teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.mode === 'online' ? ' (online)' : ''}{qualificationOfTeacher(o, it)}</option>)}
                   </select>
-                ) : it.teachers.length === 1 ? <bdi data-i18n-skip="true">{it.teachers[0]!.name}{it.teachers[0]!.mode === 'online' ? ' (online)' : ''}</bdi> : <span className="text-muted-foreground">—</span>)}
+                ) : it.teachers.length === 1 ? <bdi data-i18n-skip="true">{it.teachers[0]!.name}{it.teachers[0]!.mode === 'online' ? ' (online)' : ''}{qualificationOfTeacher(o, it)}</bdi> : <span className="text-muted-foreground">—</span>)}
             </td>
             <td className={cn('px-3 py-2 align-top max-sm:col-start-2 max-sm:py-1', !p.on && 'max-sm:hidden')}>
               {p.on && (
