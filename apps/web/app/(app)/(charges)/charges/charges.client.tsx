@@ -200,12 +200,12 @@ export default function ChargesClient({ viewerRole }: { viewerRole: string | nul
 
       {pending && (
         <ReasonModal
-          title={pending.kind === 'accept' ? 'Accept the request' : pending.kind === 'cancel' ? 'Cancel the charge' : 'Refund to escrow'}
+          title={pending.kind === 'accept' ? 'Accept the request' : pending.kind === 'cancel' ? 'Cancel the charge' : 'Refund to the balance'}
           description={pending.kind === 'accept'
             ? `${pending.row.description}: the family is told it is due, and it can be paid.`
             : pending.kind === 'cancel'
               ? `${pending.row.description}: nothing is owed for it any more; the family is told.`
-              : `${pending.row.description}: the amount goes to the family's escrow. A paper receipt that is out comes back first.`}
+              : `${pending.row.description}: the amount goes to the family's balance. A paper receipt that is out comes back first.`}
           confirmLabel={pending.kind === 'accept' ? 'Accept' : pending.kind === 'cancel' ? 'Cancel the charge' : 'Refund'}
           destructive={pending.kind !== 'accept'}
           isPending={act.isPending}

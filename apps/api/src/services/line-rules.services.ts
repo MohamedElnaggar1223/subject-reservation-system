@@ -127,9 +127,19 @@ export async function assertLineRules(
     if (!recheck && it.kind === 'one_paper' && l.attempt === 'first') {
       throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, 'gate.availability');
     }
-    if (!recheck && l.mode === 'self_study' && l.attempt === 'first' && !c.selfStudyOnly) {
-      // The forms' "Self Study … (ONLY 2nd entry)" (G-09); the old sentence kept.
-      await gate('gate.selfStudyFirstEntry', scopeOf(it), 'Subjects can only be taken outside school when retaking or when the school does not offer them');
+    if (!recheck && l.mode === 'self_study' && l.attempt === 'first') {
+      if (c.selfStudyOnly && !it.needs_prior_series) {
+        // The forms' rule, "Self Study 50% … ONLY 2nd entry", on a subject the links sheet gives as "Retake
+        // (Self Study ONLY)" and on a unit or route marked self study only alike (the IAL forms say it per
+        // unit): no first entry in self-study but by the student's exception "self-study on a first entry"
+        // (the lead's decisions of 16 Oct 2026, FEATURES_PLAN.md §6, 1: G-09's allowance for the untaught
+        // subject is gone). The one exception is an item that carries an earlier sitting forward (the
+        // Physics form's "A.2. (Self Study 50% fees …)", its own entry after the AS): it takes one.
+        await gate('gate.selfStudyFirstEntry', scopeOf(it), `${name} is self study on a second entry only: name the earlier sitting, or ask for the exception`);
+      } else if (!c.selfStudyOnly) {
+        // The forms' "Self Study … (ONLY 2nd entry)" (G-09) on what the school teaches; the old sentence kept.
+        await gate('gate.selfStudyFirstEntry', scopeOf(it), 'Subjects can only be taken outside school when retaking or when the school does not offer them');
+      }
     }
     if (!recheck && l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
       throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared');

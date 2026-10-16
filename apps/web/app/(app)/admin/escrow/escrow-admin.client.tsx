@@ -135,7 +135,7 @@ export default function EscrowAdminClient() {
         <div>
           <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Withdrawal Requests</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Pending and partially-fulfilled escrow withdrawals — oldest first.
+            Withdrawals from families&apos; balances, pending or partly fulfilled — oldest first.
           </p>
           {approved && <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400" role="status">{approved}</p>}
           {actionError && !fulfillTarget && !rejectTarget && <p className="mt-2 text-sm text-destructive" role="alert">{actionError}</p>}
@@ -207,7 +207,7 @@ export default function EscrowAdminClient() {
                     <p className="text-base font-bold text-emerald-700 dark:text-emerald-400"><Money amount={req.releasedAmount ?? 0} /></p>
                   </div>
                   <div className="bg-muted rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Escrow Balance</p>
+                    <p className="text-xs text-muted-foreground">Balance</p>
                     <p className="text-base font-bold text-primary"><Money amount={req.escrow.balance} /></p>
                   </div>
                 </div>
@@ -278,7 +278,7 @@ export default function EscrowAdminClient() {
                 <span className="font-semibold text-foreground">{(fulfillTarget.requestedAmount - (fulfillTarget.releasedAmount ?? 0)).toFixed(2)} EGP</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Current Escrow Balance</span>
+                <span className="text-muted-foreground">Current balance</span>
                 <span className="font-medium text-primary">{fulfillTarget.escrow.balance.toFixed(2)} EGP</span>
               </div>
             </div>
@@ -348,7 +348,7 @@ export default function EscrowAdminClient() {
             <p className="text-sm text-muted-foreground">
               Rejecting this request for{' '}
               <span className="font-semibold text-foreground">{rejectTarget.escrow.student.name}</span>{' '}
-              ({rejectTarget.requestedAmount.toFixed(2)} EGP). The unreleased held amount will be returned to escrow.
+              ({rejectTarget.requestedAmount.toFixed(2)} EGP). The unreleased held amount will be returned to the balance.
             </p>
 
             <div>

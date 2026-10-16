@@ -383,6 +383,7 @@ Not changed: the model (no migration), F6b's switch and its lists, F1's screens,
    group ("class", as F6a's Replace teacher already said it), and F1's own screens call a teaching group
    مجموعة تدريس. Which word does the school use for each — a section (11A) and a subject's class (Biology with
    Teacher A)? (Defaults kept: "class" / فصل on the desk and Replace a teacher; the Messages screen as it is.)
+   **Decided 16 Oct 2026** (FEATURES_PLAN.md §6, 12): a section is فصل ("class" to families, "section" to staff), a teaching group "group" / مجموعة everywhere — the desk's and Replace a teacher's sentences now say group / مجموعة, D's قسم aligned to فصل (CYCLE_DECISIONS.md §1).
 
 ---
 

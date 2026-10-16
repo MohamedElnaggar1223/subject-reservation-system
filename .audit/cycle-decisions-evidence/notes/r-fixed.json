@@ -1,0 +1,49 @@
+{
+ "mode": "r",
+ "tag": "fixed",
+ "before": "Read-back drive a fixed 02:10:24",
+ "typed": "Read-back drive r fixed 02:19:23",
+ "after": "Read-back drive r fixed 02:19:23",
+ "replaced": {
+  "from": "Teacher A",
+  "to": "Teacher C",
+  "teachersBefore": null,
+  "teachersAfter": {
+   "Teacher A": null,
+   "Teacher B": null,
+   "Teacher C": true
+  },
+  "newTeacherTicked": true,
+  "oldTeacherTicked": false
+ },
+ "keptWhatWasSaved": true,
+ "savedShown": false,
+ "errorShown": [],
+ "requests": [
+  {
+   "at": 57,
+   "what": "GET answered"
+  },
+  {
+   "at": 1504,
+   "what": "GET answered"
+  },
+  {
+   "at": 64728,
+   "what": "GET held 4 s, answered with the sheet as it was when asked"
+  },
+  {
+   "at": 65175,
+   "what": "POST replace-teacher"
+  },
+  {
+   "at": 65223,
+   "what": "POST replace-teacher answered 200"
+  },
+  {
+   "at": 65225,
+   "what": "GET answered"
+  }
+ ],
+ "errors": []
+}

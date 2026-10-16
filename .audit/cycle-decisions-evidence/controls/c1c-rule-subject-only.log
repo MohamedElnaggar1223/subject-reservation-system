@@ -1,0 +1,6 @@
+control c1c-rule-subject-only: apps/api/src/services/line-rules.services.ts guard undone, tests ['08p']
+   × 08p: pricing policies > decision 1 (16 Oct 2026): self study is a second entry only — a first entry in self-study on a "Retake (Self Study ONLY)" subject is refused, through the API as at the desk, and so on a unit or a route marked self study only, but not on the A.2. route that carries an earlier sitting forward; the family's read and the preview offer the same; the student's exception lets one through and is used; a retake in self-study is taken as before 1203ms
+     → promise resolved "[ { …(39) } ]" instead of rejecting
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+AssertionError: promise resolved "[ { …(39) } ]" instead of rejecting

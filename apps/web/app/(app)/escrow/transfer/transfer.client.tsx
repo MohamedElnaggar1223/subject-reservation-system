@@ -91,7 +91,7 @@ export default function TransferClient() {
             onClick={() => router.push('/escrow' as never)}
             className="mt-4"
           >
-            Back to Escrow
+            Back to the balance
           </Button>
         </div>
       </div>
@@ -115,7 +115,7 @@ export default function TransferClient() {
             onClick={() => router.push('/escrow' as never)}
             className="mt-6"
           >
-            Back to Escrow
+            Back to the balance
           </Button>
         </div>
       </div>
@@ -129,9 +129,9 @@ export default function TransferClient() {
     <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
       <div className="max-w-lg mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Transfer Escrow Funds</h1>
+          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Move money between children</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Move funds between your linked children&apos;s escrow accounts.
+            Move money between your linked children&apos;s balances with the school.
           </p>
         </div>
 

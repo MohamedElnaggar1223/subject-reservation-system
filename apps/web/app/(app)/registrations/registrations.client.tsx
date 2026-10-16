@@ -111,7 +111,7 @@ function RefundPreviewNote({ registrationId }: { registrationId: string }) {
     <div className="bg-muted rounded-lg p-3 text-xs text-foreground">
       Refund policy: you will receive{' '}
       <span className="font-semibold">{preview.percentage}% = {formatPrice(preview.amount)}</span>{' '}
-      back (of {formatPrice(preview.fullPrice)}), released to escrow once the subject&apos;s
+      back (of {formatPrice(preview.fullPrice)}), released to the balance once the subject&apos;s
       receipt is returned to the school.
       {/* Why the board fee comes back or stays: the entries sent to the board and when (F4's mark, step C's refundFor). */}
       {preview.boardNote && <p className="mt-1 text-muted-foreground">{preview.boardNote}</p>}
@@ -523,7 +523,7 @@ function RequestSwapModal({
               {diff > 0
                 ? `Additional payment of ${formatPrice(diff)} will be required`
                 : diff < 0
-                ? `${formatPrice(Math.abs(diff))} will be credited to your escrow`
+                ? `${formatPrice(Math.abs(diff))} will be added to your balance`
                 : 'Same price — no financial impact'}
             </p>
           </div>
@@ -678,8 +678,8 @@ function DirectSwapModal({
               {diff > 0
                 ? ` New registration (${formatPrice(newPrice)}) will require payment.`
                 : diff < 0
-                ? ` New registration is ${formatPrice(Math.abs(diff))} cheaper, leaving that amount available if escrow is applied at checkout.`
-                : ' Same price — full escrow credit then payment of same amount required.'}
+                ? ` New registration is ${formatPrice(Math.abs(diff))} cheaper, leaving that amount available if the balance is used at checkout.`
+                : ' Same price — the full amount goes to the balance, then the same amount is paid.'}
             </p>
           </div>
         )}

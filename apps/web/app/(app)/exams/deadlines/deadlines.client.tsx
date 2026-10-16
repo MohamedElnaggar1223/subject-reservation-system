@@ -34,7 +34,7 @@ import { cn } from '~/lib/utils';
 import { DateText, MONTHS } from '../../academic/calendar/academic-shared';
 import { EXAMS_KEY, fetchDeadlines, BoardText, PrintButton, type DeadlinesData } from '../exam-f4-shared';
 import { SeriesWords } from '../candidates/series-words';
-import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
+import { leadsOutsideTheCycle, entryDatesOnly } from '~/lib/reservation-focus';
 
 type Item = DeadlinesData['items'][number];
 type Field = Item['field'];
@@ -61,6 +61,19 @@ const FIX: Partial<Record<Field, { path: string; label: string }>> = {
 
 const itemKey = (i: Item) => `${i.boardSeriesId}-${i.field}`;
 
+/** The dates that stop entries: the entry and retake deadlines (the school's hard stops). */
+const ENTRY_FIELDS: readonly Field[] = ['entryDeadline', 'retakeDeadline'];
+/**
+ * While F6b's switch is on, the page lists only the dates that stop entries — the entry and retake
+ * deadlines, and the exams' start of a sitting that has no entry deadline, its cut-off (the lead's
+ * decision of 16 Oct 2026, 10). The other dates (forecasts, arrangements, the timetable, results,
+ * certificates) are outside the cycle: hidden by the same switch, back with it off.
+ */
+const keptBy = (withoutDeadline: Set<string>) => (i: Item) =>
+  !entryDatesOnly() || ENTRY_FIELDS.includes(i.field) || (i.field === 'examsStart' && withoutDeadline.has(i.boardSeriesId));
+/** An exams' start shown as the cut-off of a sitting with no entry deadline. */
+const isCutOff = (i: Item) => entryDatesOnly() && i.field === 'examsStart';
+
 /** The hard stop's time of day, as the school reads it (Cairo). */
 function cairoTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Cairo' });
@@ -84,13 +97,15 @@ export default function DeadlinesClient(): React.JSX.Element {
     router.replace((qs ? `${pathname}?${qs}` : pathname) as Route, { scroll: false });
   };
 
+  // The dates the page lists (all of them with F6b's switch off; with it on, the dates that stop entries).
+  const visible = useMemo(() => (data?.items ?? []).filter(keptBy(new Set((data?.seriesWithoutDeadline ?? []).map((s) => s.id)))), [data]);
   const boards = useMemo(() => {
     const m = new Map<string, string>();
-    for (const i of data?.items ?? []) m.set(i.boardCode, i.boardName);
+    for (const i of visible) m.set(i.boardCode, i.boardName);
     return [...m.entries()].map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [data]);
+  }, [visible]);
   const boardName = boards.find((b) => b.code === board)?.name ?? null;
-  const items = useMemo(() => (data?.items ?? []).filter((i) => !board || i.boardCode === board), [data, board]);
+  const items = useMemo(() => visible.filter((i) => !board || i.boardCode === board), [visible, board]);
   const focus = items.filter((i) => !i.passed && i.daysLeft <= FOCUS_DAYS);
   const focusWithWork = focus.filter((i) => i.outstanding.length > 0).length;
   const withoutDeadline = (data?.seriesWithoutDeadline ?? []).filter((s) => !boardName || s.name.startsWith(boardName));
@@ -101,7 +116,9 @@ export default function DeadlinesClient(): React.JSX.Element {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Exam deadlines</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Every date the boards set for every series, in date order, with what the school still has to do for it. The entry deadline is the school&apos;s hard stop: after it, nothing more is entered, paid or confirmed for that series.
+            {entryDatesOnly()
+              ? "The entry and retake deadlines of every series, in date order, with what the school still has to do for them — and, for a series with no entry deadline, the day its exams start, when entries close. The entry deadline is the school's hard stop: after it, nothing more is entered, paid or confirmed for that series."
+              : "Every date the boards set for every series, in date order, with what the school still has to do for it. The entry deadline is the school's hard stop: after it, nothing more is entered, paid or confirmed for that series."}
           </p>
         </div>
         <PrintButton />
@@ -130,7 +147,7 @@ export default function DeadlinesClient(): React.JSX.Element {
         <LoadingState label="Loading the deadlines…" />
       ) : isError || !data ? (
         <ErrorState title="The deadlines did not load" message={error instanceof Error ? error.message : 'This is a connection problem, not an empty calendar. Try again.'} onRetry={() => refetch()} />
-      ) : !data.items.length ? (
+      ) : !visible.length ? (
         <EmptyState
           title="No board dates from the last 30 days on"
           message="Type each series' dates from the board's key-dates document on the Board series page; they appear here with what is still to do."
@@ -266,13 +283,17 @@ function DeadlineRow({ item }: { item: Item }) {
         )}
       </td>
       <td className="px-3 py-2.5">
-        <p className={cn('text-foreground', item.hardStop && 'font-semibold')}>{item.label}</p>
+        <p className={cn('text-foreground', (item.hardStop || isCutOff(item)) && 'font-semibold')}>{item.label}</p>
         {item.hardStop && <p className="text-xs text-muted-foreground">After this time nothing more is entered, paid or confirmed for the series.</p>}
+        {isCutOff(item) && <p className="text-xs text-muted-foreground">The series has no entry deadline: entries close when its exams start.</p>}
       </td>
       <td className="px-3 py-2.5 text-foreground"><SeriesWords name={item.seriesName} /></td>
       <td className="px-3 py-2.5"><When item={item} /></td>
       <td className="px-3 py-2.5">
-        {item.outstanding.length > 0 ? (
+        {/* The exams' start as the cut-off: its own to-do list is the timetable's, outside the cycle (decision 10). */}
+        {isCutOff(item) ? (
+          <span className="text-muted-foreground">—</span>
+        ) : item.outstanding.length > 0 ? (
           <ul className="space-y-0.5">
             {item.outstanding.map((o) => <li key={o} className="text-amber-700 dark:text-amber-400">{o}</li>)}
           </ul>

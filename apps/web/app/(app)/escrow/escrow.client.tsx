@@ -112,7 +112,7 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
     return (
       <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">My Escrow Balance</h1>
+          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Your balance with the school</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Read-only view. Contact your parent to request withdrawals or transfers.
           </p>
@@ -143,7 +143,7 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
     <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Wallet</h1>
+          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Your balance with the school</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.
           </p>

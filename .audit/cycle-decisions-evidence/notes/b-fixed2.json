@@ -1,0 +1,47 @@
+{
+ "mode": "b",
+ "tag": "fixed2",
+ "before": "Read-back drive a fixed 02:10:24",
+ "typed": "Read-back drive b fixed2 14:56:55",
+ "after": "Read-back drive b fixed2 14:56:55",
+ "keptWhatWasSaved": true,
+ "savedShown": true,
+ "errorShown": [],
+ "duringOutage": {
+  "savedShownAt1500ms": true,
+  "drawerTitle": "Physics",
+  "waitingNoticeShownAt1500ms": true,
+  "screenReplacedByError": false,
+  "addedName": null
+ },
+ "requests": [
+  {
+   "at": 147,
+   "what": "GET answered"
+  },
+  {
+   "at": 1244,
+   "what": "GET answered"
+  },
+  {
+   "at": 3435,
+   "what": "PUT the form"
+  },
+  {
+   "at": 3475,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 3476,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 13021,
+   "what": "GET answered"
+  }
+ ],
+ "errors": [
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED"
+ ]
+}

@@ -1,0 +1,6 @@
+control c3-read-exception-undone: apps/api/src/services/offers-read.services.ts guard undone, tests ['08p']
+   × 08p: pricing policies > decision 1's exception reaches the screens (the review of dd68598, item 2): once granted, the family's and the desk's reads offer a first entry in self-study, priced for the student, on the untaught subject and on a taught one; the desk's reservation of it is made and uses it; a student without it, and the preview, are offered none 638ms
+     → expected [ 'retake self_study 16200' ] to deeply equal [ 'first self_study 16200', …(1) ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+AssertionError: expected [ 'retake self_study 16200' ] to deeply equal [ 'first self_study 16200', …(1) ]

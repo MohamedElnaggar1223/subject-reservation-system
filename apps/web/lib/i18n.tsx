@@ -18,6 +18,7 @@ import { reservationsArabic, translateReservationsText } from './i18n-reservatio
 import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
 import { uiAuditArabic } from './i18n-ui-audit';
+import { decisionsArabic, translateDecisionsText } from './i18n-decisions';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
 import { LANGUAGE_COOKIE } from './language';
 
@@ -46,7 +47,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.sessions': 'Sessions',
     'nav.subjects': 'Subjects',
     'nav.payments': 'Payments',
-    'nav.escrow': 'Escrow',
+    'nav.escrow': 'Balance withdrawals',
     'nav.finance': 'Finance',
     'nav.financeWorkbench': 'Finance Workbench',
     'nav.schoolFees': 'School Fees',
@@ -73,7 +74,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.approvals': 'Approvals',
     'nav.financial': 'Financial',
     // F6: a family's word for the money the school holds for a child (the landings say "the wallet").
-    'nav.escrowBalance': 'Wallet',
+    'nav.escrowBalance': 'Balance',
     'nav.checkout': 'Checkout',
     'nav.account': 'Account',
     // F6b: the stages of the reservation cycle, as the staff sidebar groups them (lib/reservation-focus.ts).
@@ -272,7 +273,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.sessions': 'الجلسات',
     'nav.subjects': 'المواد',
     'nav.payments': 'المدفوعات',
-    'nav.escrow': 'الرصيد',
+    'nav.escrow': 'سحوبات الرصيد',
     'nav.finance': 'المالية',
     'nav.financeWorkbench': 'مكتب المالية',
     'nav.schoolFees': 'المصاريف الدراسية',
@@ -298,7 +299,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.history': 'السجل',
     'nav.approvals': 'الموافقات',
     'nav.financial': 'المالية',
-    'nav.escrowBalance': 'المحفظة',
+    'nav.escrowBalance': 'الرصيد',
     'nav.checkout': 'الدفع',
     'nav.account': 'الحساب',
     'nav.cycleSetUp': 'الإعداد',
@@ -800,7 +801,8 @@ const autoArabicText: Record<string, string> = {
   'Grade 12': 'الصف 12',
   'Graduated': 'متخرج',
   'Summary': 'الملخص',
-  'Section': 'القسم',
+  // A section (11A) is فصل on every screen (the lead's decision of 16 Oct 2026, 12).
+  'Section': 'الفصل',
 
   // Registration and subjects
   'Available Subjects': 'المواد المتاحة',
@@ -879,16 +881,16 @@ const autoArabicText: Record<string, string> = {
   'balance. You can approve or reject link requests at any time.': 'والاطلاع على الرصيد. يمكنك الموافقة على طلبات الربط أو رفضها في أي وقت.',
 
   // Escrow and checkout
-  'My Escrow Balance': 'رصيد حسابي',
+  'Your balance with the school': 'رصيدك لدى المدرسة',
   'Escrow Management': 'إدارة الرصيد',
   'Transfer Funds': 'تحويل أموال',
   'Request Withdrawal': 'طلب سحب',
-  'Transfer Escrow Funds': 'تحويل رصيد الحساب',
-  'Back to Escrow': 'العودة للرصيد',
-  'Current Escrow Balance': 'رصيد الحساب الحالي',
-  'Apply Escrow Balance': 'استخدام رصيد الحساب',
-  'Escrow applied': 'تم استخدام الرصيد',
-  'Open Wallet': 'فتح المحفظة',
+  'Move money between children': 'نقل المال بين الأبناء',
+  'Back to the balance': 'العودة إلى الرصيد',
+  'Current balance': 'الرصيد الحالي',
+  'Use your balance': 'استخدم رصيدك',
+  'From your balance': 'من رصيدك',
+  'from your balance': 'من رصيدك',
   'Payment Method': 'طريقة الدفع',
   'Payment Summary': 'ملخص الدفع',
   'Fully Escrow-Funded': 'ممولة بالكامل من الرصيد',
@@ -1025,7 +1027,7 @@ const autoArabicText: Record<string, string> = {
   'Select a subject': 'اختر مادة',
   'Select a subject to swap to': 'اختر المادة البديلة',
   'Same price — no financial impact': 'نفس السعر - لا يوجد أثر مالي',
-  'Same price — full escrow credit then payment of same amount required.': 'نفس السعر - سيتم إضافة رصيد كامل ثم يلزم دفع نفس المبلغ.',
+  'Same price — the full amount goes to the balance, then the same amount is paid.': 'نفس السعر - يذهب المبلغ كاملًا إلى الرصيد، ثم يُدفع المبلغ نفسه.',
   'Original price': 'السعر الأصلي',
   'New subject price': 'سعر المادة الجديدة',
   'Financial impact': 'الأثر المالي',
@@ -1365,7 +1367,7 @@ const autoArabicText: Record<string, string> = {
   "'s subject registration": 'تسجيل مواد',
   'escrow)': 'رصيد)',
   'A receipt has been emailed to you. Your subjects are confirmed.': 'تم إرسال إيصال إلى بريدك الإلكتروني. تم تأكيد موادك.',
-  'Your registrations have been confirmed — no payment was required because escrow covered the full amount.': 'تم تأكيد تسجيلاتك - لم يكن الدفع مطلوبًا لأن الرصيد غطى المبلغ بالكامل.',
+  'Your registrations have been confirmed — no payment was required because your balance covered the full amount.': 'تم تأكيد تسجيلاتك - لم يكن الدفع مطلوبًا لأن رصيدك غطى المبلغ بالكامل.',
   'Verify the registrations belong to a linked child and are ready for payment.': 'تحقق من أن التسجيلات تخص ابنًا/ابنة مرتبطًا وأنها جاهزة للدفع.',
   'Ref:': 'المرجع:',
   'Amount to Release (EGP)': 'المبلغ المطلوب صرفه (جنيه)',
@@ -1376,8 +1378,7 @@ const autoArabicText: Record<string, string> = {
   'Refresh': 'تحديث',
   'Submitted': 'تم الإرسال',
   'EGP available': 'جنيه متاح',
-  'Withdraw cash from a child&apos;s escrow balance. Admin will process your request.': 'اسحب نقدًا من رصيد ابنك/ابنتك. ستعالج الإدارة طلبك.',
-  "Withdraw cash from a child's escrow balance. Admin will process your request.": 'اسحب نقدًا من رصيد ابنك/ابنتك. ستعالج الإدارة طلبك.',
+  "Withdraw cash from a child's balance with the school. The admin processes your request.": 'اسحب نقدًا من رصيد ابنك أو ابنتك لدى المدرسة. تعالج الإدارة طلبك.',
   'Your withdrawal request has been sent to the admin for processing.': 'تم إرسال طلب السحب إلى الإدارة للمعالجة.',
   'Submit another request': 'إرسال طلب آخر',
   'View withdrawal request history': 'عرض سجل طلبات السحب',
@@ -1448,8 +1449,7 @@ const autoArabicText: Record<string, string> = {
   'Manage your children&apos;s escrow balances.': 'أدر أرصدة أبنائك.',
   "Manage your children's escrow balances.": 'أدر أرصدة أبنائك.',
   "Manage your children's account links": 'أدر روابط حسابات أبنائك',
-  'Move funds between your linked children&apos;s escrow accounts.': 'حوّل الأموال بين حسابات الرصيد الخاصة بأبنائك المرتبطين.',
-  "Move funds between your linked children's escrow accounts.": 'حوّل الأموال بين حسابات الرصيد الخاصة بأبنائك المرتبطين.',
+  "Move money between your linked children's balances with the school.": 'انقل المال بين أرصدة أبنائك المرتبطين لدى المدرسة.',
   'New End Date': 'تاريخ الانتهاء الجديد',
   'New Session': 'جلسة جديدة',
   "Next step: Link your children's accounts": 'الخطوة التالية: ربط حسابات أبنائك',
@@ -1468,13 +1468,13 @@ const autoArabicText: Record<string, string> = {
   'Old price (': 'السعر القديم (',
   'Only one active session of each type is allowed at a time.': 'يُسمح بجلسة نشطة واحدة فقط من كل نوع في نفس الوقت.',
   'Page': 'صفحة',
-  'Paid from escrow': 'مدفوع من الرصيد',
+  'Paid from your balance': 'مدفوع من رصيدك',
   'Parent note:': 'ملاحظة ولي الأمر:',
   'Parent note: &ldquo;': 'ملاحظة ولي الأمر: "',
   'Parent note: "': 'ملاحظة ولي الأمر: "',
   'Parent:': 'ولي الأمر:',
   'Pay this amount at any Fawry outlet within 24 hours. Expires:': 'ادفع هذا المبلغ في أي منفذ فوري خلال 24 ساعة. ينتهي:',
-  'Pending and partially-fulfilled escrow withdrawals — oldest first.': 'طلبات السحب المعلقة والمنفذة جزئيًا - الأقدم أولًا.',
+  "Withdrawals from families' balances, pending or partly fulfilled — oldest first.": 'طلبات السحب من أرصدة الأسر، المعلقة أو المنفذة جزئيًا - الأقدم أولًا.',
   'Resetting...': 'جار إعادة التعيين...',
   'Select Child': 'اختر الطالب',
   'Session:': 'الجلسة:',
@@ -1493,7 +1493,7 @@ const autoArabicText: Record<string, string> = {
   'Dashboard — Admin': 'لوحة التحكم - الإدارة',
   'Bank Transfer Confirmations — IGCSE Admin': 'تأكيدات التحويل البنكي - إدارة IGCSE',
   'Checkout — IGCSE Reservation': 'الدفع - حجز IGCSE',
-  'Escrow — IGCSE Reservation': 'الرصيد - حجز IGCSE',
+  'Balance — IGCSE Reservation': 'الرصيد - حجز IGCSE',
   'My Pending Requests — IGCSE Reservation': 'طلباتي المعلقة - حجز IGCSE',
   'My Registrations — IGCSE Reservation': 'تسجيلاتي - حجز IGCSE',
   'Notifications — IGCSE Reservation': 'الإشعارات - حجز IGCSE',
@@ -1505,10 +1505,10 @@ const autoArabicText: Record<string, string> = {
   'Session Management — Admin': 'إدارة الجلسات - الإدارة',
   'Subject Management — Admin': 'إدارة المواد - الإدارة',
   'Subjects — IGCSE Reservation': 'المواد - حجز IGCSE',
-  'Transfer Escrow — IGCSE Reservation': 'تحويل الرصيد - حجز IGCSE',
+  'Move balance — IGCSE Reservation': 'نقل الرصيد - حجز IGCSE',
   'Withdrawal Requests — Admin': 'طلبات السحب - الإدارة',
   'IGCSE Subject Reservation': 'حجز مواد IGCSE',
-  'IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and escrow.': 'نظام تسجيل وحجز مواد IGCSE - إدارة مواد الامتحان والموافقات والمدفوعات والأرصدة.',
+  'IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and balances.': 'نظام تسجيل وحجز مواد IGCSE - إدارة مواد الامتحان والموافقات والمدفوعات والأرصدة.',
   '-- | IGCSE Reservation': '-- | حجز IGCSE',
   'active ·': 'نشطة ·',
   'draft ·': 'مسودة ·',
@@ -1593,6 +1593,8 @@ for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicT
 
 // F6 (lib/i18n-ui-audit.ts): its words are the ones used — where it rewrote a sentence, its Arabic wins.
 Object.assign(autoArabicText, uiAuditArabic);
+// The lead's decisions of 16 Oct 2026 (lib/i18n-decisions.ts): last, so a sentence they rewrote wins.
+Object.assign(autoArabicText, decisionsArabic);
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1603,6 +1605,13 @@ function reworkClaims(text: string): boolean {
 }
 
 function translateDynamicText(text: string): string | null {
+  // The lead's decisions of 16 Oct 2026: the desk's balance sentences with data in them (lib/i18n-decisions.ts),
+  // before every rule here: "EGP (.+)" below took the record-transfer dialog's description, which starts with its
+  // label's amount, whole (the drive of the review of dd68598, item 4); each rule of theirs is anchored to its own
+  // sentence's end, so none takes another screen's text.
+  const decisionsText = translateDecisionsText(text);
+  if (decisionsText) return decisionsText;
+
   const gradeMatch = /^Grade (\d+)$/.exec(text);
   if (gradeMatch) return `الصف ${gradeMatch[1]}`;
 
@@ -1630,8 +1639,8 @@ function translateDynamicText(text: string): string | null {
   const additionalPaymentMatch = /^(.+) EGP additional payment$/.exec(text);
   if (additionalPaymentMatch) return `دفعة إضافية ${additionalPaymentMatch[1]} جنيه`;
 
-  const escrowCreditMatch = /^(.+) EGP escrow credit$/.exec(text);
-  if (escrowCreditMatch) return `رصيد مضاف ${escrowCreditMatch[1]} جنيه`;
+  const escrowCreditMatch = /^(.+) EGP to the balance$/.exec(text);
+  if (escrowCreditMatch) return `${escrowCreditMatch[1]} جنيه إلى الرصيد`;
 
   const toPayMatch = /^(.+) to pay$/.exec(text);
   if (toPayMatch) return `المطلوب دفعه ${toPayMatch[1]}`;

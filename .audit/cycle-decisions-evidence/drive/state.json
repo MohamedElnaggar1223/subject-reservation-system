@@ -1,0 +1,30 @@
+{
+  "june": "ca9ff1ce-dfee-4af6-9332-b2c8f16559bf",
+  "winter": "7f03f40f-e7fb-48dc-9f15-473b10e71919",
+  "winterMaths": "d69933bd-4dd1-45f3-81ea-098f85e9d254",
+  "camJune": "bs_936acb8d32599e0fccf11a977a6ea6e9",
+  "peaJan": "b74a5407-5f9b-40b4-b09c-2545a6d2ea1c",
+  "a1": "cOssYNnRdsluodq1qykOturigHIRKlbC",
+  "e1": "2WmvQD6PnQhmA7g8a0lxLvszsPXVazq0",
+  "f1": "YhY6eGeqPIuElHbStsRDu8s0Wkqkll21",
+  "G": {
+    "A": "c2964e1b-93d6-4af5-b8bc-a5ef57a4c5ca",
+    "B": "500b7b5e-5e48-473a-8fc3-3245c9bbffbf"
+  },
+  "lines": {
+    "a1": {
+      "studentId": "cOssYNnRdsluodq1qykOturigHIRKlbC",
+      "statementBytes": 6021
+    },
+    "e1": {
+      "studentId": "2WmvQD6PnQhmA7g8a0lxLvszsPXVazq0",
+      "statementBytes": 2994
+    },
+    "f1": {
+      "studentId": "YhY6eGeqPIuElHbStsRDu8s0Wkqkll21",
+      "statementBytes": 2994
+    }
+  },
+  "c2": "tASYupuxhdZI76aaFCWXVtlf1ucYLvq4",
+  "b1": "Mk6zqtjuxpuIEWJ5HCnkIZ4HnLQp8lOW"
+}

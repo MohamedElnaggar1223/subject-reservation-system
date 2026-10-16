@@ -21,7 +21,7 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  IGCSE_NEVER_MONTHS, IGCSE_NEVER_MESSAGE, SERIES_MONTH_LABELS, sessionSeriesMonths, itemDisplayLabel,
+  IGCSE_NEVER_MONTHS, IGCSE_NEVER_MESSAGE, IAL_UNIT_MONTHS, SERIES_MONTH_LABELS, sessionSeriesMonths, itemDisplayLabel,
   type CreateOfferType, type UpdateOfferType, type OfferItemInputType, type UpdateOfferItemType, type ReplaceOfferTeacherType,
   type OfferTeacherInputType, type FeeKeyInputType, type Availability, type SeriesMonth, type OfferFormType,
 } from '@repo/validations';
@@ -162,6 +162,21 @@ export async function defaultSeriesFor(
     : (level === 'igcse' ? options.find((m) => m.month === 'november')
       : boardCode === 'pearson_edexcel' ? options.find((m) => m.month === 'october') : options.find((m) => m.month === 'november')) ?? options[0]!;
   return (await findOrCreateSeries(tx, boardCode, preferred.month, preferred.year, '', actorId)).id;
+}
+
+/**
+ * The unit items (kind 'unit') that enter a unit of a units-cash-in award — a Pearson IAL's units: they sit
+ * in the board's IAL months alone (`IAL_UNIT_MONTHS`, the lead's decision of 16 Oct 2026). The subject's
+ * form offers them those months and refuses another (saveOfferForm); the sheet's read says which they are.
+ */
+async function cashInUnitItems(executor: Executor, itemIds: string[]): Promise<Set<string>> {
+  if (!itemIds.length) return new Set();
+  const rows = await executor.selectDistinct({ itemId: sessionOfferItemUnit.itemId }).from(sessionOfferItemUnit)
+    .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, sessionOfferItemUnit.itemId))
+    .innerJoin(qualificationUnit, eq(qualificationUnit.unitId, sessionOfferItemUnit.unitId))
+    .innerJoin(qualification, eq(qualification.id, qualificationUnit.qualificationId))
+    .where(and(inArray(sessionOfferItemUnit.itemId, itemIds), eq(sessionOfferItem.kind, 'unit'), eq(qualification.entryMethod, 'units_cash_in')));
+  return new Set(rows.map((r) => r.itemId));
 }
 
 /** Refuse an item's series that breaks the per-item rules the service checks before the database. */
@@ -849,6 +864,7 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
       const byId = new Map(items.map((i) => [i.id, i]));
       for (const id of ids) if (!byId.has(id)) throw new OfferError('That paper or unit is not under this subject', 404);
       const live = await liveLinesByItem(tx, items.map((i) => i.id));
+      const ialUnits = await cashInUnitItems(tx, items.map((i) => i.id));
       const done = { offer: false, itemsChanged: 0, itemsCreated: 0, linesMoved: 0 };
 
       // (a)–(c), (f)–(h): the subject's own answers, only those that differ (updateOffer's logic).
@@ -894,6 +910,10 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
           if (!want) throw new OfferError(`${SERIES_MONTH_LABELS[f.seriesMonth]} is not a sitting of this session`);
           const [now] = item.boardSeriesId ? await tx.select().from(boardSeries).where(eq(boardSeries.id, item.boardSeriesId)) : [];
           if (!now || now.month !== want.month || now.year !== want.year) {
+            // An IAL unit sits in October, January or June (decision 2 of 16 Oct 2026): a move to another month is refused.
+            if (ialUnits.has(item.id) && !IAL_UNIT_MONTHS.includes(want.month)) {
+              throw new OfferError(`${subjectRow.name} — ${item.label}: an IAL unit sits in October, January or June, not ${SERIES_MONTH_LABELS[want.month]}`);
+            }
             const target = await findOrCreateSeries(tx, subjectRow.council, want.month, want.year, '', actorId);
             moves.push({ item, targetId: target.id });
             data.boardSeriesId = target.id;
@@ -1394,6 +1414,7 @@ export async function listOffers(sessionId: string) {
         itemBoardFees(db, itemIds),
       ])
     : [[], [], [], [], new Map()];
+  const ialUnits = await cashInUnitItems(db, itemIds);
   const seriesById = new Map(seriesRows.map((s) => [s.id, s]));
   const now = new Date();
   const seriesView = (id: string | null) => {
@@ -1432,6 +1453,8 @@ export async function listOffers(sessionId: string) {
         series: seriesView(i.boardSeriesId),
         teachers: itemTeachers.filter((t) => t.itemId === i.id),
         units: itemUnits.filter((u) => u.itemId === i.id),
+        // A unit of a units-cash-in award (an IAL's): its form offers the board's IAL months alone (decision 2).
+        ialUnit: ialUnits.has(i.id),
         boardFee: f ? { amount: f.amount, provisional: f.provisional, missing: f.missing } : { amount: null, provisional: false, missing: 1 },
         lines: { live, all: counts.reduce((a, c) => a + c.n, 0), confirmed: counts.find((c) => c.status === 'confirmed')?.n ?? 0 },
       };

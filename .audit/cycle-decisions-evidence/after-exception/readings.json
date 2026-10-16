@@ -1,0 +1,24 @@
+{
+ "d01-03-reserve-parent": {
+  "enStatus": 200,
+  "en": [
+   "Chemistry Cambridge International Self-study only (not taught this cycle)",
+   "All papers — self-study First entry, self-study (not taught this cycle) Retake, self-study — name the sitting EGP 17,850",
+   "Arabic A.L. Pearson Edexcel",
+   "Arabic IAL (YAA01) Teacher A (Edexcel YAA01) First entry, in school First entry, self-study Retake, in school — name the sitting Retake, self-study — name the s"
+  ],
+  "enBytes": 79574,
+  "arStatus": 200,
+  "ar": [
+   "Chemistry Cambridge International دراسة ذاتية فقط (لا تُدرَّس هذه الدورة)",
+   "كل الأوراق — دراسة ذاتية قيد أول، دراسة ذاتية (لا تُدرَّس هذه الدورة) إعادة، دراسة ذاتية — سمِّ الدورة 17,850 جنيه",
+   "Arabic A.L. Pearson Edexcel",
+   "Arabic IAL (YAA01) Teacher A (Edexcel YAA01) قيد أول، في المدرسة قيد أول، دراسة ذاتية إعادة، في المدرسة — سمِّ الدورة إعادة، دراسة ذاتية — سمِّ الدورة 13,800 جن"
+  ],
+  "dir": "rtl",
+  "arBytes": 65825
+ },
+ "_errors": {
+  "2026-10-16T14:58:23.649Z": []
+ }
+}

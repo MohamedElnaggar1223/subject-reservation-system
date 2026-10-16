@@ -628,8 +628,13 @@ describe('F7: the day-one import', () => {
         code: 'self_study_on_taught', severity: 'error',
         detail: 'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting',
       });
-      // 5: not taught this cycle: a first entry in self-study, at the self-study share of the course fee and the whole board fee.
-      expect(codes(rowAt(v, 'Live', 5))).toEqual(['self_study_not_taught']);
+      // 5: not taught this cycle ("Retake (Self Study ONLY)"): a first entry in self-study, at the self-study share of the course
+      // fee and the whole board fee — refused by the rules a reservation runs, naming the exception, since the lead's decision of
+      // 16 Oct 2026 (FEATURES_PLAN.md §6, 1): the student's exception, or a retake with its sitting (staff name it below).
+      expect(codes(rowAt(v, 'Live', 5))).toEqual(['registration_refused', 'self_study_not_taught']);
+      expect(rowAt(v, 'Live', 5).problems.find((p) => p.code === 'registration_refused')).toEqual({
+        code: 'registration_refused', severity: 'error', detail: 'Live Subject Self is self study on a second entry only: name the earlier sitting, or ask for the exception',
+      });
       expect(lineOf(rowAt(v, 'Live', 5))).toMatchObject({ attempt: 'first', mode: 'self_study', teacherId: null, price: { total: 1000, courseFee: 500, boardFee: 500, coursePercent: 50, boardPercent: 100 } });
       // 6: no fee row in the series' grid: refused, naming the grid (never priced at 0).
       expect(rowAt(v, 'Live', 6).problems).toEqual([{ code: 'fee_missing', severity: 'error', detail: `Whole subject has no board fee in ${seriesName} yet — set one on the session's Fees tab` }]);
@@ -671,6 +676,8 @@ describe('F7: the day-one import', () => {
       let v = await fetchView(adm, liveBatch);
       await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 4).id], edits: { selfStudyChoice: 'in_school' } });
       await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 9).id], edits: { priorSitting: { month: 'june', year: Y } } });
+      // The untaught subject's self-study row: a retake once staff name the sitting it follows (decision 1, 16 Oct 2026).
+      await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 5).id], edits: { priorSitting: { month: 'june', year: Y } } });
       // The gridless subject is refused until finance sets its row in the series' grid.
       await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: L.G!, amount: 450, provisional: false }] } }));
       v = await fetchView(adm, liveBatch);
@@ -679,6 +686,8 @@ describe('F7: the day-one import', () => {
       expect(codes(rowAt(v, 'Live', 6))).toEqual([]);
       expect(lineOf(rowAt(v, 'Live', 6)).price).toMatchObject({ total: 1450, boardFee: 450 });
       expect(lineOf(rowAt(v, 'Live', 9))).toMatchObject({ attempt: 'retake', mode: 'in_school', priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'line' }, price: { total: 1500, coursePercent: 100 } });
+      expect(codes(rowAt(v, 'Live', 5))).not.toContain('registration_refused');
+      expect(lineOf(rowAt(v, 'Live', 5))).toMatchObject({ attempt: 'retake', mode: 'self_study', priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'line' }, price: { total: 1000, coursePercent: 50 } });
       expect(v.summary).toMatchObject({ heldFamilies: 0, plan: { registrations: 8, history: 2 } });
       expect(await refused(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: liveBatch } }))).toEqual({
         status: 403, error: 'Reserving lines for families in a session is the admin’s: ask the admin to commit this import, or set those series to "History only"',
@@ -709,7 +718,7 @@ describe('F7: the day-one import', () => {
         ['live.one', 'Live Subject C', 'retake', 'in_school', 1500, 1000, 500, false, 'declared_by_desk', `pearson_edexcel june ${Y}`, 'Mr Live', 100, 100],
         ['live.one', 'Live Subject Gridless', 'first', 'in_school', 1450, 1000, 450, false, null, null, 'Mr Live', 100, 100],
         ['live.one', 'Live Subject Provisional', 'first', 'in_school', 1600, 1000, 600, true, null, null, 'Mr Live', 100, 100],
-        ['live.one', 'Live Subject Self', 'first', 'self_study', 1000, 500, 500, false, null, null, null, 50, 100],
+        ['live.one', 'Live Subject Self', 'retake', 'self_study', 1000, 500, 500, false, 'declared_by_desk', `pearson_edexcel june ${Y}`, null, 50, 100],
         ['live.two', 'Live Subject A', 'retake', 'self_study', 1000, 500, 500, false, 'declared_by_desk', `pearson_edexcel november ${Y - 1}`, null, 50, 100],
         // A retake of what the student sat before the system (the legacy history), at the self-study share.
         ['live.two', 'Live Subject B', 'retake', 'self_study', 1000, 500, 500, false, 'legacy', `pearson_edexcel june ${Y}`, null, 50, 100],
@@ -729,6 +738,7 @@ describe('F7: the day-one import', () => {
       const mine = list.lines.filter((l) => l.student.name.startsWith('Live '));
       expect(mine.map((l) => [l.student.name, l.line.subject, l.sitting?.name, l.declaredBy.channel]).sort()).toEqual([
         ['Live One', 'Live Subject C', `Pearson Edexcel June ${Y}`, 'desk'],
+        ['Live One', 'Live Subject Self', `Pearson Edexcel June ${Y}`, 'desk'],
         ['Live Two', 'Live Subject A', `Pearson Edexcel November ${Y - 1}`, 'desk'],
       ]);
       // B's known sittings are the system's own lines (the lead's answer, 8 Oct): Live Two's sheet history of C is not one.

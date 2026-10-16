@@ -1,0 +1,6 @@
+control c15a-public-shape: apps/api/src/services/settings.services.ts guard undone, tests ['08f']
+   × F0a: settings, uploads, academic structure, sections, teaching > the school's name (the lead's decision of 16 Oct 2026, 15) > empty by default; the admin's alone to set, checked and audited; read by every visitor from the public read the sign-in page asks; emptied, the app's name stands alone again 282ms
+     → expected { schoolName: '', …(1) } to deeply equal { schoolName: '' }
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 passed (21)
+AssertionError: expected { schoolName: '', …(1) } to deeply equal { schoolName: '' }

@@ -26,7 +26,8 @@ export function StudentEnrolmentBlock({ studentId, canEdit }: { studentId: strin
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subjects this year</h3>
+        {/* In the cycle's words (the lead's decision of 16 Oct 2026, 9): the desk reads who teaches the student what. */}
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">This year&apos;s subjects and teachers</h3>
         {/* F6b: course enrolment is outside the reservation cycle for now (lib/reservation-focus.ts). */}
         {canEdit && !leadsOutsideTheCycle('/academic/enrolment') && (
           <Link href={`/academic/enrolment?tab=student&student=${studentId}` as Route} className="text-xs font-medium underline hover:no-underline">

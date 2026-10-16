@@ -212,7 +212,7 @@ export const catalogueArabic: Record<string, string> = {
   'Deadline (your clock)': 'الموعد (بتوقيت جهازك)',
   'Why it changes': 'سبب التغيير',
   'Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It must fall after every window feeding the series closes. Leave it empty for no automatic cut-off.':
-    'بعده تُغلق تلقائيًا كل دفعة غير مؤكدة لهذه الدورة (يُعاد رصيد المحفظة وتُبلَّغ الأسر) وتنتهي كل التسجيلات المنتظرة. يجب أن يقع بعد إغلاق كل نافذة تغذي الدورة. اتركه فارغًا لعدم الإيقاف التلقائي.',
+    'بعده تُغلق تلقائيًا كل دفعة غير مؤكدة لهذه الدورة (يُعاد ما أُخذ من الرصيد وتُبلَّغ الأسر) وتنتهي كل التسجيلات المنتظرة. يجب أن يقع بعد إغلاق كل نافذة تغذي الدورة. اتركه فارغًا لعدم الإيقاف التلقائي.',
   'Not set yet.': 'لم يُحدَّد بعد.',
   'Only an admin sets it: past it the school closes every unconfirmed payment on the series.': 'يحدده المدير فقط: بعده تُغلق المدرسة كل دفعة غير مؤكدة في الدورة.',
   "The board's other dates (information)": 'تواريخ المجلس الأخرى (للعلم)',

@@ -417,15 +417,19 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
    retakes only. Does the school ever take a first entry in self study on a subject it does not teach this
    cycle? Default: allowed, and the preview shows it as the family sees it ("First entry, self-study (not
    taught this cycle)").
+   **Decided 16 Oct 2026** (FEATURES_PLAN.md §6, 1): refused — self study is a second entry only, on the subject and on a unit or route marked self study only, the A.2. carry forward excepted; the student's exception is the only way (CYCLE_DECISIONS.md §1).
 2. **A unit's sitting in a winter session**: the form offers the session's months the board sits
    (Pearson: October, November, January). Should November be hidden for IAL units (Pearson sits IAL in
    October and January)? Default: every month the board sits.
+   **Decided 16 Oct 2026** (§6, 2): a unit of a units-cash-in award sits in October, January or June — the form offers those and refuses another; an IGCSE subject keeps every month its board sits (CYCLE_DECISIONS.md §1).
 3. **A second qualification under one subject** (Arabic A Level): who chooses — the family or the teacher
    (Q-16)? Default: the family, through the teacher (the form's sentence).
+   **Decided 16 Oct 2026** (§6, 3): the family, through the teacher; each teacher option names its qualification ("Teacher A (Edexcel YAA01)") on the Reserve page and the preview (CYCLE_DECISIONS.md §1).
 4. **The tools the old drawer had** (§11): adding an item of any kind, removing one, a labelled sitting,
    which items are one-or-the-other, which fee rows an item reads, an item required in a first entry.
    Does the coordinator need any of them on a screen, or is the catalogue's generation (and the form's
    papers) enough? Default: API-only, the coordinator asks the lead.
+   **Decided 16 Oct 2026** (§6, 4): API-only — no change.
 
 ## 13. Progress log
 

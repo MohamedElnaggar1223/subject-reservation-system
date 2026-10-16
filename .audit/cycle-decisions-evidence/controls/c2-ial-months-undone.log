@@ -1,0 +1,6 @@
+control c2-ial-months-undone: apps/api/src/services/offer.services.ts guard undone, tests ['08u']
+   × 08u: the session in the school's words — one form per subject, the preview > decision 2 (16 Oct 2026): a unit of a units-cash-in award (an IAL's) sits in October, January or June — the form refuses November for it, nothing moved, and takes January; a unit that enters no cash-in award keeps every month its board sits 33ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 400, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 400, …(1) }

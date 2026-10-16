@@ -1103,22 +1103,22 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     const ds = await named(await raceSubject('DS', 3), 'DS');
     // Moves: X's class keeps students taught by X, and Y has a class of the subject.
     const moved = await desk(ds.line[0]!, ds.y);
-    expect(say(moved.groupsFollowed)).toEqual([{ text: 'The student moves to the class Race DS — Y.', reason: null, tone: 'success' }]);
-    expect(arabic(say(moved.groupsFollowed)[0]!)).toEqual({ text: `ينتقل الطالب إلى فصل ${iso('Race DS — Y')}.`, reason: null });
+    expect(say(moved.groupsFollowed)).toEqual([{ text: 'The student moves to the group Race DS — Y.', reason: null, tone: 'success' }]);
+    expect(arabic(say(moved.groupsFollowed)[0]!)).toEqual({ text: `ينتقل الطالب إلى مجموعة ${iso('Race DS — Y')}.`, reason: null });
     // Waits: Z's only class is retired today, so Z has none of the subject.
     await apiResponse(coordinator.api.v1.scheduling.groups[':id'].archive.$post({ param: { id: ds.gz }, json: { archivedOn: D1, reason: 'not needed this year' } }));
     const waits = await desk(ds.line[1]!, ds.z);
     expect(waits.groupsFollowed!.waiting).toEqual([expect.objectContaining({ kind: 'no_group', groupName: 'Race DS — X' })]);
-    expect(say(waits.groupsFollowed)).toEqual([{ text: `Race DS Z ${RUN} has no class of this subject yet: the student stays in Race DS — X and waits to be placed.`, reason: null, tone: 'warning' }]);
-    expect(arabic(say(waits.groupsFollowed)[0]!)).toEqual({ text: `ليس لدى ${iso(`Race DS Z ${RUN}`)} فصل في هذه المادة بعد: يبقى الطالب في ${iso('Race DS — X')} وينتظر توزيعه.`, reason: null });
+    expect(say(waits.groupsFollowed)).toEqual([{ text: `Race DS Z ${RUN} has no group of this subject yet: the student stays in Race DS — X and waits to be placed.`, reason: null, tone: 'warning' }]);
+    expect(arabic(say(waits.groupsFollowed)[0]!)).toEqual({ text: `ليس لدى ${iso(`Race DS Z ${RUN}`)} مجموعة في هذه المادة بعد: يبقى الطالب في ${iso('Race DS — X')} وينتظر توزيعه.`, reason: null });
     // A teacher the screen cannot name is "the new teacher".
-    expect(followSentences(waits.groupsFollowed, { one: true, teacherName: () => undefined })[0]!.text).toBe('The new teacher has no class of this subject yet: the student stays in Race DS — X and waits to be placed.');
-    expect(translateReservationsText('The new teacher has no class of this subject yet: the student stays in Race DS — X and waits to be placed.'))
-      .toBe(`ليس لدى المعلم الجديد فصل في هذه المادة بعد: يبقى الطالب في ${iso('Race DS — X')} وينتظر توزيعه.`);
+    expect(followSentences(waits.groupsFollowed, { one: true, teacherName: () => undefined })[0]!.text).toBe('The new teacher has no group of this subject yet: the student stays in Race DS — X and waits to be placed.');
+    expect(translateReservationsText('The new teacher has no group of this subject yet: the student stays in Race DS — X and waits to be placed.'))
+      .toBe(`ليس لدى المعلم الجديد مجموعة في هذه المادة بعد: يبقى الطالب في ${iso('Race DS — X')} وينتظر توزيعه.`);
     // The whole class: the last student taught by X goes to Z too — every member of X's class now has Z.
     const whole = await desk(ds.line[2]!, ds.z);
-    expect(say(whole.groupsFollowed)).toEqual([{ text: `The whole class Race DS — X goes to Race DS Z ${RUN}: the student stays in it.`, reason: null, tone: 'success' }]);
-    expect(arabic(say(whole.groupsFollowed)[0]!)).toEqual({ text: `ينتقل فصل ${iso('Race DS — X')} كله إلى ${iso(`Race DS Z ${RUN}`)}: ويبقى الطالب فيه.`, reason: null });
+    expect(say(whole.groupsFollowed)).toEqual([{ text: `The whole group Race DS — X goes to Race DS Z ${RUN}: the student stays in it.`, reason: null, tone: 'success' }]);
+    expect(arabic(say(whole.groupsFollowed)[0]!)).toEqual({ text: `تنتقل مجموعة ${iso('Race DS — X')} كلها إلى ${iso(`Race DS Z ${RUN}`)}: ويبقى الطالب فيها.`, reason: null });
 
     // Refused: Y's class meets on Wednesday at period 2 in a version published from D1, when the student
     // has a homeroom lesson; X's class keeps another student taught by X, so it is the student who would move.
@@ -1154,15 +1154,15 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     // Self-study: in Z's class now, the retake taken alone leaves it after today.
     await apiResponse(addTo(dc.gz, lone.studentId));
     const alone = await desk(loneLine, null, 'self_study');
-    expect(say(alone.groupsFollowed)).toEqual([{ text: 'The student leaves the class Race DC — Z after today: self-study from now.', reason: null, tone: 'success' }]);
-    expect(arabic(say(alone.groupsFollowed)[0]!)).toEqual({ text: `يغادر الطالب فصل ${iso('Race DC — Z')} بعد اليوم: دراسة ذاتية من الآن.`, reason: null });
+    expect(say(alone.groupsFollowed)).toEqual([{ text: 'The student leaves the group Race DC — Z after today: self-study from now.', reason: null, tone: 'success' }]);
+    expect(arabic(say(alone.groupsFollowed)[0]!)).toEqual({ text: `يغادر الطالب مجموعة ${iso('Race DC — Z')} بعد اليوم: دراسة ذاتية من الآن.`, reason: null });
 
     // The Session screen's Replace a teacher (A's), counted: the whole class handed over …
     const dr = await named(await raceSubject('DR', 2), 'DR');
     const handed = await apiResponse(replaceOn(dr));
     const handedSaid = followSentences(handed.groupsFollowed, { one: false, teacherName: (id) => names.get(id) });
-    expect(handedSaid).toEqual([{ text: `The whole class Race DR — X goes to Race DR Y ${RUN}.`, reason: null, tone: 'success' }]);
-    expect(arabic(handedSaid[0]!)).toEqual({ text: `ينتقل فصل ${iso('Race DR — X')} كله إلى ${iso(`Race DR Y ${RUN}`)}.`, reason: null });
+    expect(handedSaid).toEqual([{ text: `The whole group Race DR — X goes to Race DR Y ${RUN}.`, reason: null, tone: 'success' }]);
+    expect(arabic(handedSaid[0]!)).toEqual({ text: `تنتقل مجموعة ${iso('Race DR — X')} كلها إلى ${iso(`Race DR Y ${RUN}`)}.`, reason: null });
     // … or two students moved, X's class keeping a third taught by X through no line of this offer.
     const dm = await named(await raceSubject('DM', 2), 'DM');
     const third = await onboard(officer, `rr-DM2-${RUN}`, 11);
@@ -1171,8 +1171,8 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     await apiResponse(addTo(dm.gx, third.studentId));
     const two = await apiResponse(replaceOn(dm));
     const twoSaid = followSentences(two.groupsFollowed, { one: false, teacherName: (id) => names.get(id) });
-    expect(twoSaid).toEqual([{ text: '2 students move to the class Race DM — Y.', reason: null, tone: 'success' }]);
-    expect(arabic(twoSaid[0]!)).toEqual({ text: `ينتقل طالبان إلى فصل ${iso('Race DM — Y')}.`, reason: null });
+    expect(twoSaid).toEqual([{ text: '2 students move to the group Race DM — Y.', reason: null, tone: 'success' }]);
+    expect(arabic(twoSaid[0]!)).toEqual({ text: `ينتقل طالبان إلى مجموعة ${iso('Race DM — Y')}.`, reason: null });
     texts.push(...handedSaid.map((s) => s.text), ...twoSaid.map((s) => s.text));
 
     // On the page the rework's rules come after F4's, F0b's, F7's, A's and C's (lib/i18n.tsx): none of them takes these sentences.

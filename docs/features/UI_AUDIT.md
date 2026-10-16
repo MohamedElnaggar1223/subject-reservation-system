@@ -633,37 +633,53 @@ Each with the default kept until the owner answers.
 From SESSION_WORDS.md §12 (F6a):
 1. "Retake (Self Study ONLY)": does the school ever take a first entry in self study on a subject it does not
    teach this cycle? Default: allowed, shown as "First entry, self-study (not taught this cycle)".
+   **Decided 16 Oct 2026** (FEATURES_PLAN.md §6, 1): refused — self study is a second entry only (subject, unit or route; the A.2. carry forward excepted), the student's exception the only way; the option is gone (CYCLE_DECISIONS.md §1).
 2. A unit's sitting in a winter session: hide November for IAL units? Default: every month the board sits.
+   **Decided** (§6, 2): an IAL unit sits in October, January or June; the form offers those and refuses another.
 3. A second qualification under one subject (Arabic A Level): who chooses — the family or the teacher (Q-16)?
    Default: the family, through the teacher.
+   **Decided** (§6, 3): the family, through the teacher; each teacher option names its qualification ("Teacher A (Edexcel YAA01)").
 4. The old drawer's tools (adding or removing an item, a labelled sitting, the exclusive group, fee keys,
    "required in a first entry"): does the coordinator need any on a screen? Default: API-only.
+   **Decided** (§6, 4): API-only — no change.
 
 From RESERVATION_FOCUS.md §8 (F6b):
 5. Candidates in the cycle's sidebar? (Reachable now from the entries' fix links.)
+   **Decided** (§6, 5): yes, under "Entries to the board".
 6. My Exams for families: show the statement of entry once entries are sent?
+   **Decided** (§6, 6): My Exams stays hidden; the statement of entry alone is shown once the school sends its first entries (queued).
 7. Board Services: keep it in the cycle? (§3.8)
+   **Decided** (§6, 7): kept; its remark-service rows hidden by the switch.
 8. Subjects `/admin/subjects`: its fee columns predate the session's fees and differ from the sheet's — keep,
    relabel or hide? (§3.6)
+   **Decided** (§6, 8): hidden from the sidebar, reachable by URL.
 9. "Subjects this year" (course enrolment) on the Student 360: hide the block too? (§3.13)
+   **Decided** (§6, 9): kept, titled "This year's subjects and teachers"; its link stays hidden.
 10. Exam Deadlines: show only the entry dates? Its exam-start rows say "No timetable imported yet". (§3.21)
+    **Decided** (§6, 10): the entry and retake deadlines and the exams' start where it is the cut-off; the other rows hidden by the switch.
 11. History for families: keep it? (§3.28)
+    **Decided** (§6, 11): kept — no change.
 
 From CYCLE_FOLLOWUPS.md §10:
 12. The Arabic words for a section (11A) and a subject's class (Biology with Teacher A): Messages says فصل for
     a section, the desk فصل for a class, F1's screens مجموعة تدريس. Default: as they are.
+    **Decided** (§6, 12): a section فصل, a teaching group "group" / مجموعة everywhere; the desk's and Replace a teacher's sentences changed, D's قسم aligned.
 
 F6's own:
 13. **Payments** (`/admin/payments`) lists only the old bank transfers, a method no new payment uses; InstaPay
     transfers are confirmed on the Finance Workbench, and the page now says so (§3.15). Keep it on the admin's
     sidebar? Default: kept (F6b's list is not F6's to change).
+    **Decided** (§6, 13): hidden from the sidebar, reachable by URL.
 14. **"Wallet"** (المحفظة) for the money the school holds for a child, on the family's screens (§3.31): the
     school's word? Default: Wallet.
+    **Decided** (§6, 14): "Balance" / الرصيد ("Your balance with the school" / رصيدك لدى المدرسة) on every kept screen; escrow stays the code's and the audit's word.
 15. **The sign-in page's words** (§3.32): "The school's subject reservations, in one place — One account for
     the family, in place of a form for every subject", under the app's name "IGCSE Reserve". Should it carry
     the school's own name and logo? Default: the app's name, as before.
+    **Decided** (§6, 15): the school's name from the setting `school.name` (admin, empty by default) above the app's name; no logo until the school provides one.
 16. **Entry Lists' rule source** reads "From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026)" (§3.23):
     change the stored text to the handbook's name alone? Default: as stored.
+    **Decided** (§6, 16): yes — migration 0061 changes the stored text on every database, 0057 untouched (CYCLE_DECISIONS.md §1.16, §6).
 
 ## 10. Proof
 

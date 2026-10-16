@@ -15,7 +15,11 @@
  * student's.
  *
  * A one-paper item ("One paper ONLY" on the forms) is always a retake: it offers no first entry
- * (the lead's decision of 11 Oct 2026; assertLineRules refuses one too).
+ * (the lead's decision of 11 Oct 2026; assertLineRules refuses one too). Nor does a subject the links
+ * sheet gives as "Retake (Self Study ONLY)", or a unit or route marked self study only: retakes in
+ * self-study only, but for an item that carries an earlier sitting forward (the A.2. carry forward, its
+ * own entry after the AS) — the lead's decisions of 16 Oct 2026, FEATURES_PLAN.md §6, 1; a first entry
+ * in self-study elsewhere is the student's exception, asked by assertLineRules.
  */
 
 import { db, sql } from '@repo/db';
@@ -25,6 +29,7 @@ import { availabilityConstraints } from './offer.services';
 import { priceLine } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { examSittingsOf, examKeysOf } from './reservation.services';
+import { lineExceptions } from './line-exceptions';
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
@@ -73,8 +78,9 @@ async function readOffers(sessionId: string, studentId: string | null) {
       bs.month, bs.year, bs.label as "seriesLabel", bs.entry_deadline as "entryDeadline", bs.retake_deadline as "retakeDeadline", bs.exams_start as "examsStart",
       coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units,
       coalesce((select json_agg(json_build_object('code', eu.code, 'shortCode', eu.short_code, 'level', eu.unit_level) order by eu.code)
-        from session_offer_item_unit u join exam_unit eu on eu.id = u.unit_id where u.item_id = i.id), '[]') as "unitCodes"
-    from session_offer_item i left join board_series bs on bs.id = i.board_series_id
+        from session_offer_item_unit u join exam_unit eu on eu.id = u.unit_id where u.item_id = i.id), '[]') as "unitCodes",
+      q.code as "qualificationCode"
+    from session_offer_item i left join board_series bs on bs.id = i.board_series_id left join qualification q on q.id = i.qualification_id
     where i.offer_id in (${sql.join(offerIds.map((id) => sql`${id}`), sql`, `)}) and i.availability <> 'closed'
     order by i.sort_order, i.label`).then((r) => r.rows as Record<string, unknown>[]) : [];
   const teachers = offerIds.length ? await db.execute(sql`
@@ -138,9 +144,21 @@ async function readOffers(sessionId: string, studentId: string | null) {
       const firstEntries = !c.retakeOnly && i.kind !== 'one_paper';
       if (!c.closed) {
         if (firstEntries && !c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'in_school' });
-        if (firstEntries && c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'self_study' });
+        // Self study is a second entry ("Self Study 50% … ONLY 2nd entry", decision 1 of 16 Oct 2026): a first
+        // entry in self-study only where the item carries an earlier sitting forward (the A.2. carry forward).
+        if (firstEntries && c.selfStudyOnly && i.needsPriorSeries) combos.push({ attempt: 'first', mode: 'self_study' });
         if (!c.selfStudyOnly) combos.push({ attempt: 'retake', mode: 'in_school' });
         combos.push({ attempt: 'retake', mode: 'self_study' });
+      }
+      // The student's exception "self-study on a first entry" — decision 1's only way past the rule — offers the
+      // choice where it covers the item, so a family or the desk can take it from the screen (the review of
+      // dd68598, item 2). Read without locking (a GET marks nothing used); the reservation asks it again, under
+      // its lock, through assertLineRules. A preview (no student) offers no family's exception.
+      if (studentId && !c.closed && firstEntries && !combos.some((k) => k.attempt === 'first' && k.mode === 'self_study')) {
+        const held = await lineExceptions.active(db, studentId, ['gate.selfStudyFirstEntry'], {
+          sessionId, subjectId: o.subjectId, offerId: o.id, offerItemId: i.id as string, ...(seriesId ? { boardSeriesId: seriesId } : {}),
+        });
+        if (held.length) combos.splice(combos.some((k) => k.attempt === 'first') ? 1 : 0, 0, { attempt: 'first', mode: 'self_study' });
       }
       // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
       // exams' start with none); a retake of the board's previous sitting until the retake deadline
@@ -170,6 +188,9 @@ async function readOffers(sessionId: string, studentId: string | null) {
         label: i.label as string,
         kind: i.kind as string,
         enters: { kind: i.entersKind as string, units: i.unitCodes as { code: string; shortCode: string | null; level: string }[] },
+        // The award it enters, by the board's code (Arabic A Level's two: "YAA01", "9AA0"): the family's form names it
+        // beside the teacher who teaches it (the lead's decision of 16 Oct 2026, FEATURES_PLAN.md §6, 3).
+        qualification: i.qualificationCode ? { code: i.qualificationCode as string } : null,
         series: seriesId ? {
           id: seriesId, month: i.month as string, year: i.year as number, label: i.seriesLabel as string,
           entryDeadline: i.entryDeadline as Date | null, retakeDeadline: i.retakeDeadline as Date | null, examsStart: i.examsStart as string | null,

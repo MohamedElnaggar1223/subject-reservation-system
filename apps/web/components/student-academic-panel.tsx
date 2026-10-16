@@ -864,7 +864,7 @@ function CohortDialog({
                   </>
                 )}
                 <p className="mt-2 text-muted-foreground">
-                  Registrations for series they may no longer sit expire, their open checkouts close with any escrow returned, and the family is told. The correction is recorded with your reason.
+                  Registrations for series they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.
                 </p>
               </>
             )}

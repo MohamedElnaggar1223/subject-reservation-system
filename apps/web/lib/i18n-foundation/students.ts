@@ -108,7 +108,7 @@ export const studentsArabic: Record<string, string> = {
   'That is the cohort already recorded: nothing would change.': 'هذه هي الدفعة المسجلة بالفعل: لن يتغير شيء.',
   'After the correction': 'بعد التصحيح',
   'In the exam series open now': 'في دورات الامتحانات المفتوحة الآن',
-  'Registrations for series they may no longer sit expire, their open checkouts close with any escrow returned, and the family is told. The correction is recorded with your reason.':
+  'Registrations for series they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.':
     'تنتهي صلاحية التسجيلات في الدورات التي لم يعد بإمكانه أداؤها، وتُغلق عمليات الدفع المفتوحة ويُعاد أي رصيد، وتُبلَّغ الأسرة. ويُسجَّل التصحيح مع السبب الذي تذكره.',
   'e.g. Repeating grade 11': 'مثال: يعيد الصف 11',
   // Recording a leaving
