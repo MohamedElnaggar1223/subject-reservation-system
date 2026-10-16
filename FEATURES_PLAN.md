@@ -668,6 +668,34 @@ every feature once.
   merges their branches (migrations renumbered per §3), never on `main` itself.
 - The demo school is rebuilt from its script for every version, so the page's steps stay true.
 
+**Scoped by the owner on 16 Oct 2026 (the complete journey of the reservation cycle).** The owner's
+words: "a full complete artifact of someone to clone the repo and initialize the app. Like the
+prerequisites they would need etc. Then a complete Admin side step by step walk through explaining
+how to set up a session, add the subject, like a complete walk through for example to replicate
+exactly the June session forms we had, then another section as a walkthrough from the student's
+side, then one from the parent's side. This artifact will be the complete full journey step by step
+explaining everything." So F8 is, in order: (1) **Set-up from a clean clone** — prerequisites
+(Node, pnpm, Docker for Postgres 17, git), clone, install, the two env files with every variable
+explained and a safe local value, the database container, the database, the migrations, the first
+admin account, the builds, the two servers, the first sign-in; and what a fresh database holds;
+and a short "before going live" pointer to SECURITY_AUDIT.md's checklist. (2) **The admin's
+journey** — rebuilding the June 2027 cycle exactly as the school's 25 forms describe it
+(SCHOOL_FORMS.md §2.2 and §2.3, placeholder teachers): the Team, the Catalogue (papers, options,
+units), the session and its sheet with every subject's own options in the forms' words, the fees
+from the boards' lists, the deadlines, the settings, opening the session, the desk (a walk-in
+family, a reservation, the money), to verify, exceptions, reminders and messages, the Money tab,
+the entries to the board; the day-one import as the alternative start. (3) **The student's
+journey** and (4) **the parent's journey** — from sign-up and linking to reserving as the forms
+ask, paying, the statement, the balance, notifications, a drop and its refund. Every step is
+driven on a running system with a screenshot, numbered, naming the exact label on the screen,
+and quoting the form's own wording beside the step so the admin recognises it. Format: a
+self-contained folder `docs/walkthrough/` with `index.html` (inline CSS, a navigation column,
+no external dependency) and `img/` (JPEG, each under 150 KB), opened from the repo in any
+browser; the demo data built by a reproducible script through the API. Built by one Opus 5.5
+agent end to end on `feature/walkthrough-cycle` (database `walk`, ports 3191/3190) from main
+once the decisions follow-up has landed; the lead's acceptance test is a fresh clone followed
+step by step. Everything outside the cycle stays out of this version.
+
 ---
 
 ## 2. Contracts between features
