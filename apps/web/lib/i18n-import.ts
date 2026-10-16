@@ -495,8 +495,8 @@ export const importArabic: Record<string, string> = {
   'How the school’s level codes are read from the units each entry covers.': 'كيف تُقرأ رموز مستوى المدرسة من الوحدات التي يشملها كل قيد.',
   'The coordinator’s answers every import’s review starts from.': 'إجابات المنسق التي تبدأ منها مراجعة كل استيراد.',
   'What "Carry forward on …" means in the sheet': 'معنى "Carry forward on …" في الجدول',
-  "The school's sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today's rule allows studying outside school only on a retake: a first entry in self-study is the student's exception. The day-one import starts every review from this answer.":
-    'يعلّم جدول المدرسة بعض الأسطر دراسة ذاتية لمواد تدرّسها المدرسة أيضًا (IS-03). تسمح قاعدة اليوم بالدراسة خارج المدرسة عند الإعادة فقط: والقيد الأول بدراسة ذاتية استثناءٌ للطالب. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
+  "The school's sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today's rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student's exception. The day-one import starts every review from this answer.":
+    'يعلّم جدول المدرسة بعض الأسطر دراسة ذاتية لمواد تدرّسها المدرسة أيضًا (IS-03). تسمح قاعدة اليوم بالدراسة خارج المدرسة عند الإعادة فقط، أو في A.2. يُرحَّل إليه A.S.: وأي قيد أول آخر بدراسة ذاتية استثناءٌ للطالب. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
   'Staff wrote "Carry forward on June 2022" on some A2 rows (IMPORT_SPIKE.md IS-02, DISCOVERY.md Q-02): an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.':
     'كتب الموظفون "Carry forward on June 2022" على بعض أسطر A2 (IS-02، Q-02): نتيجة AS مُرحّلة إلى القيد، أو دفعة مُرحّلة. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
 

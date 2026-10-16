@@ -45,7 +45,7 @@ await page.route(sheetUrl, async (route) => {
     try { await route.fulfill({ response }); } catch { seen.push({ at: Date.now() - t0, what: 'the held GET was cancelled by the page' }); }
     return;
   }
-  if (mode === 'b' && Date.now() < failUntil) {
+  if ((mode === 'b' || mode === 'add') && Date.now() < failUntil) {
     seen.push({ at, what: 'GET aborted (the sheet cannot be read: the network is down for 9 s)' });
     return route.abort('failed');
   }
@@ -55,12 +55,26 @@ await page.route(sheetUrl, async (route) => {
 page.on('response', (r) => { if (r.request().method() === 'POST' && r.url().includes('replace-teacher')) seen.push({ at: Date.now() - t0, what: `POST replace-teacher answered ${r.status()}` }); });
 page.on('request', (r) => {
   if (r.method() === 'POST' && r.url().includes('replace-teacher')) seen.push({ at: Date.now() - t0, what: 'POST replace-teacher' });
+  if (mode === 'add' && r.method() === 'POST' && /\/v1\/sessions\/[^/]+\/offers$/.test(r.url())) { seen.push({ at: Date.now() - t0, what: 'POST the new subject' }); failUntil = Date.now() + 9000; }
   if (r.method() === 'PUT' && r.url().includes('/form')) { seen.push({ at: Date.now() - t0, what: 'PUT the form' }); if (mode === 'b') failUntil = Date.now() + 9000; }
 });
 
 await page.goto(`${WEB}/admin/sessions/${S.june}#subjects`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1500);
-await page.locator('tr').filter({ has: page.getByRole('button', { name: 'Physics', exact: true }) }).getByRole('button', { name: 'Physics', exact: true }).click();
+let addedName = null;
+if (mode === 'add') {
+  // Add a subject the sheet does not have yet, as "Retake (Self Study ONLY)" at a course fee (no teacher needed).
+  await page.getByRole('button', { name: 'Add subject', exact: true }).first().click();
+  await page.waitForSelector('#as-search');
+  const first = page.locator('[role=listbox] [role=option]').first();
+  addedName = (await first.locator('bdi').first().textContent())?.trim() ?? null;
+  await first.click();
+  await page.waitForSelector('#sf-fee');
+  await page.locator('label', { hasText: 'Retake (Self Study ONLY)' }).locator('input[type=radio]').check();
+  await page.fill('#sf-fee', '5000');
+} else {
+  await page.locator('tr').filter({ has: page.getByRole('button', { name: 'Physics', exact: true }) }).getByRole('button', { name: 'Physics', exact: true }).click();
+}
 await page.waitForSelector('#sf-notes');
 const before = await page.inputValue('#sf-notes');
 const teachersBeforeEarly = { pending: true };
@@ -89,13 +103,20 @@ const ticked = async () => Object.fromEntries(await Promise.all(['Teacher A', 'T
 let teachersBefore = null;
 if (mode === 'r') {
   await page.getByRole('button', { name: 'Replace', exact: true }).click();
+} else if (mode === 'add') {
+  await page.locator('[role=dialog] button[type=submit]').click();
 } else {
   await page.getByRole('button', { name: 'Save', exact: true }).click();
 }
 let waitingShown = null;
 let tabErrorShown = null;
-if (mode === 'b') {
-  await page.waitForTimeout(3000);
+let drawerTitle = null;
+let savedSoon = null;
+if (mode === 'b' || mode === 'add') {
+  // Sampled 1.5 s after the change: the read-back has failed by then (one attempt, no retries).
+  await page.waitForTimeout(1500);
+  savedSoon = await page.getByText(mode === 'add' ? 'Added. Its papers and their fees, if the Catalogue gives it any, can be set below.' : 'Saved.', { exact: true }).count() > 0;
+  drawerTitle = await page.locator('[role=dialog] h2').first().textContent().catch(() => null);
   // During the outage: what the screen says (the sheet's own error, or the drawer's notice that the form waits).
   waitingShown = await page.getByText("The sheet could not be read again just now: the subject's form comes back once it is.").count();
   tabErrorShown = await page.getByText('Could not load this').count();
@@ -110,12 +131,12 @@ if (mode === 'b') {
   await page.waitForTimeout(7000);
 }
 const after = await page.inputValue('#sf-notes').catch(() => null);
-const saved = await page.getByText('Saved.', { exact: true }).count();
+const saved = await page.getByText(mode === 'add' ? 'Added. Its papers and their fees, if the Catalogue gives it any, can be set below.' : 'Saved.', { exact: true }).count();
 const errorShown = await page.locator('[role=dialog] .text-destructive, [role=dialog] [role=alert]').allInnerTexts().catch(() => []);
 const shot = path.join(EVIDENCE, `${mode}-${tag}.jpg`);
 await page.screenshot({ path: shot, type: 'jpeg', quality: 55 });
 const teachersAfter = mode === 'r' ? await ticked() : undefined;
-const result = { mode, tag, before, typed: note, after, replaced: mode === 'r' ? { from: fromT, to: toT, teachersBefore, teachersAfter, newTeacherTicked: teachersAfter[toT] === true, oldTeacherTicked: teachersAfter[fromT] === true } : undefined, keptWhatWasSaved: after === note, savedShown: saved > 0, errorShown, duringOutage: mode === 'b' ? { waitingNoticeShown: waitingShown > 0, screenReplacedByError: tabErrorShown > 0 } : undefined, requests: seen, errors };
+const result = { mode, tag, before, typed: note, after, replaced: mode === 'r' ? { from: fromT, to: toT, teachersBefore, teachersAfter, newTeacherTicked: teachersAfter[toT] === true, oldTeacherTicked: teachersAfter[fromT] === true } : undefined, keptWhatWasSaved: after === note, savedShown: saved > 0, errorShown, duringOutage: (mode === 'b' || mode === 'add') ? { savedShownAt1500ms: savedSoon, drawerTitle, waitingNoticeShownAt1500ms: waitingShown > 0, screenReplacedByError: tabErrorShown > 0, addedName } : undefined, requests: seen, errors };
 fs.writeFileSync(path.join(EVIDENCE, `${mode}-${tag}.json`), JSON.stringify(result, null, 1));
 console.log(JSON.stringify(result));
 await browser.close();

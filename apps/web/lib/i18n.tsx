@@ -18,7 +18,7 @@ import { reservationsArabic, translateReservationsText } from './i18n-reservatio
 import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
 import { uiAuditArabic } from './i18n-ui-audit';
-import { decisionsArabic } from './i18n-decisions';
+import { decisionsArabic, translateDecisionsText } from './i18n-decisions';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
 import { LANGUAGE_COOKIE } from './language';
 
@@ -891,7 +891,6 @@ const autoArabicText: Record<string, string> = {
   'Use your balance': 'استخدم رصيدك',
   'From your balance': 'من رصيدك',
   'from your balance': 'من رصيدك',
-  'Open Wallet': 'فتح المحفظة',
   'Payment Method': 'طريقة الدفع',
   'Payment Summary': 'ملخص الدفع',
   'Fully Escrow-Funded': 'ممولة بالكامل من الرصيد',
@@ -1509,7 +1508,7 @@ const autoArabicText: Record<string, string> = {
   'Move balance — IGCSE Reservation': 'نقل الرصيد - حجز IGCSE',
   'Withdrawal Requests — Admin': 'طلبات السحب - الإدارة',
   'IGCSE Subject Reservation': 'حجز مواد IGCSE',
-  'IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and escrow.': 'نظام تسجيل وحجز مواد IGCSE - إدارة مواد الامتحان والموافقات والمدفوعات والأرصدة.',
+  'IGCSE Subject Registration & Reservation System — manage exam subjects, approvals, payments, and balances.': 'نظام تسجيل وحجز مواد IGCSE - إدارة مواد الامتحان والموافقات والمدفوعات والأرصدة.',
   '-- | IGCSE Reservation': '-- | حجز IGCSE',
   'active ·': 'نشطة ·',
   'draft ·': 'مسودة ·',
@@ -1606,6 +1605,13 @@ function reworkClaims(text: string): boolean {
 }
 
 function translateDynamicText(text: string): string | null {
+  // The lead's decisions of 16 Oct 2026: the desk's balance sentences with data in them (lib/i18n-decisions.ts),
+  // before every rule here: "EGP (.+)" below took the record-transfer dialog's description, which starts with its
+  // label's amount, whole (the drive of the review of dd68598, item 4); each rule of theirs is anchored to its own
+  // sentence's end, so none takes another screen's text.
+  const decisionsText = translateDecisionsText(text);
+  if (decisionsText) return decisionsText;
+
   const gradeMatch = /^Grade (\d+)$/.exec(text);
   if (gradeMatch) return `الصف ${gradeMatch[1]}`;
 

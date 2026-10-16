@@ -105,7 +105,7 @@ screen kept because the doubt was real.
 | Sessions `/admin/sessions` | Management | Set up | the session: its sheet, teachers, fees, Money and To verify tabs |
 | Subjects `/admin/subjects` | Management | **hidden** since 16 Oct 2026 (Set up before) | the Catalogue is the subject list and the session's form joins its teachers to the pool; its fee columns contradict the session's fees (§8, Q4, decided) |
 | Payments `/admin/payments` | Management | **hidden** since 16 Oct 2026 (Reserve and pay before) | no new payment uses the old bank transfer; InstaPay is confirmed on the Finance Workbench |
-| Escrow `/admin/escrow` | Management | Follow up | the wallet's withdrawal requests: drops and refunds |
+| Balance withdrawals `/admin/escrow` (Escrow before 16 Oct 2026) | Management | Follow up | the withdrawal requests from families' balances: drops and refunds |
 | Finance Workbench `/finance` | Management | Money | named in the cycle |
 | Charges `/charges` | Management | Reserve and pay | instalments and charges, pushed or asked for |
 | School Fees `/admin/school-fees` | Management | Set up | the school fee: the gate before reserving, and its push to families |
@@ -127,7 +127,7 @@ screen kept because the doubt was real.
 | Sections, Course Enrolment, Academic Year, Calendar, Bell Schedules, Rooms | Academic | **hidden** | named outside |
 | Exam Deadlines, Candidates (since 16 Oct 2026), Exam Entries, Entry Lists | Exams | Entries to the board | the entries, the candidates' details they need, and the series' deadlines |
 | Forecast Grades, Exam Timetable, Exam Days, Exam Results, Certificates | Exams | **hidden** | named outside |
-| Exam Catalogue, Board Series, Board Services | Exams | Set up | the papers and the boards' dates; Board Services **in doubt** as for the admin |
+| Exam Catalogue, Board Series, Board Services | Exams | Set up | the papers and the boards' dates; Board Services kept with its remark rows hidden, as for the admin (decided 16 Oct 2026) |
 | Sessions, Day-one Import, Settings | School | Set up | the session's sheet (the coordinator keeps subjects, teachers and items), the import, the settings |
 | Exceptions | School | Follow up | the academic gates are the coordinator's to grant |
 | Timetables, Teaching Groups, Timetable Rules, Cover `/timetable/*` (F1, merged after F6b) | Timetable | **hidden** | the timetable is outside the cycle (`TIMETABLE_SCREENS`) |
@@ -145,7 +145,7 @@ screen kept because the doubt was real.
 | Sessions | first group | Set up | the session's Fees tab (the board fees), Money and To verify |
 | Messages | first group | Follow up | the payment reminders |
 | Remarks Desk, Results Entry, Certificates | first group | **hidden** | named outside |
-| School Fees, Board Services, Settings | Management | Set up | the fees and the settings behind them (Board Services **in doubt**) |
+| School Fees, Board Services, Settings | Management | Set up | the fees and the settings behind them (Board Services kept, its remark rows hidden: decided 16 Oct 2026) |
 | Exceptions | Management | Follow up | lifting a rule for a family; payment plans |
 | Notifications, Profile | Account | Account | the account |
 
@@ -177,10 +177,10 @@ screens (`TIMETABLE_SCREENS`) are on both lists since F1's merge.
 |---|---|---|---|
 | Home `/` | first | first | the landing (§3.3) |
 | Reserve Subjects, My Registrations, Approvals | Registration | Registration | reserving; a student's reservation waits for the parent's approval |
-| History `/registrations/history` | Registration | Registration | **in doubt**: the reservations' own record (each line's changes — reserved, paid, dropped, refunded), part of drops and refunds |
+| History `/registrations/history` | Registration | Registration | kept (decided 16 Oct 2026, §8 Q7): the reservations' own record (each line's changes — reserved, paid, dropped, refunded), part of drops and refunds |
 | Remarks `/remarks` | Registration | **hidden** | named outside |
 | My Exams `/exams/my` | Registration | **hidden** | its three parts are the exam timetable, the statement of entry the school publishes with it, and results — all after the entries go to the board (§8, Q2) |
-| Statement, School Fee, Charges & Instalments, Escrow Balance | Financial | Financial | paying: the statement, the school fee, instalments, the wallet |
+| Statement, School Fee, Charges & Instalments, Balance (Escrow Balance, then Wallet, before 16 Oct 2026) | Financial | Financial | paying: the statement, the school fee, instalments, the balance with the school |
 | Linked Children, Notifications, Profile | Account | Account | the family's link (needed to reserve for a child) and the account |
 | Timetables `/my-timetable` (F1, merged after F6b) | first | **hidden** | the children's week: the timetable is outside the cycle (`TIMETABLE_SCREENS`) |
 
@@ -193,7 +193,7 @@ would change wording on the families' screens (point 4).
 |---|---|---|---|
 | Home `/` | first | first | the landing (§3.3) |
 | Reserve Subjects, My Registrations, Statement | Registration | Registration | reserving and what it costs |
-| History | Registration | Registration | **in doubt**, as for the parent |
+| History | Registration | Registration | kept, as for the parent (decided 16 Oct 2026) |
 | Browse Subjects `/subjects` | Registration | **hidden** | "the students' subject browse" is named outside; the Reserve page lists the session's subjects with their prices |
 | Remarks, My Exams | Registration | **hidden** | as for the parent |
 | Pending Requests | Requests | Requests | drop and swap requests: drops and refunds |
@@ -291,8 +291,8 @@ banner and the quick links stay (Browse Subjects hidden).
 | Done | everything reserved in an open session is paid | Add a subject / Reserve another subject |
 | Receipts, requests | receipts to bring back; drop or swap requests | My Registrations; Review / My requests |
 
-The header button is always the statement (**The family statement** / **My statement**); the wallet's
-free balance closes the card. A parent with no linked child gets "Start by linking your child". Driven:
+The header button is always the statement (**The family statement** / **My statement**); the free
+balance with the school (the wallet's, before 16 Oct 2026) closes the card. A parent with no linked child gets "Start by linking your child". Driven:
 open (`stage-open-parent2-*`: Reserve subjects), a graduate (`stage-open-parent-*`: the reason),
 reserved (`stage-reserved-parent2-*`, `-student2-*`), due today, after a payment (`after-parent2-*`).
 

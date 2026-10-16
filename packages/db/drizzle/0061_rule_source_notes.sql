@@ -1,10 +1,9 @@
--- Decision 16 (the lead, 16 Oct 2026; FEATURES_PLAN.md §6, 16): Entry Lists' rule source names the boards'
--- documents alone, not the research file. Migration 0057 seeds the new text for new installs; this one-off
--- update is for a database that ran 0057 before (igcse_template_dev, the owner's). Only a row that still holds
--- the text 0057 seeded changes (a note an admin edited is left alone); each change has its audit row in the
--- same transaction. Run once with: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f d16-rule-source-notes.sql
--- Run again, it changes nothing (no row holds the old text).
-BEGIN;
+-- The lead's decision of 16 Oct 2026 (FEATURES_PLAN.md §6, 16; docs/features/CYCLE_DECISIONS.md): Entry Lists'
+-- rule source names the boards' documents alone, not the research file. 0057 seeded the notes with "From
+-- DISCOVERY_RESEARCH.md §2 (…)"; 0057 stays as it was applied, and this migration changes the seeded text on every
+-- database, the template, the owner's and a fresh install alike. Only a row still holding 0057's text changes (a
+-- note an admin edited through "Change the rules" is left alone), so it is idempotent; each change writes its audit
+-- row in the same statement. One statement: drizzle runs the pending migrations in one transaction.
 WITH changed AS (
   UPDATE exam_board_rule r SET notes = v.new_notes, updated_at = now()
   FROM (VALUES
@@ -21,9 +20,8 @@ WITH changed AS (
   WHERE r.board_code = v.board_code AND r.notes = v.old_notes
   RETURNING r.board_code, v.old_notes, v.new_notes
 )
-INSERT INTO audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data)
+INSERT INTO "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data")
 SELECT gen_random_uuid()::text, NULL, 'EXAM_BOARD_RULE_UPDATED', 'exam_board_rule', board_code,
        jsonb_build_object('notes', old_notes),
-       jsonb_build_object('notes', new_notes, 'reason', 'The rule source names the board''s documents alone (the lead''s decision of 16 Oct 2026, 16)')
+       jsonb_build_object('notes', new_notes, 'reason', 'The rule source names the board''s documents alone (the lead''s decision of 16 Oct 2026, 16; migration 0061)')
 FROM changed;
-COMMIT;

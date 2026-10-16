@@ -480,6 +480,8 @@ function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCre
   // What was typed on the form before a Replace a teacher, carried into the form made again after it.
   const [carry, setCarry] = useState<Carry | null>(null);
   const [readBack, setReadBack] = useState<ReadBack | null>(null);
+  // The name of a subject just added, for the drawer's title while it waits for the sheet (an Add whose read-back failed).
+  const [addedName, setAddedName] = useState<string | null>(null);
   const targetId = 'offerId' in target ? target.offerId : null;
   const listed = targetId ? data.offers.find((o) => o.id === targetId) ?? null : null;
   // The row read back after this drawer's own change, until the sheet's copy is as new as it.
@@ -494,7 +496,7 @@ function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCre
     if (readBack?.failed && sheetAt > readBack.at) { setReadBack(null); setVersion((v) => v + 1); }
   }, [readBack, sheetAt]);
   if ('offerId' in target && !offer && !waiting) return null;
-  const title = offer ? offer.subject.name : addable?.name ?? '';
+  const title = offer ? offer.subject.name : addable?.name ?? addedName ?? '';
   const subtitle = offer
     ? <><bdi data-i18n-skip="true">{offer.subject.boardName}</bdi> · <bdi data-i18n-skip="true" className="font-mono">{offer.subject.code}</bdi> · <span>{offer.lines}</span> <span>{offer.lines === 1 ? 'reservation' : 'reservations'}</span></>
     : addable ? <><span>Add subject</span> · <bdi data-i18n-skip="true" className="font-mono">{addable.code}</bdi></> : null;
@@ -515,7 +517,7 @@ function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCre
             setReadBack(back);
             // A failed read-back waits for the sheet (above) rather than make the form from the copy before the change.
             if (!back.failed) setVersion((v) => v + 1);
-            if (createdId) onCreated(createdId);
+            if (createdId) { setAddedName(addable?.name ?? null); onCreated(createdId); }
           }}
           // A teacher replaced: the form is made again from the offer as it is now — the row the replacement
           // read back (the review of d3f62cf, item 2; F6's review, finding 2) — kept, its old ticks would send
@@ -607,7 +609,10 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
   const refresh = async (offerId: string | null): Promise<ReadBack> => {
     const [back] = await Promise.all([
       readBack(queryClient, session.id, offerId),
-      queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }),
+      // The sessions' list and the rest under ['sessions'], not this sheet: its key is under the prefix, and an
+      // invalidation would start a refetch with the query's retries that the read-back then joined (a save during
+      // an outage waited about 7 s before it said anything: the review of dd68598, item 3). readBack reads it.
+      queryClient.invalidateQueries({ queryKey: SESSIONS_KEY, predicate: (q) => !(q.queryKey[1] === session.id && q.queryKey[2] === 'offers') }),
       queryClient.invalidateQueries({ queryKey: ['sessions', session.id, 'preview'] }),
     ]);
     return back;
@@ -930,7 +935,8 @@ async function readBack(queryClient: ReturnType<typeof useQueryClient>, sessionI
   const asked = Date.now();
   await queryClient.cancelQueries({ queryKey: offersKey(sessionId) });
   try {
-    const sheet = await queryClient.fetchQuery({ queryKey: offersKey(sessionId), queryFn: () => fetchOffers(sessionId), staleTime: 0 });
+    // One attempt (no retries): a read that fails says so at once, and the sheet's own refetch takes the retries.
+    const sheet = await queryClient.fetchQuery({ queryKey: offersKey(sessionId), queryFn: () => fetchOffers(sessionId), staleTime: 0, retry: false });
     return { row: offerId ? sheet.offers.find((o) => o.id === offerId) ?? null : null, at: sheetTime(queryClient, sessionId) };
   } catch (err) {
     console.warn('[sheet] the read-back after a saved change failed; the sheet will refetch:', err instanceof Error ? err.message : err);

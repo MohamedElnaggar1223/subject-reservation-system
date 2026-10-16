@@ -8,12 +8,17 @@ questions (lead-env `.audit/school-forms.tsv`), which widened decision 1 and app
 web 3180. **Built by:** one Opus 5.5 implementer. **Trail:** `.audit/cycle-decisions.tsv`. **Evidence:**
 `.audit/cycle-decisions-evidence/`: `before/` and `after/` (one JPEG per screen in English and Arabic, with
 `readings.json`, what each screen said), `after-set/` and `after-emptied/` (decision 15), `notes/` (F6's notes),
-`controls/` (each guard undone, the test red), `sql/` (decision 16's one-off update), `drive/` (the scripts and the
-dev data's ids).
+`controls/` (each guard undone, the test red), `migration-0061.txt` (decision 16's migration on a fresh database),
+`after-exception/` (decision 1's exception on the Reserve page), `desk-transfer-ar/` (decision 14's desk dialogs in
+Arabic), `drive/` (the scripts and the dev data's ids).
 
 **In one sentence.** Each decision is applied exactly as the lead wrote it. A decision marked "no change" changes
 nothing. The two rule changes (1, 2) and the new setting (15) each have a scenario and a control. Every changed
 screen was driven as the role that reaches it, in English and Arabic, before and after.
+
+**The review of dd68598** (Opus 5.5: "merge after fixes 1, 2") is answered in one round on top of it: item 1 in §1.16
+and §6, item 2 in §1.1, item 3 in §2, item 4 in §1.14, item 5 in §9, item 6 in §3, and item 7's nits in the documents
+and dictionaries they name.
 
 ---
 
@@ -38,17 +43,32 @@ way past it.*
   untaught subject is gone. The family's and the preview's option "First entry, self-study (not taught this cycle)" is
   therefore gone from Chemistry. It remains on the A.2. carry-forward route, whose form says "A.2. (Self Study 50%
   fees …)" as its own entry after the AS.
+- **The student who holds the exception** (the review of dd68598, item 2). The read for a given student (the
+  family's Reserve page, the desk's for that student) adds the first entry in self-study wherever that student holds
+  `gate.selfStudyFirstEntry` in a scope that covers the item: `lineExceptions.active(db, studentId,
+  ['gate.selfStudyFirstEntry'], { sessionId, subjectId, offerId, offerItemId, boardSeriesId })`, read without a lock
+  (the reservation's own `assertLineRules` takes the exception under its lock and uses it up). It is priced for that
+  student by `priceLine`, as every option is. The preview, which has no student, is unchanged. The Reserve row says
+  "First entry, self-study" on a taught subject and "First entry, self-study (not taught this cycle)" on an untaught
+  one (قيد أول، دراسة ذاتية). Once the exception is used, the option goes.
 - **The day-one import.** The brief said the import "already treats it as an error naming the exception". That was
   not so. Before this change, 08n-import's row 5 ("Live Subject Self", not taught) was planned as a first entry in
   self-study, with only the information line `self_study_not_taught`. Now the review's own dry run of `assertLineRules`
   refuses the row as `registration_refused`, with the rule's sentence naming the exception. `import/view.ts` is
   unchanged: the import asks the same rule a reservation asks. Staff settle the row as the sentence says, by naming
   the earlier sitting, which makes it a declared retake on To verify (the lead confirmed this at 01:11Z).
+  - A row for a student the import itself creates cannot be settled by the exception: no exception can be granted to
+    a student who does not exist yet. That row stays refused until staff name an earlier sitting, or the student is
+    made, granted the exception and the import reviewed again (§9).
 - The settings description of `import.selfStudyOnTaught` and its Arabic now say "Today's rule allows studying outside
-  school only on a retake: a first entry in self-study is the student's exception".
+  school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the
+  student's exception" (the carry-forward case added by the review of dd68598, item 7).
 - **Screens:** `before|after/d01-preview-chemistry-{en,ar}.jpg` shows Chemistry's preview: "First entry, self-study
   (not taught this cycle) · EGP 17,850" is gone and "Retake, self-study — name the sitting" stays.
   `d01-03-reserve-parent-*` shows parent B's Reserve page: Chemistry ticked now defaults to "Retake, self-study".
+  `after-exception/d01-03-reserve-parent-{en,ar}.jpg`: after the finance admin grants student B1 the exception
+  (`drive/grant-exception.mjs`), the same page offers Chemistry "First entry, self-study (not taught this cycle)" at
+  EGP 17,850, and the taught Arabic IAL "First entry, self-study" beside "First entry, in school".
 
 ### 2 — An IAL unit sits in October, January or June
 
@@ -67,6 +87,8 @@ way past it.*
   - A unit of no cash-in award keeps every month its board sits.
 - **Screens:** `before|after/d02-winter-ial-units-*` shows the winter session's Mathematics A.S./A.L. Each unit's
   Sitting offered October 2026, November 2026 and January 2027 before, and October 2026 and January 2027 after.
+- **Enforced on the form only** (accepted as is by the review of dd68598, item 5): the item endpoint and a sheet copied
+  from another session can still place an IAL unit in November (§9).
 
 ### 3 — Arabic A Level: the family chooses the qualification through the teacher (a label only)
 
@@ -179,6 +201,28 @@ a section appears only as its name (11A), so no English word changed there.
   its word.
 - **Screens:** `before|after/d14-parent-sidebar-*`, `d14-parent-home-*`, `d14-parent-balance-page-*`,
   `d14-parent-statement-*`, `d14-desk-*`, `d14-admin-balance-withdrawals-*`.
+- **The Arabic the sweep had lost** (the review of dd68598, item 4). The sweep changed some English strings whose
+  Arabic keys then matched nothing. `lib/i18n-decisions.ts` now gives them Arabic:
+  - the desk's "Transfer found — added to the balance" and "Add to the balance";
+  - the finance workbench's "Withdrawal rejected — unreleased amount returned to the balance." and "Receipt returned —
+    any pending drop refund has been released to the balance.";
+  - the checkout's "Only if you have not paid. What your balance paid toward it goes back to the balance.".
+
+  The desk's sentences with data in them are translated by `translateDecisionsText`, whose rules are each anchored to
+  their sentence's end. They cover the transfer and undo-transfer dialogs' descriptions, with their labels ("8,800
+  جنيه عبر إنستاباي") and the family's reference, and the two sentences the desk writes after each.
+  `translateDynamicText` asks them before its own rules. The first drive showed why that order matters: the
+  record-transfer description starts with its amount, and the rule "EGP (.+)" took the whole sentence.
+
+  The two dialogs' titles, fields, placeholders and buttons, and the row's "Transfer found" and "Undo", had no Arabic
+  on main either. They have it now, so the dialog reads in one language.
+
+  Driven as the finance admin on student B1 (`desk-transfer-ar/`, `drive/desk-transfer.mjs`). Its InstaPay payment
+  was rejected first, then the transfer recorded and undone. Both dialogs and both sentences read in Arabic, and the
+  balance went from 0 to 8,800 جنيه and back. No English "balance" was left on the desk.
+
+  The finance and checkout strings were checked as dictionary keys (`balance-sentences-ar.json`), not driven. They
+  take the path the desk's own strings prove on screen.
 
 ### 15 — The sign-in page carries the school's name
 
@@ -206,23 +250,36 @@ a section appears only as its name (11A), so no English word changed there.
 
 ### 16 — Entry Lists' rule source names the handbook alone
 
-- `packages/db/drizzle/0057_exam_entries_board_rules.sql` (F4's seed of `exam_board_rule.notes`) now writes the text
-  below, for new installs only.
+- `packages/db/drizzle/0057_exam_entries_board_rules.sql` (F4's seed of `exam_board_rule.notes`) is untouched,
+  byte-identical to main 19dabff: an applied migration is never edited (the review of dd68598, item 1).
+- `packages/db/drizzle/0061_rule_source_notes.sql`, made with `drizzle-kit generate --custom --name rule_source_notes`
+  (journal entry 61), changes each board's note to the text below. It is one statement (`WITH … UPDATE exam_board_rule
+  … INSERT INTO audit_log`) and has no BEGIN or COMMIT: the migrator runs pending migrations in its own transaction.
+  A new install gets 0057's text, then 0061's. A database that ran 0057 gets 0061's on its next migrate. §6 has the
+  proof.
 
-  | Board | Seeded text |
+  | Board | Text after 0061 |
   |---|---|
   | Cambridge | "Cambridge Handbook 2026. Check each rule against the current handbook." |
   | Pearson | "Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI." |
   | OxfordAQA | "OxfordAQA's entry rules were not researched: only its series and entry routes are known." |
 
-  Pearson's and OxfordAQA's notes are changed on the same principle: no internal file's name on a staff screen. The
-  SQL below changes each board on its own row, so the lead may run Cambridge's alone.
-- Drizzle's migrator applies by the journal's time, not by the file's hash, so a database that ran 0057 is unaffected
-  until the one-off update below runs on it. The dictionary (`i18n-exams/entries.ts`) carries the new texts and keeps
-  the old ones until then.
+  Pearson's and OxfordAQA's notes are changed on the same principle: no internal file's name on a staff screen. 0061
+  changes each board's row only while it still holds 0057's text, so a note an admin edited through "Change the rules"
+  is left alone. Each change writes its audit row (`EXAM_BOARD_RULE_UPDATED`, by no user, naming the decision and
+  0061) in the same statement.
+- The dictionary (`i18n-exams/entries.ts`) carries the new texts. The three old ones are removed: once 0061 has run, no
+  database holds them.
+- The IAL Mathematics starter set's note (`catalogue.services.ts`) said "Starter set from the research
+  (DISCOVERY_RESEARCH.md §2) — …". It now names the board's documents: "Starter set from Pearson's IAL information
+  manual 2025/26, the IAL Mathematics aggregation rules and the IAL January 2027 timetable — check it against the
+  board's current specification." It is written on the units and awards the starter set makes. No screen shows it and
+  no test asserts it.
 - **Screens:** `before|after/d16-entry-lists-*`. The source line read "From DISCOVERY_RESEARCH.md §2 (Cambridge
-  Handbook 2026). …" before. After the update was run on `igcse_decisions_dev` it reads "Cambridge Handbook 2026. Check
-  each rule against the current handbook." / «دليل Cambridge 2026. …».
+  Handbook 2026). …" before, and "Cambridge Handbook 2026. Check each rule against the current handbook." / «دليل
+  Cambridge 2026. …» after. The after drive ran with the update on `igcse_decisions_dev` as a hand-run statement.
+  That statement is superseded by 0061, which changed nothing on that database when it ran there: its rows already
+  held the new text.
 
 ---
 
@@ -248,13 +305,26 @@ teacher.
     It keeps the sheet and the open form, with a notice "The sheet could not be read again just now: it shows the
     subjects as last read." and Try again. This is the cause of (b)'s visible symptom on main: a successful save
     followed by a screen that says nothing loaded.
+- **The read-back on its own** (the review of dd68598, item 3). The refresh's `invalidateQueries` matches by prefix, so
+  `['sessions']` also covered this sheet's offers. A failed read-back then joined the tab's refetch, with its retries,
+  and the waiting state was never seen. Now:
+  - `refresh()` invalidates the sessions' queries except this sheet's offers (a `predicate`), which the read-back
+    reads itself;
+  - `readBack`'s `fetchQuery` has `retry: false`: a failed read fails at once and the drawer says so.
+  - After an Add, the drawer keeps the added subject's name (`addedName`) as its title while it waits.
+
+  Driven again (`b-fixed2`, `add-fixed`): the sheet's reads were aborted for 9 s after the change, and the screen
+  was sampled 1.5 s after it. Case b showed "Saved." and the waiting notice, the drawer titled Physics, with the sheet
+  still shown. The Add path showed the drawer titled Accounting with "Added. …" and the waiting notice. In both, the
+  form held the note typed after "Read the sheet again".
 - **Driven** (`notes/`, `drive/notes.mjs`; the admin, June 2027, Physics O.L.; a focus refetch held 4 s with the sheet
   from before the change, after waiting out the app's one-minute `staleTime`):
 
   | Case | Main's read-back put back (control) | This branch |
   |---|---|---|
   | a — Save during a focus refetch | **CancelledError**, no "Saved." (`a-control`) | "Saved.", the note typed kept (`a-fixed`) |
-  | b — the sheet unreadable for 9 s after a Save | the tab replaced by "Could not load this", no "Saved." (`b-control`) | "Saved.", the screen kept, the note back once the sheet answers (`b-fixed`, `b-fixed-during`) |
+  | b — the sheet unreadable for 9 s after a Save | the tab replaced by "Could not load this", no "Saved." (`b-control`) | "Saved.", the screen kept, the note back once the sheet answers (`b-fixed`, `b-fixed-during`); at 1.5 s "Saved." and the waiting notice (`b-fixed2`, `b-fixed2-during`) |
+| Add a subject, the sheet unreadable for 9 s after it | — | the drawer titled with the subject, "Added. …" and the waiting notice at 1.5 s; the note kept (`add-fixed`, `add-fixed-during`) |
   | Replace a teacher during a focus refetch (C → A, then A → C) | the form ticks **the teacher who left** (`r-control`) | the new teacher ticked, the typed note carried (`r-fixed`) |
 
 ---
@@ -274,7 +344,7 @@ teacher.
 | `08u-session-form.test.ts`, the IAL preview | `['S1', ['in_school'], ['first self_study', 'retake self_study']]` | `['S1', ['in_school'], ['retake self_study']]` |
 | `08s6-scheduling-rework.test.ts`, the desk's sentence (14 lines) | "The student moves to the class …" / ينتقل الطالب إلى فصل …; "… has no class of this subject yet …" / ليس لدى … فصل …; "The whole class … goes to …: the student stays in it." / ينتقل فصل … كله إلى …: ويبقى الطالب فيه.; "The student leaves the class …" / يغادر الطالب فصل …; "The whole class … goes to …." / ينتقل فصل … كله إلى …; "2 students move to the class …" / ينتقل طالبان إلى فصل … | "group" in each English sentence; مجموعة, with تنتقل / كلها / فيها, in each Arabic one |
 | `04-authz-matrix.test.ts`, the anonymous list | `['GET /v1/health', 'GET /v1/health/ready', 'GET /v1/ical/:token']` | the same and `'GET /v1/settings/public'` |
-| `08f-foundation-structure.test.ts`, the readers' map | (no `school.name`) | `'school.name': false` for the coordinator (a new setting's row, as each setting added before) |
+| `08f-foundation-structure.test.ts`, the coordinator's `canEdit` map | (no `school.name`) | `'school.name': false`: the coordinator reads `school.name` and cannot change it (a new setting's row, as each setting added before) |
 
 **Set-ups that priced the allowance now grant the exception first.** No asserted value changed in these:
 
@@ -289,6 +359,11 @@ teacher.
 
 - `08p`: decision 1 — subject, unit, plain route and carry-forward route; through the family's and the desk's endpoints
   and the read; the exception used once.
+- `08p`: decision 1's exception reaches the screens (the review of dd68598, item 2). Once granted, the family's and the
+  officer's reads for that student list `first self_study` at 16200 beside `retake self_study` on the untaught
+  subject, and among the four options on a taught one. Another student and the preview get the retake alone. The
+  desk's reservation of that option succeeds (7000 + 9200 = 16200) and uses the exception, after which the option is
+  no longer offered.
 - `08u`: decision 2 — an IAL unit's November refused with nothing moved and nothing audited; January taken; units of
   no cash-in award take November.
 - `08f`: decision 15 — empty by default; refused to six roles; refused at 121 characters and as a number; trimmed and
@@ -305,6 +380,7 @@ teacher.
 | … its reach to units and routes | the rule limited to the subject | 08p: the unit's first entry made, "promise resolved instead of rejecting" (`c1c`) |
 | … its carry-forward exception | the exception dropped | 08p: the A.2. route refused (`c1d`) |
 | Decision 1's read | the carry-forward condition dropped | 08p: `expected [ …(2) ] to deeply equal [['retake', 'self_study', 16200]]` (`c1b`) |
+| … the exception in the read | `if (false && held.length)` | 08p: `expected [ 'retake self_study 16200' ] to deeply equal [ 'first self_study 16200', …(1) ]` (`c3-read-exception-undone.log`) |
 | Decision 2's month check | `if (false && …)` | 08u: `expected { status: 200 } to deeply equal { status: 400 }` (`c2`) |
 | Decision 15's shape | a second key in the public read | 08f: `expected { schoolName: '', …(1) } to deeply equal { schoolName: '' }` (`c15a`) |
 | Decision 15's anonymous read | the route behind the auth gate | 08f: `Unauthorized` (`c15b`) |
@@ -329,14 +405,13 @@ c3ccc36's. One earlier full run (on the work in progress, while the browser driv
 
 ---
 
-## 6. The one-off SQL for decision 16
+## 6. Decision 16's migration (0061)
 
-`.audit/cycle-decisions-evidence/sql/d16-rule-source-notes.sql` is for the lead to run once on `igcse_template_dev` and
-on the owner's database. It was run here on `igcse_decisions_dev` only: `INSERT 0 3` the first time, `INSERT 0 0` the
-second.
+0061 does this; nothing to run by hand. The one-off SQL the first round left for the lead is withdrawn (its file
+removed from the evidence). The migration is its statement without BEGIN and COMMIT, with 0061 named in the audit
+row's reason:
 
 ```sql
-BEGIN;
 WITH changed AS (
   UPDATE exam_board_rule r SET notes = v.new_notes, updated_at = now()
   FROM (VALUES
@@ -353,19 +428,21 @@ WITH changed AS (
   WHERE r.board_code = v.board_code AND r.notes = v.old_notes
   RETURNING r.board_code, v.old_notes, v.new_notes
 )
-INSERT INTO audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data)
+INSERT INTO "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data")
 SELECT gen_random_uuid()::text, NULL, 'EXAM_BOARD_RULE_UPDATED', 'exam_board_rule', board_code,
        jsonb_build_object('notes', old_notes),
-       jsonb_build_object('notes', new_notes, 'reason', 'The rule source names the board''s documents alone (the lead''s decision of 16 Oct 2026, 16)')
+       jsonb_build_object('notes', new_notes, 'reason', 'The rule source names the board''s documents alone (the lead''s decision of 16 Oct 2026, 16; migration 0061)')
 FROM changed;
-COMMIT;
 ```
 
-Each row changes only while it still holds 0057's seeded text. A note an admin edited through "Change the rules" is
-left alone. Each change writes its audit row in the same transaction. To change Cambridge's alone, keep its row of
-`VALUES` and delete the others.
+**Proof** (`migration-0061.txt`):
 
----
+- `igcse_decisions_mig` is a fresh copy of `igcse_template_dev`, which held 34 migrations.
+- Migrated with main's migration set (122 files, byte-identical to 19dabff) to 61, it holds 0057's three notes and no
+  `EXAM_BOARD_RULE_UPDATED` row.
+- Migrated with this branch's set to 62, it holds three notes changed and three audit rows.
+- A second migrate applies nothing, and the statement run again by hand gives `INSERT 0 0`.
+- The suite starts from an empty database migrated through 0061 (§5).
 
 ## 7. The dev data (through the API; never a migration or a seed; placeholders only)
 
@@ -412,7 +489,7 @@ with two qualifications (step 1), and the self-study-only subject, Chemistry (st
 6. **Decision 15's name is read on the server**, so the page arrives with it and nothing moves once it loads. A failed
    read leaves the app's name alone and logs a warning; the sign-in form never depends on it.
 7. **Decision 16 includes Pearson and OxfordAQA.** The decision's reason (an internal file's name on a staff screen)
-   applies to all three notes. The SQL lets the lead run Cambridge's alone.
+   applies to all three notes. 0061 changes each board's row on its own, and only while it still holds 0057's text.
 8. **Note (b) is fixed where its symptom comes from.** The read-back is caught, and the tab keeps a loaded sheet when a
    later read fails. The drawer waits for a fresh copy rather than rebuild the form from a stale one.
 9. **Attribution:** every commit ends with "Co-Authored-By: Claude Opus 5.5".
@@ -426,11 +503,16 @@ with two qualifications (step 1), and the self-study-only subject, Chemistry (st
   strings the suite asserts, which the brief did not pre-authorise. Their Arabic already says الرصيد. For the lead.
 - **The hidden screens' words** are left as they are and come back with the switch. That covers F1's teaching screens
   ("My classes", "Close the class", cover's "the class is told") and the remarks screens' "escrow".
-- **The first entry in self-study under an exception has no screen.** A family or the desk holding
-  `gate.selfStudyFirstEntry` reserves it through the API, as before. The read lists no such option on a taught subject
-  either.
-- **The item endpoint** (`PUT …/items/:itemId`, API-only by decision 4) can still place an IAL unit in November. The
-  decision governs the form, and decision 4 left the old tools as they are.
+- **Decision 2 is enforced on the form only** (accepted as is by the review of dd68598, item 5). Two paths can still
+  place an IAL unit in November:
+  - the item endpoint (`PUT …/items/:itemId`, API-only by decision 4, which left the old tools as they are);
+  - `copyOffersFrom`, when a sheet is copied from another session, which keeps each unit's month.
+
+  The form lists such a unit's current month, so the select tells the truth, and refuses a move to November.
+- **The import's brand-new student and the exception.** A row of the day-one import that is a first entry in
+  self-study on a self-study-only item, for a student the import itself creates, stays refused: no exception can be
+  granted before the student exists. Staff name an earlier sitting, or make the student, grant the exception and
+  review the import again.
 - **The register and registrations pages redirect an admin to `/admin/subjects`.** A redirect for a role that has no
   Reserve page, not a link; it now lands on a hidden screen.
 
@@ -466,4 +548,14 @@ with two qualifications (step 1), and the self-study-only subject, Chemistry (st
   and §8, CYCLE_FOLLOWUPS.md §10 and UI_AUDIT.md §9; this document.
 - The dev servers are left running for the lead's drive: API on 3181 (pnpm 86464, node 86475) and web on 3180 (pnpm
   86466), database `igcse_decisions_dev`, with the school's name emptied again.
-- Next: the final commit (documents, trail, evidence) and its CI run; then the lead's review.
+- 02:57Z: CI run 38841703673 green on b4ee015 (the documents, the trail and the evidence).
+- 14:45Z: the Opus 5.5 review of dd68598: merge after fixes 1, 2; seven items.
+- 14:45–14:50Z: item 1 — 0057 restored byte-identical to 19dabff; 0061 generated and filled; proved on a fresh
+  template copy, migrated 61 then 62 (`migration-0061.txt`); the starter-set note.
+- 14:52Z: item 2 — the read for a student with the exception; 08p's new scenario (12 passed) and control c3.
+- 14:54Z: item 7's nits. 14:55Z: item 4's dictionary and its check.
+- 14:57Z: item 3 — case b and the Add path driven with the screen sampled at 1.5 s (`b-fixed2`, `add-fixed`).
+- 14:58Z: item 2 on the Reserve page (`after-exception/`).
+- 15:05Z: the desk's transfer dialogs in Arabic: the record dialog's description was taken by "EGP (.+)" (red).
+  15:06Z: the decisions' rules asked first, the dialogs given Arabic, driven again (`desk-transfer-ar/`).
+- Items 5 and 6: this document (§9, §3).

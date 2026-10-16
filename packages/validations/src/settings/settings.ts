@@ -178,7 +178,7 @@ export const SETTINGS = {
     group: 'import',
     label: 'Self-study on a subject the school teaches',
     description:
-      'The school\'s sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today\'s rule allows studying outside school only on a retake: a first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
+      'The school\'s sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today\'s rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
     editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
     source: 'IS-03',
     input: 'choice',

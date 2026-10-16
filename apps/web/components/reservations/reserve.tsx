@@ -108,8 +108,10 @@ const reservable = (it: Item) => it.open.first || it.open.retake;
 const usable = (p: Price) => !p.noFee && p.open;
 
 /** The entry choices as the forms word them: the attempt and the mode in one list. */
-function entryLabel(p: Price, known: boolean): string {
-  if (p.attempt === 'first') return p.mode === 'in_school' ? 'First entry, in school' : 'First entry, self-study (not taught this cycle)';
+function entryLabel(p: Price, known: boolean, taught: boolean): string {
+  // A first entry in self-study is offered where nothing is taught (the A.2. carried forward in self-study) or by
+  // the student's exception on what is (the lead's decision of 16 Oct 2026, 1): only the first says "not taught".
+  if (p.attempt === 'first') return p.mode === 'in_school' ? 'First entry, in school' : taught ? 'First entry, self-study' : 'First entry, self-study (not taught this cycle)';
   if (p.mode === 'in_school') return known ? 'Retake, in school' : 'Retake, in school — name the sitting';
   return known ? 'Retake, self-study' : 'Retake, self-study — name the sitting';
 }
@@ -494,7 +496,7 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
               {p.on && (
                 <div className="space-y-1.5">
                   <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-80')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
-                    {options.map((x) => <option key={entryKey(x)} value={entryKey(x)}>{entryLabel(x, isKnown(it))}</option>)}
+                    {options.map((x) => <option key={entryKey(x)} value={entryKey(x)}>{entryLabel(x, isKnown(it), !it.constraints.selfStudyOnly)}</option>)}
                   </select>
                   {needsSitting && (
                     <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-80')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
@@ -506,7 +508,7 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
                   {preview && options.length > 0 && (
                     <ul className="space-y-0.5 text-xs text-muted-foreground">
                       {options.map((x) => (
-                        <li key={entryKey(x)}><span>{entryLabel(x, isKnown(it))}</span> · <Money amount={x.total} />{x.provisional && ' ⓟ'}</li>
+                        <li key={entryKey(x)}><span>{entryLabel(x, isKnown(it), !it.constraints.selfStudyOnly)}</span> · <Money amount={x.total} />{x.provisional && ' ⓟ'}</li>
                       ))}
                     </ul>
                   )}

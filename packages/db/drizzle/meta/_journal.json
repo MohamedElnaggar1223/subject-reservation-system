@@ -428,6 +428,13 @@
       "when": 1791510469146,
       "tag": "0060_scheduling_leavings",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1792161944346,
+      "tag": "0061_rule_source_notes",
+      "breakpoints": true
     }
   ]
 }

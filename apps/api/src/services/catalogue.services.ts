@@ -691,7 +691,8 @@ export async function loadStarterSet(set: StarterSet, actorId: string, ctx?: Aud
   return db.transaction(async (tx) => {
     // One load at a time: the board row is the lock.
     await tx.select({ code: examBoard.code }).from(examBoard).where(eq(examBoard.code, data.boardCode)).for('update');
-    const note = 'Starter set from the research (DISCOVERY_RESEARCH.md §2) — check it against the board\'s current specification.';
+    // The documents' names alone, not the research file's (the lead's decision of 16 Oct 2026, 16; the review of dd68598).
+    const note = 'Starter set from Pearson\'s IAL information manual 2025/26, the IAL Mathematics aggregation rules and the IAL January 2027 timetable — check it against the board\'s current specification.';
     const addedUnits = await tx.insert(examUnit).values(data.units.map((u) => ({
       id: randomUUID(), boardCode: data.boardCode, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, kind: 'unit', notes: note,
     }))).onConflictDoNothing().returning({ id: examUnit.id });

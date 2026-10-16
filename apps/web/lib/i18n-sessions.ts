@@ -156,7 +156,6 @@ export const sessionsArabic: Record<string, string> = {
   'Its board fee is read for the subject row; an item entering a unit or an award is made from the catalogue when the subject is added.':
     'تُقرأ رسوم المجلس لصف المادة؛ أما البند الذي يقيد وحدة أو مؤهلًا فيُنشأ من الكتالوج عند إضافة المادة.',
   'Replace a teacher': 'استبدال معلم',
-  'Every line, item and this year\'s class of the teacher who leaves moves to the other, audited.': 'تنتقل كل أسطر المعلم المغادر وبنوده ومجموعته هذا العام إلى الآخر، مع التسجيل.',
   'Who leaves': 'من يغادر',
   'Who takes over': 'من يتولى',
   'Replace': 'استبدال',

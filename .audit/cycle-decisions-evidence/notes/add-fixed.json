@@ -1,0 +1,47 @@
+{
+ "mode": "add",
+ "tag": "fixed",
+ "before": "",
+ "typed": "Read-back drive add fixed 14:57:28",
+ "after": "Read-back drive add fixed 14:57:28",
+ "keptWhatWasSaved": true,
+ "savedShown": true,
+ "errorShown": [],
+ "duringOutage": {
+  "savedShownAt1500ms": true,
+  "drawerTitle": "Accounting",
+  "waitingNoticeShownAt1500ms": true,
+  "screenReplacedByError": false,
+  "addedName": "Accounting"
+ },
+ "requests": [
+  {
+   "at": 54,
+   "what": "GET answered"
+  },
+  {
+   "at": 286,
+   "what": "GET answered"
+  },
+  {
+   "at": 2566,
+   "what": "POST the new subject"
+  },
+  {
+   "at": 2630,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 2631,
+   "what": "GET aborted (the sheet cannot be read: the network is down for 9 s)"
+  },
+  {
+   "at": 12152,
+   "what": "GET answered"
+  }
+ ],
+ "errors": [
+  "console: Failed to load resource: net::ERR_FAILED",
+  "console: Failed to load resource: net::ERR_FAILED"
+ ]
+}

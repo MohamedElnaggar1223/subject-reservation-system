@@ -1,0 +1,35 @@
+{
+ "Transfer found — added to the balance": {
+  "inSource": true,
+  "arabic": "وُجد التحويل — أُضيف إلى الرصيد"
+ },
+ "Add to the balance": {
+  "inSource": true,
+  "arabic": "إضافة إلى الرصيد"
+ },
+ "Withdrawal rejected — unreleased amount returned to the balance.": {
+  "inSource": true,
+  "arabic": "رُفض السحب — أُعيد المبلغ غير المصروف إلى الرصيد."
+ },
+ "Receipt returned — any pending drop refund has been released to the balance.": {
+  "inSource": true,
+  "arabic": "أُعيد الإيصال — أُفرج عن أي استرداد سحب معلّق إلى الرصيد."
+ },
+ "Only if you have not paid. What your balance paid toward it goes back to the balance.": {
+  "inSource": true,
+  "arabic": "فقط إذا لم تدفع. ما دفعه رصيدك منها يعود إلى الرصيد."
+ },
+ "The transfer recorded today against EGP 8,800 by InstaPay. Its amount is taken back from the student's balance and it leaves today's takings; the payment can then be recorded again. Possible only today, and only while that amount is unspent.": "التحويل المسجَّل اليوم مقابل ⁨8,800 جنيه⁩ عبر إنستاباي. يُستعاد المبلغ من رصيد الطالب ويخرج من إيرادات اليوم؛ ثم يمكن تسجيل الدفعة من جديد. ممكن اليوم فقط، وما دام المبلغ لم يُصرف.",
+ "EGP 8,800 by InstaPay (the family gave reference IPX-PLACEHOLDER-0001). The payment had already closed, so its subjects stay as they are; the amount that arrived is added to the student's balance, to use on a later payment or take back as cash. This cannot be undone. Recorded in the audit trail and in today's takings.": "⁨8,800 جنيه⁩ عبر إنستاباي (أعطت الأسرة المرجع ⁨IPX-PLACEHOLDER-0001⁩). كانت الدفعة قد أُغلقت، فتبقى موادها كما هي؛ ويُضاف المبلغ الذي وصل إلى رصيد الطالب، ليُستخدم في دفعة لاحقة أو يُسترد نقدًا. لا يمكن التراجع عن هذا. يُسجَّل في سجل التدقيق وفي إيرادات اليوم.",
+ "EGP 8,800 by InstaPay. The payment had already closed, so its subjects stay as they are; the amount that arrived is added to the student's balance, to use on a later payment or take back as cash. This cannot be undone. Recorded in the audit trail and in today's takings.": "⁨8,800 جنيه⁩ عبر إنستاباي. كانت الدفعة قد أُغلقت، فتبقى موادها كما هي؛ ويُضاف المبلغ الذي وصل إلى رصيد الطالب، ليُستخدم في دفعة لاحقة أو يُسترد نقدًا. لا يمكن التراجع عن هذا. يُسجَّل في سجل التدقيق وفي إيرادات اليوم.",
+ "Transfer IPX-PLACEHOLDER-0001 recorded — EGP 8,800 added to the student's balance. The family has been told.": "سُجّل التحويل ⁨IPX-PLACEHOLDER-0001⁩ — أُضيف ⁨8,800 جنيه⁩ إلى رصيد الطالب. وأُبلغت الأسرة.",
+ "Transfer undone — EGP 8,800 taken back from the student's balance. The payment can be recorded again.": "أُلغي التحويل — استُعيد ⁨8,800 جنيه⁩ من رصيد الطالب. يمكن تسجيل الدفعة من جديد.",
+ "_templatesInSource": [
+  true,
+  true,
+  true,
+  true,
+  true,
+  true
+ ]
+}

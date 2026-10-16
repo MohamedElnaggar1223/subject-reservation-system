@@ -679,7 +679,7 @@ F6's own:
     **Decided** (§6, 15): the school's name from the setting `school.name` (admin, empty by default) above the app's name; no logo until the school provides one.
 16. **Entry Lists' rule source** reads "From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026)" (§3.23):
     change the stored text to the handbook's name alone? Default: as stored.
-    **Decided** (§6, 16): yes — 0057's seed for new installs and a one-off update for existing databases (CYCLE_DECISIONS.md §6).
+    **Decided** (§6, 16): yes — migration 0061 changes the stored text on every database, 0057 untouched (CYCLE_DECISIONS.md §1.16, §6).
 
 ## 10. Proof
 

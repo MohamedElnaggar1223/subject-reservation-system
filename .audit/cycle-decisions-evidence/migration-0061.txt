@@ -1,0 +1,20 @@
+Migration 0061_rule_source_notes (the review of dd68598, item 1) on a fresh copy of igcse_template_dev, 16 Oct 2026 ~14:50Z.
+igcse_decisions_mig = CREATE DATABASE … TEMPLATE igcse_template_dev (the template held 34 migrations).
+
+1. Migrated with main 19dabff's migration set (/tmp/cd/mig-main/drizzle: all 122 files byte-identical to 19dabff's
+   packages/db/drizzle, 0057 included):
+   migrations: 61
+   cambridge | From DISCOVERY_RESEARCH.md §2 (Cambridge Handbook 2026). Check each rule against the current handbook.
+   oxford | OxfordAQA's entry rules were not researched (DISCOVERY_RESEARCH.md §2 lists only its series and entry routes).
+   pearson_edexcel | From DISCOVERY_RESEARCH.md §2 (Pearson key dates 2026/27, IAL information manual). IAL unit results are banked under the UCI.
+   audit rows (EXAM_BOARD_RULE_UPDATED, no user): 0
+
+2. Migrated with the branch's set (0061 the one pending):
+   migrations: 62
+   cambridge | Cambridge Handbook 2026. Check each rule against the current handbook.
+   oxford | OxfordAQA's entry rules were not researched: only its series and entry routes are known.
+   pearson_edexcel | Pearson key dates 2026/27, IAL information manual. IAL unit results are banked under the UCI.
+   audit rows: 3 (each with the old notes as previous_data and the new as new_data)
+
+3. Second run: drizzle-kit migrate again applies nothing (migrations: 62); 0061's statement run by hand: INSERT 0 0;
+   audit rows: still 3.

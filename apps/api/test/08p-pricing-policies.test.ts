@@ -184,6 +184,32 @@ describe('08p: pricing policies', () => {
     expect((await priceOf(carried!.id)).basis).toMatchObject({ attempt: 'first', mode: 'self_study', coursePercent: 50 });
   });
 
+  it("decision 1's exception reaches the screens (the review of dd68598, item 2): once granted, the family's and the desk's reads offer a first entry in self-study, priced for the student, on the untaught subject and on a taught one; the desk's reservation of it is made and uses it; a student without it, and the preview, are offered none", async () => {
+    const f = await onboard(officer, `p08-d1x-${RUN}`, 11);
+    const other = await onboard(officer, `p08-d1y-${RUN}`, 11);
+    const offered = async (who: Client, studentId: string, itemId: string) =>
+      (await apiResponse(who.api.v1.registrations.offers.$get({ query: { sessionId: session, studentId } }))).offers.flatMap((o) => o.items)
+        .find((i) => i.id === itemId)!.prices.map((p) => `${p.attempt} ${p.mode} ${p.total}`);
+    expect(await offered(f.parent, f.studentId, untaught)).toEqual(['retake self_study 16200']);
+    const gate = await firstInSelfStudy(f.studentId);
+    // Granted: the family's read and the desk's offer it, on the untaught subject and on a taught one (the grant names no subject).
+    for (const who of [f.parent, officer]) expect(await offered(who, f.studentId, untaught)).toEqual(['first self_study 16200', 'retake self_study 16200']);
+    expect(await offered(officer, f.studentId, taughtWhole)).toEqual(['first in_school 23200', 'first self_study 16200', 'retake in_school 23200', 'retake self_study 16200']);
+    // Nobody else's read, and not the preview (no family's exception there).
+    expect(await offered(other.parent, other.studentId, untaught)).toEqual(['retake self_study 16200']);
+    const pre = await apiResponse(adm.api.v1.registrations.offers.preview.$get({ query: { sessionId: session } }));
+    expect(pre.offers.flatMap((o) => o.items).find((i) => i.id === untaught)!.prices.map((p) => `${p.attempt} ${p.mode}`)).toEqual(['retake self_study']);
+    // The desk reserves it as the screen offers it: made at the self-study share, the exception used by it.
+    const made = await apiResponse(officer.api.v1.registrations.desk.$post({
+      json: { sessionId: session, studentId: f.studentId, lines: [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }], consent: CONSENT },
+    }));
+    const line = made.registrations[0]!;
+    expect(await priceOf(line.id)).toMatchObject({ course: 7000, board: 9200, price: 16200, basis: { attempt: 'first', mode: 'self_study' } });
+    expect(await one(`select status, used_for as used from exception where id = $1`, [gate.id])).toEqual({ status: 'used', used: { registrationIds: [line.id] } });
+    // Used once: the read offers it no more.
+    expect(await offered(f.parent, f.studentId, taughtWhole)).toEqual(['first in_school 23200', 'retake in_school 23200', 'retake self_study 16200']);
+  });
+
   it("a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry", async () => {
     const f = await onboard(officer, `p08-one-${RUN}`, 11);
     const retake = { attempt: 'retake' as const, priorSittingSeriesId: priorJune, priorSittingSource: 'declared_by_desk' as const };

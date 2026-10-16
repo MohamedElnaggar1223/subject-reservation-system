@@ -29,6 +29,7 @@ import { availabilityConstraints } from './offer.services';
 import { priceLine } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { examSittingsOf, examKeysOf } from './reservation.services';
+import { lineExceptions } from './line-exceptions';
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
@@ -148,6 +149,16 @@ async function readOffers(sessionId: string, studentId: string | null) {
         if (firstEntries && c.selfStudyOnly && i.needsPriorSeries) combos.push({ attempt: 'first', mode: 'self_study' });
         if (!c.selfStudyOnly) combos.push({ attempt: 'retake', mode: 'in_school' });
         combos.push({ attempt: 'retake', mode: 'self_study' });
+      }
+      // The student's exception "self-study on a first entry" — decision 1's only way past the rule — offers the
+      // choice where it covers the item, so a family or the desk can take it from the screen (the review of
+      // dd68598, item 2). Read without locking (a GET marks nothing used); the reservation asks it again, under
+      // its lock, through assertLineRules. A preview (no student) offers no family's exception.
+      if (studentId && !c.closed && firstEntries && !combos.some((k) => k.attempt === 'first' && k.mode === 'self_study')) {
+        const held = await lineExceptions.active(db, studentId, ['gate.selfStudyFirstEntry'], {
+          sessionId, subjectId: o.subjectId, offerId: o.id, offerItemId: i.id as string, ...(seriesId ? { boardSeriesId: seriesId } : {}),
+        });
+        if (held.length) combos.splice(combos.some((k) => k.attempt === 'first') ? 1 : 0, 0, { attempt: 'first', mode: 'self_study' });
       }
       // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
       // exams' start with none); a retake of the board's previous sitting until the retake deadline
