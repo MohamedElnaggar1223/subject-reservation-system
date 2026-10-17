@@ -1464,8 +1464,11 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
     const rule = await apiResponse(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: r.id, offsetsDays: [-10], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: '08n: this draft reminds ten days ahead' } }));
     const [aud, msg] = [`n08-del-aud-${RUN}`, `n08-del-msg-${RUN}`];
     await sql(`insert into message_audience (id, kind, definition) values ($1, 'batch', '{"kind":"batch","list":"reminder"}'::jsonb)`, [aud]);
-    await sql(`insert into message (id, audience_id, template_id, channels, notification_type, source, reminder_rule_id, status, sent_at) values ($1, $2, 'tpl-payment-due', '{in_app}', 'PAYMENT_REMINDER', 'reminder', $3, 'sent', now())`, [msg, aud, rule.id]);
+    await sql(`insert into message (id, audience_id, template_id, channels, notification_type, source, reminder_rule_id, status, sent_at, recipient_count) values ($1, $2, 'tpl-payment-due', '{in_app}', 'PAYMENT_REMINDER', 'reminder', $3, 'sent', now(), 0)`, [msg, aud, rule.id]);
     await sql(`insert into reminder_sent (id, rule_id, kind, target_kind, target_id, anchor_on, offset_days, session_id, message_id, sent_on) values ($1, $2, 'payment_due', 'line', $3, current_date + 10, -10, $4, $5, current_date)`, [`n08-del-sent-${RUN}`, rule.id, `n08-del-line-${RUN}`, r.id, msg]);
+    // Its audit row, as the step writes one with every send (09's rule: every message sent has one).
+    await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data) values ($1, null, 'REMINDERS_SENT', 'message', $2, null, $3::jsonb)`,
+      [`n08-del-audit-${RUN}`, msg, JSON.stringify({ kind: 'payment_due', ruleId: rule.id, sessionId: r.id, offsets: [-10], claimed: 1, people: 0, deliveries: 0 })]);
     expect(await refused(del(adm, r.id, 'a draft a reminder went out for'))).toEqual({ status: 409, error: `Reminders were sent for ${r.name}: it is kept as history and cannot be deleted` });
     expect(await exists(r.id)).toBe(true);
     expect(await one(`select count(*)::int as n from reminder_rule where id = $1`, [rule.id])).toEqual({ n: 1 });
