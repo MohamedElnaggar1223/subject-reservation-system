@@ -14,7 +14,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, formatEgp } from '@repo/validations';
 import Link from 'next/link';
 import { useI18n } from '~/lib/i18n';
 
@@ -310,7 +310,7 @@ export default function AdminDashboardClient() {
               <MetricCard
                 label={t('dashboard.withdrawals')}
                 value={metrics.pendingWithdrawals}
-                sub={`EGP ${(metrics.pendingWithdrawalsAmountEGP ?? 0).toLocaleString('en-EG', { minimumFractionDigits: 2 })} ${t('dashboard.total')}`}
+                sub={`${formatEgp(metrics.pendingWithdrawalsAmountEGP ?? 0)} ${t('dashboard.total')}`}
                 accent="red"
                 href="/admin/escrow"
               />
@@ -336,7 +336,7 @@ export default function AdminDashboardClient() {
               />
               <MetricCard
                 label={t('dashboard.revenueCurrent')}
-                value={`EGP ${metrics.currentSessionRevenueEGP.toLocaleString('en-EG', { minimumFractionDigits: 2 })}`}
+                value={formatEgp(metrics.currentSessionRevenueEGP)}
                 sub={t('dashboard.confirmedPayments')}
                 accent="teal"
               />
@@ -355,7 +355,7 @@ export default function AdminDashboardClient() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <MetricCard
                 label={t('dashboard.escrowLiability')}
-                value={`EGP ${metrics.escrowLiabilityEGP.toLocaleString('en-EG', { minimumFractionDigits: 2 })}`}
+                value={formatEgp(metrics.escrowLiabilityEGP)}
                 sub={t('dashboard.totalPositiveBalances')}
                 accent="purple"
                 href="/admin/escrow"
@@ -374,7 +374,7 @@ export default function AdminDashboardClient() {
               <MetricCard
                 label={t('dashboard.pendingWithdrawals')}
                 value={metrics.pendingWithdrawals}
-                sub={`EGP ${metrics.pendingWithdrawalsAmountEGP.toLocaleString('en-EG', { minimumFractionDigits: 2 })}`}
+                sub={formatEgp(metrics.pendingWithdrawalsAmountEGP)}
                 accent="amber"
                 href="/admin/escrow"
               />
@@ -506,7 +506,7 @@ export default function AdminDashboardClient() {
                       {r.sessionName}
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-card-foreground">
-                      EGP {r.priceEGP.toFixed(2)}
+                      {formatEgp(r.priceEGP)}
                     </td>
                     <td className="px-4 py-3">
                       <DaysBadge days={r.daysWaiting} />

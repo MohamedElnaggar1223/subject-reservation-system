@@ -19,8 +19,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, IN_SCHOOL_INSTRUMENT_LABELS, PAYMENT_METHOD_LABELS } from '@repo/validations';
-import { formatPrice } from '~/lib/format';
+import { apiResponse, IN_SCHOOL_INSTRUMENT_LABELS, PAYMENT_METHOD_LABELS, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 
@@ -93,30 +92,30 @@ export default function TakingsClient(): React.JSX.Element {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <p className="text-xs text-muted-foreground">Cash in drawer</p>
-              <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.drawer.net)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatEgp(data.totals.drawer.net)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {formatPrice(data.totals.drawer.cashIn)} cash in · {formatPrice(data.totals.drawer.cashOut)} cash out
+                {formatEgp(data.totals.drawer.cashIn)} cash in · {formatEgp(data.totals.drawer.cashOut)} cash out
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <p className="text-xs text-muted-foreground">Money in</p>
-              <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.moneyIn)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatEgp(data.totals.moneyIn)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                all instruments · plus {formatPrice(data.totals.escrowApplied)} paid from balances
+                all instruments · plus {formatEgp(data.totals.escrowApplied)} paid from balances
                 {data.totals.correctedTotal > 0 && (
-                  <> · {formatPrice(data.totals.correctedTotal)} corrected out
-                    {data.totals.correctedEscrow > 0 && <> (and {formatPrice(data.totals.correctedEscrow)} to balances)</>}</>
+                  <> · {formatEgp(data.totals.correctedTotal)} corrected out
+                    {data.totals.correctedEscrow > 0 && <> (and {formatEgp(data.totals.correctedEscrow)} to balances)</>}</>
                 )}
-                {data.totals.lateTransferTotal > 0 && <> · incl. {formatPrice(data.totals.lateTransferTotal)} transfers found later</>}
+                {data.totals.lateTransferTotal > 0 && <> · incl. {formatEgp(data.totals.lateTransferTotal)} transfers found later</>}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <p className="text-xs text-muted-foreground">Money out</p>
-              <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.moneyOut)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatEgp(data.totals.moneyOut)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {formatPrice(data.totals.cashRefunded)} refunds · {formatPrice(data.totals.reversedTotal)} reversed
-                {data.totals.closedMonthCorrectionTotal > 0 && <> · less {formatPrice(data.totals.closedMonthCorrectionTotal)} corrections to closed months</>}
-                {' '}· net {formatPrice(data.totals.net)}
+                {formatEgp(data.totals.cashRefunded)} refunds · {formatEgp(data.totals.reversedTotal)} reversed
+                {data.totals.closedMonthCorrectionTotal > 0 && <> · less {formatEgp(data.totals.closedMonthCorrectionTotal)} corrections to closed months</>}
+                {' '}· net {formatEgp(data.totals.net)}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
@@ -124,7 +123,7 @@ export default function TakingsClient(): React.JSX.Element {
               {Object.entries(data.totals.byInstrument).map(([k, v]) => (
                 <p key={k} className="text-sm text-foreground flex justify-between">
                   <span>{instrumentLabel(k)}</span>
-                  <span className="font-medium">{formatPrice(v)}</span>
+                  <span className="font-medium">{formatEgp(v)}</span>
                 </p>
               ))}
             </div>
@@ -162,7 +161,7 @@ export default function TakingsClient(): React.JSX.Element {
                       </td>
                       <td className="px-4 py-2.5 text-card-foreground">{instrumentLabel(r.instrumentUsed ?? r.paymentMethod)}</td>
                       <td className="px-4 py-2.5 text-card-foreground">{r.confirmedByUser?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatEgp(r.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -184,7 +183,7 @@ export default function TakingsClient(): React.JSX.Element {
                       <td className="px-4 py-2.5 text-foreground">{d.student?.name ?? '—'}</td>
                       <td className="px-4 py-2.5 text-card-foreground">Cash refund</td>
                       <td className="px-4 py-2.5 text-card-foreground">{d.disbursedByUser?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">− {formatPrice(d.amount)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">− {formatEgp(d.amount)}</td>
                     </tr>
                   ))}
                   {data.reversed.map((r) => (
@@ -199,7 +198,7 @@ export default function TakingsClient(): React.JSX.Element {
                         )
                       </td>
                       <td className="px-4 py-2.5 text-card-foreground">{r.reversedByUser?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">− {formatPrice(r.amount)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">− {formatEgp(r.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -224,10 +223,10 @@ export default function TakingsClient(): React.JSX.Element {
                       <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
                       <td className="px-4 py-2.5 text-card-foreground">
                         InstaPay <span className="font-mono">{r.verificationReference}</span> — added to the balance
-                        {r.lateTransferAmount !== r.amount && <> (the payment was for {formatPrice(r.amount)})</>}
+                        {r.lateTransferAmount !== r.amount && <> (the payment was for {formatEgp(r.amount)})</>}
                       </td>
                       <td className="px-4 py-2.5 text-card-foreground">{r.lateTransferByUser?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatPrice(r.lateTransferAmount ?? 0)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatEgp(r.lateTransferAmount ?? 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -255,9 +254,9 @@ export default function TakingsClient(): React.JSX.Element {
                         Confirmed this day by {r.confirmedByUser?.name ?? '—'}; reversed{' '}
                         {r.reversedAt ? new Date(r.reversedAt).toLocaleDateString() : ''} by {r.reversedByUser?.name ?? '—'}
                         {' '}({instrumentLabel(r.instrumentUsed ?? r.paymentMethod)}
-                        {r.escrowAmountApplied > 0 ? `; ${formatPrice(r.escrowAmountApplied)} from the balance, returned` : ''})
+                        {r.escrowAmountApplied > 0 ? `; ${formatEgp(r.escrowAmountApplied)} from the balance, returned` : ''})
                       </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-muted-foreground line-through whitespace-nowrap">{formatPrice(r.amount)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-muted-foreground line-through whitespace-nowrap">{formatEgp(r.amount)}</td>
                     </tr>
                   ))}
                   {data.correctionsRecorded
@@ -271,7 +270,7 @@ export default function TakingsClient(): React.JSX.Element {
                             <>
                               Reversed this day by {r.reversedByUser?.name ?? '—'}: confirmed{' '}
                               {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : ''}, a month already closed, so corrected on this day
-                              {r.escrowAmountApplied > 0 ? ` (${formatPrice(r.escrowAmountApplied)} from the balance, returned)` : ''}
+                              {r.escrowAmountApplied > 0 ? ` (${formatEgp(r.escrowAmountApplied)} from the balance, returned)` : ''}
                             </>
                           ) : (
                             <>
@@ -280,7 +279,7 @@ export default function TakingsClient(): React.JSX.Element {
                             </>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-right font-medium text-muted-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-muted-foreground whitespace-nowrap">{formatEgp(r.amount)}</td>
                       </tr>
                     ))}
                 </tbody>

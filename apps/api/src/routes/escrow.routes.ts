@@ -49,6 +49,7 @@ import {
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import * as escrowService from '../services/escrow.services';
+import { isInsufficientBalance } from '../services/escrow.services';
 import * as linkService from '../services/link.services';
 
 export const escrowRoutes = new Hono<HonoEnv>()
@@ -200,7 +201,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Transfer failed');
         const status = message.includes('not linked') ? 403 :
-                       message.includes('Insufficient') ? 422 : 400;
+                       isInsufficientBalance(err) ? 422 : 400;
         return error(c, message, status);
       }
     }
@@ -270,7 +271,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to fulfill withdrawal');
         const status = message.includes('not found') ? 404 :
-                       message.includes('Insufficient') || message.includes('Cannot release') ? 422 :
+                       isInsufficientBalance(err) || message.includes('Cannot release') ? 422 :
                        message.includes('already') || message.includes('has been rejected') ? 409 : 400;
         return error(c, message, status);
       }

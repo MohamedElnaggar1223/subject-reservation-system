@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import {
   admin, staff, onboard, subject, refused, one, sql, audited, money, futureWindow, runPaymentDeadlines, runSessionRecovery,
-  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf,
+  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf, pauseAtAudits, lockWaiters,
 } from './helpers';
 
 /**
@@ -1378,7 +1378,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
 });
 
 describe('08n: a draft session nobody reserved in is deleted from its Session screen (F8-01)', () => {
-  let adm: Client, coordinator: Client, officer: Client;
+  let adm: Client, coordinator: Client, officer: Client, finadmin: Client;
   let teacherId: string;
   const mk = async (label: string, draft: boolean) => (await apiResponse(adm.api.v1.sessions.$post({
     json: {
@@ -1394,6 +1394,7 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
     adm = await admin('n08del');
     coordinator = await staff(adm, 'coordinator', 'n08del');
     officer = await staff(adm, 'finance_officer', 'n08del');
+    finadmin = await staff(adm, 'finance_admin', 'n08del');
     teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher D (08n ${RUN})` } })))!.id;
   });
 
@@ -1438,5 +1439,59 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
     expect(await exists(d.id)).toBe(true);
     expect((await refused(del(coordinator, d.id, 'the coordinator tries'))).status).toBe(403);
     expect(await one(`select count(*)::int as n from audit_log where action = 'SESSION_DELETED' and entity_id in $1`, [[open.id, d.id]])).toEqual({ n: 0 });
+  });
+
+  it('refused, nothing deleted, for a draft whose exception was revoked and for one a reminder went out for: both are kept as history (the review of 744e553, item 2)', async () => {
+    // An exception granted on one of the draft's items, then revoked: revoking keeps the row, so the draft stays,
+    // and the refusal says it is kept rather than sending the admin to revoke it.
+    const d = await mk(`n08-del-exc-${RUN}`, true);
+    const sub = await subject(adm, `RWN-DELX-${RUN}`, `An exception in a draft (08n ${RUN})`, { course: 1000, registration: 0 });
+    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const f = await onboard(officer, `n08-delx-${RUN}`, 11);
+    const ex = await apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.availability', studentId: f.studentId, scope: { offerItemId: o.items[0]! }, reason: '08n: a first entry the item is not open to' } }));
+    const refusedWith = `An exception was granted for ${d.name}: it is kept as history and cannot be deleted`;
+    expect(await refused(del(adm, d.id, 'a draft with an exception'))).toEqual({ status: 409, error: refusedWith });
+    await apiResponse(coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: ex.id } }));
+    expect(await one(`select status from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked' });
+    expect(await refused(del(adm, d.id, 'the exception was revoked'))).toEqual({ status: 409, error: refusedWith });
+    expect(await exists(d.id)).toBe(true);
+    expect(await one(`select count(*)::int as n from session_offer_item where offer_id = $1`, [o.id])).toEqual({ n: o.items.length });
+    expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked', offer_item_id: o.items[0] });
+
+    // A reminder rule of the draft's own, and a reminder sent under it. No path sends one for a draft today (the
+    // step reminds lines and open sessions); the history the rule's foreign keys keep is written as the step writes it.
+    const r = await mk(`n08-del-rem-${RUN}`, true);
+    const rule = await apiResponse(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: r.id, offsetsDays: [-10], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: '08n: this draft reminds ten days ahead' } }));
+    const [aud, msg] = [`n08-del-aud-${RUN}`, `n08-del-msg-${RUN}`];
+    await sql(`insert into message_audience (id, kind, definition) values ($1, 'batch', '{"kind":"batch","list":"reminder"}'::jsonb)`, [aud]);
+    await sql(`insert into message (id, audience_id, template_id, channels, notification_type, source, reminder_rule_id, status, sent_at) values ($1, $2, 'tpl-payment-due', '{in_app}', 'PAYMENT_REMINDER', 'reminder', $3, 'sent', now())`, [msg, aud, rule.id]);
+    await sql(`insert into reminder_sent (id, rule_id, kind, target_kind, target_id, anchor_on, offset_days, session_id, message_id, sent_on) values ($1, $2, 'payment_due', 'line', $3, current_date + 10, -10, $4, $5, current_date)`, [`n08-del-sent-${RUN}`, rule.id, `n08-del-line-${RUN}`, r.id, msg]);
+    expect(await refused(del(adm, r.id, 'a draft a reminder went out for'))).toEqual({ status: 409, error: `Reminders were sent for ${r.name}: it is kept as history and cannot be deleted` });
+    expect(await exists(r.id)).toBe(true);
+    expect(await one(`select count(*)::int as n from reminder_rule where id = $1`, [rule.id])).toEqual({ n: 1 });
+    expect(await one(`select count(*)::int as n from audit_log where action = 'SESSION_DELETED' and entity_id in $1`, [[d.id, r.id]])).toEqual({ n: 0 });
+  });
+
+  it("finding 8: an exception granted on a draft's item while the deletion counts is seen and the deletion refused — never deleted unseen by the cascade", async () => {
+    const d = await mk(`n08-del-race-${RUN}`, true);
+    const sub = await subject(adm, `RWN-DELK-${RUN}`, `A grant during a deletion (08n ${RUN})`, { course: 1000, registration: 0 });
+    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const f = await onboard(officer, `n08-delk-${RUN}`, 11);
+    // The grant paused at its audit row: its exception is written, its transaction still open.
+    const p = await pauseAtAudits(['EXCEPTION_GRANTED']);
+    try {
+      const granting = apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.availability', studentId: f.studentId, scope: { offerItemId: o.items[0]! }, reason: '08n: granted while the draft is deleted' } }));
+      await p.paused('EXCEPTION_GRANTED');
+      // The deletion waits on the item the grant names (its lock before the count), then counts the grant.
+      const deleting = refused(del(adm, d.id, 'deleted while a grant is under way'));
+      await lockWaiters(2);
+      await p.release('EXCEPTION_GRANTED');
+      const ex = await granting;
+      expect(await deleting).toEqual({ status: 409, error: `An exception was granted for ${d.name}: it is kept as history and cannot be deleted` });
+      expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'active', offer_item_id: o.items[0] });
+      expect(await exists(d.id)).toBe(true);
+    } finally {
+      await p.releaseAll();
+    }
   });
 });

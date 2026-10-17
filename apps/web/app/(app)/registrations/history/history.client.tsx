@@ -28,8 +28,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
-import { formatPrice } from '~/lib/format';
-import { apiResponse, gradeLabel, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS, CHANGE_REQUEST_STATUS_LABELS, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -130,8 +129,8 @@ function ChangeRequestEntry({ cr }: { cr: ChangeRequestAudit }) {
           <p className={isCredit ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>
             Financial impact:{' '}
             {isCredit
-              ? `+${formatPrice(Math.abs(cr.priceDifference))} to the balance`
-              : `${formatPrice(cr.priceDifference)} additional payment`}
+              ? `+${formatEgp(Math.abs(cr.priceDifference))} to the balance`
+              : `${formatEgp(cr.priceDifference)} additional payment`}
           </p>
         )}
       </div>
@@ -167,7 +166,7 @@ function HistoryCard({ reg }: { reg: HistoryRegistration }) {
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_STYLES[reg.status] ?? 'bg-muted text-muted-foreground'}`}>
               {REGISTRATION_STATUS_LABELS[reg.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? reg.status}
             </span>
-            <span className="text-sm font-bold text-foreground">{formatPrice(reg.priceAtRegistration)}</span>
+            <span className="text-sm font-bold text-foreground">{formatEgp(reg.priceAtRegistration)}</span>
           </div>
         </div>
 
@@ -358,10 +357,10 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
                     </span>
                     <div className="text-xs text-right">
                       {totalPaid > 0 && (
-                        <p className="text-emerald-700 dark:text-emerald-400 font-semibold">Confirmed: {formatPrice(totalPaid)}</p>
+                        <p className="text-emerald-700 dark:text-emerald-400 font-semibold">Confirmed: {formatEgp(totalPaid)}</p>
                       )}
                       {totalDropped > 0 && (
-                        <p className="text-muted-foreground">Dropped: {formatPrice(totalDropped)}</p>
+                        <p className="text-muted-foreground">Dropped: {formatEgp(totalDropped)}</p>
                       )}
                     </div>
                   </div>

@@ -30,7 +30,7 @@ import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
-import { getEscrowBalance, debitEscrow } from './escrow.services';
+import { getEscrowBalance, debitEscrow, InsufficientBalanceError } from './escrow.services';
 import { confirmPayment, failPayment, assertNoLivePlan, createChargePaymentsInTx } from './payment.services';
 import {
   academicYearForDate,
@@ -245,7 +245,7 @@ async function registerAtDeskAfterChecks(
   if (escrowToApply > 0) {
     const balance = await getEscrowBalance(data.studentId);
     if (escrowToApply > balance) {
-      throw new Error(
+      throw new InsufficientBalanceError(
         `Not enough in the balance: ${formatEgp(balance)} available`
       );
     }

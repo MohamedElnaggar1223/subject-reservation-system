@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearLabel, SETTINGS, SETTING_KEYS } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, schoolToday, clientFor, type Client, reservationOf } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, schoolToday, clientFor, waitFor, type Client, reservationOf } from './helpers';
 
 /**
  * F0a — the settings store, uploads, the academic structure, sections and
@@ -159,6 +159,41 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       // Emptied: the app's name alone again.
       await apiResponse(put(adm, ''));
       expect(await publicRead(visitor)).toEqual({ schoolName: '' });
+    });
+
+    it("the emails and the emailed PDF receipt say who they come from: the school's name with the app's name under it, the app's name alone when empty (the review of 744e553, item 7)", async () => {
+      const sub = await subject(adm, 'F0A-RCPT', 'Receipt heading (F0a)', { course: 1000, registration: 0 });
+      const sid = await session(adm, 'November (F0a receipt)', 'november', 'igcse', { ...openWindow(), activate: true });
+      // The email stub's log: one line per email, with its heading (integrations/email.ts sendEmail).
+      const logged = vi.spyOn(console, 'log');
+      try {
+        const pay = async (f: Family) => (await apiResponse(officer.api.v1.registrations.desk.$post({
+          json: { studentId: f.studentId, sessionId: sid, ...(await reservationOf(sid, [sub])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        }))).payment!.id;
+        const receiptEmailTo = (email: string) => waitFor(async () => logged.mock.calls.map((c) => c.join(' '))
+          .find((l) => l.startsWith('[email:stub]') && l.includes(email) && l.includes('| Attachments: receipt')));
+        const pdfText = async (f: Family, id: string) =>
+          Buffer.from(await (await f.parent.api.v1.payments[':id'].receipt.$get({ param: { id } })).arrayBuffer()).toString('latin1');
+
+        await apiResponse(put(adm, 'Placeholder International School'));
+        const named = await family('rcpt-named');
+        const p1 = await pay(named);
+        expect(await receiptEmailTo(named.parent.email)).toContain('| Heading: Placeholder International School / IGCSE Subject Reservation System |');
+        const t1 = await pdfText(named, p1);
+        expect(t1).toContain('Placeholder International School) Tj');
+        expect(t1).toContain('IGCSE Subject Reservation System) Tj');
+
+        await apiResponse(put(adm, ''));
+        const plain = await family('rcpt-plain');
+        const p2 = await pay(plain);
+        expect(await receiptEmailTo(plain.parent.email)).toContain('| Heading: IGCSE Subject Reservation System |');
+        const t2 = await pdfText(plain, p2);
+        expect(t2).toContain('IGCSE SUBJECT RESERVATION SYSTEM) Tj');
+        expect(t2).not.toContain('Placeholder International School');
+      } finally {
+        // The name, if a step failed with it set, goes with the file's afterAll.
+        logged.mockRestore();
+      }
     });
   });
 

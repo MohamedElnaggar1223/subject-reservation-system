@@ -32,6 +32,19 @@ export async function getSetting<K extends SettingKey>(key: K, executor: Executo
   return (parsed.success ? parsed.data : SETTINGS[key].default) as SettingValue<K>;
 }
 
+/** The app's name: under the school's in a heading, alone when the school's name is not set. */
+export const APP_NAME = 'IGCSE Subject Reservation System';
+
+/**
+ * Who an email or a receipt comes from (the review of 744e553, item 7; F8-11's rule for the printed papers): the
+ * school's name as the admin set it on Settings (`school.name`), with the app's name under it — or the app's name
+ * alone when it is empty. The name is data, written as it was typed.
+ */
+export async function senderNames(): Promise<{ school: string | null; app: string }> {
+  const school = (await getSetting('school.name')).trim();
+  return { school: school || null, app: APP_NAME };
+}
+
 /**
  * What any visitor may read, signed in or not (GET /v1/settings/public): the school's name for the
  * sign-in, sign-up and account pages (the lead's decision of 16 Oct 2026, 15). Nothing else is public.

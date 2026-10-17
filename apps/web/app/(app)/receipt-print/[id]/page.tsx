@@ -7,7 +7,7 @@
 
 import { requireAuth } from '~/lib/auth/session';
 import { getServerApi } from '~/lib/hono-server';
-import { apiResponse, gradeLabel } from '@repo/validations';
+import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
 import { readSchoolName } from '~/lib/school-name-server';
 import { PrintHeading } from '~/components/print-heading';
 import PrintButton from './print-button.client';
@@ -23,7 +23,7 @@ const fetchReceipt = (api: Awaited<ReturnType<typeof getServerApi>>, id: string)
 type ReceiptDetail = Awaited<ReturnType<typeof fetchReceipt>>;
 
 /** "EGP 14,000" (and "EGP 14,000.50" when there are piastres), as every money figure on the screens reads. */
-const egp = (n: number) => `EGP ${n.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+const egp = formatEgp;
 
 const COUNCILS: Record<string, string> = {
   pearson_edexcel: 'Pearson Edexcel',

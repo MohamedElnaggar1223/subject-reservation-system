@@ -1,0 +1,71 @@
+{
+  "errors": [
+    "http 409 DELETE /v1/sessions/8ad6c5ed-5187-40d9-9117-070efc5b69d7 {\"success\":false,\"error\":\"An exception was granted for June 2028 — r2-kept: it is kept as history and cannot be deleted\"}",
+    "http 409 DELETE /v1/sessions/8ad6c5ed-5187-40d9-9117-070efc5b69d7 {\"success\":false,\"error\":\"An exception was granted for June 2028 — r2-kept: it is kept as history and cannot be deleted\"}",
+    "step i6-school-fee-ar: TimeoutError: locator.isEnabled: Timeout 30000ms exceeded.",
+    "http 400 POST /v1/registrations/direct {\"success\":false,\"error\":\"The 2026-2027 school fee (EGP 5,000) must be paid before registering subjects\"}"
+  ],
+  "readings": {
+    "i1-board-admin-changed-en": "Cambridge International\nCambridge Direct\nEntry portal\nMonths it sits\nOctober\nNovember\nJanuary\nJune\nA one-paper retake's board fee\nThe syllabus's fee (the list prices the syllabus)\nThe paper's own fee (the list prices each paper)\nA one-paper retake added to a session from now on reads it; one already on a sheet keeps its fee.\nReason\nNotes\nCancel\nSave",
+    "i1-board-admin-no-reason-en": "Cambridge International\nCambridge Direct\nEntry portal\nMonths it sits\nOctober\nNovember\nJanuary\nJune\nA one-paper retake's board fee\nThe syllabus's fee (the list prices the syllabus)\nThe paper's own fee (the list prices each paper)\nA one-paper retake added to a session from now on reads it; one already on a sheet keeps its fee.\nReason\nNotes\nSay why the one-paper rule changes (at least 5 characters) — it is recorded.\nCancel\nSave",
+    "i1-board-coordinator-en": "Cambridge International\nCambridge Direct\nEntry portal\nMonths it sits\nOctober\nNovember\nJanuary\nJune\nA one-paper retake: the syllabus's board fee Only an admin changes it: it decides what every new one-paper retake costs.\nNotes\nCancel\nSave",
+    "i1-coordinator-select-count": 0,
+    "i1-api-coordinator-refused": "Error: PUT /v1/catalogue/boards/cambridge: 403 {\"success\":false,\"error\":\"Only an admin changes a board's one-paper fee rule: it decides what every new one-paper retake costs\"}",
+    "i2-sessions": {
+      "deleted": [
+        "7eb7afcf-a5fa-42c4-87f3-4c2943d27db7",
+        "June 2028 — r2-deleted"
+      ],
+      "kept": [
+        "8ad6c5ed-5187-40d9-9117-070efc5b69d7",
+        "June 2028 — r2-kept"
+      ],
+      "exception": "65349bd6-f824-48dc-ac89-256ce7015f47"
+    },
+    "i2-after-delete-url": "/admin/sessions",
+    "i2-responses-400-or-more": [],
+    "i2-list-names-deleted": false,
+    "i2-kept-refusal-en": "Delete this draft session\nOnly a draft nobody has reserved in can be deleted. Its subjects, items and fees on this sheet go with it; the subjects stay in the catalogue and the boards' series keep their dates and fee lists. Recorded in the audit trail with your reason.\nReason\nAn exception was granted for June 2028 — r2-kept: it is kept as history and cannot be deleted\nCancel\nDelete the draft",
+    "i2-kept-url-en": "/admin/sessions/8ad6c5ed-5187-40d9-9117-070efc5b69d7",
+    "i2-kept-refusal-ar": "حذف دورة المسودة هذه\nلا تُحذف إلا مسودة لم يحجز فيها أحد. تُحذف معها مواد هذا الجدول وبنوده ورسومه؛ وتبقى المواد في الدليل وتحتفظ دورات المجالس بمواعيدها وقوائم رسومها. يُسجَّل ذلك في سجل التدقيق مع سببك.\nالسبب\nAn exception was granted for يونيو 2028 — r2-kept: it is kept as history and cannot be deleted\nإلغاء\nحذف المسودة",
+    "i2-kept-url-ar": "/admin/sessions/8ad6c5ed-5187-40d9-9117-070efc5b69d7",
+    "i6-submit-enabled-en": true,
+    "i6-school-fee-refusal-en": "Reserve\nChoose your child and the session, tick what they will sit, and pay by exam series.\nChild\nChoose…\nStudent C · Grade 11\nSession\nChoose…\nJune 2027\nJune 2028 — r2-kept (preregistration)\nReservations close 15 Feb 2027\nThe school fee comes first\nThe 2026-2027 school fee (EGP 5,000) is paid before reserving. Pay the school fee now →\nTick what you want to sit. A retake the school does not know about yet: choose \"retake\" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.\n\tSUBJECT · PAPERS\tTEACHER\tENTRY\tPRICE\nO.L.\nArabic Cambridge International\n\tAll papers\n\tPaper 1 only (retake) Retakes only\n\tPaper 2 only (retake) Retakes only\nBiology Cambridge International\n\tAll papers already reserved\n\tPaper 41/42 only (retake) Self-study only (not taught this cycle)\nBusiness Studies Cambridge International\n\tAll papers\nChemistry Cambridge International\n\tAll papers\nNo preference\nTeacher 8\nTeacher 9\nTeacher 10\nFirst entry, in school\nRetake, in school — name the sitting\nRetake, self-study — name the sitting\n\tEGP 22,850\n\tPaper 41/42 only (retake) Self-study only (not taught this cycle)\nCombined Science Cambridge International\n\tAll papers\n\tPaper 41/42 only (retake) Self-study only (not taught this cycle)\nComputer Science Cambridge International\n\tAll papers\nEnglish as a Second Language OxfordAQA\n\tAll papers\nEnvironmental Management Cambridge International\n\tAll papers\nFrench Cambridge International\n\tAll papers\nGerman Cambridge International\n\tAll papers\nGlobal Perspectives Cambridge International\n\tAll papers\nGlobal Citizenship Cambridge International\n\tAll papers\nHuman Biology Pearson Edexcel\n\tAll papers\nICT Cambridge International\n\tAll papers\n\tTheory Paper only (retake) Self-study only (not taught this cycle)\nMathematics Pearson Edexcel\n\tAll papers\n\t1H only (retake) Self-study only (not taught this cycle) board fee not set yet\n\t2H only (retake) Self-study only (not taught this cycle) board fee not set yet\nPhysics Cambridge International\n\tAll papers\n\tPaper 41/42 only (retake) Self-study only (not taught this cycle)\nPsychology OxfordAQA\n\tAll papers\nA.S. / A.L.\nArabic A.L. Pearson Edexcel\n\tArabic IAL (YAA01)\n\tEdexcel 9AA0\nBiology A.S./A.L. Pearson Edexcel\n\tUnit 1 Self-study only (not taught this cycle)\n\tUnit 2 Self-study only (not taught this cycle)\n\tUnit 3 Self-study only (not taught this cycle)\n\tUnit 4 Self-study only (not taught this cycle)\n\tUnit 5\n\tUnit 6\nChemistry A.S. Cambridge International\n\tA.L.\n\tA.S.\nComputer Science A.S./A.L. Cambridge International\n\tA.L.\n\tA.2. (Carry forward)\n\tA.S.\nFrench A.S./A.L. Cambridge International\n\tA.L.\n\tA.S.\nMathematics A.S./A.L. Pearson Edexcel\n\tP1\n\tP2\n\tP3\n\tP4\n\tM1\n\tS1\nPhysics A.S./A.L. Cambridge International\n\tA.2. (Carry forward) Self-study only (not taught this cycle)\n\tA.S.\nPsychology A.L. Cambridge International\n\tAll papers\n1 reservation · EGP 22,850\nDue 30 Nov 2026\nI confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.\nI confirm that the information given is true, complete and accurate.\nThe 2026-2027 school fee (EGP 5,000) must be paid before registering subjects\nReserve\n(1)",
+    "i7-payment": "bf6bac48-884e-44d8-9902-da932ed30852",
+    "i7-pdf-named": {
+      "schoolName": "Demo International School",
+      "status": 200,
+      "type": "application/pdf",
+      "heading": [
+        "============================================================",
+        "                 Demo International School",
+        "              IGCSE Subject Reservation System",
+        "                 PAYMENT RECEIPT",
+        "============================================================",
+        ""
+      ]
+    },
+    "i7-pdf-empty": {
+      "schoolName": "",
+      "status": 200,
+      "type": "application/pdf",
+      "heading": [
+        "============================================================",
+        "          IGCSE SUBJECT RESERVATION SYSTEM",
+        "                 PAYMENT RECEIPT",
+        "============================================================",
+        "",
+        "Confirmation #:  bf6bac48-884e-44d8-9902-da932ed30852"
+      ]
+    },
+    "i9-charge": {
+      "id": "dc8bb169-c0ee-446b-b5b5-a1020f6a3264",
+      "amount": 150.5,
+      "status": "pending_payment"
+    },
+    "i9-desk-en": "The Desk\nFind a student — see everything, do everything, in one place.\n+ New family\nTODAY · 17 OCT 2026\nCollected today\nEGP 158,300\n4 payments\nDaily takings\nDue today\nEGP 0\n0 items due today\nNext due 31 Oct 2026: EGP 150.50\nOpen the Money tab\nOverdue\nEGP 0\n0 items past their due date\nOpen the Money tab\nStudent CGrade 11 · STU-20261017-7FD89\nAt school\nStarted grade 10 in 2025/26\nAcademic record\nStatement\nParents: Parent C\nOwes now\nEGP 150.50\nBalance\nEGP 22,850\n+ Reserve\nTo collect now\nPaid with\nCash\nCredit / Debit Card\nInstaPay (at desk)\nOther\nCollect\nEGP 150.50\nA replacement ID card (round 2 drive)\nOther charge · due 31 Oct 2026\nEGP 150.50\nRegistrations\nBiology0970\nJune 2027 · Teacher 4\n\tConfirmed\tEGP 22,850\nWith Parent\nPrint\nChemistry0971\nJune 2027 · Teacher 8\n\tDropped\tEGP 22,850\nReturned to School\nPrint\nRecent payments\n17 Oct 2026\tReservations · Cash · DESK-9A3C347D\tCompleted\tEGP 45,700\t",
+    "i9-home-en": "Welcome back, Parent C\nYour children’s subjects and payments, and the next step for each.\nWhat comes next\nFor each of your children, the next step of the reservation.\nThe family statement\nStudent C · Grade 11\nJune 2027: 1 subject reserved and paid\nAdd a subject\nComing up\nJune 2028 — r2-kept: opens on 5 May 2027; you can preregister now.\nPreregister\nReserve subjects\n›\nMy Registrations\n›\nSchool Fee\n›\nCharges & Instalments\n›\nBalance\nEGP 22,850\navailable\n›\nLinked Children\n›",
+    "i9-desk-ar": "المكتب\nابحث عن طالب — شاهد كل شيء ونفّذ كل شيء من مكان واحد.\n+ أسرة جديدة\nاليوم · 17 أكتوبر 2026\nالمُحصَّل اليوم\n158,300 جنيه\n4 دفعات\nإيرادات اليوم\nالمستحق اليوم\n0 جنيه\n0 بنود مستحقة اليوم\nالاستحقاق التالي 31 أكتوبر 2026: 150.50 جنيه\nافتح تبويب المال\nمتأخر\n0 جنيه\n0 بنود تجاوزت موعد استحقاقها\nافتح تبويب المال\nStudent Cالصف 11 · STU-20261017-7FD89\nفي المدرسة\nبدأ الصف 10 في 2025/26\nالسجل الأكاديمي\nكشف الحساب\nأولياء الأمور: Parent C\nالمستحق الآن\n150.50 جنيه\nالرصيد\n22,850 جنيه\n+ حجز\nللتحصيل الآن\nتم الدفع بـ\nCash\nCredit / Debit Card\nInstaPay (at desk)\nأخرى\nتحصيل\n150.50 جنيه\nA replacement ID card (round 2 drive)\nرسم آخر · مستحق 31 أكتوبر 2026\n150.50 جنيه\nالتسجيلات\nBiology0970\nيونيو 2027 · Teacher 4\n\tمؤكد\t22,850 جنيه\nمع ولي الأمر\nطباعة\nChemistry0971\nيونيو 2027 · Teacher 8\n\tمحذوف\t22,850 جنيه\nأُعيد إلى المدرسة\nطباعة\nالمدفوعات الأخيرة\n17 أكتوبر 2026\tالحجوزات · Cash · DESK-9A3C347D\tمكتمل\t45,700 جنيه\t",
+    "i9-home-ar": "مرحبًا بعودتك، Parent C\nمواد أبنائك ومدفوعاتهم، والخطوة التالية لكل منهم.\nالخطوة التالية\nلكل طفل من أطفالك، الخطوة التالية في الحجز.\nكشف حساب الأسرة\nStudent C · الصف 11\nيونيو 2027: 1 مادة محجوزة ومدفوعة\nأضف مادة\nالقادم\nيونيو 2028 — r2-kept: تُفتح في 5 مايو 2027، ويمكنك التسجيل المسبق الآن.\nسجّل مسبقًا\nاحجز المواد\n›\nتسجيلاتي\n›\nالمصاريف الدراسية\n›\nالرسوم والأقساط\n›\nالرصيد\n22,850 جنيه\nمتاح\n›\nالأبناء المرتبطون\n›"
+  }
+}

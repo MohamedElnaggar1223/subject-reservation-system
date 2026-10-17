@@ -567,7 +567,9 @@ describe('08q: instalment plans', () => {
     expect(takingsDelta(before, await takings(officer)).moneyIn).toBe(500);
     // Held money is not free: not withdrawn, not applied to another line.
     expect((await refused(f.parent.api.v1.escrow.withdraw.$post({ json: { studentId: f.studentId, amount: 500 } }))).status).toBeGreaterThanOrEqual(400);
-    expect((await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [other!], paymentMethod: 'in_school', escrowAmountToApply: 500 } }))).error).toContain('Not enough in the balance');
+    // Answered 422 by the refusal's code (INSUFFICIENT_BALANCE), not by its words (the review of 744e553, item 3).
+    expect(await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [other!], paymentMethod: 'in_school', escrowAmountToApply: 500 } })))
+      .toMatchObject({ status: 422, error: expect.stringContaining('Not enough in the balance') });
     // Reversed while unspent: the deposit comes back out of the held wallet; paid again.
     await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: first.paymentId }, json: { reason: 'recorded on the wrong family', moneyReturned: true } }));
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 0 });

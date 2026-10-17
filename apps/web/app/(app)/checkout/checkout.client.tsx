@@ -21,7 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import type { InferRequestType } from 'hono/client';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, formatEgp } from '@repo/validations';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   ACTIVE_PAYMENT_METHODS,
@@ -330,7 +330,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                       ['Account Name', instapay?.account.accountName],
                       ['Account Number', instapay?.account.accountNumber],
                       ...(instapay?.account.iban ? [['IBAN', instapay.account.iban]] : []),
-                      ['Exact Amount', `EGP ${(instapay?.amountDue ?? result.amount ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`],
+                      ['Exact Amount', formatEgp(instapay?.amountDue ?? result.amount ?? 0)],
                     ].map(([label, value]) => (
                       <div key={label as string} className="flex justify-between gap-4">
                         <dt className="text-violet-700 dark:text-violet-400">{label}</dt>

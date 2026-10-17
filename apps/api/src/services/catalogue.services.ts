@@ -28,7 +28,7 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  deriveLevelCode, STARTER_SET_DATA, COUNCIL_LABELS, IGCSE_NEVER_MONTHS, type SeriesMonth,
+  deriveLevelCode, STARTER_SET_DATA, COUNCIL_LABELS, IGCSE_NEVER_MONTHS, ROLES, type SeriesMonth,
   type UpdateBoardType, type CreateQualificationType, type UpdateQualificationType, type CreateUnitType,
   type UpdateUnitType, type SetQualificationUnitsType, type CreateQualificationOptionType,
   type UpdateQualificationOptionType, type MapRegistrableType, type StarterSet, type UnitLevel, type LevelCodeReading,
@@ -172,22 +172,30 @@ export async function getCatalogue() {
 
 // ─── Boards ──────────────────────────────────────────────────────────────────
 
-export async function updateBoard(code: string, data: UpdateBoardType, actorId: string, ctx?: AuditContext) {
+export async function updateBoard(code: string, data: UpdateBoardType, actorId: string, actorRole: string | null | undefined, ctx?: AuditContext) {
+  // The one-paper fee rule decides what every new one-paper retake of the board costs: the admin's alone, with a
+  // reason (the review of 744e553, item 1), as the board's entry deadline is (MO-10). The rest of the board is the
+  // coordinator's and the admin's, as before.
+  const { reason, ...fields } = data;
+  if (fields.onePaperFeeKey !== undefined) {
+    if (actorRole !== ROLES.ADMIN) throw new CatalogueError("Only an admin changes a board's one-paper fee rule: it decides what every new one-paper retake costs", 403);
+    if (!reason) throw new CatalogueError("Say why the board's one-paper fee rule changes");
+  }
   return db.transaction(async (tx) => {
     const [b] = await tx.select().from(examBoard).where(eq(examBoard.code, code)).for('update');
     if (!b) throw new CatalogueError('Board not found', 404);
-    if (data.seriesMonths) {
+    if (fields.seriesMonths) {
       // A month a series of this board already runs in stays: those series exist.
       const used = await tx.selectDistinct({ month: boardSeries.month }).from(boardSeries).where(eq(boardSeries.boardCode, code));
-      const dropped = used.map((u) => u.month).filter((m) => !data.seriesMonths!.includes(m as never));
+      const dropped = used.map((u) => u.month).filter((m) => !fields.seriesMonths!.includes(m as never));
       if (dropped.length) {
         throw new CatalogueError(`${b.name} already has ${dropped.join(' and ')} series on record — those months stay`, 409);
       }
     }
-    const [updated] = await tx.update(examBoard).set({ ...data, updatedAt: new Date() }).where(eq(examBoard.code, code)).returning();
+    const [updated] = await tx.update(examBoard).set({ ...fields, updatedAt: new Date() }).where(eq(examBoard.code, code)).returning();
     await logAction(actorId, 'BOARD_UPDATED', 'board', code,
       { name: b.name, shortName: b.shortName, entryPortal: b.entryPortal, seriesMonths: b.seriesMonths, notes: b.notes, onePaperFeeKey: b.onePaperFeeKey },
-      data as Record<string, unknown>, ctx, tx);
+      { ...fields, ...(reason ? { reason } : {}) } as Record<string, unknown>, ctx, tx);
     return updated!;
   });
 }

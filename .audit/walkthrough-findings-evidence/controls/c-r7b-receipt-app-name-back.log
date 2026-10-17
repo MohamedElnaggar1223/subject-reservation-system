@@ -1,0 +1,11 @@
+Control c-r7b (review item 7): the receipt PDF's heading put back on the app's name alone (the school's name never written), 08f -t 'say who they come from' run, then the file restored.
+
+ ❯ test/08f-foundation-structure.test.ts (22 tests | 1 failed | 21 skipped) 2317ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08f-foundation-structure.test.ts > F0a: settings, uploads, academic structure, sections, teaching > the school's name (the lead's decision of 16 Oct 2026, 15) > the emails and the emailed PDF receipt say who they come from: the school's name with the app's name under it, the app's name alone when empty (the review of 744e553, item 7)
+AssertionError: expected '%PDF-1.4\n1 0 obj\n<< /Type /Catalog …' to contain 'Placeholder International School) Tj'
+- Expected
++ Received
+ ❯ test/08f-foundation-structure.test.ts:183:20

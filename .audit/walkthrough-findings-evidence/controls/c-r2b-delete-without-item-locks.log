@@ -1,0 +1,15 @@
+Control c-r2b (review item 2, finding 8): deleteDraftSession's locks on the session's subjects, items and reminder rules removed (the session's own lock kept), 08n -t 'finding 8' run, then the file restored.
+
+ ❯ test/08n-session-offers.test.ts (42 tests | 1 failed | 41 skipped) 2341ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 41 skipped (42)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08n-session-offers.test.ts > 08n: a draft session nobody reserved in is deleted from its Session screen (F8-01) > finding 8: an exception granted on a draft's item while the deletion counts is seen and the deletion refused — never deleted unseen by the cascade
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+- Expected
++ Received
+-   "error": "An exception was granted for June 2027 — n08-del-race-18fr: it is kept as history and cannot be deleted",
+-   "status": 409,
++   "error": "\"\"",
++   "status": 200,
+ ❯ test/08n-session-offers.test.ts:1490:30

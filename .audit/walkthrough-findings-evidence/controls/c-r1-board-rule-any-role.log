@@ -1,0 +1,15 @@
+Control c-r1 (review item 1): the board's one-paper rule open to any academic role again — updateBoard's admin check removed (the reason still asked), 08u -t F8-05 run, then the file restored.
+
+ ❯ test/08u-session-form.test.ts (14 tests | 1 failed | 13 skipped) 2556ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > F8-05: a one-paper retake's board fee follows its board — Edexcel 4MA1's Paper 1H at the paper's own fee, Cambridge's Paper 4 at the syllabus's; the Fees tab names the paper once
+AssertionError: expected { status: 200, error: '""' } to match object { status: 403, …(1) }
+- Expected
++ Received
+-   "error": StringContaining "Only an admin",
+-   "status": 403,
++   "error": "\"\"",
++   "status": 200,
+ ❯ test/08u-session-form.test.ts:310:8

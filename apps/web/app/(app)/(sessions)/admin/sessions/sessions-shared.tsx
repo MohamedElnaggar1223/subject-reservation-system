@@ -9,7 +9,7 @@
 
 import { useEffect } from 'react';
 import { api } from '~/lib/hono';
-import { apiResponse, type SessionMoneyQueryType } from '@repo/validations';
+import { apiResponse, type SessionMoneyQueryType, formatEgp } from '@repo/validations';
 import { Badge, Notice, type Tone } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
@@ -67,11 +67,10 @@ export const LINE_STATUS_TONE: Record<string, Tone> = {
 
 // ─── Pieces ──────────────────────────────────────────────────────────────────
 
-const egp = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-/** An amount in pounds: "EGP 9,850" (the translator knows "EGP …"). */
+/** An amount in pounds: "EGP 9,850", "EGP 9,412.50" (formatEgp, the one formatter; the translator knows "EGP …"). */
 export function Money({ amount, className }: { amount: number | null | undefined; className?: string }) {
   if (amount === null || amount === undefined) return <span className="text-muted-foreground">—</span>;
-  return <span className={cn('whitespace-nowrap tabular-nums', className)} dir="ltr">{`EGP ${egp.format(amount)}`}</span>;
+  return <span className={cn('whitespace-nowrap tabular-nums', className)} dir="ltr">{formatEgp(amount)}</span>;
 }
 
 /** A date as the school reads it (Cairo), no time. */

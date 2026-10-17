@@ -54,8 +54,13 @@ export const UpdateBoard = z.object({
     .refine((m) => new Set(m).size === m.length, 'Each month once')
     .optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
-  /** What a one-paper retake's board fee is read for (F8-05): see ONE_PAPER_FEE_KEYS. */
+  /**
+   * What a one-paper retake's board fee is read for (F8-05): see ONE_PAPER_FEE_KEYS. The admin's alone, with a reason
+   * (the review of 744e553, item 1; MO-10's deadline is the precedent): it decides what every new one-paper retake costs.
+   */
   onePaperFeeKey: z.enum(['qualification', 'unit']).optional(),
+  /** Why the one-paper rule changes (kept in the audit row); asked with `onePaperFeeKey`. */
+  reason: z.string().trim().min(5, 'Say why the rule changes (at least 5 characters)').max(500).optional(),
 });
 export type UpdateBoardType = z.infer<typeof UpdateBoard>;
 

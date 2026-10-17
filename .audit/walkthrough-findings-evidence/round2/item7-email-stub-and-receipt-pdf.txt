@@ -1,0 +1,43 @@
+Item 7 (the review of 744e553): who an email and the emailed PDF receipt come from.
+
+1. The email stub's log (integrations/email.ts sendEmail prints the heading), from 08f's scenario
+   'the emails and the emailed PDF receipt say who they come from ...' (apps/api/test/08f-foundation-structure.test.ts),
+   school.name set to 'Placeholder International School' for the first family, emptied for the second:
+
+[email:stub] To: parent.f0s-rcpt-named@test.local | Subject: Verify your email — IGCSE System | Heading: Placeholder International School / IGCSE Subject Reservation System 
+[email:stub] To: student.f0s-rcpt-named@test.local | Subject: Verify your email — IGCSE System | Heading: Placeholder International School / IGCSE Subject Reservation System 
+[email:stub] To: parent.f0s-rcpt-named@test.local | Subject: Payment confirmed — November 2026 – January 2027 — t1-s8ik | Heading: Placeholder International School / IGCSE Subject Reservation System | Attachments: receipt-<payment id>.pdf
+[email:stub] To: parent.f0s-rcpt-plain@test.local | Subject: Verify your email — IGCSE System | Heading: IGCSE Subject Reservation System 
+[email:stub] To: student.f0s-rcpt-plain@test.local | Subject: Verify your email — IGCSE System | Heading: IGCSE Subject Reservation System 
+[email:stub] To: parent.f0s-rcpt-plain@test.local | Subject: Payment confirmed — November 2026 – January 2027 — t1-s8ik | Heading: IGCSE Subject Reservation System | Attachments: receipt-<payment id>.pdf
+      Tests  1 passed | 21 skipped (22)
+
+2. The receipt PDF's first lines (GET /v1/payments/:id/receipt as the parent, the drive on igcse_findings_walk),
+   with the school's name set ('Demo International School') and emptied, then put back:
+
+{
+ "schoolName": "Demo International School",
+ "status": 200,
+ "type": "application/pdf",
+ "heading": [
+  "============================================================",
+  "                 Demo International School",
+  "              IGCSE Subject Reservation System",
+  "                 PAYMENT RECEIPT",
+  "============================================================",
+  ""
+ ]
+}
+{
+ "schoolName": "",
+ "status": 200,
+ "type": "application/pdf",
+ "heading": [
+  "============================================================",
+  "          IGCSE SUBJECT RESERVATION SYSTEM",
+  "                 PAYMENT RECEIPT",
+  "============================================================",
+  "",
+  "Confirmation #:  bf6bac48-884e-44d8-9902-da932ed30852"
+ ]
+}

@@ -68,7 +68,7 @@ export const decisionsArabic: Record<string, string> = {
 /** Data inside an Arabic sentence (a payment's label, a reference), kept one left-to-right unit. */
 const iso = (s: string) => `⁨${s}⁩`;
 
-/** An amount as formatPrice writes it ("EGP 8,800"), in the Arabic screens' order ("8,800 جنيه"). */
+/** An amount as formatEgp writes it ("EGP 8,800", "EGP 9,412.50"), in the Arabic screens' order ("8,800 جنيه"). */
 const egp = (s: string) => {
   const m = /^EGP (.+)$/.exec(s);
   return iso(m ? `${m[1]} جنيه` : s);

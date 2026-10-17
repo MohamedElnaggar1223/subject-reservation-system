@@ -104,9 +104,15 @@ function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
   const router = useRouter();
   const refresh = () => queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
   // F8-01: a draft nobody reserved in goes (a stale sample draft, one made by mistake); the API refuses otherwise.
+  // Deleted, the screen goes back to the Sessions list at once, and only the lists are fetched again: the deleted
+  // session's own queries are left alone, since each would answer 404 (the review of 744e553, item 2: the lead's
+  // drive stayed on the deleted session's address with four of them).
   const remove = useMutation({
     mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].$delete({ param: { id: s.id }, json: { reason } })),
-    onSuccess: async () => { setDeleting(false); await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }); router.push('/admin/sessions'); },
+    onSuccess: () => {
+      router.replace('/admin/sessions');
+      void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY, predicate: (q) => q.queryKey[1] !== s.id });
+    },
   });
   const close = useMutation({
     mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: { reason } })),
@@ -146,7 +152,7 @@ function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
       )}
       {deleting && (
         <ReasonModal title="Delete this draft session" description="Only a draft nobody has reserved in can be deleted. Its subjects, items and fees on this sheet go with it; the subjects stay in the catalogue and the boards' series keep their dates and fee lists. Recorded in the audit trail with your reason."
-          confirmLabel="Delete the draft" destructive minLength={5} isPending={remove.isPending} error={remove.error ? errorText(remove.error) : undefined}
+          confirmLabel="Delete the draft" destructive minLength={5} isPending={remove.isPending || remove.isSuccess} error={remove.error ? errorText(remove.error) : undefined}
           onConfirm={(reason) => remove.mutate(reason)} onClose={() => setDeleting(false)} />
       )}
       {correcting && <CorrectSeries s={s} onClose={() => setCorrecting(false)} />}

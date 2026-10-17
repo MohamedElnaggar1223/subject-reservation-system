@@ -920,9 +920,12 @@ function AddQualification({ session, offer, pool, onAdded }: {
   const picked = offer.qualificationsToAdd.find((q) => q.id === pickedId) ?? null;
   const add = useMutation({
     mutationFn: async (q: OfferRow['qualificationsToAdd'][number]) => {
+      // The API offers a qualification only beside a single whole item (the review of 744e553, item 5): without it
+      // nothing would make the new one a choice against the subject's own entry.
       const whole = offer.items.find((i) => i.kind === 'whole');
-      const group = whole?.exclusiveGroup ?? 'qualification';
-      if (whole && !whole.exclusiveGroup) {
+      if (!whole) throw new Error("This subject has no whole-subject item for the new qualification to be a choice against");
+      const group = whole.exclusiveGroup ?? 'qualification';
+      if (!whole.exclusiveGroup) {
         await apiResponse(api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
           param: { id: session.id, offerId: offer.id, itemId: whole.id },
           json: { exclusiveGroup: group, reason: `${board} ${q.code} is added beside it: one qualification or the other` },

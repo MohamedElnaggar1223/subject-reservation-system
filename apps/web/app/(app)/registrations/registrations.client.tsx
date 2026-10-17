@@ -5,7 +5,7 @@ import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from '@tansta
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
-import { formatPrice, labelFor } from '~/lib/format';
+import { labelFor } from '~/lib/format';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   apiResponse,
@@ -13,7 +13,7 @@ import {
   gradeLabel,
   REGISTRATION_STATUS_LABELS,
   COUNCIL_LABELS,
-  seriesAcademicYearStart,
+  seriesAcademicYearStart, formatEgp,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { useSwapChoices, useSwapConsent, SwapConsent } from '~/components/reservations/swap-pick';
@@ -110,8 +110,8 @@ function RefundPreviewNote({ registrationId }: { registrationId: string }) {
   return (
     <div className="bg-muted rounded-lg p-3 text-xs text-foreground">
       Refund policy: you will receive{' '}
-      <span className="font-semibold">{preview.percentage}% = {formatPrice(preview.amount)}</span>{' '}
-      back (of {formatPrice(preview.fullPrice)}), released to the balance once the subject&apos;s
+      <span className="font-semibold">{preview.percentage}% = {formatEgp(preview.amount)}</span>{' '}
+      back (of {formatEgp(preview.fullPrice)}), released to the balance once the subject&apos;s
       receipt is returned to the school.
       {/* Why the board fee comes back or stays: the entries sent to the board and when (F4's mark, step C's refundFor). */}
       {preview.boardNote && <p className="mt-1 text-muted-foreground">{preview.boardNote}</p>}
@@ -245,7 +245,7 @@ function RegistrationCard({
             {statusLabel}
           </span>
           <span className="text-sm font-semibold text-foreground">
-            {formatPrice(reg.priceAtRegistration)}
+            {formatEgp(reg.priceAtRegistration)}
           </span>
         </div>
       </div>
@@ -301,7 +301,7 @@ function RegistrationCard({
               Bring paper receipt <span className="font-mono font-semibold">{reg.receipt.receiptNumber}</span>{' '}
               back to the school finance desk
               {reg.receipt.refundAmountOnReturn != null && (
-                <> to release your {formatPrice(reg.receipt.refundAmountOnReturn)} refund</>
+                <> to release your {formatEgp(reg.receipt.refundAmountOnReturn)} refund</>
               )}
               . The drop only completes once the school has it.
             </>
@@ -495,7 +495,7 @@ function RequestSwapModal({
       <div className="space-y-4">
         <div className="bg-brand-50 dark:bg-brand-900/20 rounded-lg p-3 text-sm">
           <p className="font-medium text-brand-800 dark:text-brand-300">Swap from: {reg.subject.name}</p>
-          <p className="text-brand-600 dark:text-brand-400 text-xs mt-1">Current price: {formatPrice(reg.priceAtRegistration)}</p>
+          <p className="text-brand-600 dark:text-brand-400 text-xs mt-1">Current price: {formatEgp(reg.priceAtRegistration)}</p>
         </div>
         <RefundPreviewNote registrationId={reg.id} />
 
@@ -510,7 +510,7 @@ function RequestSwapModal({
             <option value="">Choose what to swap to</option>
             {choices.map((c) => (
               <option key={c.key} value={c.key}>
-                {c.label} — {formatPrice(c.price)}{c.provisional ? ' (provisional)' : ''}
+                {c.label} — {formatEgp(c.price)}{c.provisional ? ' (provisional)' : ''}
               </option>
             ))}
           </select>
@@ -523,9 +523,9 @@ function RequestSwapModal({
             </p>
             <p className={`text-xs mt-1 ${diff > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
               {diff > 0
-                ? `Additional payment of ${formatPrice(diff)} will be required`
+                ? `Additional payment of ${formatEgp(diff)} will be required`
                 : diff < 0
-                ? `${formatPrice(Math.abs(diff))} will be added to your balance`
+                ? `${formatEgp(Math.abs(diff))} will be added to your balance`
                 : 'Same price — no financial impact'}
             </p>
           </div>
@@ -649,7 +649,7 @@ function DirectSwapModal({
         <div className="bg-brand-50 dark:bg-brand-900/20 rounded-lg p-3 text-sm">
           <p className="font-medium text-brand-800 dark:text-brand-300">Swapping from: {reg.subject.name}</p>
           <p className="text-brand-600 dark:text-brand-400 text-xs mt-1">
-            {reg.student.name} · Current price: {formatPrice(reg.priceAtRegistration)}
+            {reg.student.name} · Current price: {formatEgp(reg.priceAtRegistration)}
           </p>
         </div>
 
@@ -664,7 +664,7 @@ function DirectSwapModal({
             <option value="">Choose what to swap to</option>
             {choices.map((c) => (
               <option key={c.key} value={c.key}>
-                {c.label} — {formatPrice(c.price)}{c.provisional ? ' (provisional)' : ''}
+                {c.label} — {formatEgp(c.price)}{c.provisional ? ' (provisional)' : ''}
               </option>
             ))}
           </select>
@@ -678,9 +678,9 @@ function DirectSwapModal({
             <p className={`text-xs mt-1 ${diff > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
               Old subject refunded per the refund policy below.
               {diff > 0
-                ? ` New registration (${formatPrice(newPrice)}) will require payment.`
+                ? ` New registration (${formatEgp(newPrice)}) will require payment.`
                 : diff < 0
-                ? ` New registration is ${formatPrice(Math.abs(diff))} cheaper, leaving that amount available if the balance is used at checkout.`
+                ? ` New registration is ${formatEgp(Math.abs(diff))} cheaper, leaving that amount available if the balance is used at checkout.`
                 : ' Same price — the full amount goes to the balance, then the same amount is paid.'}
             </p>
           </div>
@@ -971,7 +971,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                       }`}>
                         {session.status}
                       </span>
-                      <span className="text-sm font-semibold text-foreground">{formatPrice(sessionTotal)}</span>
+                      <span className="text-sm font-semibold text-foreground">{formatEgp(sessionTotal)}</span>
                     </div>
                   </div>
 
@@ -990,7 +990,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                           <span className="font-medium">{ppRegs.length}</span> awaiting payment
                           {selectedRegs.length > 0 && (
                             <span>
-                              {' '}· {selectedRegs.length} selected · {formatPrice(selectedTotal)}
+                              {' '}· {selectedRegs.length} selected · {formatEgp(selectedTotal)}
                             </span>
                           )}
                         </div>

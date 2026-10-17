@@ -18,9 +18,8 @@ import {
   apiResponse,
   REMARK_SERVICE_TYPES,
   REMARK_SERVICE_LABELS,
-  COUNCIL_LABELS,
+  COUNCIL_LABELS, formatEgp,
 } from '@repo/validations';
-import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 
 type RemarkItem = { id: string; paperCode: string; paperName: string | null; outcome: string; gradeAfter: string | null };
@@ -156,7 +155,7 @@ export default function RemarksDeskClient({ userRole }: { userRole: string }) {
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {COUNCIL_LABELS[r.registration.subject.council as keyof typeof COUNCIL_LABELS]} ·{' '}
                     {r.boardService?.label ?? REMARK_SERVICE_LABELS[r.serviceType as keyof typeof REMARK_SERVICE_LABELS] ?? r.serviceType} ·{' '}
-                    {r.registration.session.name} · Papers: {r.items.map((i) => i.paperCode).join(', ')} · {formatPrice(r.feeCharged)} paid
+                    {r.registration.session.name} · Papers: {r.items.map((i) => i.paperCode).join(', ')} · {formatEgp(r.feeCharged)} paid
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -273,7 +272,7 @@ export default function RemarksDeskClient({ userRole }: { userRole: string }) {
                     <tr key={f.id}>
                       <td className="py-2 text-card-foreground">{COUNCIL_LABELS[f.council as keyof typeof COUNCIL_LABELS] ?? f.council}</td>
                       <td className="py-2 text-card-foreground">{REMARK_SERVICE_LABELS[f.serviceType as keyof typeof REMARK_SERVICE_LABELS] ?? f.serviceType}</td>
-                      <td className="py-2 text-right font-medium text-foreground">{formatPrice(f.amountPerPaper)}</td>
+                      <td className="py-2 text-right font-medium text-foreground">{formatEgp(f.amountPerPaper)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -325,7 +324,7 @@ export default function RemarksDeskClient({ userRole }: { userRole: string }) {
                 onChange={(e) => setGradeChanged(e.target.checked)}
                 className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
               />
-              The SUBJECT grade changed — refund the fee ({formatPrice(outcomeTarget.feeCharged)}) to escrow
+              The SUBJECT grade changed — refund the fee ({formatEgp(outcomeTarget.feeCharged)}) to escrow
             </label>
 
             <div className="flex gap-3">

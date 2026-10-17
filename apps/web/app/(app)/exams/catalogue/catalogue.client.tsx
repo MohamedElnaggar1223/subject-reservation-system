@@ -40,7 +40,7 @@ import { UnitsTab } from './units.client';
 export type CatalogueTab = 'registrable' | 'qualifications' | 'units';
 type Tab = CatalogueTab;
 
-export default function CatalogueClient({ initialTab, mayAddSubjects = false }: { initialTab: Tab; mayAddSubjects?: boolean }): React.JSX.Element {
+export default function CatalogueClient({ initialTab, isAdmin = false }: { initialTab: Tab; isAdmin?: boolean }): React.JSX.Element {
   const { data, isLoading, isError, refetch } = useCatalogue();
   // The tab lives in the address, so a link lands on it: the page reads it on
   // the server (no Suspense around a server-rendered catalogue, which the page
@@ -73,7 +73,7 @@ export default function CatalogueClient({ initialTab, mayAddSubjects = false }: 
       ) : (
         <>
           <div className="mb-6 grid gap-3 md:grid-cols-3">
-            {data.boards.map((b) => <BoardCard key={b.code} board={b} />)}
+            {data.boards.map((b) => <BoardCard key={b.code} board={b} isAdmin={isAdmin} />)}
           </div>
 
           <p className="mb-4 text-sm text-muted-foreground">
@@ -108,7 +108,7 @@ export default function CatalogueClient({ initialTab, mayAddSubjects = false }: 
             ))}
           </div>
 
-          {tab === 'registrable' && <RegistrableTab data={data} mayAddSubjects={mayAddSubjects} />}
+          {tab === 'registrable' && <RegistrableTab data={data} mayAddSubjects={isAdmin} />}
           {tab === 'qualifications' && <QualificationsTab data={data} />}
           {tab === 'units' && <UnitsTab data={data} />}
         </>
@@ -163,29 +163,35 @@ function StarterSets() {
 
 const ALL_MONTHS = ['october', 'november', 'january', 'june'] as const;
 
-function BoardCard({ board }: { board: BoardRow }) {
+function BoardCard({ board, isAdmin }: { board: BoardRow; isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [portal, setPortal] = useState(board.entryPortal ?? '');
   const [months, setMonths] = useState<string[]>(board.seriesMonths);
   const [notes, setNotes] = useState(board.notes ?? '');
   const [onePaper, setOnePaper] = useState(board.onePaperFeeKey);
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  // The one-paper rule decides what every new one-paper retake of the board costs: the admin's alone, with a reason
+  // kept in the audit row, as a series' entry deadline is (MO-10). It is sent only when it changes.
+  const onePaperChanged = isAdmin && onePaper !== board.onePaperFeeKey;
   const save = useMutation({
     mutationFn: () => apiResponse(api.v1.catalogue.boards[':code'].$put({
       param: { code: board.code as 'cambridge' },
       json: {
         entryPortal: portal.trim() || null, seriesMonths: months as ('june' | 'october' | 'november' | 'january')[], notes: notes.trim() || null,
-        onePaperFeeKey: onePaper === 'unit' ? 'unit' : 'qualification',
+        ...(onePaperChanged ? { onePaperFeeKey: onePaper === 'unit' ? 'unit' as const : 'qualification' as const, reason: reason.trim() } : {}),
       },
     })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATALOGUE_KEY });
       setEditing(false);
+      setReason('');
       setError('');
     },
     onError: (err: Error) => setError(err.message),
   });
+  const onePaperWords = (key: string) => (key === 'unit' ? "the paper's own board fee" : "the syllabus's board fee");
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-label={board.name}>
       <div className="flex items-start justify-between gap-2">
@@ -210,12 +216,20 @@ function BoardCard({ board }: { board: BoardRow }) {
           {/* F8-05: what a one-paper retake's board fee is read for, as the board's list prices it. */}
           <p className="mt-2 text-xs text-muted-foreground">
             <span>A one-paper retake:</span>{' '}
-            <span className="text-foreground">{board.onePaperFeeKey === 'unit' ? "the paper's own board fee" : "the syllabus's board fee"}</span>
+            <span className="text-foreground">{onePaperWords(board.onePaperFeeKey)}</span>
           </p>
           {board.notes && <p className="mt-2 text-xs text-card-foreground">{board.notes}</p>}
         </>
       ) : (
-        <form className="mt-3 space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (onePaperChanged && reason.trim().length < 5) return setError("Say why the one-paper rule changes (at least 5 characters) — it is recorded.");
+            setError('');
+            save.mutate();
+          }}
+        >
           <div>
             <Label htmlFor={`portal-${board.code}`} className="mb-1 text-xs text-muted-foreground">Entry portal</Label>
             <Input id={`portal-${board.code}`} value={portal} onChange={(e) => setPortal(e.target.value)} maxLength={100} />
@@ -242,14 +256,28 @@ function BoardCard({ board }: { board: BoardRow }) {
               })}
             </div>
           </fieldset>
-          <div>
-            <Label htmlFor={`one-paper-${board.code}`} className="mb-1 text-xs text-muted-foreground">A one-paper retake&apos;s board fee</Label>
-            <select id={`one-paper-${board.code}`} value={onePaper} onChange={(e) => setOnePaper(e.target.value)} className={SELECT_CLASS}>
-              <option value="qualification">The syllabus&apos;s fee (the list prices the syllabus)</option>
-              <option value="unit">The paper&apos;s own fee (the list prices each paper)</option>
-            </select>
-            <p className="mt-1 text-xs text-muted-foreground">A one-paper retake added to a session from now on reads it; one already on a sheet keeps its fee.</p>
-          </div>
+          {isAdmin ? (
+            <div>
+              <Label htmlFor={`one-paper-${board.code}`} className="mb-1 text-xs text-muted-foreground">A one-paper retake&apos;s board fee</Label>
+              <select id={`one-paper-${board.code}`} value={onePaper} onChange={(e) => setOnePaper(e.target.value)} className={SELECT_CLASS}>
+                <option value="qualification">The syllabus&apos;s fee (the list prices the syllabus)</option>
+                <option value="unit">The paper&apos;s own fee (the list prices each paper)</option>
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">A one-paper retake added to a session from now on reads it; one already on a sheet keeps its fee.</p>
+              {onePaperChanged && (
+                <div className="mt-2">
+                  <Label htmlFor={`one-paper-reason-${board.code}`} className="mb-1 text-xs text-muted-foreground">Reason</Label>
+                  <Input id={`one-paper-reason-${board.code}`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. the board's 2027 list prices each paper" maxLength={500} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              <span>A one-paper retake:</span>{' '}
+              <span className="text-foreground">{onePaperWords(board.onePaperFeeKey)}</span>{' '}
+              <span>Only an admin changes it: it decides what every new one-paper retake costs.</span>
+            </p>
+          )}
           <div>
             <Label htmlFor={`notes-${board.code}`} className="mb-1 text-xs text-muted-foreground">Notes</Label>
             <Input id={`notes-${board.code}`} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} />

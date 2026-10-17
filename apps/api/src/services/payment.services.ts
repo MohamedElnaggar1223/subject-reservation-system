@@ -60,13 +60,14 @@ import {
   getEscrowBalance,
   creditEscrow,
   debitEscrow,
-  INSUFFICIENT_BALANCE,
+  InsufficientBalanceError,
+  isInsufficientBalance,
 } from './escrow.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, schoolDateTime } from './window.services';
 import { effectiveDeadlinesOf, lineDeadlineSql, linesKeptByLateEntry } from './deadline.services';
-import { getSetting } from './settings.services';
+import { getSetting, senderNames } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { consentStanding, writeConsents, refundTermsFor, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { holdUnverifiedAtDeadline } from './verification.services';
@@ -293,7 +294,7 @@ export async function initiatePayment(
   if (escrowToApply > 0) {
     const balance = await getEscrowBalance(studentId);
     if (escrowToApply > balance) {
-      throw new Error(
+      throw new InsufficientBalanceError(
         `Not enough in the balance: ${formatEgp(balance)} available, ${formatEgp(escrowToApply)} asked for`
       );
     }
@@ -1199,7 +1200,7 @@ export async function undoLateTransfer(paymentId: string, financeAdminId: string
       { studentId: p.studentId, amount: p.lateTransferAmount, reason: 'late_transfer_undone', initiatedBy: financeAdminId, relatedPaymentId: paymentId },
       tx
     ).catch((err) => {
-      if (err instanceof Error && err.message.startsWith(INSUFFICIENT_BALANCE)) {
+      if (isInsufficientBalance(err)) {
         throw new Error('What this transfer added to the balance has already been used, so it can no longer be undone');
       }
       throw err;
@@ -1993,8 +1994,17 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   const hr = '='.repeat(60);
   const thin = '-'.repeat(60);
 
+  // Who it is from (the review of 744e553, item 7): the school's name with the app's under it, the app's alone when
+  // the setting is empty — as the emails' heading and the printed papers (F8-11).
+  const names = await senderNames();
+  const centred = (t: string) => `${' '.repeat(Math.max(0, Math.floor((60 - t.length) / 2)))}${t}`;
   lines.push(hr);
-  lines.push('          IGCSE SUBJECT RESERVATION SYSTEM');
+  if (names.school) {
+    lines.push(centred(names.school));
+    lines.push(centred(names.app));
+  } else {
+    lines.push('          IGCSE SUBJECT RESERVATION SYSTEM');
+  }
   lines.push('                 PAYMENT RECEIPT');
   lines.push(hr);
   lines.push('');
@@ -2406,7 +2416,7 @@ export async function initiateChargePayment(parentId: string, data: InitiatePaym
   if (escrowToApply > 0) {
     const balance = await getEscrowBalance(studentId);
     if (escrowToApply > balance) {
-      throw new Error(`Not enough in the balance: ${formatEgp(balance)} available, ${formatEgp(escrowToApply)} asked for`);
+      throw new InsufficientBalanceError(`Not enough in the balance: ${formatEgp(balance)} available, ${formatEgp(escrowToApply)} asked for`);
     }
   }
   const expected = new Map(rows.map((r) => [r.id, r.amount]));

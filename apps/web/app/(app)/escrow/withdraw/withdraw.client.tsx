@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
@@ -133,7 +133,7 @@ export default function WithdrawClient() {
                 <option value="">Select a child</option>
                 {children.map((child) => (
                   <option key={child.id} value={child.id}>
-                    {child.name} — {`EGP ${child.escrowBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}`} available
+                    {child.name} — {formatEgp(child.escrowBalance)} available
                   </option>
                 ))}
               </select>

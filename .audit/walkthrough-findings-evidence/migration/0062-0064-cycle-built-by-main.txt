@@ -1,0 +1,72 @@
+== The migration proof of 0062, 0063 and 0064 on a cycle built by main's code, 2026-10-17T06:23:00Z
+igcse_findings_cycle65: a copy of igcse_findings_before (main 2a149dd's 62; the demo cycle and the before drive, main's API).
+
+== Before
+ migrations 
+------------
+         62
+
+      board      |     subject      |           label            |   key_kind    | key_code | fee_read | lines 
+-----------------+------------------+----------------------------+---------------+----------+----------+-------
+ cambridge       | Arabic           | Paper 1 only (retake)      | qualification | 3180     |  9850.00 |     0
+ cambridge       | Arabic           | Paper 2 only (retake)      | qualification | 3180     |  9850.00 |     0
+ cambridge       | Biology          | Paper 41/42 only (retake)  | qualification | 0970     | 10850.00 |     0
+ cambridge       | Chemistry        | Paper 41/42 only (retake)  | qualification | 0971     | 10850.00 |     0
+ cambridge       | Combined Science | Paper 41/42 only (retake)  | qualification | 0653     | 10850.00 |     0
+ cambridge       | ICT              | Theory Paper only (retake) | qualification | 0983     | 12950.00 |     0
+ cambridge       | Physics          | Paper 41/42 only (retake)  | qualification | 0972     | 10850.00 |     0
+ pearson_edexcel | Mathematics      | 1H only (retake)           | qualification | 4MA1     |  9200.00 |     0
+ pearson_edexcel | Mathematics      | 2H only (retake)           | qualification | 4MA1     |  9200.00 |     0
+
+ action | entity_type | rows 
+--------+-------------+------
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     6 |   135450.00 | f314f3661e3e7488960e56640427ffab
+
+ payments |   paid   |         payments_digest          
+----------+----------+----------------------------------
+        2 | 91400.00 | 02e9f432fee3b4eb071e6fafa82ab856
+
+== drizzle-kit migrate with the branch's set
+[⣷] applying migrations...[2K[1G[✓] migrations applied successfully!
+
+== After
+ migrations 
+------------
+         65
+
+      board      |     subject      |           label            | key_kind | key_code | fee_read | lines 
+-----------------+------------------+----------------------------+----------+----------+----------+-------
+ cambridge       | Arabic           | Paper 1 only (retake)      | option   | A        |  9850.00 |     0
+ cambridge       | Arabic           | Paper 2 only (retake)      | option   | A        |  9850.00 |     0
+ cambridge       | Biology          | Paper 41/42 only (retake)  | option   | CX       | 10850.00 |     0
+ cambridge       | Chemistry        | Paper 41/42 only (retake)  | option   | CX       | 10850.00 |     0
+ cambridge       | Combined Science | Paper 41/42 only (retake)  | option   | CX       | 10850.00 |     0
+ cambridge       | ICT              | Theory Paper only (retake) | option   | DY       | 12950.00 |     0
+ cambridge       | Physics          | Paper 41/42 only (retake)  | option   | CX       | 10850.00 |     0
+ pearson_edexcel | Mathematics      | 1H only (retake)           | unit     | 4MA1/1H  |          |     0
+ pearson_edexcel | Mathematics      | 2H only (retake)           | unit     | 4MA1/2H  |          |     0
+
+       action       | entity_type | rows 
+--------------------+-------------+------
+ BOARD_UPDATED      | board       |    1
+ OFFER_ITEM_UPDATED | offer_item  |    9
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     6 |   135450.00 | f314f3661e3e7488960e56640427ffab
+
+ payments |   paid   |         payments_digest          
+----------+----------+----------------------------------
+        2 | 91400.00 | 02e9f432fee3b4eb071e6fafa82ab856
+
+== A second migrate, and 0064 by hand
+[⣷] applying migrations...[2K[1G[✓] migrations applied successfully!
+INSERT 0 0
+ migrations 
+------------
+         65
+(1 row)
+

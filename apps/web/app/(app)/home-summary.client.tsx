@@ -11,8 +11,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
-import { apiResponse, gradeLabel } from '@repo/validations';
-import { formatPrice } from '~/lib/format';
+import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
 
 // Explicit type — this endpoint's RPC inference degrades in the web
 // compile (documented pattern; see PATTERNS.md)
@@ -56,7 +55,7 @@ function buildActions(s: HomeSummary): Action[] {
     if (c.schoolFee.required && !c.schoolFee.paid) {
       actions.push({
         label: isParent
-          ? `Pay the ${c.schoolFee.academicYear} school fee${c.schoolFee.amount != null ? ` (${formatPrice(c.schoolFee.amount)})` : ''}${who}`
+          ? `Pay the ${c.schoolFee.academicYear} school fee${c.schoolFee.amount != null ? ` (${formatEgp(c.schoolFee.amount)})` : ''}${who}`
           : `School fee unpaid${who} — ask your parent`,
         href: isParent ? `/school-fee?studentId=${c.student.id}` : '/registrations',
         tone: isParent ? 'pay' : 'info',
@@ -66,8 +65,8 @@ function buildActions(s: HomeSummary): Action[] {
     if (c.owing > 0) {
       actions.push({
         label: isParent
-          ? `Pay ${formatPrice(c.owing)} for registered subjects${who}`
-          : `${formatPrice(c.owing)} awaiting payment${who}`,
+          ? `Pay ${formatEgp(c.owing)} for registered subjects${who}`
+          : `${formatEgp(c.owing)} awaiting payment${who}`,
         href: isParent
           ? `/checkout?ids=${c.owingRegistrationIds.join(',')}`
           : '/registrations',
@@ -178,7 +177,7 @@ export default function HomeSummaryCard(): React.JSX.Element | null {
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total outstanding</p>
             <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-              {formatPrice(data.totals.owing)}
+              {formatEgp(data.totals.owing)}
             </p>
           </div>
         )}
@@ -221,9 +220,9 @@ export default function HomeSummaryCard(): React.JSX.Element | null {
             .map((c) => (
               <p key={c.student.id}>
                 {data.children.length > 1 ? `${c.student.name}: ` : 'Balance: '}
-                {formatPrice(c.escrow.freeBalance)} available
+                {formatEgp(c.escrow.freeBalance)} available
                 {c.escrow.heldBalance > 0 && (
-                  <> · {formatPrice(c.escrow.heldBalance)} held for preregistered subjects</>
+                  <> · {formatEgp(c.escrow.heldBalance)} held for preregistered subjects</>
                 )}
               </p>
             ))}

@@ -21,9 +21,9 @@ import {
 
   EXCEPTION_TYPE_LABELS,
   POLICIES,
-  isRegistryPolicyKey,
+  isRegistryPolicyKey, formatEgp,
 } from '@repo/validations';
-import { formatPrice, labelFor } from '~/lib/format';
+import { labelFor } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
@@ -56,10 +56,10 @@ function isEarlierMonth(a: Date, b: Date): boolean {
 function paymentsLine(res: { payments: { series: string[]; collected: number }[]; notCollected: { series: string[]; amount: number; reason: string }[] }) {
   const parts: string[] = [];
   if (res.payments.length > 1) {
-    parts.push(` In ${res.payments.length} payments, one per exam series: ${res.payments.map((p) => `${p.series.join(' and ')} ${formatPrice(p.collected)}`).join('; ')}.`);
+    parts.push(` In ${res.payments.length} payments, one per exam series: ${res.payments.map((p) => `${p.series.join(' and ')} ${formatEgp(p.collected)}`).join('; ')}.`);
   }
   if (res.notCollected.length) {
-    parts.push(` Not collected — hand this money back: ${res.notCollected.map((n) => `${n.series.join(' and ')} ${formatPrice(n.amount)} (${n.reason})`).join('; ')}.`);
+    parts.push(` Not collected — hand this money back: ${res.notCollected.map((n) => `${n.series.join(' and ')} ${formatEgp(n.amount)} (${n.reason})`).join('; ')}.`);
   }
   return parts.join('');
 }
@@ -128,7 +128,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       apiResponse(api.v1.payments[':id']['record-transfer'].$post({ param: { id }, json: { notes, reference, amount } })),
     onSuccess: (d) => {
       setTransferTarget(null);
-      done(`Transfer ${d.reference} recorded — ${formatPrice(d.creditedToEscrow)} added to the student's balance. The family has been told.`);
+      done(`Transfer ${d.reference} recorded — ${formatEgp(d.creditedToEscrow)} added to the student's balance. The family has been told.`);
     },
     onError: fail,
   });
@@ -139,7 +139,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       apiResponse(api.v1.payments[':id']['undo-transfer'].$post({ param: { id }, json: { reason } })),
     onSuccess: (d) => {
       setUndoTransferTarget(null);
-      done(`Transfer undone — ${formatPrice(d.debitedFromEscrow)} taken back from the student's balance. The payment can be recorded again.`);
+      done(`Transfer undone — ${formatEgp(d.debitedFromEscrow)} taken back from the student's balance. The payment can be recorded again.`);
     },
     onError: fail,
   });
@@ -291,12 +291,12 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                   <p className="text-xs text-muted-foreground">Owes now</p>
                   {/* amber-700, not 600: 5.0:1 on the card (600 was 3.2:1, WCAG 1.4.3). */}
                   <p className={`text-lg font-bold ${summary.owing > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`} dir="ltr">
-                    {formatPrice(summary.owing)}
+                    {formatEgp(summary.owing)}
                   </p>
                   {/* F8-09: what a payment under way covers is owed, not collected here: said apart. */}
                   {summary.owingInProgress > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      <span dir="ltr">+{formatPrice(summary.owingInProgress)}</span>{' '}
+                      <span dir="ltr">+{formatEgp(summary.owingInProgress)}</span>{' '}
                       <span>{summary.registrations.every((r) => !r.paymentInProgress || r.paymentInProgress.status === 'pending_verification')
                         ? "awaiting the transfer's check" : 'with a payment under way'}</span>
                     </p>
@@ -304,9 +304,9 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Balance</p>
-                  <p className="text-lg font-bold text-foreground" dir="ltr">{formatPrice(summary.escrow.freeBalance)}</p>
+                  <p className="text-lg font-bold text-foreground" dir="ltr">{formatEgp(summary.escrow.freeBalance)}</p>
                   {summary.escrow.heldBalance > 0 && (
-                    <p className="text-xs text-violet-700 dark:text-violet-400">+{formatPrice(summary.escrow.heldBalance)} held</p>
+                    <p className="text-xs text-violet-700 dark:text-violet-400">+{formatEgp(summary.escrow.heldBalance)} held</p>
                   )}
                 </div>
               </div>
@@ -328,7 +328,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
               {summary.schoolFee.required && !summary.schoolFee.paid ? (
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   <span dir="ltr">{summary.schoolFee.academicYear}</span> <span>school fee due</span>
-                  {summary.schoolFee.amount != null && <> — <span dir="ltr">{formatPrice(summary.schoolFee.amount)}</span></>}
+                  {summary.schoolFee.amount != null && <> — <span dir="ltr">{formatEgp(summary.schoolFee.amount)}</span></>}
                 </span>
               ) : summary.schoolFee.required ? (
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -414,7 +414,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                         {labelFor(REGISTRATION_STATUS_LABELS, r.status)}
                       </td>
                       <td className="px-3 py-2.5 text-end font-medium text-foreground whitespace-nowrap" dir="ltr">
-                        {formatPrice(r.priceAtRegistration)}
+                        {formatEgp(r.priceAtRegistration)}
                       </td>
                       <td className="px-5 py-2.5 text-end whitespace-nowrap">
                         {r.receipt ? (
@@ -478,7 +478,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                       </td>
                       <td className="px-3 py-2.5 text-xs">{labelFor(PAYMENT_STATUS, p.status)}</td>
                       <td className="px-5 py-2.5 text-end font-medium text-foreground whitespace-nowrap" dir="ltr">
-                        {formatPrice(p.amount + p.escrowAmountApplied)}
+                        {formatEgp(p.amount + p.escrowAmountApplied)}
                       </td>
                       <td className="px-3 py-2.5 text-end">
                         {isFinanceAdmin && p.status === 'completed' &&
@@ -491,7 +491,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                             onClick={() =>
                               setReverseTarget({
                                 id: p.id,
-                                label: `${formatPrice(p.amount + p.escrowAmountApplied)} · ${p.purpose.replace('_', ' ')}`,
+                                label: `${formatEgp(p.amount + p.escrowAmountApplied)} · ${p.purpose.replace('_', ' ')}`,
                                 confirmedAt: p.confirmedAt,
                               })
                             }
@@ -508,7 +508,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                             onClick={() =>
                               setTransferTarget({
                                 id: p.id,
-                                label: `${formatPrice(p.amount)} by InstaPay`,
+                                label: `${formatEgp(p.amount)} by InstaPay`,
                                 amount: p.amount,
                                 reference: p.verificationReference,
                               })
@@ -525,7 +525,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                             size="sm"
                             variant="ghost"
                             disabled={undoTransferMutation.isPending}
-                            onClick={() => setUndoTransferTarget({ id: p.id, label: `The transfer recorded today against ${formatPrice(p.amount)} by InstaPay` })}
+                            onClick={() => setUndoTransferTarget({ id: p.id, label: `The transfer recorded today against ${formatEgp(p.amount)} by InstaPay` })}
                           >
                             Undo
                           </Button>
@@ -598,7 +598,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           fields={[
             { label: 'Transfer reference on the bank statement', placeholder: 'e.g. FT-2026-000123', minLength: 4, mono: true },
             // Left empty: read off the statement, never assumed to be the amount due.
-            { label: `Amount on the bank statement (EGP, at most ${formatPrice(transferTarget.amount)})`, placeholder: 'As printed on the statement', inputMode: 'decimal', minLength: 1 },
+            { label: `Amount on the bank statement (EGP, at most ${formatEgp(transferTarget.amount)})`, placeholder: 'As printed on the statement', inputMode: 'decimal', minLength: 1 },
           ]}
           onConfirm={(notes, _choice, values) =>
             transferMutation.mutate({ id: transferTarget.id, notes, reference: values?.[0] ?? '', amount: Number((values?.[1] ?? '').replace(/[,\s]/g, '')) })

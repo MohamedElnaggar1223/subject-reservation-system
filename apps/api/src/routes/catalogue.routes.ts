@@ -47,7 +47,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
 
   .put('/boards/:code', requireAcademic(), zValidator('param', BoardCodeParam), zValidator('json', UpdateBoard), async (c) => {
     try {
-      return success(c, await catalogue.updateBoard(c.req.valid('param').code, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+      return success(c, await catalogue.updateBoard(c.req.valid('param').code, c.req.valid('json'), c.get('user')!.id, c.get('user')!.role, extractAuditContext(c)));
     } catch (err) {
       const f = fail(err, 'Failed to update the board');
       return error(c, f.message, f.status);

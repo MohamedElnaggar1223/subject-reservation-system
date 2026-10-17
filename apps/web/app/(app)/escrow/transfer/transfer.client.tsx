@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, gradeLabel } from '@repo/validations';
+import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
@@ -148,7 +148,7 @@ export default function TransferClient() {
               <option value="">Select child</option>
               {children.map((child) => (
                 <option key={child.id} value={child.id} disabled={child.id === toId}>
-                  {child.name} ({gradeLabel(child.grade)}) — {`EGP ${child.escrowBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
+                  {child.name} ({gradeLabel(child.grade)}) — {formatEgp(child.escrowBalance)}
                 </option>
               ))}
             </select>
@@ -171,7 +171,7 @@ export default function TransferClient() {
               <option value="">Select child</option>
               {children.map((child) => (
                 <option key={child.id} value={child.id} disabled={child.id === fromId}>
-                  {child.name} ({gradeLabel(child.grade)}) — {`EGP ${child.escrowBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
+                  {child.name} ({gradeLabel(child.grade)}) — {formatEgp(child.escrowBalance)}
                 </option>
               ))}
             </select>

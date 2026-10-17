@@ -24,13 +24,12 @@ import {
   gradeLabel,
   IN_SCHOOL_INSTRUMENTS,
   IN_SCHOOL_INSTRUMENT_LABELS,
-  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHOD_LABELS, formatEgp,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
-import { formatPrice } from '~/lib/format';
 
 const fetchPendingManual = () => apiResponse(api.v1.payments['pending-manual'].$get());
 type PendingPayment = Awaited<ReturnType<typeof fetchPendingManual>>[number];
@@ -184,7 +183,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       setRejectPaymentTarget(null);
       afterAction(
         `Payment rejected for ${student?.name ?? 'student'}; the family has been told.` +
-          (r.escrowReturned > 0 ? ` ${formatPrice(r.escrowReturned)} returned to the balance.` : '') +
+          (r.escrowReturned > 0 ? ` ${formatEgp(r.escrowReturned)} returned to the balance.` : '') +
           (r.registrationsExpired > 0 ? ' The window has closed, so the subjects are released.' : ''),
         student?.id
       );
@@ -594,7 +593,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       {lostTarget && (
         <ReasonModal
           title="Write this receipt off as lost?"
-          description={`Receipt ${lostTarget.receiptNumber} — ${receiptOwner(lostTarget).what} for ${receiptOwner(lostTarget).student.name}. The family cannot produce the paper, so the school accepts the loss: any pending drop completes and its refund is released${lostTarget.refundAmountOnReturn != null ? ` (${formatPrice(lostTarget.refundAmountOnReturn)})` : ''}. Recorded in the audit trail.`}
+          description={`Receipt ${lostTarget.receiptNumber} — ${receiptOwner(lostTarget).what} for ${receiptOwner(lostTarget).student.name}. The family cannot produce the paper, so the school accepts the loss: any pending drop completes and its refund is released${lostTarget.refundAmountOnReturn != null ? ` (${formatEgp(lostTarget.refundAmountOnReturn)})` : ''}. Recorded in the audit trail.`}
           label="Reason"
           placeholder="e.g. Parent confirms the receipt was lost in a move"
           confirmLabel="Mark Lost"
@@ -608,7 +607,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       {rejectPaymentTarget && (
         <ReasonModal
           title="Reject this payment?"
-          description={`${rejectPaymentTarget.paymentMethod === 'instapay' && !rejectPaymentTarget.verificationReference ? `The parent has not submitted a transfer reference yet and may be transferring right now — reject only a checkout they abandoned (started ${new Date(rejectPaymentTarget.createdAt).toLocaleString()}). ` : ''}${rejectPaymentTarget.student.name} — ${formatPrice(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied)} by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${formatPrice(rejectPaymentTarget.escrowAmountApplied)} applied from the balance goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
+          description={`${rejectPaymentTarget.paymentMethod === 'instapay' && !rejectPaymentTarget.verificationReference ? `The parent has not submitted a transfer reference yet and may be transferring right now — reject only a checkout they abandoned (started ${new Date(rejectPaymentTarget.createdAt).toLocaleString()}). ` : ''}${rejectPaymentTarget.student.name} — ${formatEgp(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied)} by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${formatEgp(rejectPaymentTarget.escrowAmountApplied)} applied from the balance goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
           label="Reason (sent to the family)"
           placeholder="e.g. No transfer with this reference on the bank statement"
           confirmLabel="Reject Payment"

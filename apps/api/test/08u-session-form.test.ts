@@ -229,7 +229,9 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     expect(await keysOf(m1h.id)).toEqual([{ key_kind: 'unit', key_id: h1 }]);
     expect(await keysOf(m2h.id)).toEqual([{ key_kind: 'unit', key_id: h2 }]);
     expect(await keysOf(bioRow.items.find((i) => i.kind === 'whole')!.id)).toEqual([{ key_kind: 'option', key_id: cx }]);
-    expect(await keysOf(b4.id)).toEqual([{ key_kind: 'qualification', key_id: bio }]);
+    // Paper 4 reads the whole item's row, the option's (the lead's answer 2 on the review of 744e553): the list names
+    // the syllabus once, "0970 CX 10,850".
+    expect(await keysOf(b4.id)).toEqual([{ key_kind: 'option', key_id: cx }]);
 
     // Each subject's items into a June series of this file with an entry deadline (the unlabelled one has no dates, and
     // a series with neither takes no line): the item endpoint's move, nothing reserved yet.
@@ -241,16 +243,20 @@ describe('08u: the session in the school\'s words — one form per subject, the 
       }
     }
     // The fee lists as the boards publish them: Pearson the qualification (9,200) and each paper (4,600); Cambridge the
-    // syllabus with its option (10,850) and, for the carry-forward re-entry of one paper, the syllabus again (Q-13).
+    // syllabus with its option once (10,850), which the carry-forward re-entry of one paper is charged too (Q-13).
     await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: pearsonJune }, json: { rows: [
       { keyKind: 'qualification', keyId: ma, amount: 9200, provisional: false },
       { keyKind: 'unit', keyId: h1, amount: 4600, provisional: false },
       { keyKind: 'unit', keyId: h2, amount: 4600, provisional: false },
     ] } }));
-    await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: cambridgeJune }, json: { rows: [
-      { keyKind: 'option', keyId: cx, amount: 10850, provisional: false },
-      { keyKind: 'qualification', keyId: bio, amount: 10850, provisional: false },
-    ] } }));
+    // Cambridge's row from the Fees tab's paste, as its list writes it: one row, read by the whole subject and by each
+    // paper's retake (Paper 2's is on the sheet unticked).
+    const camParsed = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].parse.$post({ param: { seriesId: cambridgeJune }, json: { text: `F0970-${RUN} CX 10,850` } }));
+    expect(camParsed.matched.map((m) => [m.keyKind, m.keyId, m.amount])).toEqual([['option', cx, 10850]]);
+    await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: cambridgeJune }, json: { rows: camParsed.matched.map((m) => ({ keyKind: m.keyKind, keyId: m.keyId, amount: m.amount, provisional: false })) } }));
+    const camGrid = await apiResponse(finadmin.api.v1['board-fees'].$get({ query: { seriesId: cambridgeJune } }));
+    expect(camGrid.rows.find((r) => r.keyKind === 'option' && r.keyId === cx)!.items.map((i) => i.label).sort()).toEqual(['Paper 2 only (retake)', 'Paper 4 only (retake)', 'Whole subject']);
+    expect(camGrid.rows.some((r) => r.keyKind === 'qualification' && r.keyId === bio)).toBe(false);
     // The school opens Paper 1H and Paper 4 at EGP 3,000 each (retakes only: "One paper ONLY").
     await apiResponse(save(coordinator, june, om.id, { ...asIs(mathsRow), items: [{ itemId: m1h.id, availability: 'retake_only', courseFee: 3000 }] }));
     await apiResponse(save(coordinator, june, ob.id, { ...asIs(bioRow), items: [{ itemId: b4.id, availability: 'retake_only', courseFee: 3000 }] }));
@@ -272,7 +278,7 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     const priced = (id: string) => one<{ price: number; rows: { keyKind: string; keyId: string; amount: number }[] }>(
       `select price_at_registration::float as price, pricing_basis->'feeRows' as rows from registration where id = $1`, [id]);
     expect(await priced(l1h!.id)).toMatchObject({ price: 7600, rows: [{ keyKind: 'unit', keyId: h1, amount: 4600 }] });
-    expect(await priced(l4!.id)).toMatchObject({ price: 13850, rows: [{ keyKind: 'qualification', keyId: bio, amount: 10850 }] });
+    expect(await priced(l4!.id)).toMatchObject({ price: 13850, rows: [{ keyKind: 'option', keyId: cx, amount: 10850 }] });
 
     // The Fees tab: Paper 1H's row names the paper and the item read from it; the qualification's row only the whole subject.
     const grid = await apiResponse(finadmin.api.v1['board-fees'].$get({ query: { seriesId: pearsonJune } }));
@@ -298,14 +304,23 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     const e2h = (await viaEndpoint(om.id, h2, 'Paper 2H only (endpoint)'))!.id;
     const e2 = (await viaEndpoint(ob.id, c2, 'Paper 2 only (endpoint)'))!.id;
     expect(await keysOf(e2h)).toEqual([{ key_kind: 'unit', key_id: h2 }]);
-    expect(await keysOf(e2)).toEqual([{ key_kind: 'qualification', key_id: bio }]);
+    expect(await keysOf(e2)).toEqual([{ key_kind: 'option', key_id: cx }]);
 
-    // The rule is the board's, changed on the Catalogue's board card and audited (OxfordAQA, set and set back).
+    // The rule is the board's, changed on the Catalogue's board card by the admin alone and with a reason kept in the
+    // audit row (the review of 744e553, item 1; MO-10's deadline is the precedent): OxfordAQA, set and set back.
     const oxford = boards.find((b) => b.code === 'oxford')!;
-    await apiResponse(coordinator.api.v1.catalogue.boards[':code'].$put({ param: { code: 'oxford' }, json: { onePaperFeeKey: 'unit' } }));
-    expect(await one(`select previous_data->>'onePaperFeeKey' as was, new_data->>'onePaperFeeKey' as now from audit_log where action = 'BOARD_UPDATED' and entity_id = 'oxford' order by created_at desc limit 1`))
-      .toEqual({ was: 'qualification', now: 'unit' });
-    await apiResponse(coordinator.api.v1.catalogue.boards[':code'].$put({ param: { code: 'oxford' }, json: { onePaperFeeKey: oxford.onePaperFeeKey as 'qualification' } }));
+    const putOxford = (who: Client, json: { onePaperFeeKey?: 'qualification' | 'unit'; reason?: string; notes?: string | null }) =>
+      who.api.v1.catalogue.boards[':code'].$put({ param: { code: 'oxford' }, json });
+    // The coordinator, who edits the rest of the board, is refused the rule; the admin is refused it without a reason.
+    expect(await refused(putOxford(coordinator, { onePaperFeeKey: 'unit', reason: '08u F8-05: the coordinator tries' })))
+      .toMatchObject({ status: 403, error: expect.stringContaining('Only an admin') });
+    expect(await refused(putOxford(adm, { onePaperFeeKey: 'unit' }))).toMatchObject({ status: 400, error: expect.stringContaining('Say why') });
+    expect((await apiResponse(coordinator.api.v1.catalogue.$get())).boards.find((b) => b.code === 'oxford')!.onePaperFeeKey).toBe('qualification');
+    expect(await apiResponse(putOxford(coordinator, { notes: oxford.notes }))).toMatchObject({ code: 'oxford', onePaperFeeKey: 'qualification' });
+    await apiResponse(putOxford(adm, { onePaperFeeKey: 'unit', reason: "08u F8-05: OxfordAQA's list prices a paper" }));
+    expect(await one(`select previous_data->>'onePaperFeeKey' as was, new_data->>'onePaperFeeKey' as now, new_data->>'reason' as reason from audit_log where action = 'BOARD_UPDATED' and entity_id = 'oxford' order by created_at desc limit 1`))
+      .toEqual({ was: 'qualification', now: 'unit', reason: "08u F8-05: OxfordAQA's list prices a paper" });
+    await apiResponse(putOxford(adm, { onePaperFeeKey: oxford.onePaperFeeKey as 'qualification', reason: "08u F8-05: back to the syllabus's fee" }));
     expect((await apiResponse(coordinator.api.v1.catalogue.$get())).boards.find((b) => b.code === 'oxford')!.onePaperFeeKey).toBe('qualification');
   });
 
@@ -641,6 +656,19 @@ describe('08u: the session in the school\'s words — one form per subject, the 
         { offerItemId: second, attempt: 'first', mode: 'in_school', priorSittingSeriesId: null },
       ]);
     })).rejects.toThrow('cannot be reserved together');
+
+    // A subject mapped to its award and the award's units (one item per unit, no whole item) is offered no other
+    // qualification: nothing would make the new one a choice against the units, so both could be reserved (the review
+    // of 744e553, item 5). Only a subject whose own entry is a single whole item is (Arabic A.L. above).
+    const byUnit = await award('FYB', 'Arabic IAL by unit', 'International A Level', 'units_cash_in');
+    const [y1, y2] = [await unit('pearson_edexcel', 'FYU1', 'Unit 1', 'as', 'unit'), await unit('pearson_edexcel', 'FYU2', 'Unit 2', 'a2', 'unit')];
+    await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].units.$put({ param: { id: byUnit }, json: { units: [y1, y2].map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
+    const arUnits = await subject(adm, `F804-ARU-${RUN}`, `Arabic A.S./A.L. by unit (08u F8-04 ${RUN})`, { course: 4000, registration: 0 }, { council: 'pearson_edexcel', qualificationLevel: 'a_level' });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: arUnits }, json: { boardCode: 'pearson_edexcel', qualificationId: byUnit, unitIds: [y1, y2], reason: '08u F8-04: the award and its units' } }));
+    const perUnit = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: june }, json: { subjectId: arUnits, courseFee: 4000, teachers: [{ teacherId: t1, mode: 'in_school' }] } })))!;
+    const pu = await offerRow(june, perUnit.id);
+    expect(pu.items.map((i) => i.kind).sort()).toEqual(['unit', 'unit']);
+    expect(pu.qualificationsToAdd).toEqual([]);
   });
 
   it('the same form twice changes nothing and writes no audit row; a form whose audit row cannot be written changes nothing (the rows commit with the change)', async () => {

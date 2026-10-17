@@ -16,7 +16,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, gradeLabel } from '@repo/validations';
+import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
 import { Notice } from '~/components/ui/tone';
 import { Reserve, type ReserveDone } from '~/components/reservations/reserve';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
@@ -120,7 +120,7 @@ export default function RegisterClient({ userId, userRole }: { userId: string; u
       {feeDue && (
         <Notice tone="warning" title="The school fee comes first">
           {/* One sentence, translated whole (word by word "The" stayed English in Arabic). */}
-          <span>{`The ${fee.academicYear} school fee${fee.amount != null ? ` (EGP ${Number(fee.amount).toLocaleString('en-US')})` : ''} is paid before reserving.`}</span>{' '}
+          <span>{`The ${fee.academicYear} school fee${fee.amount != null ? ` (${formatEgp(Number(fee.amount))})` : ''} is paid before reserving.`}</span>{' '}
           {isParent ? <Link href={`/school-fee${studentId ? `?studentId=${studentId}` : ''}` as never} className="font-semibold underline">Pay the school fee now →</Link> : <span>Ask your parent to pay it from their account.</span>}
         </Notice>
       )}

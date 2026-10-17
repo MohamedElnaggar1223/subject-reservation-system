@@ -5,9 +5,8 @@ import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
-import { formatPrice } from '~/lib/format';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, gradeLabel, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -329,7 +328,7 @@ export default function ApprovalsClient(): React.JSX.Element {
         <div className="sticky top-4 z-10 bg-card rounded-xl border border-border shadow-lg p-4 flex items-center justify-between gap-4 flex-wrap">
           <div className="text-sm text-foreground">
             <span className="font-semibold">{selectedIds.size}</span> selected ·{' '}
-            <span className="font-semibold">{formatPrice(selectedTotal)}</span> total
+            <span className="font-semibold">{formatEgp(selectedTotal)}</span> total
           </div>
           <div className="flex gap-2">
             <Button
@@ -415,7 +414,7 @@ export default function ApprovalsClient(): React.JSX.Element {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-foreground">
-                  {formatPrice(sessionTotal)}
+                  {formatEgp(sessionTotal)}
                 </span>
                 <button
                   onClick={() =>
@@ -494,7 +493,7 @@ export default function ApprovalsClient(): React.JSX.Element {
 
                     {/* Price */}
                     <div className="text-sm font-semibold text-foreground shrink-0">
-                      {formatPrice(price)}
+                      {formatEgp(price)}
                     </div>
                   </div>
                 );
@@ -513,7 +512,7 @@ export default function ApprovalsClient(): React.JSX.Element {
             </h3>
 
             <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-              Total: <strong>{formatPrice(selectedTotal)}</strong> — payment will be required to finalize these registrations.
+              Total: <strong>{formatEgp(selectedTotal)}</strong> — payment will be required to finalize these registrations.
             </div>
 
             <div>
@@ -738,21 +737,21 @@ function ChangeRequestsSection() {
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-xs text-muted-foreground">Current Price</p>
                   <p className="text-sm font-bold text-foreground">
-                    {formatPrice(cr.registration.priceAtRegistration)}
+                    {formatEgp(cr.registration.priceAtRegistration)}
                   </p>
                 </div>
                 {cr.type === 'swap' && (
                   <div className="bg-muted rounded-lg p-2 text-center">
                     <p className="text-xs text-muted-foreground">New Price</p>
-                    <p className="text-sm font-bold text-foreground">{formatPrice(cr.priceAtRequest)}</p>
+                    <p className="text-sm font-bold text-foreground">{formatEgp(cr.priceAtRequest)}</p>
                   </div>
                 )}
                 <div className="bg-muted rounded-lg p-2 text-center">
                   <p className="text-xs text-muted-foreground">Impact</p>
                   <p className={`text-sm font-bold ${isCredit ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
                     {isCredit
-                      ? `+${formatPrice(Math.abs(cr.priceDifference))} to the balance`
-                      : `${formatPrice(cr.priceDifference)} to pay`}
+                      ? `+${formatEgp(Math.abs(cr.priceDifference))} to the balance`
+                      : `${formatEgp(cr.priceDifference)} to pay`}
                   </p>
                 </div>
               </div>

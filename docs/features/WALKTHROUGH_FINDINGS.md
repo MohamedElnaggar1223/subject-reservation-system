@@ -1,18 +1,22 @@
 # The fix round of F8's findings (F8-01 to F8-14)
 
 **Spec:** the lead's brief of 17 Oct 2026 — the twelve items that remove the workarounds F8's walkthrough had to take
-(`docs/features/WALKTHROUGH.md` §5, `docs/walkthrough/index.html`), and the decisions' reviewer's two low notes.
+(`docs/features/WALKTHROUGH.md` §5, `docs/walkthrough/index.html`), and the decisions' reviewer's two low notes; then the
+lead's review of 744e553 (17 Oct, "merge after fixes 1, 2, 3, 4, 6"; 5, 7 and 9 in scope too) and the answers to §10's
+three questions — **round 2, §13**.
 **Branch:** `feature/walkthrough-findings` (worktree `.claude/worktrees/walkthrough-findings`), from main 8ae295e; main
 2a149dd (F8's walkthrough) merged as d73109d, main e90850d as 6c90d1f.
 **Databases:** `igcse_findings_dev` (a copy of `igcse_template_dev`, migrated to 64), `igcse_findings_test` (the suite),
-`igcse_findings_mig` (the migration proof on a template copy), `igcse_findings_walk` (a cycle built by main's code, then
-migrated and driven on the branch), `igcse_findings_before` (main's before-state for the screenshots),
+`igcse_findings_mig` and `igcse_findings_mig2` (the migration proofs on template copies), `igcse_findings_walk` (a cycle
+built by main's code, then migrated and driven on the branch; 65 migrations since round 2), `igcse_findings_before`
+(main's before-state for the screenshots), `igcse_findings_cycle65` (a copy of it, migrated 62 → 65 for round 2's proof),
 `igcse_findings_seed` (the seed's proof). **Ports:** API 3211, web 3210 (the branch); 3213 and 3212 for main's code in
 `/tmp/wf/main-src` while the before-state was shot. **Built by:** one Opus 5.5 implementer. **Trail:**
 `.audit/walkthrough-findings.tsv`. **Evidence:** `.audit/walkthrough-findings-evidence/`: `before/` and `after/` (a JPEG per
 screen in English and Arabic, with `readings*.json`: what each screen said), `controls/` (each guard undone, its test
-red), `migration/` (0062–0063 on a template copy and on a cycle built by main's code; the seed), `changed-assertions.tsv`,
-`gates/` (the suite's summaries), `drive/` (the drive scripts).
+red), `migration/` (0062–0064 on template copies and on cycles built by main's code; the seed), `changed-assertions.tsv`,
+`gates/` (the suite's summaries), `drive/` (the drive scripts), `round2/` (round 2's drive: shots, readings, scripts,
+item 7's email log and receipt text, item 6's dictionary check).
 
 **In one sentence.** Each finding is fixed where it starts: a one-paper retake's board fee is the board's rule (a
 column, two migrations), a payment under way is a fact of the statement and the desk's read, the API says amounts and
@@ -28,8 +32,11 @@ form adds a second qualification, a draft session can be deleted, and the seed p
 - **The rule.** `exam_board.one_paper_fee_key` (`packages/db/src/schema.ts`; text, default `'qualification'`, checked
   `IN ('qualification', 'unit')`). `'qualification'`: the syllabus's fee — Cambridge charges the syllabus for a
   carry-forward re-entry (Q-13). `'unit'`: the paper's own row, where the board's list prices per paper or unit — Pearson
-  Edexcel ("4MA1 1H 4,600", SCHOOL_FORMS.md §3.2). OxfordAQA stays on `'qualification'`: no list of its fees is in hand
-  (F8-07; §10, question 1).
+  Edexcel ("4MA1 1H 4,600", SCHOOL_FORMS.md §3.2). OxfordAQA stays on `'qualification'`, the syllabus's fee, until its
+  fee list is in hand (F8-07); the board card is where the admin changes it then (the lead's answer 1, §10).
+- **Whose row on a syllabus-keyed board** (the lead's answer 2, round 2): a one-paper item reads the same fee row as the
+  subject's whole item — the option's row when the whole item enters an option (0970 CX), the qualification's otherwise —
+  so the fee list names a syllabus once. Migration `0064_one_paper_whole_item_row` re-keys the items already made (§13).
 - **Read by** `onePaperFeeKeys()` in `apps/api/src/services/offer.services.ts`: `withOnePaper` (the items the catalogue
   gives a subject, so the sheet's Add subject and the form's "Paper N only") and `insertItem`'s default fee keys for a
   one-paper item made through the item endpoint with none given (before, that default was the unit for every board,
@@ -39,6 +46,14 @@ form adds a second qualification, a draft session can be deleted, and the seed p
   the syllabus's board fee", and in its Edit "A one-paper retake's board fee" (a select), with "A one-paper retake added
   to a session from now on reads it; one already on a sheet keeps its fee." `UpdateBoard` gains `onePaperFeeKey`; the
   `BOARD_UPDATED` audit row now records its old value. Arabic: «إعادة ورقة واحدة: رسوم المجلس للورقة نفسها / للمنهج كله».
+- **The admin's alone, with a reason** (round 2, the review's item 1). The rule decides what every new one-paper retake
+  of the board costs, so it follows **MO-10's precedent** — a series' entry deadline is the admin's alone, asked with a
+  reason and audited with it (`series.services.ts` `assertDeadlineChangeAllowed`, `series.client.tsx` `DatesForm`):
+  `updateBoard` refuses `onePaperFeeKey` from any other role (403, "Only an admin changes a board's one-paper fee rule:
+  it decides what every new one-paper retake costs") and without a reason (400); `UpdateBoard.reason` (5–500) goes into
+  the `BOARD_UPDATED` row's new data. The route's authz row is unchanged: the coordinator still edits the board's other
+  fields. The card shows the select to the admin only, sends the rule only when it changes, and asks a Reason then; the
+  coordinator reads the rule with "Only an admin changes it: it decides what every new one-paper retake costs."
 - **The paste.** `parseFees` (`board-fee.services.ts`) reads a unit's whole code ("4MA1/1H", or "4MA1 1H") before its
   parts. Read token by token, a paper's own row pasted as "4MA1/1H 4,600" was matched to the award 4MA1 and would have
   set the whole syllabus's fee to 4,600 — met while driving this item (§6), fixed here, asserted in 08u, control c1b.
@@ -212,7 +227,7 @@ form adds a second qualification, a draft session can be deleted, and the seed p
 
 ## 2. Changed assertions, old and new
 
-**Approved by the lead for item 1** (the message of 17 Oct, 23:14Z; they asserted the old rule itself, no money outcome):
+**Approved by the lead for item 1** (the message of 16 Oct, 23:12:43Z; they asserted the old rule itself, no money outcome):
 
 | File | Old | New |
 |---|---|---|
@@ -312,9 +327,9 @@ and driven on the branch with families C and D2, 44 shots (`after/`). Each scree
 
 1. **The board's rule is a column, not a list.** One property per board, read when an item is made; a board whose list
    changes is changed on its card, and the school's existing items stay as they are (the Fees tab re-prices unpaid lines).
-2. **Cambridge's one-paper item stays on the qualification even where the whole subject enters an option** — the brief's
-   rule. The list therefore names 0970 twice for Cambridge ("0970 CX" for All papers, "0970" for the carry-forward
-   re-entry): §10, question 2.
+2. ~~Cambridge's one-paper item stays on the qualification even where the whole subject enters an option~~ —
+   superseded by the lead's answer 2 (round 2): it reads the whole item's row, the option's, and the list names 0970
+   once ("0970 CX 10,850"); migration 0064 re-keys the items already made.
 3. **The migration re-keys only a one-paper item that enters one unit and reads one qualification key**; an item made by
    hand with other keys is left as it was made.
 4. **A payment under way is the API's fact**, not the screen's inference: the statement and the Student 360 say it, so
@@ -331,10 +346,14 @@ and driven on the branch with families C and D2, 44 shots (`after/`). Each scree
 
 ## 8. Deferred, and why
 
-- **An unpaid line of a re-keyed item keeps the syllabus's fee.** Its pricing basis names the qualification's row, so
-  "Re-price unpaid lines" moves it only if that row changes. On the school's database such a line exists only if an
-  Edexcel one-paper retake was reserved before 0063 (none on the template; on the walk cycle none was). The school's
-  way: the desk's price adjustment, or the lead's call (§10, question 3).
+- **An unpaid line of a re-keyed item** (corrected in round 2, the review's item 4). A line keeps the price it was
+  given, but the next re-price moves it: `repriceLines` (`board-fee.services.ts`) finds a line through the fee row its
+  pricing basis names — the syllabus's row, for a one-paper line reserved before 0063 (Edexcel) or 0064 (Cambridge with
+  an option) — and `repriceBoardPart` (`pricing.services.ts`) then prices it from the item's **current** keys. So the
+  next "Re-price unpaid lines" after that syllabus row changes moves such a line to the paper's price (Edexcel) or the
+  option's (Cambridge), and refuses with an error if that row is missing from the series. Acceptable (the lead's answer 3:
+  leave them): no such line exists on the template or on the walk cycle (both proofs, §4 and §13, show none), and the same
+  state already arises from the item endpoint's fee-key edit on any item with unpaid lines.
 - **The old Home card** (`home-summary.client.tsx`, the screen with F6b's switch off) still offers "Pay" for every owed
   line; it is hidden while the switch is on, and the switch was not touched.
 - **Hidden screens' amounts** (`admin/payments` "Incl. … escrow", the dashboard): hidden by decisions 13 and F6b; left with
@@ -354,14 +373,18 @@ and driven on the branch with families C and D2, 44 shots (`after/`). Each scree
 - **F8-14** — one address over 600 requests in 15 minutes is refused: a deployment setting (`API_RATE_LIMIT_MAX`,
   `CLIENT_IP_HEADER` behind a proxy; SECURITY_AUDIT O-4).
 
-## 10. Questions for the lead
+## 10. Questions for the lead — answered (the review of 744e553), applied in round 2
 
 1. OxfordAQA's one-paper rule: its fee list is not in hand; it stays on the syllabus's fee. Set it on the board card when
-   the list arrives?
+   the list arrives? — **Yes:** OxfordAQA stays on the syllabus's fee until its list is in hand; the board card is where
+   the admin changes it then (now the admin's alone, with a reason: item 1 above).
 2. Cambridge with an option code: should a one-paper retake read the option's row (the same 10,850, the list naming the
-   syllabus once) instead of the qualification's?
+   syllabus once) instead of the qualification's? — **Yes:** the whole item's row, the option's where the whole item
+   enters one, the qualification's otherwise; `withOnePaper` and the item endpoint's default follow it; migration 0064
+   re-keys the existing Cambridge items (§13).
 3. Unpaid lines of Edexcel one-paper items reserved before 0063 (if the school has any): re-price them to the paper's fee
-   by hand, or leave them at the price the family was given?
+   by hand, or leave them at the price the family was given? — **Leave them** (none exist); the next re-price of their
+   syllabus row moves them (§8, corrected).
 
 ## 11. For F8's agent: the walkthrough's steps to retake
 
@@ -376,8 +399,8 @@ the statement, notifications and Pending Requests in both languages, and Setting
 ## 12. Progress log (UTC, 16–17 Oct 2026)
 
 - 22:43 — set up (install, builds, `igcse_findings_dev` migrated, env on 3211/3210). 22:51 — main 2a149dd merged (d73109d).
-- 23:14 — the lead approved the two fee-key assertions. 23:46 — item 1's scenario green, control c1. 23:55 — 0062/0063
-  proven on a template copy.
+- 23:12:43 — the lead approved the two fee-key assertions. 23:46 — item 1's scenario green, control c1. 23:55 —
+  0062/0063 proven on a template copy.
 - 00:47 — items 2 and 3 in the API, 08o's scenario, control c3. 01:01 — 6fc855d pushed (CI red as expected: the
   sentences' assertions not yet changed). 01:19 — item 8, control c8. 02:00 — item 4's sentences, 19 assertions,
   control c4. 02:03 — item 9, control c9. 02:13 — items 10–12; c79f8db pushed.

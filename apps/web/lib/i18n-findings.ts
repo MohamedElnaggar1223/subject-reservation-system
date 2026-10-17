@@ -121,6 +121,20 @@ export const findingsArabic: Record<string, string> = {
   // F8-12: the exception's result, one in the singular.
   'due date moved.': 'موعد سداد نُقل.',
   'pushed school fee cancelled.': 'رسوم مدرسية مدفوعة أُلغيت.',
+
+  // The review of 744e553, item 1: a board's one-paper fee rule is the admin's, with a reason.
+  'Only an admin changes it: it decides what every new one-paper retake costs.': 'لا يغيّرها إلا المسؤول: فهي تحدد تكلفة كل إعادة ورقة واحدة جديدة.',
+  'Say why the one-paper rule changes (at least 5 characters) — it is recorded.': 'اذكر سبب تغيير قاعدة الورقة الواحدة (5 أحرف على الأقل) — يُسجَّل السبب.',
+  "Only an admin changes a board's one-paper fee rule: it decides what every new one-paper retake costs":
+    'لا يغيّر قاعدة رسوم الورقة الواحدة لمجلس إلا المسؤول: فهي تحدد تكلفة كل إعادة ورقة واحدة جديدة',
+  "Say why the board's one-paper fee rule changes": 'اذكر سبب تغيير قاعدة رسوم الورقة الواحدة للمجلس',
+  'Say why the rule changes (at least 5 characters)': 'اذكر سبب تغيير القاعدة (5 أحرف على الأقل)',
+  "e.g. the board's 2027 list prices each paper": 'مثال: قائمة المجلس لعام 2027 تسعّر كل ورقة',
+  // Item 5: a second qualification only beside a whole subject.
+  'This subject has no whole-subject item for the new qualification to be a choice against':
+    'لا يوجد لهذه المادة بند للمادة كاملة يكون المؤهل الجديد بديلًا عنه',
+  // Item 2 (F8-01): the reason a draft's deletion asks for.
+  'Say why the session is deleted (at least 5 characters)': 'اذكر سبب حذف الدورة (5 أحرف على الأقل)',
 };
 
 /** Data inside an Arabic sentence (an amount, a name), kept one left-to-right unit. */
@@ -167,6 +181,13 @@ const FINDINGS_RULES: [RegExp, (m: RegExpExecArray) => string][] = [
     (m) => `طلب ${iso(m[1]!)} سحب ${egp(m[2]!)} من رصيدك. الطلب بانتظار معالجة الإدارة.`],
   [/^The withdrawal request for (.+) was rejected\. (EGP [\d,.]+) has been returned to the balance\. Reason: (.+)$/,
     (m) => `رُفض طلب السحب لـ ${iso(m[1]!)}. أُعيد ${egp(m[2]!)} إلى الرصيد. السبب: ${iso(m[3]!)}`],
+  // F8-01 and the review of 744e553, item 2: why a draft session is not deleted (the Session screen's modal).
+  [/^(.+) is open: only a draft session can be deleted \(close it instead\)$/, (m) => `${iso(m[1]!)} مفتوحة: لا تُحذف إلا دورة مسودة (أغلقها بدلًا من ذلك)`],
+  [/^(.+) is closed: only a draft session can be deleted$/, (m) => `${iso(m[1]!)} مغلقة: لا تُحذف إلا دورة مسودة`],
+  [/^(.+) has a reservation: a session with reservations is never deleted$/, (m) => `في ${iso(m[1]!)} حجز: لا تُحذف دورة فيها حجوزات أبدًا`],
+  [/^(.+) has (\d+) reservations: a session with reservations is never deleted$/, (m) => `في ${iso(m[1]!)} ${m[2]} حجوزات: لا تُحذف دورة فيها حجوزات أبدًا`],
+  [/^An exception was granted for (.+): it is kept as history and cannot be deleted$/, (m) => `مُنح استثناء في ${iso(m[1]!)}: تُحفظ في السجل ولا يمكن حذفها`],
+  [/^Reminders were sent for (.+): it is kept as history and cannot be deleted$/, (m) => `أُرسلت تذكيرات عن ${iso(m[1]!)}: تُحفظ في السجل ولا يمكن حذفها`],
 ];
 
 export function translateFindingsText(text: string): string | null {

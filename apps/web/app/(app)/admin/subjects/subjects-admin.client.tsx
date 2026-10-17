@@ -3,11 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, formatEgp } from '@repo/validations';
 import { COUNCIL_LABELS, QUALIFICATION_LEVEL_LABELS, type CreateSubjectInputType, type UpdateSubjectType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { toCsv, downloadCsv } from '~/lib/csv';
-import { formatPrice } from '~/lib/format';
 
 type Subject = {
   id: string;
@@ -589,7 +588,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                     {QUALIFICATION_LEVEL_LABELS[s.qualificationLevel as keyof typeof QUALIFICATION_LEVEL_LABELS] ?? s.qualificationLevel}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">
-                    <div dir="ltr">{formatPrice(s.courseFee)}</div>
+                    <div dir="ltr">{formatEgp(s.courseFee)}</div>
                     {!s.isOfferedAtSchool && (
                       <div className="text-xs text-amber-600 dark:text-amber-400">Outside school · 50%</div>
                     )}
