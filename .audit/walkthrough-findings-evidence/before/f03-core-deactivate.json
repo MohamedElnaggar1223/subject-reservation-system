@@ -1,0 +1,1 @@
+{"phase":"before","made":{"id":"1c21450e-966d-4d73-b034-694ae881c9c8","isCore":true},"deactivate":"DELETE /v1/subjects/1c21450e-966d-4d73-b034-694ae881c9c8: 409 {\"success\":false,\"error\":\"Cannot deactivate a core subject. Remove the core designation first.\"}","unmappedCount":17,"unmappedActive":1,"unmappedAll":17}

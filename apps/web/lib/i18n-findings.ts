@@ -59,6 +59,16 @@ export const findingsArabic: Record<string, string> = {
   'Balance withdrawal processed': 'تمت معالجة السحب من الرصيد',
   'Balance withdrawal requested': 'طُلب سحب من الرصيد',
 
+  // The notification centre a family reads (its type labels; "escrow" was the code's word, decision 14).
+  'Balance Updated': 'تغيّر الرصيد',
+  'Drop / Swap Processed': 'عولج طلب الحذف / التبديل',
+  'Drop / Swap Request': 'طلب حذف / تبديل',
+  'Payment Reversed': 'أُلغيت الدفعة',
+  'New Charge': 'رسم جديد',
+  'Just now': 'الآن',
+  'Mark all read': 'تعليم الكل كمقروء',
+  'Marking...': 'جارٍ التعليم...',
+
   // F8-11: the printed papers' subtitle.
   'Subject Registration Receipt': 'إيصال تسجيل مادة',
 
@@ -129,6 +139,10 @@ const how = (s: string) => findingsArabic[s] ?? s;
 
 /** Sentences with data in them (a name, an amount, a count): each rule anchored to its sentence's end. */
 const FINDINGS_RULES: [RegExp, (m: RegExpExecArray) => string][] = [
+  // The notification centre's times ("12m ago").
+  [/^(\d+)m ago$/, (m) => `قبل ${m[1]} دقيقة`],
+  [/^(\d+)h ago$/, (m) => `قبل ${m[1]} ساعة`],
+  [/^(\d+)d ago$/, (m) => `قبل ${m[1]} يوم`],
   // A date as the app writes it in a sentence ("20 Dec 2026": the exception's "by …").
   [/^(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})$/, (m) => `${m[1]} ${MONTHS_AR[m[2]!]} ${m[3]}`],
   // F8-04: the subject's form after a second qualification is added.

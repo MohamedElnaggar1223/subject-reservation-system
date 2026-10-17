@@ -1,0 +1,37 @@
+== seed proof, 2026-10-17T03:21:40Z: igcse_findings_seed, empty, the branch's 64 migrations
+-- before: subjects=0 sessions=0 admins=(none)
+-- two accounts signed up (placeholders): subjects=0 sessions=0 admins=(none)
+
+== seed (no flag)
+--- Starting database seed ---
+No sample subjects or sessions (run with --with-samples to add them for a demo or a test system).
+Looking for user admin@igcse.local to promote to admin...
+  Promoted admin@igcse.local to admin.
+--- Seed complete ---
+-- after: subjects=0 sessions=0 admins=admin@igcse.local
+
+== ADMIN_EMAIL=head@school.example seed
+--- Starting database seed ---
+No sample subjects or sessions (run with --with-samples to add them for a demo or a test system).
+Looking for user head@school.example to promote to admin...
+  Promoted head@school.example to admin.
+--- Seed complete ---
+-- after: subjects=0 sessions=0 admins=admin@igcse.local,head@school.example
+
+== seed --with-samples
+--- Starting database seed ---
+Seeding 17 subjects...
+  [subject] 0500 - English Language (created if missing)
+  [subject] 0580 - Mathematics (created if missing)
+  [subject] 0544 - Arabic Language (created if missing)
+  [subject] 0625 - Physics (created if missing)
+  [subject] 0620 - Chemistry (created if missing)
+  [subject] 0610 - Biology (created if missing)
+   …
+-- after: subjects=17 sessions=2 admins=admin@igcse.local,head@school.example
+
+== seed --with-samples again (changes nothing)
+Looking for user admin@igcse.local to promote to admin...
+  User admin@igcse.local is already an admin. Skipping.
+--- Seed complete ---
+-- after: subjects=17 sessions=2 admins=admin@igcse.local,head@school.example

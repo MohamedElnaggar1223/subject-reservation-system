@@ -1,0 +1,13 @@
+{
+  "errors": [
+    "http 409 DELETE /v1/subjects/27d78ded-545e-4092-a248-0321238b7537 {\"success\":false,\"error\":\"Cannot deactivate a core subject. Remove the core designation first.\"}"
+  ],
+  "readings": {
+    "before/f01-admin-home-with-draft-en": "Welcome back, School Admin\nThe reservation cycle: where each session stands, and what comes next.\nJune 2027\nOpen\nOpen: families reserve until 15 Feb 2027. Payment due 30 Nov 2026.\nOpen the sheet\nWHAT THE SHEET STILL NEEDS\n9 board fees not published yet\nFamilies can reserve these subjects, not pay for them, until the fee is confirmed.\nConfirm the fees\nWHAT FAMILIES ARE DOING\n5 reservations\n·\n1 paid\n·\n4 unpaid\n(EGP 89,750 outstanding)\nSee who has not paid\nENTRIES TO THE BOARD\nPearson Edexcel June 2027: entries by 13 Feb 2027\nExam entries\nCambridge International June 2027: entries by 21 Feb 2027\nExam entries\nOxfordAQA June 2027: entries by 21 Feb 2027\nExam entries\nNovember 2026 – January 2027\nDraft\nBeing prepared: not open to families yet. Families reserve from 1 Jul 2026 to 1 Oct 2026.\nOpen the sheet\nWHAT THE SHEET STILL NEEDS\nNo subjects on the sheet yet.\nAdd the subjects",
+    "before/f03-core-deactivate-refused-en": "Subject Management\n42 subjects total  · 26 active\nExport CSV\nImport CSV\nNew Subject\nAll boards\nPearson Edexcel\nCambridge International\nOxfordAQA\nAll Statuses\nActive\nInactive\nSubject\tBoard\tLevel\tFees\tCore\tStatus\tActions\nCore sample on the page\nCORE-SAMPLE-PAGE\n\tCambridge International\tIGCSE\nEGP 1,000\n1,000 + 0 reg\n\tActive\nEdit\nTeachers\nDeactivate",
+    "before/f03-core-after": {
+      "isActive": true,
+      "isCore": true
+    }
+  }
+}

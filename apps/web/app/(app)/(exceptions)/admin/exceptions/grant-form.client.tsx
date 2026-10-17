@@ -19,6 +19,7 @@ import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money, fetchSessions, SESSIONS_KEY } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { dateParts, MONTHS_SHORT } from '~/app/(app)/academic/calendar/academic-shared';
+import { formatPrice } from '~/lib/format';
 import {
   fetchStudents, fetchStudent, fetchSummary, fetchCharges, fetchOffersFor, fetchSubjects, fetchSeries,
   EXCEPTIONS_KEY, WHY_NOT, type PoliciesData, type PolicyRow,
@@ -283,7 +284,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.line} htmlFor="exc-scope-line" hint={!readsFamilies ? 'The finance desk picks a line.' : !studentId ? 'Pick the student first.' : undefined}>
                 <select id="exc-scope-line" value={scope.registrationId ?? ''} disabled={!summary.data} onChange={(e) => setScopeField('registrationId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">{policy.nullScope === null && accepts.size === 1 ? 'Pick a line…' : 'Any'}</option>
-                  {lines.map((l) => <option key={l.id} value={l.id}>{`${l.subject?.name ?? '—'} · ${l.session?.name ?? ''} · EGP ${l.priceAtRegistration}`}</option>)}
+                  {lines.map((l) => <option key={l.id} value={l.id}>{`${l.subject?.name ?? '—'} · ${l.session?.name ?? ''} · ${formatPrice(l.priceAtRegistration)}`}</option>)}
                 </select>
               </Field>
             )}
