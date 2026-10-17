@@ -278,7 +278,20 @@ Logs: `evidence/controls/`.
 
 ## 5. Gates
 
-See the progress log (§12) for the runs, each naming its commit; the summaries are in `evidence/gates/`.
+| Gate | Commit | Result | Evidence |
+|---|---|---|---|
+| `pnpm --filter @repo/api check-types` (source and tests) | 5d9da54 | green | session log, trail 03:48Z |
+| `pnpm --filter web check-types` | 5d9da54 | green | session log |
+| the suite, local time (Africa/Cairo), from an empty database migrated through 0063 | 5d9da54 | 43 files, **850 passed**, 1 todo (main: 843; seven scenarios added) | `gates/suite-local-5d9da54.txt` |
+| the same with `TZ=UTC` | 5d9da54 | 43 files, **850 passed**, 1 todo | `gates/suite-utc-5d9da54.txt` |
+| 09's invariants (in both runs) | 5d9da54 | 61 green | the same files |
+| `useQuery<…>` generics in `apps/web/app` | — | 15 (unchanged) | `grep -rn "useQuery<" apps/web/app` |
+| No file over 300 KB under `.audit`; no mobile number in the trail or the documents | — | none (largest shot 111 KB) | CI's gate 0 |
+
+The seven scenarios added: 08u "F8-05" and "F8-04", 08o "F8-08, F8-09", 08h "a subject is added …" and "a subject marked
+core is deactivated …", 08n "a draft with its sheet is deleted …" and "refused, nothing deleted …". An earlier local
+run on 6c90d1f (849 passed, 1 failed) had loaded the fee service before the paste's fix and 08u after its new assertion:
+superseded by these.
 
 ## 6. The drives
 
@@ -369,5 +382,11 @@ the statement, notifications and Pending Requests in both languages, and Setting
   control c4. 02:03 — item 9, control c9. 02:13 — items 10–12; c79f8db pushed.
 - 02:15–03:13 — the drives: main's before-state, the walk database migrated (02:45, second proof), the branch's after
   shots; the before phase run again on its own database. 03:21 — the seed's proof.
-- 03:25 — adac39f (evidence), 6c90d1f (main e90850d merged), pushed; the gates and the paste's fix follow in the log
-  below.
+- 03:25 — adac39f (evidence), 6c90d1f (main e90850d merged), pushed.
+- 03:28–03:35 — a local run on 6c90d1f; meanwhile the drive's parse check found the paste's token reading (item 1);
+  fixed, 08u asserts it, controls c1b and c7 (03:37); 5d9da54 with this document, pushed.
+- 03:41–03:48 — the suite on 5d9da54 in local time, 850 passed; 03:48–03:55 with `TZ=UTC`, 850 passed. Both type-checks
+  green. The prints in Arabic and with the school's name emptied (`after/f11-*-named-ar`, `…-unnamed-en`), the name put back.
+- The branch's dev servers are left running for the lead's drive: API on 3211 (pnpm 47310), web on 3210 (pnpm 47312), on
+  `igcse_findings_walk` (the June 2027 cycle with families A, C, D2; the admin `admin@igcse.local` / `AdminPass1`, the
+  demo's staff and families `TestPass1`). Main's servers (3212/3213) were stopped by their PIDs.
