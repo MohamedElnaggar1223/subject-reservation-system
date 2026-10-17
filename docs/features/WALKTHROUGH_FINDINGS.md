@@ -163,7 +163,8 @@ form adds a second qualification, a draft session can be deleted, and the seed p
 ### Item 8 — F8-04: Arabic A.L.'s second qualification
 
 - **API:** `listOffers` gives each offer `qualificationsToAdd`: the board's other active awards of the subject's area and
-  level **in another suite**, not yet entered by an item of the subject (the GCE 9AA0 beside the IAL YAA01).
+  level **in another suite**, not yet entered by an item of the subject (the GCE 9AA0 beside the IAL YAA01) — and since
+  round 2 only when the subject's own entry is a single whole item (§13, item 5).
 - **The form** (`subjects-tab.client.tsx` `AddQualification`): "Another qualification — The board has another award of
   this subject at this level. Offered beside this one, the family chooses one of the two with its teacher." and "Add a
   qualification: Edexcel 9AA0 (Arabic (GCE A Level))": its teacher (required), its course fee (empty: the subject's).
@@ -185,10 +186,10 @@ form adds a second qualification, a draft session can be deleted, and the seed p
   seed (`helpers.ts` promotes its admins itself). Proven in `migration/seed-proof.txt`.
 - **Deleting a draft:** `DELETE /v1/sessions/:id` with `{ reason }` (admin; at least 5 characters) → `deleteDraftSession`
   (`session.services.ts`): the session row locked; refused for an open or closed session, one with a line (any
-  status), granted exceptions or sent reminders; its sheet (subjects, items, teachers, fee keys), series links and
-  never-sent reminder rules go with it; the subjects, the boards' series and their fee lists stay; one
-  `SESSION_DELETED` row ("Draft Session Deleted") in the transaction. `authz-policy.tsv`: admin A, everyone else D. The
-  Session screen's "Delete this draft" (a reason dialog), back to the Sessions list.
+  status), exceptions of any status or sent reminders (kept as history, round 2); its sheet (subjects, items, teachers,
+  fee keys), series links and never-sent reminder rules go with it; the subjects, the boards' series and their fee lists
+  stay; one `SESSION_DELETED` row ("Draft Session Deleted") in the transaction. `authz-policy.tsv`: admin A, everyone
+  else D. The Session screen's "Delete this draft" (a reason dialog), back to the Sessions list (§13, item 2).
 - **Scenario** (08n, two): deleted with its sheet, audited, its subject and series kept; refused for an open session, a
   draft with a reservation, a short reason and the coordinator. **Control c9:** the draft-only check undone, red.
 - **Drive:** `after/f01-admin-home-with-draft-en` → `…/f01-delete-draft-dialog-en` → `…/f01-sessions-after-delete-en` →
@@ -271,10 +272,18 @@ The same list, with the exact text, is `evidence/changed-assertions.tsv`. No oth
 | c9 — item 9, only a draft is deleted | the draft-only check skipped | 08n F8-01: `expected { status: 200 } to deeply equal { status: 409, … }` (the open session deleted) |
 | c1b — item 1, the paste reads a unit's whole code | the whole-code reading skipped | 08u F8-05: `expected [ [ 'qualification', … ] ] to deeply equal [ [ 'unit', … ] ]` |
 | c7 — item 7, a core subject deactivated | the route's core refusal put back | 08h F8-02/03: `Error: Cannot deactivate a core subject. Remove the core designation first.` |
+| c-r1 — round 2, item 1: the rule the admin's | `updateBoard`'s admin check removed | 08u F8-05: `expected { status: 200, … } to match object { status: 403, … }` |
+| c-r2a — round 2, item 2: kept as history | the old sentence ("… revoke them on the Exceptions page first") | 08n: the refusal's sentence differs |
+| c-r2b — round 2, item 2 (finding 8): the locks | the locks on the session's subjects, items and reminder rules removed | 08n "finding 8": `expected { status: 200, … } to deeply equal { status: 409, … }` (deleted; the cascade would take the exception) |
+| c-r3 — round 2, item 3: the code, not the words | `isInsufficientBalance` reading the message for "insufficient" | 08q: `"status": 400` for 422 |
+| c-r5 — round 2, item 5: a single whole item | the gate removed | 08u F8-04: `expected [ { …(4) } ] to deeply equal []` (the GCE offered beside the units) |
+| c-r7 / c-r7b — round 2, item 7: the school's name | the email's `<h1>` / the receipt's heading back on the app's name | 08f: the stub's heading / the PDF's text |
+| c-a2 — answer 2: the whole item's row | `onePaperFeeKeys` back on the qualification | 08u F8-05: `expected [ { key_kind: 'qualification', … } ] to deeply equal [ { key_kind: 'option', … } ]` |
+| item 6 on the screen — the Arabic rule | the old rule `\((.+) EGP\)` put back while the web reloaded | the Reserve page in Arabic shows the refusal in English (`round2/r2-i6-control-old-rule-ar.jpg`) |
 
 Logs: `evidence/controls/`.
 
-## 4. Migrations 0062 and 0063, proven
+## 4. Migrations 0062 and 0063, proven (0064: §13)
 
 - **On a template copy** (`migration/0062-0063-template-copy.txt`): `igcse_findings_mig`, a fresh copy of
   `igcse_template_dev` (34), migrated with main 2a149dd's set to 62, given a fixture of main's one-paper items
@@ -414,3 +423,148 @@ the statement, notifications and Pending Requests in both languages, and Setting
 - The branch's dev servers are left running for the lead's drive: API on 3211 (pnpm 47310), web on 3210 (pnpm 47312), on
   `igcse_findings_walk` (the June 2027 cycle with families A, C, D2; the admin `admin@igcse.local` / `AdminPass1`, the
   demo's staff and families `TestPass1`). Main's servers (3212/3213) were stopped by their PIDs.
+
+## 13. Round 2 — the review of 744e553 (17 Oct 2026)
+
+The lead's review: "merge after fixes 1, 2, 3, 4, 6"; 5, 7 and 9 in scope too; 8 covered by 2; the three questions
+answered (§10). One round on the branch, each item with its scenario or control and a trail row
+(`.audit/walkthrough-findings.tsv`, phases `item-r1` … `item-r9`, `answer-2`).
+
+**Item 1 — the one-paper rule is the admin's, with a reason.** §1, item 1 ("The admin's alone, with a reason"; MO-10's
+precedent). 08u's F8-05 flips OxfordAQA as the admin with a reason (read back from the audit row) and back; the
+coordinator is refused (403) and the admin without a reason (400); the coordinator's edit of the board's notes still
+passes. Control c-r1. Screens: `round2/r2-i1-board-admin-changed-en` (the Reason field once the rule changes),
+`…-admin-no-reason-en` ("Say why the one-paper rule changes (at least 5 characters) — it is recorded."),
+`…-coordinator-{en,ar}` (the rule read, no select).
+
+**Item 2 — a draft's kept history, its locks, and the screen after a deletion** (`session.services.ts`
+`deleteDraftSession`, `session.client.tsx`).
+- History is kept: an exception of any status (a revoked one too) or a sent reminder refuses the deletion with
+  "An exception was granted for <session>: it is kept as history and cannot be deleted" and "Reminders were sent for
+  <session>: it is kept as history and cannot be deleted" — nobody is sent to revoke anything.
+- Finding 8: after the session's own lock, its subjects, its items and its reminder rules are locked `FOR UPDATE` in id
+  order before anything is counted. A grant or a reminder writing a row that names one of them takes a key-share lock on
+  it: one committed before is counted, one after waits and then fails its foreign key; none is deleted unseen by the
+  cascade.
+- Scenarios (08n): a draft with an item-scoped exception refused before and after the revoke (row kept, `revoked`, items
+  intact); a draft with a sent reminder refused (its rule kept; no path of the app sends one for a draft today, so the
+  step's records are written as the step writes them); and a forced race — the grant paused at its audit row with its
+  exception written, the deletion fired and queued on the item's lock, the grant released: the deletion refused, the
+  exception active. Controls c-r2a (the old sentence) and c-r2b (the locks removed: the deletion answered 200).
+- The screen: on success it `router.replace`s to the Sessions list and refetches only the lists (the deleted session's
+  own queries are left alone; each would answer 404). Driven: landed on `/admin/sessions`, which no longer lists it, and
+  no response of 400 or more during the flow, GETs included (`round2/r2-i2-*`; `drive-readings.json`:
+  `i2-after-delete-url`, `i2-responses-400-or-more: []`). The kept draft's refusal in English and Arabic
+  (`r2-i2-kept-refusal-{en,ar}`); the deletion's refusals now have their Arabic (`i18n-findings.ts`).
+
+**Item 3 — the balance refusals' status by a code** (`escrow.services.ts`). `InsufficientBalanceError` carries
+`errorCode: 'INSUFFICIENT_BALANCE'` — not `code`: `clientMessage` (`lib/response.ts`) reads a string `code` as a
+driver's SQLSTATE and hides the sentence, which the first run showed (422 with "Failed to initiate payment"). Thrown
+by `debitEscrow`, `debitHeld` (three), `transferEscrow` and the desk's and the payment's balance checks; the escrow,
+payment and registration routes answer 422 by `isInsufficientBalance(err)`. 08q's "three instalments …" asserts
+`{ status: 422, error: 'Not enough in the balance…' }`. Control c-r3.
+
+**Item 4 — §8 corrected** (the re-price of a re-keyed item's unpaid line).
+
+**Answer 2 — the whole item's row on a syllabus-keyed board.** `onePaperFeeKeys(…, wholeOptionId)`: on a
+`'qualification'` board, the option's row when the subject's whole item enters an option, the qualification's
+otherwise; `withOnePaper` passes the whole item's option; the item endpoint's default reads the offer's whole item
+(`wholeItemOption`). Migration **`0064_one_paper_whole_item_row`** (`drizzle-kit generate --custom`): an existing
+one-paper item that enters units, reads exactly one key (its qualification), and whose offer has exactly one whole item
+entering an option of that qualification, re-keyed on the option; an `OFFER_ITEM_UPDATED` row each, in the same
+statement; lines untouched; idempotent.
+- **On a fresh template copy** (`migration/0062-0064-template-copy.txt`): `igcse_findings_mig2`, 34 → main's 62 → the
+  fixtures (`fixture-at-62.sql`, and `fixture-0064-at-62.sql`: a Cambridge syllabus entered through option CX, its Paper
+  2 and Paper 4 keyed on the qualification as main's code makes them) → the branch's set, 65: Paper 2 and Paper 4 on
+  option CX with their audit rows; the Cambridge Paper 4 under an offer whose whole subject enters the award kept on the
+  qualification; 0063's Edexcel change as before; the 8 lines' digest identical; a second migrate applies nothing; 0063
+  and 0064 by hand: `INSERT 0 0`.
+- **On a cycle built by main** (`migration/0062-0064-cycle-built-by-main.txt`): `igcse_findings_cycle65`, a copy of
+  `igcse_findings_before` (main's 62; the demo cycle and the before drive on main's API) → 65: the seven Cambridge
+  one-paper items from their syllabus to its option (A, CX, DY) at the same fee read (9,850 / 10,850 / 12,950: the
+  demo's list names both rows), Mathematics' 1H and 2H to 4MA1/1H and 4MA1/2H, 10 audit rows, the 6 lines' and 2
+  payments' digests identical; 0064 again by hand: `INSERT 0 0`. The walk database was migrated to 65 the same way
+  before round 2's drive.
+- 08u's F8-05: Paper 4 and the endpoint's Paper 2 read option CX; the reserved line's basis names the option at 10,850
+  (price 13,850 unchanged); the Cambridge fee list is the Fees tab's paste `F0970-RUN CX 10,850` — one row, read by the
+  whole subject and each paper's retake; the qualification's row is no longer in it. Control c-a2.
+
+**Item 5 — a second qualification only beside a single whole item** (`offer.services.ts` `qualificationsToAdd`):
+offered only when the subject's own entry — its items, less the qualifications added beside it — is one whole item. A
+subject entered by unit (one item per unit), by paper or by route gets none: nothing would make the new one a choice
+against its entry. The form's `AddQualification` refuses without a whole item instead of falling back to an ungrouped
+one. 08u's F8-04 adds an Arabic subject mapped to an IAL award and its two units: two unit items,
+`qualificationsToAdd` `[]`. Control c-r5 (the GCE offered beside the units).
+
+**Item 6 — the Arabic rules on round 1's shapes.** `i18n-import.ts`'s school-fee rule reads `(EGP N)` now; the year
+is kept one left-to-right unit (the drive showed "2026-2027" reversed in a right-to-left line; the desk's "school fee
+(EGP N) was collected" rule in `i18n-money.ts` had the same reversal and is isolated too). The check
+(`round2/dict_old_shapes.py`, output `dict-old-shapes.txt`): every sentence round 1 removed from `apps/api/src`
+(e90850d..744e553), and the web's and validations' rewritten ones, cut into their literal fragments and looked for in
+every dictionary — this rule was the only one left on an old shape; the two hits remaining ("school fee (EGP") are text
+both shapes share, and both rules capture "EGP 5,000". No rule captures an amount without its decimal point. The
+deletion's, the board's and Add a qualification's new sentences have their Arabic. Driven in Arabic on the family's
+Reserve page with a school-fee schedule made for the drive and deleted after: «يجب دفع الرسوم المدرسية لعام 2026-2027 (5,000
+جنيه) قبل تسجيل المواد» (`r2-i6-school-fee-refusal-ar`); with the old rule put back while the web reloaded, the same
+screen kept the English (`r2-i6-control-old-rule-ar`).
+
+**Item 7 — the school's name on the emails and the emailed receipt.** `settings.services.ts` `senderNames()`: the
+school's name (`school.name`) and the app's, the school's `null` when the setting is empty. The emails' layout
+(`integrations/email.ts`): its `<h1>` is the school's name with "IGCSE Subject Reservation System" under it, or the
+app's name alone; the footer the same; the link-request email's signature, the auth emails' subject and welcome line
+name the school too. The receipt PDF (`payment.services.ts` `generatePaymentReceipt`): the school's name and the app's
+under it, centred, or the old single line. The stub prints each email's heading. 08f's new scenario (a desk payment
+with the name set, another with it empty): the receipt email's stub line and the PDF's text, both ways
+(`round2/item7-email-stub-and-receipt-pdf.txt`, which also has the drive's receipt on the walk cycle with "Demo
+International School" and with the name emptied). Controls c-r7, c-r7b. Known limit kept: the PDF writer's Courier
+prints Latin-1 only, as it already does for students' names.
+
+**Item 9 — one money formatter.** `lib/format.ts`'s `formatPrice` (Intl, no fraction digits) is gone; its 111 uses in 15
+files call `formatEgp` (`@repo/validations`), and so do the hand-built amounts: the sessions screens' `Money`, the
+receipt print, the dashboard's totals and price column, the checkout's exact InstaPay amount, the Reserve page's and the
+desk's school-fee and collected sentences, the subjects list, the balance transfer and withdrawal pickers, the exception
+form's charge picker. "EGP 9,412.50" with piastres, "EGP 9,850" without. Driven with a charge of EGP 150.50 pushed to
+student C and cancelled after: the desk reads "EGP 150.50" and «150.50 جنيه» (`r2-i9-desk-{en,ar}`). §2's date of the
+lead's approval is 16 Oct 23:12:43Z.
+
+**Changed assertions (round 2)** — the pre-authorised 08u Cambridge expectations, and two the lead asked for:
+
+| File:line | Old | New |
+|---|---|---|
+| 08u-session-form:234 | `keysOf(b4.id)` → `[{ key_kind: 'qualification', key_id: bio }]` | `[{ key_kind: 'option', key_id: cx }]` (answer 2, pre-authorised) |
+| 08u-session-form:281 | `priced(l4)` → `rows: [{ keyKind: 'qualification', keyId: bio, amount: 10850 }]` | `rows: [{ keyKind: 'option', keyId: cx, amount: 10850 }]` (price 13,850 unchanged; pre-authorised) |
+| 08u-session-form:307 | `keysOf(e2)` → `[{ key_kind: 'qualification', key_id: bio }]` | `[{ key_kind: 'option', key_id: cx }]` (pre-authorised) |
+| 08u-session-form:245–259 (setup) | Cambridge's list: the option's row and the qualification's, both 10,850 | the option's row alone, from the Fees tab's paste, read by the whole subject and each paper |
+| 08u-session-form:309–324 | the coordinator flips OxfordAQA's rule, no reason | the coordinator refused, the admin without a reason refused, the admin with reasons (item 1, as asked) |
+| 08q-charges:570 | `.error).toContain('Not enough in the balance')` | `.toMatchObject({ status: 422, error: …'Not enough in the balance' })` (item 3, as asked) |
+
+No other existing assertion changed (`changed-assertions.tsv` has the exact text).
+
+**New scenarios:** 08n "refused … a draft whose exception was revoked and … a reminder went out for" and "finding 8: …",
+08f "the emails and the emailed PDF receipt say who they come from …"; 08u's F8-05 and F8-04 and 08q's "three
+instalments" extended.
+
+**Gates (round 2)**
+
+| Gate | Commit | Result | Evidence |
+|---|---|---|---|
+| `pnpm --filter @repo/api check-types` (source and tests) | 9231458 and 86e77c7 | green | session log |
+| `pnpm --filter web check-types` | 9231458 | green | session log |
+| the suite, local time (Africa/Cairo), from an empty database migrated through 0064 | 9231458 | **red**: 852 passed, 1 failed (09's O-7: 08n's hand-written reminder message had no audit row) | `gates/suite-local-9231458.txt` |
+| the same with `TZ=UTC` | 9231458 | **red**: the same one | `gates/suite-utc-9231458.txt` |
+| the suite, local time, after the scenario writes the send's audit row | 86e77c7 | 43 files, **853 passed**, 1 todo (round 1: 850; three scenarios added) | `gates/suite-local-86e77c7.txt` |
+| the same with `TZ=UTC` | 86e77c7 | 43 files, **853 passed**, 1 todo | `gates/suite-utc-86e77c7.txt` |
+| `useQuery<…>` generics in `apps/web/app` | 86e77c7 | 15 (unchanged) | `grep -rn "useQuery<" apps/web/app` |
+| CI (gate 0, both type-checks, the suite) | 86e77c7 | run 39014603807 **green** (the run on 9231458, 39013733203, was cancelled by the push of 86e77c7) | `gh run list --branch feature/walkthrough-findings` |
+
+**Left on the walk database by the drive:** the draft "June 2028 — r2-kept" (its revoked exception is history, so it
+cannot be deleted: item 2 as decided), which the Reserve page lists to families as "(preregistration)". The
+school-fee schedule, the EGP 150.50 charge and the school's name were removed, cancelled or put back. The branch's API
+was restarted on the walk database at 65 (pnpm PID 99956; the web is the same server, pnpm 47312).
+
+**Progress (UTC, 17 Oct):** 05:13 — the review received. 05:36 item 3 (control c-r3); 05:37 item 1 (c-r1); 06:07 items
+5 and 2 (c-r5, c-r2a, c-r2b); 06:21–06:25 answer 2, 0064 proven twice (c-a2); 06:33 item 7 (c-r7, c-r7b); 06:41 item
+6's dictionary check; 07:07–07:18 the drive on the walk cycle at 65 (items 1, 2, 6, 7, 9), item 6's on-screen control
+and the year's isolation; 07:27 9231458 committed and pushed; both suites red on one test (09's O-7, the scenario's
+hand-written message without its audit row), fixed in 86e77c7 (07:41), pushed; 07:41:58–07:50:10 both suites green on
+86e77c7 (853 passed each); 07:42–07:56 CI run 39014603807 green.
