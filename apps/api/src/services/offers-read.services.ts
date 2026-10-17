@@ -29,7 +29,7 @@ import { availabilityConstraints } from './offer.services';
 import { priceLine } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { examSittingsOf, examKeysOf } from './reservation.services';
-import { lineExceptions } from './line-exceptions';
+import { lineExceptions, coversScope } from './line-exceptions';
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
@@ -108,6 +108,9 @@ async function readOffers(sessionId: string, studentId: string | null) {
       : x.entersKind === 'units' ? x.units.map((u) => `u:${u}`) : [`s:${x.subjectId}`];
   // F4's results and sent entries of this student (step B's known sittings, RESERVATIONS_LINES.md §3.1).
   const exams = studentId ? await examSittingsOf(studentId) : [];
+  // The student's exceptions "self-study on a first entry", read once for the whole read and matched to each
+  // item below (the decisions' review, low note 2: the check ran a query per item).
+  const firstEntryGates = studentId ? await lineExceptions.held(db, studentId, ['gate.selfStudyFirstEntry']) : [];
   const now = new Date();
   const outOffers = [];
   for (const o of offers) {
@@ -155,10 +158,8 @@ async function readOffers(sessionId: string, studentId: string | null) {
       // dd68598, item 2). Read without locking (a GET marks nothing used); the reservation asks it again, under
       // its lock, through assertLineRules. A preview (no student) offers no family's exception.
       if (studentId && !c.closed && firstEntries && !combos.some((k) => k.attempt === 'first' && k.mode === 'self_study')) {
-        const held = await lineExceptions.active(db, studentId, ['gate.selfStudyFirstEntry'], {
-          sessionId, subjectId: o.subjectId, offerId: o.id, offerItemId: i.id as string, ...(seriesId ? { boardSeriesId: seriesId } : {}),
-        });
-        if (held.length) combos.splice(combos.some((k) => k.attempt === 'first') ? 1 : 0, 0, { attempt: 'first', mode: 'self_study' });
+        const scope = { sessionId, subjectId: o.subjectId, offerId: o.id, offerItemId: i.id as string, ...(seriesId ? { boardSeriesId: seriesId } : {}) };
+        if (firstEntryGates.some((e) => coversScope(e, scope))) combos.splice(combos.some((k) => k.attempt === 'first') ? 1 : 0, 0, { attempt: 'first', mode: 'self_study' });
       }
       // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
       // exams' start with none); a retake of the board's previous sitting until the retake deadline

@@ -72,7 +72,7 @@ describe('V3 flows', () => {
     expect(twice).toEqual({ status: 409, error: 'A schedule for that academic year and grade already exists' });
 
     const blocked = await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, ...(await reservationOf(juneA, [economics])) } }));
-    expect(blocked).toEqual({ status: 400, error: `The ${academicYear} school fee (5000.00 EGP) must be paid before registering subjects` });
+    expect(blocked).toEqual({ status: 400, error: `The ${academicYear} school fee (EGP 5,000) must be paid before registering subjects` });
 
     const due = { required: true, waived: false, paid: false, amount: 5000 };
     expect(await feeViews()).toEqual({ desk: due, due: [{ academicYear, amount: 5000 }], home: due, status: due });

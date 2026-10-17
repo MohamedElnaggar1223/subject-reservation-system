@@ -979,6 +979,15 @@ describe('08o: reservation lines (step B)', () => {
     expect([after.owing, after.owingInProgress, after.registrations.find((r) => r.id === b.id)!.paymentInProgress]).toEqual([0, 0, null]);
     const st2 = await apiResponse(f.parent.api.v1.statement.$get({ query: { studentId: f.studentId } }));
     expect(st2.students[0]!.sessions.find((x) => x.id === june)!.lines.find((l) => l.id === b.id)).toMatchObject({ outstanding: 0, paymentInProgress: null });
+    // F8-10: the family is told each amount as the screens write it and how it was paid in words — never
+    // "EGP 14600.00 via in_school". The statement's payments carry what the screen words ("in cash at the school").
+    const told = await notified(f.parent.email, 'PAYMENT_CONFIRMED', 2);
+    expect(told.map((n) => n.body.replace(/ for .+$/, ''))).toEqual([
+      'Payment of EGP 14,600 in cash at the school has been confirmed',
+      'Payment of EGP 23,200 by InstaPay has been confirmed',
+    ]);
+    expect(st2.students[0]!.payments.filter((p) => p.status === 'completed').map((p) => [p.method, p.instrument, p.total]).sort())
+      .toEqual([['in_school', 'cash', 14600], ['instapay', 'instapay', 23200]]);
   });
 
   it("the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is", async () => {

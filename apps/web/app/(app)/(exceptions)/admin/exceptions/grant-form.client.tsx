@@ -18,6 +18,7 @@ import { apiResponse, itemDisplayLabel, policySentence, type PolicyScope, type R
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money, fetchSessions, SESSIONS_KEY } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { dateParts, MONTHS_SHORT } from '~/app/(app)/academic/calendar/academic-shared';
 import {
   fetchStudents, fetchStudent, fetchSummary, fetchCharges, fetchOffersFor, fetchSubjects, fetchSeries,
   EXCEPTIONS_KEY, WHY_NOT, type PoliciesData, type PolicyRow,
@@ -116,9 +117,12 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
     scope.academicYear,
   ].filter(Boolean).join(' · ') || null;
   const scheduleTotal = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  // A date as the app writes one ("20 Dec 2026"), not the field's "2026-12-20" (F8-12).
   const valueWords = policy?.valueType === 'schedule'
     ? `${rows.filter((r) => r.dueAt && r.amount).length} instalments`
-    : value || null;
+    : policy?.valueType === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? (() => { const { y, m, d } = dateParts(value); return `${d} ${MONTHS_SHORT[m - 1]} ${y}`; })()
+      : value || null;
   const worded = policy ? policySentence(policy.key as RegistryPolicyKey, { who: whoWords, value: valueWords, scope: scopeWords }) : '';
   const sentence = worded.charAt(0).toUpperCase() + worded.slice(1);
 
@@ -357,8 +361,9 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
       {granted && (
         <Notice tone="success" className="mt-4" title="Granted">
           {granted.repriced && <p><span>The price is now</span> <Money amount={granted.repriced.to} /> (<span>was</span> <Money amount={granted.repriced.from} />).</p>}
-          {granted.dueDatesMoved > 0 && <p><span>{granted.dueDatesMoved}</span> <span>due dates moved.</span></p>}
-          {granted.pushesCancelled > 0 && <p><span>{granted.pushesCancelled}</span> <span>pushed school fees cancelled.</span></p>}
+          {/* F8-12: one of each said in the singular ("1 due dates moved."). */}
+          {granted.dueDatesMoved > 0 && <p><span>{granted.dueDatesMoved}</span> <span>{granted.dueDatesMoved === 1 ? 'due date moved.' : 'due dates moved.'}</span></p>}
+          {granted.pushesCancelled > 0 && <p><span>{granted.pushesCancelled}</span> <span>{granted.pushesCancelled === 1 ? 'pushed school fee cancelled.' : 'pushed school fees cancelled.'}</span></p>}
           {granted.plan && <p>The instalments are on the family's statement.</p>}
         </Notice>
       )}

@@ -93,6 +93,11 @@ export function covers(r: Pick<Row, 'sessionId' | 'subjectId' | 'offerId' | 'off
   return true;
 }
 
+/** `covers` on an exception already read (its scope as `scopeOfRow` gives it): every key it sets must match. */
+export function scopeCovers(held: RegistryScope, scope: RegistryScope): boolean {
+  return SCOPE_COLUMNS.every(({ key }) => !held[key] || held[key] === scope[key]);
+}
+
 /** The family accounts (parents with an approved link) whose exceptions a student holds. */
 export async function familiesOf(executor: Executor, studentId: string): Promise<string[]> {
   const rows = await executor
@@ -114,6 +119,20 @@ export async function activeExceptions(
   scope: RegistryScope,
   opts: { lock?: 'share' | 'update'; now?: Date } = {},
 ): Promise<RegistryException[]> {
+  return activeExceptionsHeld(executor, studentId, keys, { ...opts, scope });
+}
+
+/**
+ * Active, unexpired exceptions of these keys held by the student or their family, whatever their scope
+ * unless one is asked (`scope`): a read that matches many items reads them once and matches each in memory
+ * with `scopeCovers` (the offers read, the decisions' review, low note 2).
+ */
+export async function activeExceptionsHeld(
+  executor: Executor,
+  studentId: string,
+  keys: readonly PolicyKey[],
+  opts: { lock?: 'share' | 'update'; now?: Date; scope?: RegistryScope } = {},
+): Promise<RegistryException[]> {
   if (!keys.length) return [];
   const families = await familiesOf(executor, studentId);
   const holder = families.length
@@ -132,7 +151,7 @@ export async function activeExceptions(
     .orderBy(asc(exception.createdAt), asc(exception.id));
   const rows = opts.lock ? await q.for(opts.lock) : await q;
   const now = opts.now ?? new Date();
-  return rows.filter((r) => (!r.validUntil || r.validUntil > now) && covers(r, scope)).map(toRegistryException);
+  return rows.filter((r) => (!r.validUntil || r.validUntil > now) && (!opts.scope || covers(r, opts.scope))).map(toRegistryException);
 }
 
 /** Exactly these exceptions, whatever their status now (a re-price applies the ids its basis recorded). */

@@ -577,6 +577,62 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     }
   });
 
+  it("F8-04: Arabic A.L.'s second qualification from the subject's form — the board's other award of the area and level in another suite is offered, made through the item endpoint with its own teacher, one choice with the subject's own", async () => {
+    const award = async (code: string, title: string, suite: string, entryMethod: 'units_cash_in' | 'qualification') =>
+      (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}-${RUN}`, title: `${title} (08u ${RUN})`, level: 'a_level', suite, subjectArea: `Arabic F804 ${RUN}`, entryMethod } })))!.id;
+    const ial = await award('FYA', 'Arabic IAL', 'International A Level', 'units_cash_in');
+    const gce = await award('FGA', 'Arabic GCE', 'GCE A Level', 'qualification');
+    // An older award of the same suite is a replacement, not a second qualification: not offered.
+    const oldIal = await award('FYO', 'Arabic IAL, old specification', 'International A Level', 'units_cash_in');
+    const ar = await subject(adm, `F804-AR-${RUN}`, `Arabic A.L. (08u F8-04 ${RUN})`, { course: 9000, registration: 0 }, { council: 'pearson_edexcel', qualificationLevel: 'a_level' });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ar }, json: { boardCode: 'pearson_edexcel', qualificationId: ial, unitIds: [], reason: '08u F8-04: the IAL award' } }));
+    const made = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: june }, json: { subjectId: ar, courseFee: 9000, teachers: [{ teacherId: t1, mode: 'in_school' }, { teacherId: t2, mode: 'in_school' }] } })))!;
+    let o = await offerRow(june, made.id);
+    expect(o.qualificationsToAdd.map((q) => [q.id, q.code])).toEqual([[gce, `FGA-${RUN}`.toUpperCase()]]);
+    expect(o.qualificationsToAdd.map((q) => q.id)).not.toContain(oldIal);
+    const whole = o.items.find((i) => i.kind === 'whole')!;
+    expect(whole.exclusiveGroup).toBeNull();
+
+    // What the form's "Add a qualification" sends (subjects-tab.client.tsx AddQualification): the subject's own item into one group, then the new one.
+    const before = await auditCount([whole.id]);
+    await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+      param: { id: june, offerId: made.id, itemId: whole.id }, json: { exclusiveGroup: 'qualification', reason: `Edexcel FGA-${RUN} is added beside it: one qualification or the other` },
+    }));
+    const second = (await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items.$post({
+      param: { id: june, offerId: made.id },
+      json: { label: `Edexcel FGA-${RUN}`.toUpperCase(), kind: 'qualification', enters: { kind: 'award', qualificationId: gce }, availability: 'open', requiredInSeries: false, exclusiveGroup: 'qualification', teachers: [{ teacherId: t2, mode: 'in_school' }], courseFee: null,
+        sortOrder: Math.max(0, ...o.items.map((i) => i.sortOrder)) + 1 },
+    })))!.id;
+    expect(await auditCount([whole.id])).toBe(before + 1);
+    expect(await one(`select action from audit_log where entity_id = $1`, [second])).toEqual({ action: 'OFFER_ITEM_CREATED' });
+
+    o = await offerRow(june, made.id);
+    expect(o.qualificationsToAdd).toEqual([]);
+    expect(o.items.map((i) => [i.kind, i.entersKind, i.qualificationId, i.exclusiveGroup, i.teachers.map((t) => t.teacherId)])).toEqual([
+      ['whole', 'award', ial, 'qualification', []],
+      ['qualification', 'award', gce, 'qualification', [t2]],
+    ]);
+    // The family's form: the second qualification with its own teacher, named by its code beside the teacher (decision 3).
+    const pv = await apiResponse(preview(coordinator, june));
+    const row = pv.offers.find((x) => x.id === made.id)!;
+    expect(row.items.map((i) => [i.kind, i.qualification?.code, i.exclusiveGroup, i.teachers.map((t) => t.id)])).toEqual([
+      ['whole', `FYA-${RUN}`.toUpperCase(), 'qualification', [t1, t2]],
+      ['qualification', `FGA-${RUN}`.toUpperCase(), 'qualification', [t2]],
+    ]);
+    // One qualification or the other: both together are refused.
+    const f = await onboard(officer, `u08-f804-${RUN}`, 12);
+    const { db } = await import('@repo/db');
+    const { assertLineRules } = await import('../src/services/line-rules.services');
+    const { assertMayRegisterForInTx } = await import('../src/services/eligibility.services');
+    await expect(db.transaction(async (tx) => {
+      const eligibility = await assertMayRegisterForInTx(tx, f.studentId, june);
+      await assertLineRules(tx, { studentId: f.studentId, sessionId: june, eligibility }, [
+        { offerItemId: whole.id, attempt: 'first', mode: 'in_school', priorSittingSeriesId: null },
+        { offerItemId: second, attempt: 'first', mode: 'in_school', priorSittingSeriesId: null },
+      ]);
+    })).rejects.toThrow('cannot be reserved together');
+  });
+
   it('the same form twice changes nothing and writes no audit row; a form whose audit row cannot be written changes nothing (the rows commit with the change)', async () => {
     const fr = await subject(adm, `U08-FR-${RUN}`, `French O.L. (08u ${RUN})`, { course: 9000, registration: 12550 });
     const made = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: june }, json: { subjectId: fr, courseFee: 9000, teachers: [{ teacherId: t1, mode: 'in_school' }] } })))!;

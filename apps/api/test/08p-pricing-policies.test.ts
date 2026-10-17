@@ -454,6 +454,6 @@ describe('08p: pricing policies', () => {
     // The family is told the old and the new price.
     const email = (await one<{ email: string }>(`select email from "user" where id = $1`, [plain.studentId])).email;
     const [told] = await notified(email, 'PRICE_CHANGED', 1);
-    expect(told!.body).toMatch(/was 10000\.00 EGP and is now 10500\.00 EGP/);
+    expect(told!.body).toMatch(/was EGP 10,000 and is now EGP 10,500/);
   });
 });

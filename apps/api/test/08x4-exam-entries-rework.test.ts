@@ -324,7 +324,7 @@ describe('F4 on the reservations rework', () => {
       expect(c).toMatchObject({ status: 'pending_payment', amount: 700 });
       const preview = await derive(w.series.pearsonJan, w.families.a.studentId, false);
       const row = preview.rows.find((r) => r.chargeId === c.id)!;
-      expect(row).toMatchObject({ outcome: 'awaiting_payment', entries: [], note: `Cash-in awaiting payment: Cash-in (claim the award) — Pearson Edexcel January ${Y + 1} (exams xw) (EGP 700.00) — entered once it is paid` });
+      expect(row).toMatchObject({ outcome: 'awaiting_payment', entries: [], note: `Cash-in awaiting payment: Cash-in (claim the award) — Pearson Edexcel January ${Y + 1} (exams xw) (EGP 700) — entered once it is paid` });
       await derive(w.series.pearsonJan, w.families.a.studentId);
       expect(await sql(`select 1 from exam_entry where charge_id = $1`, [c.id])).toHaveLength(0);
       // By hand too: refused until it is paid.

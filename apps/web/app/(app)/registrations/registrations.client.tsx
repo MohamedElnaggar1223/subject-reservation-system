@@ -134,12 +134,14 @@ function canRevertApproval(reg: Registration, userId: string): boolean {
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  // F8-12: each of the page's dialogs (Request Drop, Drop Subject, the swaps) is a dialog to a screen reader, named by its title.
+  const titleId = `registrations-dialog-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="bg-card rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-border">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground font-display">{title}</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+          <h2 id={titleId} className="text-base font-semibold text-foreground font-display">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>

@@ -1460,6 +1460,28 @@ export async function listOffers(sessionId: string) {
       return { unitId: u.id, label: d.label, code: u.code, shortCode: u.shortCode };
     }));
   }
+  // F8-04: the other awards a subject may be entered for beside its own — its board's awards of the same subject
+  // area and level in another suite (Arabic A.L.: the Edexcel GCE 9AA0 beside the IAL YAA01; the family chooses
+  // through the teacher, decision 3) — that no item of the subject enters yet. Another syllabus of the same suite
+  // (Cambridge's older 0610 beside 0970) is not offered: it is a replacement, not a second qualification.
+  const ownQuals = [...new Set(offers.map((o) => o.subject.qualificationId).filter((x): x is string => !!x))];
+  const own = ownQuals.length
+    ? await db.select({ id: qualification.id, boardCode: qualification.boardCode, level: qualification.level, subjectArea: qualification.subjectArea, suite: qualification.suite })
+      .from(qualification).where(inArray(qualification.id, ownQuals))
+    : [];
+  const siblings = own.length
+    ? await db.select({ id: qualification.id, code: qualification.code, title: qualification.title, level: qualification.level, boardCode: qualification.boardCode, subjectArea: qualification.subjectArea, suite: qualification.suite })
+      .from(qualification).where(and(eq(qualification.isActive, true), inArray(qualification.boardCode, [...new Set(own.map((q) => q.boardCode))])))
+      .orderBy(qualification.code)
+    : [];
+  const qualificationsToAdd = (offerId: string, ownId: string | null) => {
+    const q = own.find((x) => x.id === ownId);
+    if (!q) return [];
+    const entered = new Set(items.filter((i) => i.offerId === offerId && i.qualificationId).map((i) => i.qualificationId));
+    return siblings
+      .filter((x) => x.id !== q.id && x.boardCode === q.boardCode && x.level === q.level && x.subjectArea === q.subjectArea && (x.suite ?? '') !== (q.suite ?? '') && !entered.has(x.id))
+      .map(({ id, code, title, level }) => ({ id, code, title, level }));
+  };
   const rows = offers.map(({ offer, subject: s }) => {
     const its = items.filter((i) => i.offerId === offer.id).map((i) => {
       const f = fees.get(i.id);
@@ -1492,6 +1514,7 @@ export async function listOffers(sessionId: string) {
       teachers: offerTeachers,
       items: its,
       papersToAdd: papersToAdd.get(offer.id) ?? [],
+      qualificationsToAdd: qualificationsToAdd(offer.id, s.qualificationId),
       lines: its.reduce((a, i) => a + i.lines.live, 0),
       warnings,
     };

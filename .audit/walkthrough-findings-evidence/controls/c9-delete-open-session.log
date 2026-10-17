@@ -1,0 +1,9 @@
+Control c9 (item 9, F8-01): the draft-only check undone (if (false && s.status !== 'draft')), 08n -t F8-01 run, then the file restored: the open session was deleted.
+
+ ❯ test/08n-session-offers.test.ts (40 tests | 1 failed | 38 skipped) 1820ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08n-session-offers.test.ts > 08n: a draft session nobody reserved in is deleted from its Session screen (F8-01) > refused, nothing deleted, for an open session, a draft with a reservation, and anyone but the admin
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+ ❯ test/08n-session-offers.test.ts:1425:69
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 38 skipped (40)

@@ -1,7 +1,7 @@
 # IGCSE Management System
 
 A web system for an Egyptian school's IGCSE and A-Level grades (10 to 12). Families register
-exam subjects per series, pay, keep a wallet, and request remarks; staff do all of it on a
+exam subjects per series, pay, keep a balance with the school, and request remarks; staff do all of it on a
 family's behalf at a finance desk, with physical receipts, daily takings and audited
 corrections. It began as a subject-reservation system and is becoming the school's system of
 record for grades 10 to 12, which its incumbent system does not cover.
@@ -37,10 +37,9 @@ pnpm install
 cp .env.example apps/api/.env          # then set BETTER_AUTH_SECRET; the API won't start without it
 echo "NEXT_PUBLIC_API_URL=http://localhost:3001" > apps/web/.env.local
 
-# 3. Shared packages, schema and sample data (everything runs from the repo root)
+# 3. Shared packages and schema (everything runs from the repo root)
 pnpm build --filter=@repo/db --filter=@repo/validations --filter=@repo/storage
 DATABASE_URL=postgresql://audit:auditpass@127.0.0.1:5433/igcse_audit pnpm --filter @repo/db db:migrate
-pnpm --filter @repo/db seed            # reads DATABASE_URL from apps/api/.env
 
 # 4. Servers
 pnpm --filter @repo/api dev            # http://localhost:3001
@@ -48,15 +47,19 @@ pnpm --filter web dev                  # http://localhost:3000
 ```
 
 **First admin.** Sign up through the web app with the email `admin@igcse.local`, then run
-`pnpm --filter @repo/db seed` again; it promotes that account to admin. Staff accounts are
-created from the admin's Team page.
+`pnpm --filter @repo/db seed` (it reads `DATABASE_URL` from `apps/api/.env`). It promotes that
+account to admin and makes nothing else; set `ADMIN_EMAIL` to promote another address. Staff
+accounts are created from the admin's Team page; the subjects, sessions and fees from the
+Catalogue and the Sessions page.
 
-**Sessions.** The seed creates two registration windows with fixed 2026 dates, June and
-November. On its first tick the scheduler opens or closes each one by those dates, so a window
-may already be open or closed when you sign in. Check the admin Sessions page and create a
-window for the series you want to test.
+**Sample data.** `pnpm --filter @repo/db seed --with-samples` also adds the old sample subjects
+and two sample sessions with fixed 2026 dates (a June session the scheduler closes on its first
+tick, and a November 2026 – January 2027 draft). They are for a demo or a test system, not a
+school's: a draft session nobody reserved in can be deleted from its Session screen.
 
-With no `RESEND_API_KEY`, emails are logged instead of sent. Without R2 keys, file uploads fail.
+With no `RESEND_API_KEY`, emails are logged instead of sent. Without R2 keys, file uploads go to
+`LOCAL_UPLOAD_DIR` (default `.uploads`) in development; in production they are refused until R2
+is configured.
 
 ## The three gates
 

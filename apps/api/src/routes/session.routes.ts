@@ -28,6 +28,7 @@ import {
   CreateSession,
   UpdateSession,
   CloseSession,
+  DeleteSession,
   SessionId,
   ListSessionsQuery,
   CorrectSessionSeries,
@@ -253,6 +254,24 @@ export const sessions = new Hono<HonoEnv>()
       } catch (err) {
         const msg = clientMessage(err, 'Failed to activate session');
         return error(c, msg, 409);
+      }
+    }
+  )
+
+  /**
+   * DELETE A DRAFT SESSION (F8-01): admin only, with a reason; refused for a session that is open or closed, or
+   * that has reservations, granted exceptions or sent reminders. Its sheet goes with it; one audit row.
+   */
+  .delete('/:id',
+    requireAdmin(),
+    zValidator('param', SessionId),
+    zValidator('json', DeleteSession),
+    async (c) => {
+      try {
+        return success(c, await sessionService.deleteDraftSession(c.req.valid('param').id, c.req.valid('json').reason, c.get('user')!.id, extractAuditContext(c)));
+      } catch (err) {
+        const f = failure(err, 'Failed to delete the session');
+        return error(c, f.message, f.status);
       }
     }
   )

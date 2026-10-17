@@ -1,0 +1,9 @@
+Control c8 (item 8, F8-04): listOffers' qualificationsToAdd made empty (if (true || !q) return []), 08u -t F8-04 run, then the file restored.
+
+ ❯ test/08u-session-form.test.ts (14 tests | 1 failed | 13 skipped) 2053ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > F8-04: Arabic A.L.'s second qualification from the subject's form — the board's other award of the area and level in another suite is offered, made through the item endpoint with its own teacher, one choice with the subject's own
+AssertionError: expected [] to deeply equal [ [ …(2) ] ]
+ ❯ test/08u-session-form.test.ts:591:62
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)

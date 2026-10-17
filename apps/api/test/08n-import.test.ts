@@ -665,7 +665,7 @@ describe('F7: the day-one import', () => {
       try {
         const v = await fetchView(adm, liveBatch);
         expect(rowAt(v, 'Live', 3).problems.find((p) => p.code === 'registration_refused')!.detail)
-          .toBe(`The ${Y}-${Y + 1} school fee (2500.00 EGP) must be paid before registering subjects`);
+          .toBe(`The ${Y}-${Y + 1} school fee (EGP 2,500) must be paid before registering subjects`);
       } finally {
         await apiResponse(finadmin.api.v1['school-fees'].schedules[':id'].$delete({ param: { id: schedule.id } }));
       }

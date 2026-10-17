@@ -85,7 +85,7 @@ const LEVEL_GROUP: Record<string, string> = { igcse: 'O.L.', as_level: 'A.S. / A
 const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self_study_only: 'Self-study only (not taught this cycle)' };
 
 /** The board as the school's forms write it beside a qualification ("Edexcel YAA01"). */
-const FORM_BOARD: Record<string, string> = { pearson_edexcel: 'Edexcel', cambridge: 'Cambridge', oxford: 'Oxford' };
+export const FORM_BOARD: Record<string, string> = { pearson_edexcel: 'Edexcel', cambridge: 'Cambridge', oxford: 'Oxford' };
 /**
  * What follows a teacher's name on a subject whose qualifications the family chooses through the teacher
  * (Arabic A Level, Edexcel — the form's "T1 (Edexcel YAA01)", "T2 (Edexcel 9AA01)"): the qualification the

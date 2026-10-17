@@ -74,7 +74,7 @@ describe('money paths', () => {
     // Second PAYMENT_CONFIRMED for this family (the first was the History desk payment in setup).
     const toParent = await notified(parent.email, 'PAYMENT_CONFIRMED', 2);
     // The confirmation names the full 1500 the payment settled (1000 transferred + 500 escrow), not the transfer alone.
-    expect(toParent[1]?.body).toContain('Payment of EGP 1500.00 via instapay has been confirmed');
+    expect(toParent[1]?.body).toContain('Payment of EGP 1,500 by InstaPay has been confirmed');
     await notified(student.email, 'PAYMENT_CONFIRMED', 2);
   });
 
@@ -131,7 +131,7 @@ describe('money paths', () => {
 
     const toParent = await notified(parent.email, 'PAYMENT_REVERSED', 1);
     expect(toParent[0]?.body).toContain(`Receipt ${biologyReceiptNumber} is no longer valid`);
-    expect(toParent[0]?.body).toContain('EGP 1500.00');
+    expect(toParent[0]?.body).toContain('EGP 1,500');
     expect(toParent[0]?.body).toContain('1 registration is back to pending payment');
     expect(toParent[0]?.body).toContain('no money was received for it');
     await notified(student.email, 'PAYMENT_REVERSED', 1);

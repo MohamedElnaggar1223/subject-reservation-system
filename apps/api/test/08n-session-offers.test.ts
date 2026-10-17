@@ -1161,7 +1161,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     const [told] = await notified(studentEmail(`n08v-am-w-${RUN}`), 'PRICE_CHANGED', 1);
     expect(told).toEqual({
       type: 'PRICE_CHANGED', title: `The price of Admin move price (08n ${RUN}) changed`,
-      body: `The subject is now entered in another exam series, with its own board fee. Admin move price (08n ${RUN}) was 1300.00 EGP and is now 1450.00 EGP.`,
+      body: `The subject is now entered in another exam series, with its own board fee. Admin move price (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`,
     });
     expect(await notificationsFor(studentEmail(`n08v-am-p-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
   });
@@ -1191,10 +1191,10 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     await audited([la!.id, lb!.id], ['LINE_REPRICED', 'LINE_REPRICED']);
     const because = "The session's exam series was corrected, and with it the board fee";
     expect((await notified(studentEmail(`n08v-cor-${RUN}`), 'PRICE_CHANGED', 1))[0]!.body)
-      .toBe(`${because}. Correction priced (08n ${RUN}) was 1300.00 EGP and is now 1450.00 EGP.`);
+      .toBe(`${because}. Correction priced (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`);
     expect(await notified(studentEmail(`n08v-cor-${RUN}`), 'PRICE_TO_BE_CONFIRMED', 1)).toEqual([{
       type: 'PRICE_TO_BE_CONFIRMED', title: `The price of Correction carried (08n ${RUN}) is to be confirmed`,
-      body: `${because}. Correction carried (08n ${RUN}) stays at 1300.00 EGP, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
+      body: `${because}. Correction carried (08n ${RUN}) stays at EGP 1,300, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
     }]);
   });
 
@@ -1215,7 +1215,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     expect(await priceOf(line!.id)).toEqual({ price: 1300, provisional: true, series: pea, rows: [row.id] });
     expect(await notified(studentEmail(`n08v-bc-${RUN}`), 'PRICE_TO_BE_CONFIRMED', 1)).toEqual([{
       type: 'PRICE_TO_BE_CONFIRMED', title: `The price of Board change notice (08n ${RUN}) is to be confirmed`,
-      body: `The subject's exam board changed, and with it the board fee. Board change notice (08n ${RUN}) stays at 1300.00 EGP, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
+      body: `The subject's exam board changed, and with it the board fee. Board change notice (08n ${RUN}) stays at EGP 1,300, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
     }]);
     expect(await notificationsFor(studentEmail(`n08v-bc-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
     const { PROVISIONAL_REFUSAL } = await import('../src/services/pricing.services');
@@ -1374,5 +1374,69 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       // Back to the default for the files after this one (refused when it is already off).
       await setting(false).catch(() => undefined);
     }
+  });
+});
+
+describe('08n: a draft session nobody reserved in is deleted from its Session screen (F8-01)', () => {
+  let adm: Client, coordinator: Client, officer: Client;
+  let teacherId: string;
+  const mk = async (label: string, draft: boolean) => (await apiResponse(adm.api.v1.sessions.$post({
+    json: {
+      type: 'june', year: Y + 1, label,
+      startDate: new Date(Date.now() + (draft ? days(90) : -days(1))).toISOString(), endDate: new Date(Date.now() + (draft ? days(150) : days(60))).toISOString(),
+      courseStartsOn: cairoDate(new Date(Date.now() + days(90))), paymentDueAt: new Date(Date.now() + days(140)).toISOString(),
+    },
+  })))!;
+  const del = (who: Client, id: string, reason: string) => who.api.v1.sessions[':id'].$delete({ param: { id }, json: { reason } });
+  const exists = async (id: string) => Number((await one<{ n: string }>(`select count(*) as n from registration_session where id = $1`, [id])).n) === 1;
+
+  beforeAll(async () => {
+    adm = await admin('n08del');
+    coordinator = await staff(adm, 'coordinator', 'n08del');
+    officer = await staff(adm, 'finance_officer', 'n08del');
+    teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher D (08n ${RUN})` } })))!.id;
+  });
+
+  it('a draft with its sheet is deleted with a reason, audited in the same change; its subjects and the boards\' series stay', async () => {
+    const d = await mk(`n08-del-${RUN}`, true);
+    expect(d.status).toBe('draft');
+    const sub = await subject(adm, `RWN-DEL-${RUN}`, `Deleted with its draft (08n ${RUN})`, { course: 1000, registration: 0 });
+    const made = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const linked = await sql<{ id: string }>(`select board_series_id as id from session_board_series where session_id = $1`, [d.id]);
+    expect(linked.length).toBeGreaterThan(0);
+    // A reason of a word is refused: the reason is what the audit keeps.
+    expect((await refused(del(adm, d.id, 'old'))).status).toBe(400);
+    expect(await exists(d.id)).toBe(true);
+    expect(await apiResponse(del(adm, d.id, 'the seed\'s sample draft: not this school\'s'))).toEqual({ deleted: d.id, name: d.name, subjects: 1 });
+    expect(await exists(d.id)).toBe(false);
+    expect(await sql(`select id from session_offer where id = $1`, [made.id])).toEqual([]);
+    expect(await sql(`select id from session_offer_item where offer_id = $1`, [made.id])).toEqual([]);
+    expect(await sql(`select id from session_board_series where session_id = $1`, [d.id])).toEqual([]);
+    expect(await one(`select count(*)::int as n from board_series where id in $1`, [linked.map((l) => l.id)])).toEqual({ n: linked.length });
+    expect(await one(`select is_active from subject where id = $1`, [sub])).toEqual({ is_active: true });
+    expect(await one(`select user_id, previous_data->>'name' as name, previous_data->'subjects' as subjects, new_data->>'reason' as reason from audit_log where action = 'SESSION_DELETED' and entity_id = $1`, [d.id]))
+      .toEqual({ user_id: expect.any(String), name: d.name, subjects: [sub], reason: 'the seed\'s sample draft: not this school\'s' });
+    expect((await refused(adm.api.v1.sessions[':id'].$get({ param: { id: d.id } }))).status).toBe(404);
+  });
+
+  it('refused, nothing deleted, for an open session, a draft with a reservation, and anyone but the admin', async () => {
+    const open = await mk(`n08-del-open-${RUN}`, false);
+    expect(open.status).toBe('active');
+    expect(await refused(del(adm, open.id, 'not wanted any more'))).toEqual({ status: 409, error: `${open.name} is open: only a draft session can be deleted (close it instead)` });
+    expect(await exists(open.id)).toBe(true);
+
+    const d = await mk(`n08-del-res-${RUN}`, true);
+    const sub = await subject(adm, `RWN-DELR-${RUN}`, `Preregistered in a draft (08n ${RUN})`, { course: 1000, registration: 0 });
+    const series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08-del-${RUN}`, entryDeadline: new Date(Date.now() + days(120)) } })))!.id;
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
+    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
+    })))!;
+    const f = await onboard(officer, `n08-del-${RUN}`, 11);
+    await reserve(f.studentId, d.id, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }], 'preregistered');
+    expect(await refused(del(adm, d.id, 'a draft with a family in it'))).toEqual({ status: 409, error: `${d.name} has a reservation: a session with reservations is never deleted` });
+    expect(await exists(d.id)).toBe(true);
+    expect((await refused(del(coordinator, d.id, 'the coordinator tries'))).status).toBe(403);
+    expect(await one(`select count(*)::int as n from audit_log where action = 'SESSION_DELETED' and entity_id in $1`, [[open.id, d.id]])).toEqual({ n: 0 });
   });
 });
