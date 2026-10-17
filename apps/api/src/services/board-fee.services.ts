@@ -430,6 +430,14 @@ export async function parseFees(seriesId: string, text: string) {
         .where(and(eq(qualification.boardCode, board), sql`lower(${qualification.code}) = lower(${tokens[0]!})`, sql`lower(${qualificationOption.code}) = lower(${tokens[1]!})`));
       if (o) found = { line, keyKind: 'option', keyId: o.id, code: `${o.qCode} ${o.code}`, title: `${o.title} — ${o.label}`, amount };
     }
+    // A unit's whole code ("4MA1/1H", "0970/41", or written with a space, "4MA1 1H") before its parts: such a code
+    // holds the award's, and read token by token the paper's own row went to the whole syllabus (F8-05: an Edexcel
+    // paper's fee pasted as "4MA1/1H 4,600" set 4MA1's to 4,600).
+    if (!found && tokens.length >= 2) {
+      const [u] = await db.select({ id: examUnit.id, code: examUnit.code, title: examUnit.title }).from(examUnit)
+        .where(and(eq(examUnit.boardCode, board), sql`lower(${examUnit.code}) in (lower(${codePart}), lower(${tokens.join('/')}))`));
+      if (u) found = { line, keyKind: 'unit', keyId: u.id, code: u.code, title: u.title, amount };
+    }
     if (!found) {
       for (const t of tokens) {
         const [u] = await db.select({ id: examUnit.id, code: examUnit.code, title: examUnit.title }).from(examUnit)

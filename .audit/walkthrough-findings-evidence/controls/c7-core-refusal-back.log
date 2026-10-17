@@ -1,0 +1,9 @@
+Control c7 (item 7, F8-03): the route's core refusal put back, 08h -t 'F8-02, F8-03' run, then the file restored.
+
+ ❯ test/08h-catalogue.test.ts (12 tests | 1 failed | 10 skipped) 1979ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08h-catalogue.test.ts > F0b: the exam catalogue > adding and retiring a subject (F8-02, F8-03) > a subject marked core is deactivated whatever its flag, the flag cleared with it and audited in the same change; deactivated, it is not counted as one to map
+Error: Cannot deactivate a core subject. Remove the core designation first.
+ ❯ test/08h-catalogue.test.ts:328:14
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 10 skipped (12)

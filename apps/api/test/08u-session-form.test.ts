@@ -280,6 +280,16 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     expect([rowOf('unit', h1).code, rowOf('unit', h1).items.map((i) => i.label), rowOf('unit', h1).lines]).toEqual([`F1H-${RUN}`.toUpperCase(), ['Paper 1H only (retake)'], 1]);
     expect(rowOf('qualification', ma).items.map((i) => i.label)).toEqual(['Whole subject']);
 
+    // Pasting the paper's row from Pearson's list reaches the paper, not the syllabus: a unit whose code holds the award's
+    // ("4MA1/1H", or written "4MA1 1H") is read whole before its parts; the award's own row stays the award's.
+    const h3 = (await apiResponse(coordinator.api.v1.catalogue.units.$post({
+      json: { boardCode: 'pearson_edexcel', code: `F4MA1-${RUN}/3H`, shortCode: 'Paper 3H', title: 'Paper 3H', unitLevel: 'igcse', kind: 'component' },
+    })))!.id;
+    const parsed = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].parse.$post({
+      param: { seriesId: pearsonJune }, json: { text: `F4MA1-${RUN}/3H 4,600\nF4MA1-${RUN} 3H 4,600\nF4MA1-${RUN} 9,200` },
+    }));
+    expect(parsed.matched.map((m) => [m.keyKind, m.keyId, m.amount])).toEqual([['unit', h3, 4600], ['unit', h3, 4600], ['qualification', ma, 9200]]);
+
     // The item endpoint's default (decision 4's API-only tool) follows the board too: a one-paper item made with no fee keys.
     const viaEndpoint = (offerId: string, unitId: string, label: string) => apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items.$post({
       param: { id: june, offerId },
