@@ -287,6 +287,7 @@ Logs: `evidence/controls/`.
 | 09's invariants (in both runs) | 5d9da54 | 61 green | the same files |
 | `useQuery<…>` generics in `apps/web/app` | — | 15 (unchanged) | `grep -rn "useQuery<" apps/web/app` |
 | No file over 300 KB under `.audit`; no mobile number in the trail or the documents | — | none (largest shot 111 KB) | CI's gate 0 |
+| CI (`.github/workflows/ci.yml`: gate 0, both type-checks, the suite) | 5d9da54 | run 38999618173 green | `gh run list --branch feature/walkthrough-findings` |
 
 The seven scenarios added: 08u "F8-05" and "F8-04", 08o "F8-08, F8-09", 08h "a subject is added …" and "a subject marked
 core is deactivated …", 08n "a draft with its sheet is deleted …" and "refused, nothing deleted …". An earlier local
