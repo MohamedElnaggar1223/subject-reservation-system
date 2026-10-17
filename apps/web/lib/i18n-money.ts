@@ -466,7 +466,7 @@ export function translateMoneyText(text: string, exact: (t: string) => string | 
     [/^(.+): the amount goes to the family's balance\. A paper receipt that is out comes back first\.$/, (m) => `${m[1]}: يذهب المبلغ إلى رصيد الأسرة. ويُعاد الإيصال الورقي المسلَّم أولًا.`],
     // The desk: the fee collected though the registration was refused.
     [/^The (\d{4}-\d{4}) school fee \(EGP (.+)\) was collected; the subjects were not registered: (.+)$/,
-      (m) => `حُصّلت الرسوم المدرسية لعام ${m[1]} (${m[2]} جنيه)؛ ولم تُسجَّل المواد: ${exact(m[3]!) ?? m[3]}`],
+      (m) => `حُصّلت الرسوم المدرسية لعام \u2066${m[1]}\u2069 (${m[2]} جنيه)؛ ولم تُسجَّل المواد: ${exact(m[3]!) ?? m[3]}`],
     // The API's refusals that carry a policy's label, a role or an amount.
     [/^(.+) takes no value$/, (m) => `${exact(m[1]!) ?? m[1]} لا يأخذ قيمة`],
     [/^(.+) needs a value$/, (m) => `${exact(m[1]!) ?? m[1]} يحتاج قيمة`],

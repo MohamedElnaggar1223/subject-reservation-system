@@ -7,7 +7,9 @@
 
 import { requireAuth } from '~/lib/auth/session';
 import { getServerApi } from '~/lib/hono-server';
-import { apiResponse, gradeLabel } from '@repo/validations';
+import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
+import { readSchoolName } from '~/lib/school-name-server';
+import { PrintHeading } from '~/components/print-heading';
 import PrintButton from './print-button.client';
 
 export const metadata = {
@@ -21,7 +23,7 @@ const fetchReceipt = (api: Awaited<ReturnType<typeof getServerApi>>, id: string)
 type ReceiptDetail = Awaited<ReturnType<typeof fetchReceipt>>;
 
 /** "EGP 14,000" (and "EGP 14,000.50" when there are piastres), as every money figure on the screens reads. */
-const egp = (n: number) => `EGP ${n.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+const egp = formatEgp;
 
 const COUNCILS: Record<string, string> = {
   pearson_edexcel: 'Pearson Edexcel',
@@ -39,6 +41,8 @@ export default async function ReceiptPrintPage({
   await requireAuth();
   const { id } = await params;
   const api = await getServerApi();
+  // F8-11: the school's name heads the paper (the app's name alone while the setting is empty).
+  const schoolName = await readSchoolName();
 
   let receipt: ReceiptDetail;
   try {
@@ -69,12 +73,7 @@ export default async function ReceiptPrintPage({
   return (
     <div className="mx-auto max-w-md p-8 print:p-0 print:max-w-none">
       <div className="border border-border rounded-xl p-8 print:border-0 print:rounded-none bg-card print:bg-white">
-        <div className="text-center border-b border-border pb-4 mb-4">
-          <h1 className="text-xl font-bold text-foreground print:text-black font-display">
-            IGCSE Subject Reservation System
-          </h1>
-          <p className="text-sm text-muted-foreground print:text-black mt-1">{reg ? 'Subject Registration Receipt' : 'Receipt'}</p>
-        </div>
+        <PrintHeading schoolName={schoolName} subtitle={reg ? 'Subject Registration Receipt' : 'Receipt'} className="text-center border-b border-border pb-4 mb-4" />
 
         <p className="text-center text-2xl font-bold tracking-widest font-mono text-foreground print:text-black mb-6">
           {receipt.receiptNumber}

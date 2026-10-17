@@ -12,9 +12,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
-import { apiResponse, gradeLabel } from '@repo/validations';
+import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 
 const fetchChildren = () => apiResponse(api.v1.links.children.$get());
@@ -170,7 +169,7 @@ export default function SchoolFeeClient({ initialStudentId }: { initialStudentId
               </span>
             ) : status.required ? (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                Due{status.amount != null && ` — ${formatPrice(status.amount)}`}
+                Due{status.amount != null && ` — ${formatEgp(status.amount)}`}
               </span>
             ) : status.waived ? (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
@@ -229,7 +228,7 @@ export default function SchoolFeeClient({ initialStudentId }: { initialStudentId
               >
                 {payMutation.isPending
                   ? 'Processing…'
-                  : `Pay ${status.amount != null ? formatPrice(status.amount) : ''} school fee`}
+                  : `Pay ${status.amount != null ? formatEgp(status.amount) : ''} school fee`}
               </Button>
             </>
           )}
@@ -264,7 +263,7 @@ export default function SchoolFeeClient({ initialStudentId }: { initialStudentId
                   ['Account Name', meta.instapay.account.accountName],
                   ['Account Number', meta.instapay.account.accountNumber],
                   ...(meta.instapay.account.iban ? [['IBAN', meta.instapay.account.iban]] : []),
-                  ['Exact Amount', formatPrice(meta.instapay.amountDue)],
+                  ['Exact Amount', formatEgp(meta.instapay.amountDue)],
                 ].map(([label, value]) => (
                   <div key={label as string} className="flex justify-between gap-4">
                     <dt className="text-violet-700 dark:text-violet-400">{label}</dt>

@@ -18,7 +18,7 @@ export const metadata = {
 };
 
 export default async function CataloguePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }): Promise<React.JSX.Element> {
-  await requireAcademic();
+  const session = await requireAcademic();
   const { tab } = await searchParams;
   const initialTab = TABS.find((t) => t === tab) ?? 'registrable';
   const queryClient = getQueryClient();
@@ -26,7 +26,9 @@ export default async function CataloguePage({ searchParams }: { searchParams: Pr
   await queryClient.prefetchQuery({ queryKey: ['catalogue'], queryFn: () => apiResponse(api.v1.catalogue.$get()) });
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <CatalogueClient initialTab={initialTab} />
+      {/* F8-02: adding a subject is the admin's (the Subjects page's endpoint); the coordinator maps. A board's
+          one-paper fee rule is the admin's too (the review of 744e553, item 1). */}
+      <CatalogueClient initialTab={initialTab} isAdmin={session.user.role === 'admin'} />
     </HydrationBoundary>
   );
 }

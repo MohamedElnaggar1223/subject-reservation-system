@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
-import { COUNCIL_LABELS, QUALIFICATION_LEVEL_LABELS, type CreateSubjectType, type UpdateSubjectType } from '@repo/validations';
+import { apiResponse, formatEgp } from '@repo/validations';
+import { COUNCIL_LABELS, QUALIFICATION_LEVEL_LABELS, type CreateSubjectInputType, type UpdateSubjectType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { toCsv, downloadCsv } from '~/lib/csv';
 
@@ -42,9 +42,7 @@ const emptyForm = {
   council: 'cambridge' as const,
   qualificationLevel: 'igcse' as const,
   courseFee: '',
-  registrationFee: '',
   isOfferedAtSchool: true,
-  isCore: false,
 };
 
 export default function SubjectsAdminClient(): React.JSX.Element {
@@ -65,6 +63,10 @@ export default function SubjectsAdminClient(): React.JSX.Element {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [importReport, setImportReport] = useState('');
+  // The Catalogue's "Import several from a list" lands here with the import open (F8-02).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('import') === '1') setShowImport(true);
+  }, []);
 
   // Teacher-linking modal state (V3 §6.7)
   type TeacherRow = { id: string; name: string; isActive: boolean };
@@ -79,7 +81,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: CreateSubjectType) =>
+    mutationFn: async (data: CreateSubjectInputType) =>
       apiResponse(api.v1.subjects.$post({ json: data })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -107,12 +109,6 @@ export default function SubjectsAdminClient(): React.JSX.Element {
   const activateMutation = useMutation({
     mutationFn: async (id: string) =>
       apiResponse(api.v1.subjects[':id'].activate.$put({ param: { id } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subjects'] }),
-  });
-
-  const setCoreMutation = useMutation({
-    mutationFn: async ({ id, isCore }: { id: string; isCore: boolean }) =>
-      apiResponse(api.v1.subjects[':id'].core.$put({ param: { id }, json: { isCore } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subjects'] }),
   });
 
@@ -172,6 +168,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
     const lines = importText.split('\n').map((l) => l.trim()).filter(Boolean);
     let ok = 0;
     const errors: string[] = [];
+    let ignoredColumns = false;
 
     // Excel's clipboard is TAB-separated but keeps display formatting, so
     // a price of 15,000 arrives as literal "15,000". Splitting on comma
@@ -188,17 +185,19 @@ export default function SubjectsAdminClient(): React.JSX.Element {
       const cells = splitCells(line);
       // Header row: tolerate "Subject"/"Name" and any casing
       if (i === 0 && /^(name|subject)$/i.test(cells[0] ?? '') ) continue;
+      // An older list's registration fee and core columns (6th and 7th) are not read: the session's sheet
+      // sets the board fees and grade-10 core (F8-02). They are said once in the report, not refused.
       if (cells.length < 5 || cells.length > 7) {
         errors.push(
-          `Line ${i + 1}: found ${cells.length} columns, expected 5-7 (name, code, council, level, courseFee, registrationFee, core). If you pasted from Excel, paste the cells directly rather than a comma-formatted copy.`
+          `Line ${i + 1}: found ${cells.length} columns, expected 5 (name, code, board, level, course fee). If you pasted from Excel, paste the cells directly rather than a comma-formatted copy.`
         );
         continue;
       }
-      const [name, code, councilRaw, levelRaw, courseFeeRaw, regFeeRaw, coreRaw] = cells;
+      if (cells.length > 5) ignoredColumns = true;
+      const [name, code, councilRaw, levelRaw, courseFeeRaw] = cells;
       const council = (councilRaw ?? '').toLowerCase().replace(/\s+/g, '_');
       const level = (levelRaw ?? 'igcse').toLowerCase().replace(/\s+/g, '_');
       const courseFee = parseMoney(courseFeeRaw);
-      const registrationFee = regFeeRaw ? parseMoney(regFeeRaw) : 0;
       if (!name || !code || isNaN(courseFee)) {
         errors.push(`Line ${i + 1}: needs a name, a code, and a numeric course fee`);
         continue;
@@ -216,9 +215,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
               council: council as 'cambridge',
               qualificationLevel: (['igcse', 'as_level', 'a_level'].includes(level) ? level : 'igcse') as 'igcse',
               courseFee,
-              registrationFee: isNaN(registrationFee) ? 0 : registrationFee,
               isOfferedAtSchool: true,
-              isCore: /^(yes|true|core|1)$/i.test(coreRaw ?? ''),
             },
           })
         );
@@ -228,22 +225,20 @@ export default function SubjectsAdminClient(): React.JSX.Element {
       }
     }
     queryClient.invalidateQueries({ queryKey: ['subjects'] });
-    setImportReport(`Imported ${ok} subject(s).${errors.length ? ` Problems:\n${errors.join('\n')}` : ''}`);
+    setImportReport(`Imported ${ok} subject(s).${ignoredColumns ? ' The registration fee and core columns were not read: the session\'s sheet sets the board fees and grade-10 core.' : ''}${errors.length ? ` Problems:\n${errors.join('\n')}` : ''}`);
     if (errors.length === 0) setImportText('');
   }
 
   function exportCsv() {
     // Escaped + formula-guarded (subject names/codes are user-authored)
     const csv = toCsv(
-      ['name', 'code', 'council', 'level', 'courseFee', 'registrationFee', 'core'],
+      ['name', 'code', 'board', 'level', 'courseFee'],
       (subjects as Subject[]).map((x) => [
         x.name,
         x.code,
         x.council,
         x.qualificationLevel,
         x.courseFee,
-        x.registrationFee,
-        x.isCore ? 'yes' : 'no',
       ])
     );
     downloadCsv('subjects.csv', csv);
@@ -264,9 +259,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
       council: s.council as typeof emptyForm['council'],
       qualificationLevel: s.qualificationLevel as typeof emptyForm['qualificationLevel'],
       courseFee: String(s.courseFee),
-      registrationFee: String(s.registrationFee),
       isOfferedAtSchool: s.isOfferedAtSchool,
-      isCore: s.isCore,
     });
     setFormError('');
     setShowForm(true);
@@ -284,31 +277,25 @@ export default function SubjectsAdminClient(): React.JSX.Element {
     setFormError('');
 
     const courseFee = parseFloat(form.courseFee);
-    const registrationFee = parseFloat(form.registrationFee);
     if (isNaN(courseFee) || courseFee < 0) {
       setFormError('Please enter a valid course fee (0 or more).');
       return;
     }
-    if (isNaN(registrationFee) || registrationFee < 0) {
-      setFormError('Please enter a valid registration fee (0 or more).');
-      return;
-    }
 
+    // F8-02: no registration fee and no core flag — the session's sheet owns the fees and grade-10 core.
     const payload = {
       name: form.name.trim(),
       code: form.code.trim().toUpperCase(),
       council: form.council,
       qualificationLevel: form.qualificationLevel,
       courseFee,
-      registrationFee,
       isOfferedAtSchool: form.isOfferedAtSchool,
-      isCore: form.isCore,
     };
 
     if (editingSubject) {
       updateMutation.mutate({ id: editingSubject.id, data: payload });
     } else {
-      createMutation.mutate(payload as CreateSubjectType);
+      createMutation.mutate(payload);
     }
   }
 
@@ -363,16 +350,17 @@ export default function SubjectsAdminClient(): React.JSX.Element {
         <div className="mb-6 bg-card rounded-xl border border-border shadow-sm p-5">
           <h2 className="text-sm font-semibold text-foreground font-display mb-1">Import subjects from Excel</h2>
           <p className="text-xs text-muted-foreground mb-3">
-            Paste rows as: <span className="font-mono">name, code, council, level, courseFee, registrationFee, core</span>{' '}
-            Paste cells straight from Excel (tab separated), or use commas. Prices may include
-            thousands separators. Council: Pearson Edexcel, Cambridge, or Oxford. Level: IGCSE,
-            AS Level, or A Level. Core: yes/no. Every row is reported back — nothing imports silently.
+            Paste rows as: <span className="font-mono">name, code, board, level, course fee</span>{' '}
+            Paste cells straight from Excel (tab separated), or use commas. Fees may include
+            thousands separators. Board: Pearson Edexcel, Cambridge, or Oxford. Level: IGCSE,
+            AS Level, or A Level. The course fee is the default the session&apos;s sheet offers; the board fees
+            and grade-10 core are set on the session. Every row is reported back — nothing imports silently.
           </p>
           <textarea
             rows={6}
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
-            placeholder={'Mathematics B,4MB1,Pearson Edexcel,IGCSE,5000,7000,yes\nBiology,0610,Cambridge,IGCSE,4500,7100,no'}
+            placeholder={'Mathematics B,4MB1,Pearson Edexcel,IGCSE,5000\nBiology,0970,Cambridge,IGCSE,4500'}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground font-mono"
           />
           {importReport && (
@@ -470,7 +458,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-foreground">
-                    Course Fee <span className="text-destructive">*</span>
+                    Course fee <span className="text-destructive">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">EGP</span>
@@ -484,39 +472,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                       className="w-full rounded-lg border border-border bg-background py-2 pl-12 pr-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Teaching fee.</p>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-foreground">
-                    Registration Fee <span className="text-destructive">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">EGP</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.registrationFee}
-                      onChange={(e) => setForm({ ...form, registrationFee: e.target.value })}
-                      required
-                      className="w-full rounded-lg border border-border bg-background py-2 pl-12 pr-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Exam board entry fee.</p>
-                </div>
-
-                <div className="flex items-center gap-3 pt-5">
-                  <input
-                    id="isCore"
-                    type="checkbox"
-                    checked={form.isCore}
-                    onChange={(e) => setForm({ ...form, isCore: e.target.checked })}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="isCore" className="text-sm font-medium text-foreground">
-                    Core (Grade 10)
-                  </label>
+                  <p className="mt-1 text-xs text-muted-foreground">The default the session&apos;s sheet offers when the subject is added. The board fees and grade-10 core are set on the session.</p>
                 </div>
               </div>
 
@@ -536,8 +492,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
 
                 {!form.isOfferedAtSchool && (
                   <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                    Not offered at school — students automatically pay 50% of the
-                    combined course + registration fee.
+                    Not offered at school — the session&apos;s sheet offers it as self study.
                   </p>
                 )}
               </div>
@@ -611,8 +566,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                 <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Subject</th>
                 <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Board</th>
                 <th className="px-4 py-3 text-start font-semibold text-muted-foreground">Level</th>
-                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Fees</th>
-                <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Core</th>
+                <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Course fee</th>
                 <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-end font-semibold text-muted-foreground">Actions</th>
               </tr>
@@ -634,35 +588,10 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                     {QUALIFICATION_LEVEL_LABELS[s.qualificationLevel as keyof typeof QUALIFICATION_LEVEL_LABELS] ?? s.qualificationLevel}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">
-                    <div>EGP {(s.courseFee + s.registrationFee).toLocaleString()}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {s.courseFee.toLocaleString()} + {s.registrationFee.toLocaleString()} reg
-                    </div>
+                    <div dir="ltr">{formatEgp(s.courseFee)}</div>
                     {!s.isOfferedAtSchool && (
                       <div className="text-xs text-amber-600 dark:text-amber-400">Outside school · 50%</div>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => setCoreMutation.mutate({ id: s.id, isCore: !s.isCore })}
-                      disabled={setCoreMutation.isPending}
-                      title={s.isCore ? 'Remove core designation' : 'Mark as core'}
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
-                        s.isCore
-                          ? 'bg-brand-100 text-brand-700 hover:bg-brand-200 dark:bg-brand-900/40 dark:text-brand-300'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      {s.isCore ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-3.5 w-3.5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                      )}
-                    </button>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span

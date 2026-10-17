@@ -1,0 +1,9 @@
+Control c1b (item 1, the paste): parseFees' whole-code reading skipped (if (false && !found && tokens.length >= 2)), 08u -t F8-05 run, then the file restored.
+
+ ❯ test/08u-session-form.test.ts (14 tests | 1 failed | 13 skipped) 2455ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > F8-05: a one-paper retake's board fee follows its board — Edexcel 4MA1's Paper 1H at the paper's own fee, Cambridge's Paper 4 at the syllabus's; the Fees tab names the paper once
+AssertionError: expected [ [ 'qualification', …(2) ], …(2) ] to deeply equal [ [ 'unit', …(2) ], …(2) ]
+ ❯ test/08u-session-form.test.ts:291:71
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)

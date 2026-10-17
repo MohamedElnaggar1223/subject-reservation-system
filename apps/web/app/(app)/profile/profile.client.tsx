@@ -309,20 +309,22 @@ export default function ProfileClient(): React.JSX.Element {
         )}
       </div>
 
-      {/* Quick Links */}
+      {/* Quick Links. The account links are a family's (F8-12: a member of staff's Profile offered "Linked Parents"). */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Link href={"/links" as never}>
-          <div className="bg-card rounded-xl border border-border shadow-sm p-4 transition-colors hover:border-primary/40">
-            <h3 className="font-medium text-foreground font-display">
-              {profile.role === "parent" ? "Linked Children" : "Linked Parents"}
-            </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {profile.role === "parent"
-                ? "Manage your children's account links"
-                : "View and manage parent connections"}
-            </p>
-          </div>
-        </Link>
+        {(profile.role === "parent" || profile.role === "student") && (
+          <Link href={"/links" as never}>
+            <div className="bg-card rounded-xl border border-border shadow-sm p-4 transition-colors hover:border-primary/40">
+              <h3 className="font-medium text-foreground font-display">
+                {profile.role === "parent" ? "Linked Children" : "Linked Parents"}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {profile.role === "parent"
+                  ? "Manage your children's account links"
+                  : "View and manage parent connections"}
+              </p>
+            </div>
+          </Link>
+        )}
 
         <button
           onClick={handleSignOut}

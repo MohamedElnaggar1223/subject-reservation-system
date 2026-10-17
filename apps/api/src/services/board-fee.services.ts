@@ -26,6 +26,7 @@ import { repriceBoardPart, round2 } from './pricing.services';
 import { dueDateFor } from './deadline.services';
 import { createNotification } from './notification.services';
 import { lockFeeGrids } from '../lib/fee-grid-lock';
+import { formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -391,7 +392,7 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
   for (const r of outcome.repriced) {
     const subjectName = subjects.get(r.subjectId) ?? 'a subject';
     await createNotification(r.studentId, 'PRICE_CHANGED', `The price of ${subjectName} changed`,
-      `The exam board confirmed its fee for ${outcome.seriesName}. ${subjectName} was ${r.from.toFixed(2)} EGP and is now ${r.to.toFixed(2)} EGP.`,
+      `The exam board confirmed its fee for ${outcome.seriesName}. ${subjectName} was ${formatEgp(r.from)} and is now ${formatEgp(r.to)}.`,
       { registrationId: r.id, from: r.from, to: r.to })
       .catch((err) => console.error('[board-fees] Price change notice failed:', err));
   }
@@ -428,6 +429,14 @@ export async function parseFees(seriesId: string, text: string) {
         .from(qualificationOption).innerJoin(qualification, eq(qualification.id, qualificationOption.qualificationId))
         .where(and(eq(qualification.boardCode, board), sql`lower(${qualification.code}) = lower(${tokens[0]!})`, sql`lower(${qualificationOption.code}) = lower(${tokens[1]!})`));
       if (o) found = { line, keyKind: 'option', keyId: o.id, code: `${o.qCode} ${o.code}`, title: `${o.title} — ${o.label}`, amount };
+    }
+    // A unit's whole code ("4MA1/1H", "0970/41", or written with a space, "4MA1 1H") before its parts: such a code
+    // holds the award's, and read token by token the paper's own row went to the whole syllabus (F8-05: an Edexcel
+    // paper's fee pasted as "4MA1/1H 4,600" set 4MA1's to 4,600).
+    if (!found && tokens.length >= 2) {
+      const [u] = await db.select({ id: examUnit.id, code: examUnit.code, title: examUnit.title }).from(examUnit)
+        .where(and(eq(examUnit.boardCode, board), sql`lower(${examUnit.code}) in (lower(${codePart}), lower(${tokens.join('/')}))`));
+      if (u) found = { line, keyKind: 'unit', keyId: u.id, code: u.code, title: u.title, amount };
     }
     if (!found) {
       for (const t of tokens) {

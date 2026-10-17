@@ -292,9 +292,42 @@ export async function generateItems(executor: Executor, subjectId: string): Prom
 }
 
 /**
+ * What a one-paper item's board fee is read for (F8-05): the board's `one_paper_fee_key`. Cambridge's
+ * 'qualification' — the syllabus's fee (the board charges the syllabus for a carry-forward re-entry,
+ * Q-13), read from the same row as the subject's whole item, so the fee list names a syllabus once: the
+ * option's row when the whole item enters an option ("0970 CX 10,850"), the qualification's otherwise
+ * (the lead's answer 2 on the review of 744e553). Pearson Edexcel's 'unit' — the paper's own row, as its
+ * list prices it ("4MA1 1H 4,600"). A row with no award falls back to its units.
+ */
+async function onePaperFeeKeys(
+  executor: Executor, boardCode: string, qualificationId: string | null, unitIds: string[], wholeOptionId: string | null,
+): Promise<FeeKeyInputType[]> {
+  const [b] = await executor.select({ key: examBoard.onePaperFeeKey }).from(examBoard).where(eq(examBoard.code, boardCode));
+  if (b?.key === 'qualification' && qualificationId) {
+    return wholeOptionId ? [{ kind: 'option', id: wholeOptionId }] : [{ kind: 'qualification', id: qualificationId }];
+  }
+  return unitIds.map((id) => ({ kind: 'unit' as const, id }));
+}
+
+/**
+ * The option the subject's whole item enters on this offer, when it enters one of this qualification's
+ * options: the row a one-paper item made later reads on a syllabus-keyed board (onePaperFeeKeys).
+ */
+async function wholeItemOption(executor: Executor, offerId: string, qualificationId: string | null): Promise<string | null> {
+  if (!qualificationId) return null;
+  const wholes = await executor.select({ optionId: sessionOfferItem.qualificationOptionId }).from(sessionOfferItem)
+    .innerJoin(qualificationOption, eq(qualificationOption.id, sessionOfferItem.qualificationOptionId))
+    .where(and(eq(sessionOfferItem.offerId, offerId), eq(sessionOfferItem.kind, 'whole'), eq(sessionOfferItem.entersKind, 'option'),
+      eq(qualificationOption.qualificationId, qualificationId)));
+  return wholes.length === 1 ? wholes[0]!.optionId : null;
+}
+
+/**
  * An IGCSE award's one-paper retake items (§3.2's table: "Paper 4 only (retake)", "Paper 1H only"):
  * one per component the catalogue says the award requires (its own, or its option's), each
- * entering that component, retakes only, its board fee read for the qualification (Q-13), in one
+ * entering that component, retakes only, its board fee read as its board prices one paper
+ * (`onePaperFeeKeys`: the whole item's row on Cambridge — its option's, or the syllabus's, Q-13; the
+ * paper's own on Pearson Edexcel), in one
  * exclusive group with the whole subject, carrying the other components on a Cambridge syllabus.
  * They come **unticked** (closed): the school opens the ones it offers on the drawer, with their
  * course fee.
@@ -311,14 +344,16 @@ async function withOnePaper(executor: Executor, q: typeof qualification.$inferSe
     : [];
   const components = [...new Map([...own, ...viaOption].map((u) => [u.id, u])).values()].sort((a, b) => a.code.localeCompare(b.code));
   if (!components.length) return [whole];
-  return [
-    { ...whole, exclusiveGroup: 'entry' },
-    ...components.map((u, i): ItemDraft => ({
+  const drafts: ItemDraft[] = [{ ...whole, exclusiveGroup: 'entry' }];
+  for (const [i, u] of components.entries()) {
+    drafts.push({
       label: `${u.shortCode ?? u.code} only (retake)`, kind: 'one_paper', enters: { kind: 'units', unitIds: [u.id] },
-      feeKeys: [{ kind: 'qualification', id: q.id }], availability: 'closed', needsPriorSeries: q.boardCode === 'cambridge',
+      feeKeys: await onePaperFeeKeys(executor, q.boardCode, q.id, [u.id], whole.enters.kind === 'option' ? whole.enters.optionId : null),
+      availability: 'closed', needsPriorSeries: q.boardCode === 'cambridge',
       requiredInSeries: false, exclusiveGroup: 'entry', sortOrder: 10 + i,
-    })),
-  ];
+    });
+  }
+  return drafts;
 }
 
 /** What an item enters, checked against the subject's board; the default fee keys follow from it. */
@@ -395,7 +430,12 @@ async function insertItem(
     sortOrder: d.sortOrder ?? 0, createdBy: actorId,
   });
   if (enters.unitIds.length) await tx.insert(sessionOfferItemUnit).values(enters.unitIds.map((unitId) => ({ itemId: id, unitId })));
-  await writeFeeKeys(tx, id, d.feeKeys ?? enters.feeKeys);
+  // A one-paper item made without fee keys (the item endpoint) reads them as its board prices one paper (F8-05):
+  // on a syllabus-keyed board, the row the offer's whole item reads (answer 2).
+  const defaultKeys = d.kind === 'one_paper' && d.enters.kind === 'units'
+    ? await onePaperFeeKeys(tx, subjectRow.council, enters.qualificationId, enters.unitIds, d.feeKeys ? null : await wholeItemOption(tx, offer.id, enters.qualificationId))
+    : enters.feeKeys;
+  await writeFeeKeys(tx, id, d.feeKeys ?? defaultKeys);
   if (d.teachers?.length) await writeItemTeachers(tx, id, await resolveTeachers(tx, offer.subjectId, d.teachers, actorId));
   return id;
 }
@@ -1442,6 +1482,34 @@ export async function listOffers(sessionId: string) {
       return { unitId: u.id, label: d.label, code: u.code, shortCode: u.shortCode };
     }));
   }
+  // F8-04: the other awards a subject may be entered for beside its own — its board's awards of the same subject
+  // area and level in another suite (Arabic A.L.: the Edexcel GCE 9AA0 beside the IAL YAA01; the family chooses
+  // through the teacher, decision 3) — that no item of the subject enters yet. Another syllabus of the same suite
+  // (Cambridge's older 0610 beside 0970) is not offered: it is a replacement, not a second qualification.
+  const ownQuals = [...new Set(offers.map((o) => o.subject.qualificationId).filter((x): x is string => !!x))];
+  const own = ownQuals.length
+    ? await db.select({ id: qualification.id, boardCode: qualification.boardCode, level: qualification.level, subjectArea: qualification.subjectArea, suite: qualification.suite })
+      .from(qualification).where(inArray(qualification.id, ownQuals))
+    : [];
+  const siblings = own.length
+    ? await db.select({ id: qualification.id, code: qualification.code, title: qualification.title, level: qualification.level, boardCode: qualification.boardCode, subjectArea: qualification.subjectArea, suite: qualification.suite })
+      .from(qualification).where(and(eq(qualification.isActive, true), inArray(qualification.boardCode, [...new Set(own.map((q) => q.boardCode))])))
+      .orderBy(qualification.code)
+    : [];
+  const qualificationsToAdd = (offerId: string, ownId: string | null) => {
+    const q = own.find((x) => x.id === ownId);
+    if (!q) return [];
+    // Only beside a subject whose own entry is a single whole item: the new qualification joins that item's exclusive
+    // group, one or the other. A subject entered by unit (one item per unit, no whole item), by paper or by route has
+    // nothing the new one could be a choice against, and both could be reserved (the review of 744e553, item 5). The
+    // qualifications added already beside the whole item are not the subject's own entry.
+    const ownEntry = items.filter((i) => i.offerId === offerId && !(i.kind === 'qualification' && i.qualificationId !== ownId));
+    if (ownEntry.length !== 1 || ownEntry[0]!.kind !== 'whole') return [];
+    const entered = new Set(items.filter((i) => i.offerId === offerId && i.qualificationId).map((i) => i.qualificationId));
+    return siblings
+      .filter((x) => x.id !== q.id && x.boardCode === q.boardCode && x.level === q.level && x.subjectArea === q.subjectArea && (x.suite ?? '') !== (q.suite ?? '') && !entered.has(x.id))
+      .map(({ id, code, title, level }) => ({ id, code, title, level }));
+  };
   const rows = offers.map(({ offer, subject: s }) => {
     const its = items.filter((i) => i.offerId === offer.id).map((i) => {
       const f = fees.get(i.id);
@@ -1474,6 +1542,7 @@ export async function listOffers(sessionId: string) {
       teachers: offerTeachers,
       items: its,
       papersToAdd: papersToAdd.get(offer.id) ?? [],
+      qualificationsToAdd: qualificationsToAdd(offer.id, s.qualificationId),
       lines: its.reduce((a, i) => a + i.lines.live, 0),
       warnings,
     };

@@ -393,7 +393,7 @@ describe('F0a: grade and eligibility', () => {
         scheduleIds.push(s.id);
       }
       const blocked = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, ...(await reservationOf(S.nov2027!, [subj.a!])), studentId: f.studentId } }));
-      expect(blocked).toEqual({ status: 400, error: 'The 2027-2028 school fee (4000.00 EGP) must be paid before registering subjects' });
+      expect(blocked).toEqual({ status: 400, error: 'The 2027-2028 school fee (EGP 4,000) must be paid before registering subjects' });
       expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
 
       // No 2027/28 schedule open yet: the gate is off, as today (A-14 default).
@@ -439,7 +439,7 @@ describe('F0a: grade and eligibility', () => {
       expect(retake).toHaveLength(1);
       await setSetting('schoolFee.graduatesExempt', false, finadmin);
       expect(await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, ...(await reservationOf(S.nov2027!, [subj.b!])), studentId: f.studentId } })))
-        .toEqual({ status: 400, error: 'The 2027-2028 school fee (6000.00 EGP) must be paid before registering subjects' });
+        .toEqual({ status: 400, error: 'The 2027-2028 school fee (EGP 6,000) must be paid before registering subjects' });
       await setSetting('schoolFee.graduatesExempt', true, finadmin);
       await apiResponse(finadmin.api.v1['school-fees'].schedules[':id'].$delete({ param: { id: uniform.id } }));
       scheduleIds.splice(scheduleIds.indexOf(uniform.id), 1);

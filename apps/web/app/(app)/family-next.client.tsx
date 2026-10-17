@@ -151,10 +151,47 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
     // 4. Pay, session by session, with the due date: the reminder in front of them.
     //    A line on a board fee not published yet is reserved, not payable (unless the school's
     //    setting says so): it is named apart, so the amount shown is the amount "Pay now" takes.
+    //    A line whose payment is under way (F8-08) is not paid again: a transfer the finance office is
+    //    checking is said apart ("being checked by the school"), a checkout the family started and did not
+    //    finish has its own row to finish it, and "Pay now" takes only the lines that can still be paid.
     for (const sess of st?.sessions ?? []) {
-      const owed = sess.lines.filter((l) => l.outstanding > 0);
+      const owedAll = sess.lines.filter((l) => l.outstanding > 0);
+      if (!owedAll.length) continue;
+      const sum = (ls: typeof owedAll) => Math.round(ls.reduce((a, l) => a + l.outstanding, 0) * 100) / 100;
+      const checking = owedAll.filter((l) => l.paymentInProgress?.status === 'pending_verification');
+      const started = owedAll.filter((l) => l.paymentInProgress?.status === 'pending');
+      if (started.length) {
+        const atDesk = started.every((l) => l.paymentInProgress?.method === 'in_school');
+        payRows.push({
+          key: `started-${who}-${sess.id}`, tone: 'warning',
+          body: (
+            <span>
+              <bdi>{sess.name}</bdi><span>:</span> <Money amount={sum(started)} />{' '}
+              <span>{atDesk ? 'to pay at the finance desk, as you chose' : 'in a payment you started and have not finished'}</span>
+            </span>
+          ),
+          action: isParent
+            ? { label: 'Finish the payment', href: `/checkout?ids=${started.map((l) => l.id).join(',')}` }
+            : { label: 'Ask your parent: see the statement', href: '/statement' },
+        });
+      }
+      if (checking.length) {
+        const byTransfer = checking.every((l) => l.paymentInProgress?.method === 'instapay');
+        payRows.push({
+          key: `checking-${who}-${sess.id}`, tone: 'info',
+          body: (
+            <span>
+              <bdi>{sess.name}</bdi><span>:</span> <Money amount={sum(checking)} /> <span>being checked by the school</span>
+              <span className="block text-xs text-muted-foreground">
+                <bdi data-i18n-skip="true">{checking.map((l) => l.label).join(' · ')}</bdi><span>:</span>{' '}
+                <span>{byTransfer ? 'your InstaPay transfer is with the finance office; nothing to do until it is confirmed.' : 'your payment is with the finance office; nothing to do until it is confirmed.'}</span>
+              </span>
+            </span>
+          ),
+        });
+      }
+      const owed = owedAll.filter((l) => !l.paymentInProgress);
       if (!owed.length) continue;
-      const sum = (ls: typeof owed) => Math.round(ls.reduce((a, l) => a + l.outstanding, 0) * 100) / 100;
       const payable = owed.filter((l) => c.owingRegistrationIds.includes(l.id));
       const waitingFee = owed.filter((l) => !c.owingRegistrationIds.includes(l.id) && l.provisional);
       const now = owed.filter((l) => !waitingFee.includes(l));

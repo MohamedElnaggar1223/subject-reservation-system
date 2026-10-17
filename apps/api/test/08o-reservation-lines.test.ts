@@ -940,6 +940,56 @@ describe('08o: reservation lines (step B)', () => {
     expect(s.charges).toEqual([]);
   });
 
+  it("F8-08, F8-09: a transfer waiting for finance's check — the statement and the desk say its payment is under way, the desk counts it apart and collects the other board's line, never refused", async () => {
+    const f = await onboard(officer, `o08-wip-${RUN}`, 11);
+    const asked = await apiResponse(f.student.api.v1.registrations.request.$post({
+      json: { sessionId: june, lines: [first(bioItem, { teacherId: teacherA }), first(matItem)], consent: CONSENT },
+    }));
+    await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: asked.map((r) => r.id) } }));
+    const b = asked.find((r) => r.offerItemId === bioItem)!;
+    const m = asked.find((r) => r.offerItemId === matItem)!;
+    // The parent pays Biology (Cambridge's series) by InstaPay and gives the transfer's reference: it waits for finance.
+    const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [b.id], paymentMethod: 'instapay', escrowAmountToApply: 0 } }));
+    await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay.id! }, json: { reference: `FT-O08-WIP-${RUN}` } }));
+    const underWay = { paymentId: pay.id, status: 'pending_verification', method: 'instapay' };
+
+    // The statement (what the family's Home reads): Biology's payment is under way, Mathematics' is not.
+    const st = await apiResponse(f.parent.api.v1.statement.$get({ query: { studentId: f.studentId } }));
+    const lines = st.students[0]!.sessions.find((x) => x.id === june)!.lines;
+    expect(lines.find((l) => l.id === b.id)!).toMatchObject({ outstanding: 23200, paymentInProgress: underWay });
+    expect(lines.find((l) => l.id === m.id)!).toMatchObject({ outstanding: 14600, paymentInProgress: null });
+
+    // The desk: Biology listed apart (not payable now, its payment named), counted apart from what it collects now.
+    const desk = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }));
+    expect(desk.registrations.find((r) => r.id === b.id)).toMatchObject({ status: 'pending_payment', payableNow: false, paymentInProgress: underWay });
+    expect(desk.registrations.find((r) => r.id === m.id)).toMatchObject({ status: 'pending_payment', payableNow: true, paymentInProgress: null });
+    expect([desk.owing, desk.owingInProgress]).toEqual([14600, 23200]);
+
+    // What the desk ticks (Mathematics) is collected; Biology is still refused, and its transfer is left as it was.
+    const collect = (ids: string[]) => officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: ids, instrumentUsed: 'cash', escrowAmountToApply: 0 } });
+    expect((await apiResponse(collect([m.id]))).collected).toBe(14600);
+    expect(await lineOf(m.id)).toMatchObject({ status: 'confirmed' });
+    expect((await refused(collect([b.id]))).error).toBe('These subjects already have a transfer in progress — confirm it or reject it in the Finance Workbench first');
+    expect(await one(`select status, verification_reference as ref from payment where id = $1`, [pay.id])).toEqual({ status: 'pending_verification', ref: `FT-O08-WIP-${RUN}` });
+    expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } })))).toMatchObject({ owing: 0, owingInProgress: 23200 });
+
+    // Finance confirms the transfer: nothing is under way, nothing is owed.
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { notes: 'matched on the bank statement' } }));
+    const after = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }));
+    expect([after.owing, after.owingInProgress, after.registrations.find((r) => r.id === b.id)!.paymentInProgress]).toEqual([0, 0, null]);
+    const st2 = await apiResponse(f.parent.api.v1.statement.$get({ query: { studentId: f.studentId } }));
+    expect(st2.students[0]!.sessions.find((x) => x.id === june)!.lines.find((l) => l.id === b.id)).toMatchObject({ outstanding: 0, paymentInProgress: null });
+    // F8-10: the family is told each amount as the screens write it and how it was paid in words — never
+    // "EGP 14600.00 via in_school". The statement's payments carry what the screen words ("in cash at the school").
+    const told = await notified(f.parent.email, 'PAYMENT_CONFIRMED', 2);
+    expect(told.map((n) => n.body.replace(/ for .+$/, ''))).toEqual([
+      'Payment of EGP 14,600 in cash at the school has been confirmed',
+      'Payment of EGP 23,200 by InstaPay has been confirmed',
+    ]);
+    expect(st2.students[0]!.payments.filter((p) => p.status === 'completed').map((p) => [p.method, p.instrument, p.total]).sort())
+      .toEqual([['in_school', 'cash', 14600], ['instapay', 'instapay', 23200]]);
+  });
+
   it("the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is", async () => {
     const f = await onboard(officer, `o08-owed-${RUN}`, 11);
     // A session not open yet: a parent's reservation there is a preregistration, nothing paid.

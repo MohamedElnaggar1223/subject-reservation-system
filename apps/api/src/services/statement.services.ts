@@ -58,6 +58,7 @@ type LineRow = {
   paid_payment_id: string | null; paid_at: string | null; refunded: string | null; consents: { kind: string; channel: string; at: string }[] | null;
   deposits: string; plan_id: string | null; plan_status: string | null;
   instalments: { id: string; no: number; label: string; amount: number; dueAt: string; status: string }[] | null;
+  in_progress: { id: string; status: string; method: string } | null;
 };
 
 /**
@@ -86,7 +87,10 @@ async function linesOf(studentIds: string[]) {
       ${lineDepositsSql('r')} as deposits,
       pl.id as plan_id, pl.status as plan_status,
       (select json_agg(json_build_object('id', c.id, 'no', c.instalment_no, 'label', c.description, 'amount', c.amount, 'dueAt', c.due_at, 'status', c.status) order by c.instalment_no)
-        from charge c where c.kind = 'instalment' and c.plan_exception_id = pl.id) as instalments
+        from charge c where c.kind = 'instalment' and c.plan_exception_id = pl.id) as instalments,
+      -- A payment under way for the line (F8-08): a checkout the family started, or a transfer waiting for finance.
+      (select json_build_object('id', p.id, 'status', p.status, 'method', p.payment_method) from payment_registration pr join payment p on p.id = pr.payment_id
+        where pr.registration_id = r.id and p.status in ('pending', 'pending_verification') order by p.created_at desc limit 1) as in_progress
     from registration r
     join registration_session rs on rs.id = r.session_id
     join session_offer_item i on i.id = r.offer_item_id
@@ -152,6 +156,11 @@ async function linesOf(studentIds: string[]) {
       } : null,
       paidAt: l.paid_at ? new Date(l.paid_at) : null,
       paymentId: l.paid_payment_id,
+      // A payment under way (F8-08): 'pending_verification' — the transfer's reference is with finance, being
+      // checked; 'pending' — a checkout started and not finished. Such a line is not paid again until it ends.
+      paymentInProgress: l.in_progress && !l.paid_payment_id
+        ? { paymentId: l.in_progress.id, status: l.in_progress.status as 'pending' | 'pending_verification', method: l.in_progress.method }
+        : null,
       consents: (l.consents ?? []).map((c) => ({ kind: c.kind, channel: c.channel, at: new Date(c.at) })),
       // The refund steps the family consented to (the slip prints them) and what a teacher change reads.
       refundPolicySnapshot: l.snapshot,

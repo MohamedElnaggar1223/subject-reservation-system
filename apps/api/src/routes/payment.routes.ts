@@ -56,6 +56,7 @@ import * as linkService from '../services/link.services';
 // import { validatePaymobWebhookSignature } from '../integrations/paymob';
 import { logger } from '../lib/logger';
 import { extractAuditContext } from '../services/audit.services';
+import { isInsufficientBalance } from '../services/escrow.services';
 
 export const payments = new Hono<HonoEnv>()
 
@@ -201,7 +202,7 @@ export const payments = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to initiate payment');
         const status =
           message.includes('not linked') ? 403 :
-          message.includes('insufficient') ||
+          isInsufficientBalance(err) ||
           message.includes('already have') ||
           message.includes('window is closed') ||
           message.includes('window is not open') ||

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
-import { apiResponse, COUNCIL_LABELS } from '@repo/validations';
+import { apiResponse, COUNCIL_LABELS, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 type Subject = {
@@ -205,7 +205,7 @@ function SubjectGrid({
               {COUNCIL_LABELS[s.council as keyof typeof COUNCIL_LABELS] ?? s.council}
             </span>
             <span className="font-semibold text-primary">
-              EGP {(s.isOfferedAtSchool ? s.priceInSchool : (s.customPrice ?? s.priceInSchool)).toLocaleString()}
+              {formatEgp(s.isOfferedAtSchool ? s.priceInSchool : (s.customPrice ?? s.priceInSchool))}
             </span>
           </div>
         </button>
@@ -260,7 +260,7 @@ function SubjectDetailModal({
           <div className="flex items-center justify-between rounded-lg bg-brand-50 dark:bg-brand-900/20 px-4 py-3">
             <span className="text-sm text-brand-700 dark:text-brand-400">Registration Price</span>
             <span className="text-lg font-bold text-brand-700 dark:text-brand-400">
-              EGP {effectivePrice.toLocaleString()}
+              {formatEgp(effectivePrice)}
             </span>
           </div>
 

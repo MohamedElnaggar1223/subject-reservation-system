@@ -218,7 +218,7 @@ describe('money rules', () => {
 
       const toParent = await notified(f.parent.email, 'PAYMENT_REJECTED', 1);
       expect(toParent[0]?.body).toContain('No matching transfer on the bank statement');
-      expect(toParent[0]?.body).toContain('EGP 500.00 applied from escrow has been returned');
+      expect(toParent[0]?.body).toContain('EGP 500 paid from the balance has been returned to it');
       await notified(f.student.email, 'PAYMENT_REJECTED', 1);
 
       // Nothing left to reject; a completed payment is reversed, not rejected.
@@ -846,7 +846,7 @@ describe('money rules', () => {
       expect(await escrowOf(f.studentId)).toBe(1200);
       await audited([lapsePay], ['PAYMENT_FAILED']);
       const notice = await notified(f.parent.email, 'PAYMENT_EXPIRED', 1);
-      expect(notice[0]?.body).toContain('EGP 250.00 applied from escrow has been returned');
+      expect(notice[0]?.body).toContain('EGP 250 paid from the balance has been returned to it');
       // Running it again changes nothing.
       expect((await runPaymentDeadlines()).referencesLapsed).toBe(0);
     });
@@ -999,7 +999,7 @@ describe('money rules', () => {
 
       // Nothing undoes it, so no more than the payment was for.
       expect(await refused(record(finadmin, artPay, { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1B', amount: 14000 }))).toEqual({
-        status: 400, error: 'The amount found is more than this payment was for (EGP 1400.00) — record at most that',
+        status: 400, error: 'The amount found is more than this payment was for (EGP 1,400) — record at most that',
       });
 
       // The statement's reference is the one that counts: a transfer already confirmed on
@@ -1040,7 +1040,7 @@ describe('money rules', () => {
       // Not while the escrow it added is spent: a refund request holds most of the balance.
       const w = await apiResponse(f.parent.api.v1.escrow.withdraw.$post({ json: { studentId: f.studentId, amount: 3000 } }));
       expect(await escrowOf(f.studentId)).toBe(800);
-      expect(await refused(undo(finadmin, musPay))).toEqual({ status: 409, error: 'The escrow this transfer added has already been used, so it can no longer be undone' });
+      expect(await refused(undo(finadmin, musPay))).toEqual({ status: 409, error: 'What this transfer added to the balance has already been used, so it can no longer be undone' });
       await apiResponse(officer.api.v1.escrow.admin.withdrawals[':id'].reject.$post({ param: { id: w.id }, json: { notes: 'the family keeps it as credit' } }));
       expect(await escrowOf(f.studentId)).toBe(3800);
 
@@ -1219,7 +1219,7 @@ describe('money rules', () => {
       const juneName = await sessionName(june);
       const refundNotice = await waitFor(async () => (await notificationsFor(f.parent.email, 'SESSION_CLOSED'))
         .find((n) => n.title === `Refunded: ${juneName} did not open`) ?? null);
-      expect(refundNotice.body).toContain('EGP 1500.00 paid for Geography (AS, money rules) has been returned to your escrow balance in full');
+      expect(refundNotice.body).toContain('EGP 1,500 paid for Geography (AS, money rules) has been returned to your balance in full');
       expect(refundNotice.body).toContain('History (AS, money rules)');
       // Running it again changes nothing; November's preregistration is untouched.
       expect(await runPaymentDeadlines()).toMatchObject({ preregistrationsRefundedAtDeadline: 0, preregistrationsExpiredUnopened: 0 });

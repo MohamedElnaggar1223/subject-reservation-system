@@ -1,0 +1,64 @@
+== The migration proof of 0062 and 0063 on a cycle built by main's code, 2026-10-17T02:45:52Z
+igcse_findings_walk: empty, migrated with main 2a149dd's 62; the demo script and the drive's families (main's API).
+
+== Before
+ migrations 
+------------
+         62
+
+     subject      |      board      |           label            |   key_kind    | key_code 
+------------------+-----------------+----------------------------+---------------+----------
+ Arabic           | cambridge       | Paper 1 only (retake)      | qualification | 3180
+ Arabic           | cambridge       | Paper 2 only (retake)      | qualification | 3180
+ Biology          | cambridge       | Paper 41/42 only (retake)  | qualification | 0970
+ Chemistry        | cambridge       | Paper 41/42 only (retake)  | qualification | 0971
+ Combined Science | cambridge       | Paper 41/42 only (retake)  | qualification | 0653
+ ICT              | cambridge       | Theory Paper only (retake) | qualification | 0983
+ Physics          | cambridge       | Paper 41/42 only (retake)  | qualification | 0972
+ Mathematics      | pearson_edexcel | 1H only (retake)           | qualification | 4MA1
+ Mathematics      | pearson_edexcel | 2H only (retake)           | qualification | 4MA1
+
+ action | entity_type | rows 
+--------+-------------+------
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     6 |   135450.00 | 919e4139dce13329b042dc25419daca6
+
+ payments |   paid   |         payments_digest          
+----------+----------+----------------------------------
+        2 | 91400.00 | 0d112793b285ee92d8c6eb28e8da69eb
+
+== drizzle-kit migrate with the branch's set
+[✓] migrations applied successfully!
+
+== After
+ migrations 
+------------
+         64
+
+     subject      |      board      |           label            |   key_kind    | key_code 
+------------------+-----------------+----------------------------+---------------+----------
+ Arabic           | cambridge       | Paper 1 only (retake)      | qualification | 3180
+ Arabic           | cambridge       | Paper 2 only (retake)      | qualification | 3180
+ Biology          | cambridge       | Paper 41/42 only (retake)  | qualification | 0970
+ Chemistry        | cambridge       | Paper 41/42 only (retake)  | qualification | 0971
+ Combined Science | cambridge       | Paper 41/42 only (retake)  | qualification | 0653
+ ICT              | cambridge       | Theory Paper only (retake) | qualification | 0983
+ Physics          | cambridge       | Paper 41/42 only (retake)  | qualification | 0972
+ Mathematics      | pearson_edexcel | 1H only (retake)           | unit          | 4MA1/1H
+ Mathematics      | pearson_edexcel | 2H only (retake)           | unit          | 4MA1/2H
+
+       action       | entity_type | rows 
+--------------------+-------------+------
+ BOARD_UPDATED      | board       |    1
+ OFFER_ITEM_UPDATED | offer_item  |    2
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     6 |   135450.00 | 919e4139dce13329b042dc25419daca6
+
+ payments |   paid   |         payments_digest          
+----------+----------+----------------------------------
+        2 | 91400.00 | 0d112793b285ee92d8c6eb28e8da69eb
+

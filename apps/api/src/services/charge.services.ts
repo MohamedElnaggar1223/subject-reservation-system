@@ -27,7 +27,7 @@ import {
 import { randomUUID } from 'crypto';
 import {
   CHARGE_KIND_LABELS, SERVICE_CHARGE_KINDS, serviceLevelOf, seriesLabel,
-  type CreateChargeType, type ListChargesQueryType, type RefundChargeType, type ServiceLevel, type ChargeKind,
+  type CreateChargeType, type ListChargesQueryType, type RefundChargeType, type ServiceLevel, type ChargeKind, formatEgp,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
@@ -334,8 +334,8 @@ export async function createCharge(data: CreateChargeType, actor: { id: string; 
     await logAction(actor.id, isFamily ? 'CHARGE_REQUESTED' : 'CHARGE_CREATED', 'charge', id, null,
       { kind: made!.kind, studentId: made!.studentId, registrationId: made!.registrationId, boardSeriesId: seriesId, boardServiceId: serviceId, level, amount: made!.amount, dueAt: dueAt.toISOString(), status: made!.status, reason: data.reason ?? null }, ctx, tx);
     if (!isFamily) {
-      await tellFamily(tx, data.studentId, 'CHARGE_ADDED', `${description}: EGP ${made!.amount.toFixed(2)}`,
-        `The school added ${description} (EGP ${made!.amount.toFixed(2)}), due by ${schoolDate(dueAt)}. Pay it in the app or at the finance desk.`, { chargeId: id });
+      await tellFamily(tx, data.studentId, 'CHARGE_ADDED', `${description}: ${formatEgp(made!.amount)}`,
+        `The school added ${description} (${formatEgp(made!.amount)}), due by ${schoolDate(dueAt)}. Pay it in the app or at the finance desk.`, { chargeId: id });
     }
     return made!;
   });
@@ -353,7 +353,7 @@ export async function acceptCharge(id: string, actor: { id: string }, reason: st
     await logAction(actor.id, 'CHARGE_ACCEPTED', 'charge', id, { status: 'requested' }, { status: 'pending_payment', reason }, ctx, tx);
     const priced = await repriceChargeInTx(tx, next!, actor.id, ctx);
     await tellFamily(tx, c.studentId, 'CHARGE_ADDED', `${c.description}: accepted`,
-      `The school accepted your request for ${c.description}: EGP ${priced.amount.toFixed(2)}, due by ${schoolDate(priced.dueAt)}.`, { chargeId: id });
+      `The school accepted your request for ${c.description}: ${formatEgp(priced.amount)}, due by ${schoolDate(priced.dueAt)}.`, { chargeId: id });
     return priced;
   });
 }
@@ -395,7 +395,7 @@ export async function refundCharge(id: string, actor: { id: string }, data: Refu
     if (c.kind === 'instalment') throw new ChargeError('An instalment is held for its line: a plan is settled, or an instalment reversed, never refunded', 409);
     if (c.kind === 'school_fee_push') throw new ChargeError('A pushed school fee is paid and refunded through the school-fee payment', 409);
     if (c.status !== 'paid') throw new ChargeError(`Only a paid charge is refunded (this one is ${c.status.replace('_', ' ')})`, 409);
-    if (data.amount > c.amount + 0.001) throw new ChargeError(`At most what it cost: EGP ${c.amount.toFixed(2)}`);
+    if (data.amount > c.amount + 0.001) throw new ChargeError(`At most what it cost: ${formatEgp(c.amount)}`);
     if (rc && (rc.status === 'issued' || rc.status === 'return_required')) {
       throw new ChargeError(`Receipt ${rc.receiptNumber} is with the family — take it back (mark it returned) before refunding`, 409);
     }
@@ -410,7 +410,7 @@ export async function refundCharge(id: string, actor: { id: string }, data: Refu
     await creditEscrow({ studentId: c.studentId, amount: data.amount, reason: 'charge_refund', initiatedBy: actor.id, relatedChargeId: id, ...(paid ? { relatedPaymentId: paid.id } : {}) }, tx);
     await logAction(actor.id, 'CHARGE_REFUNDED', 'charge', id, { status: 'paid' }, { status: 'refunded', refundAmount: data.amount, reason: data.reason, paymentId: paid?.id ?? null }, ctx, tx);
     await tellFamily(tx, c.studentId, 'CHARGE_UPDATED', `${c.description}: refunded`,
-      `EGP ${data.amount.toFixed(2)} for ${c.description} is back in the escrow balance (${data.reason}). Use it for a later payment or ask for it at the finance desk.`, { chargeId: id });
+      `${formatEgp(data.amount)} for ${c.description} is back in the balance (${data.reason}). Use it for a later payment or ask for it at the finance desk.`, { chargeId: id });
     return next!;
   });
   return out;

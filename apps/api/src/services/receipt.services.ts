@@ -282,7 +282,7 @@ async function notifyParkedRefund(rec: ParkedReceipt) {
         previousBalance: newBalance - rec.refundAmountOnReturn,
         newBalance,
         changeAmount: rec.refundAmountOnReturn,
-        reason: 'Receipt returned — drop refund released to escrow',
+        reason: 'Receipt returned — the drop refund released to the balance',
       }).catch((err) => console.error('[notification] NOT-008 (receipt return) failed:', err));
     }
   }

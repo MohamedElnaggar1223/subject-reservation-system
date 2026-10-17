@@ -29,7 +29,7 @@ import {
   DECLARATION_TEXT,
   DESK_CONSENT_TEXT,
   IN_SCHOOL_INSTRUMENTS,
-  IN_SCHOOL_INSTRUMENT_LABELS,
+  IN_SCHOOL_INSTRUMENT_LABELS, formatEgp,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
@@ -85,7 +85,7 @@ const LEVEL_GROUP: Record<string, string> = { igcse: 'O.L.', as_level: 'A.S. / A
 const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self_study_only: 'Self-study only (not taught this cycle)' };
 
 /** The board as the school's forms write it beside a qualification ("Edexcel YAA01"). */
-const FORM_BOARD: Record<string, string> = { pearson_edexcel: 'Edexcel', cambridge: 'Cambridge', oxford: 'Oxford' };
+export const FORM_BOARD: Record<string, string> = { pearson_edexcel: 'Edexcel', cambridge: 'Cambridge', oxford: 'Oxford' };
 /**
  * What follows a teacher's name on a subject whose qualifications the family chooses through the teacher
  * (Arabic A Level, Edexcel — the form's "T1 (Edexcel YAA01)", "T2 (Edexcel 9AA01)"): the qualification the
@@ -306,10 +306,10 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
       const parts = [`Reserved ${r.registrations.length} reservation${r.registrations.length === 1 ? '' : 's'}.`];
-      if (r.schoolFee) parts.push(`The ${r.schoolFee.academicYear} school fee collected first (EGP ${r.schoolFee.amount.toLocaleString('en-US')}).`);
+      if (r.schoolFee) parts.push(`The ${r.schoolFee.academicYear} school fee collected first (${formatEgp(r.schoolFee.amount)}).`);
       // With charges (step C's "Also collect now") the subjects are paid per entry deadline and each charge group on its own.
       const withCharges = r.payments.some((p) => 'chargeIds' in p && (p.chargeIds as string[] | undefined)?.length);
-      if (r.collected > 0) parts.push(`Collected EGP ${r.collected.toLocaleString('en-US')}${r.payments.length > 1 ? ` in ${r.payments.length} payments, ${withCharges ? 'the subjects per entry deadline and the charges on their own' : 'one per entry deadline'}` : ''}.`);
+      if (r.collected > 0) parts.push(`Collected ${formatEgp(r.collected)}${r.payments.length > 1 ? ` in ${r.payments.length} payments, ${withCharges ? 'the subjects per entry deadline and the charges on their own' : 'one per entry deadline'}` : ''}.`);
       if (r.reservedNotCollected.length) parts.push(`${r.reservedNotCollected.length} on a provisional board fee: collected once the fee is confirmed.`);
       if (r.notCollected.length) parts.push(`Not collected — hand this money back: ${r.notCollected.map((n) => n.series.join(' and ')).join('; ')}.`);
       onDone({ registrationIds: r.registrations.map((x) => x.id), message: parts.join(' '), sentences: parts, desk: r });

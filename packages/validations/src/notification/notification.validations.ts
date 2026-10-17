@@ -101,7 +101,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   PAYMENT_EXPIRED:                  'Payment Not Completed',
   DROP_SWAP_REQUEST_RECEIVED:       'Drop / Swap Request',
   DROP_SWAP_PROCESSED:              'Drop / Swap Processed',
-  ESCROW_BALANCE_CHANGED:           'Escrow Balance Updated',
+  ESCROW_BALANCE_CHANGED:           'Balance Updated',
   ESCROW_WITHDRAWAL_FULFILLED:      'Withdrawal Fulfilled',
   ESCROW_WITHDRAWAL_REJECTED:       'Withdrawal Rejected',
   GRADE_CHANGED:                    'Grade Updated',

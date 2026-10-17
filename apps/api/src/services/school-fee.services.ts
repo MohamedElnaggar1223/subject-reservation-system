@@ -34,7 +34,7 @@ import {
   gradeInAcademicYear,
   LAST_GRADE,
   type CreateSchoolFeeScheduleType,
-  type UpdateSchoolFeeScheduleType,
+  type UpdateSchoolFeeScheduleType, formatEgp,
 } from '@repo/validations';
 
 /**
@@ -174,7 +174,7 @@ export async function schoolFeeGateReason(studentId: string, eligibility: Eligib
 
   if (await hasCompletedSchoolFeePayment(studentId, academicYear)) return null;
 
-  return `The ${academicYear} school fee (${fee.amount.toFixed(2)} EGP) must be paid before registering subjects`;
+  return `The ${academicYear} school fee (${formatEgp(fee.amount)}) must be paid before registering subjects`;
 }
 
 /**
@@ -339,8 +339,8 @@ export async function pushSchoolFees(data: PushSchoolFeesType, actorId: string, 
         });
         await logAction(actorId, 'CHARGE_CREATED', 'charge', id, null,
           { kind: 'school_fee_push', studentId: s.id, academicYear: data.academicYear, amount: fee.amount, dueAt: data.dueAt.toISOString() }, ctx, tx);
-        await tellFamily(tx, s.id, 'CHARGE_ADDED', `${description}: EGP ${fee.amount.toFixed(2)}`,
-          `The ${data.academicYear} school fee (EGP ${fee.amount.toFixed(2)}) is due by ${data.dueAt.toISOString().slice(0, 10)}. Pay it on the School fee page or at the finance desk.`,
+        await tellFamily(tx, s.id, 'CHARGE_ADDED', `${description}: ${formatEgp(fee.amount)}`,
+          `The ${data.academicYear} school fee (${formatEgp(fee.amount)}) is due by ${data.dueAt.toISOString().slice(0, 10)}. Pay it on the School fee page or at the finance desk.`,
           { chargeId: id, academicYear: data.academicYear });
         return { chargeId: id, amount: fee.amount };
       });

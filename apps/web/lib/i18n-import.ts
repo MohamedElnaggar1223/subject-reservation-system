@@ -495,10 +495,10 @@ export const importArabic: Record<string, string> = {
   'How the school’s level codes are read from the units each entry covers.': 'كيف تُقرأ رموز مستوى المدرسة من الوحدات التي يشملها كل قيد.',
   'The coordinator’s answers every import’s review starts from.': 'إجابات المنسق التي تبدأ منها مراجعة كل استيراد.',
   'What "Carry forward on …" means in the sheet': 'معنى "Carry forward on …" في الجدول',
-  "The school's sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today's rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student's exception. The day-one import starts every review from this answer.":
-    'يعلّم جدول المدرسة بعض الأسطر دراسة ذاتية لمواد تدرّسها المدرسة أيضًا (IS-03). تسمح قاعدة اليوم بالدراسة خارج المدرسة عند الإعادة فقط، أو في A.2. يُرحَّل إليه A.S.: وأي قيد أول آخر بدراسة ذاتية استثناءٌ للطالب. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
-  'Staff wrote "Carry forward on June 2022" on some A2 rows (IMPORT_SPIKE.md IS-02, DISCOVERY.md Q-02): an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.':
-    'كتب الموظفون "Carry forward on June 2022" على بعض أسطر A2 (IS-02، Q-02): نتيجة AS مُرحّلة إلى القيد، أو دفعة مُرحّلة. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
+  "The school's sheet marks some rows self-study on subjects the school also teaches. Today's rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student's exception. The day-one import starts every review from this answer.":
+    'يعلّم جدول المدرسة بعض الأسطر دراسة ذاتية لمواد تدرّسها المدرسة أيضًا. تسمح قاعدة اليوم بالدراسة خارج المدرسة عند الإعادة فقط، أو في A.2. يُرحَّل إليه A.S.: وأي قيد أول آخر بدراسة ذاتية استثناءٌ للطالب. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
+  'Staff wrote "Carry forward on June 2022" on some A2 rows: an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.':
+    'كتب الموظفون "Carry forward on June 2022" على بعض أسطر A2: نتيجة AS مُرحّلة إلى القيد، أو دفعة مُرحّلة. يبدأ استيراد بدء التشغيل كل مراجعة من هذه الإجابة.',
 
   // ── The API's refusals ──
   'Import not found': 'الاستيراد غير موجود',
@@ -684,7 +684,10 @@ export function translateImportText(text: string): string | null {
     [/^(.+) is in another column$/, (m) => `${m[1]} في عمود آخر`],
     [/^(.+) are in another column$/, (m) => `${m[1]} في أعمدة أخرى`],
     [/^(.+) is no longer offered$/, (m) => `${m[1]} لم تعد متاحة`],
-    [/^The (\d{4}-\d{4}) school fee \((.+) EGP\) must be paid before registering subjects$/, (m) => `يجب دفع الرسوم المدرسية لعام ${m[1]} (${m[2]} جنيه) قبل تسجيل المواد`],
+    // The amount as the API writes it since F8-10 ("EGP 5,000", formatEgp); the rule matched "(5000.00 EGP)" before
+    // and left the refusal in English (the review of 744e553, item 6). The year kept one left-to-right unit: in a
+    // right-to-left line "2026-2027" read "2027-2026" (the round's Arabic drive).
+    [/^The (\d{4}-\d{4}) school fee \(EGP (.+)\) must be paid before registering subjects$/, (m) => `يجب دفع الرسوم المدرسية لعام \u2066${m[1]}\u2069 (${m[2]} جنيه) قبل تسجيل المواد`],
     [/^(.+) is committing this import now — wait for it to finish, then look again$/, (m) => `${m[1]} يعتمد هذا الاستيراد الآن — انتظر حتى ينتهي ثم انظر مرة أخرى`],
     [/^This file does not have the template's columns: (.+) (?:is|are) missing\. Download the template and fill it in\.$/, (m) => `هذا الملف لا يحتوي أعمدة القالب: ${m[1]} مفقودة. نزّل القالب واملأه.`],
     [/^A subject with the code (.+) exists already — map "(.+)" to it, or choose another code$/, (m) => `توجد مادة بالرمز ${m[1]} بالفعل — طابق "${m[2]}" معها، أو اختر رمزًا آخر`],

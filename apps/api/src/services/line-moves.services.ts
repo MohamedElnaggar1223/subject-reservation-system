@@ -28,6 +28,7 @@ import { logAction, logActions } from './audit.services';
 import { repriceBoardPart } from './pricing.services';
 import { createNotification } from './notification.services';
 import { lockFeeGrids } from '../lib/fee-grid-lock';
+import { formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -149,10 +150,10 @@ export async function tellPriceChanged(lines: RepricedLine[], because: string) {
     const turned = r.provisional && !r.wasProvisional;
     const send = r.from !== r.to
       ? createNotification(r.studentId, 'PRICE_CHANGED', `The price of ${subjectName} changed`,
-        `${because}. ${subjectName} was ${r.from.toFixed(2)} EGP and is now ${r.to.toFixed(2)} EGP${turned ? `, to be confirmed: ${toConfirm}` : ''}.`,
+        `${because}. ${subjectName} was ${formatEgp(r.from)} and is now ${formatEgp(r.to)}${turned ? `, to be confirmed: ${toConfirm}` : ''}.`,
         { registrationId: r.id, from: r.from, to: r.to, provisional: r.provisional })
       : createNotification(r.studentId, 'PRICE_TO_BE_CONFIRMED', `The price of ${subjectName} is to be confirmed`,
-        `${because}. ${subjectName} stays at ${r.to.toFixed(2)} EGP, to be confirmed: ${toConfirm}.`,
+        `${because}. ${subjectName} stays at ${formatEgp(r.to)}, to be confirmed: ${toConfirm}.`,
         { registrationId: r.id, price: r.to, provisional: true });
     await send.catch((err) => console.error('[line-moves] Price notice failed:', err));
   }

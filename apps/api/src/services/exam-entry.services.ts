@@ -41,7 +41,7 @@ import {
   ACADEMIC_ROLES, ACCESS_ARRANGEMENT_LABELS, ENTRY_LIST_COLUMNS, GENERIC_ENTRY_LIST_COLUMNS, ENTRY_PROBLEMS, hasRole,
   feeTierOn, forecastGradeProblem, schoolDateString, seriesLabel, seriesAcademicYearStart,
   type AccessArrangement, type CreateEntryType, type DeriveEntriesType, type EntryProblem, type ListEntriesQueryType,
-  type SubmitEntriesType, type UpdateBoardRuleType, type UpdateEntryType,
+  type SubmitEntriesType, type UpdateBoardRuleType, type UpdateEntryType, formatEgp,
 } from '@repo/validations';
 import { lineItemsFor, type LineItem } from './line.services';
 import { effectiveDeadlinesOf } from './deadline.services';
@@ -574,7 +574,7 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       priorSitting: null, expect: null,
     };
     if (c.status !== 'paid') {
-      rows.push({ ...base, outcome: 'awaiting_payment', note: `Cash-in awaiting payment: ${c.description} (EGP ${c.amount.toFixed(2)}) — entered once it is paid`, entries: [] });
+      rows.push({ ...base, outcome: 'awaiting_payment', note: `Cash-in awaiting payment: ${c.description} (${formatEgp(c.amount)}) — entered once it is paid`, entries: [] });
       continue;
     }
     if (!q) {

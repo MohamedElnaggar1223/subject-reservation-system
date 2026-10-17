@@ -39,7 +39,7 @@ import {
   db, registration, receipt, paymentRegistration, payment, paymentCharge, charge, parentStudentLink, schoolSetting,
   and, eq, inArray, isNull, sql,
 } from '@repo/db';
-import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType } from '@repo/validations';
+import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType, formatEgp } from '@repo/validations';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { effectiveDeadlineFor, effectiveDeadlinesOf } from './deadline.services';
 import { executeReceiptGatedDrop } from './receipt.services';
@@ -356,7 +356,7 @@ export async function verifyPriorSitting(
       ? `The school could not confirm ${sitting} for ${before.name}, so the retake reservation has ended. You may reserve it again as a first entry where the school offers one.`
       : result.effect === 'stands'
         ? `The school could not confirm ${sitting} for ${before.name}. The subject stays reserved and paid; it will be entered with the board as a first entry. The finance office will tell you if anything is owed.`
-        : `The school could not confirm ${sitting} for ${before.name}, and the board's first-entry deadline has passed, so it cannot be entered. It has been dropped: ${result.gated ? `bring the paper receipt back to the finance desk to release EGP ${result.refundAmount.toFixed(2)} to your escrow` : `EGP ${result.refundAmount.toFixed(2)} was returned to your escrow`}.`;
+        : `The school could not confirm ${sitting} for ${before.name}, and the board's first-entry deadline has passed, so it cannot be entered. It has been dropped: ${result.gated ? `bring the paper receipt back to the finance desk to release ${formatEgp(result.refundAmount)} to your balance` : `${formatEgp(result.refundAmount)} was returned to your balance`}.`;
     await tellFamily(before.studentId, 'Declared sitting not confirmed', body, { registrationId, effect: result.effect })
       .catch((err) => console.error('[verification] Could not tell the family:', err));
   }
@@ -441,7 +441,7 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
       const sitting = done.line.sitting ?? 'the sitting declared';
       const body = done.effect === 'expired'
         ? `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so the reservation has ended.`
-        : `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so ${done.boardSent ? 'its entry was withdrawn and it has been dropped' : 'it was not entered and has been dropped'}: ${done.drop.gated ? `bring the paper receipt back to the finance desk to release EGP ${done.drop.refundAmount.toFixed(2)} to your escrow` : `EGP ${done.drop.refundAmount.toFixed(2)} was returned to your escrow`}${done.boardSent ? ' (the board fee stays with the board: the entry had been sent)' : ''}.`;
+        : `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so ${done.boardSent ? 'its entry was withdrawn and it has been dropped' : 'it was not entered and has been dropped'}: ${done.drop.gated ? `bring the paper receipt back to the finance desk to release ${formatEgp(done.drop.refundAmount)} to your balance` : `${formatEgp(done.drop.refundAmount)} was returned to your balance`}${done.boardSent ? ' (the board fee stays with the board: the entry had been sent)' : ''}.`;
       if (done.effect === 'dropped') await tellWithdrawn(done.entries, 'the declared sitting was not verified by its deadline').catch(() => undefined);
       await tellFamily(done.line.studentId, 'Declared sitting not confirmed in time', body, { registrationId: id, effect: done.effect })
         .catch((err) => console.error('[verification] Could not tell the family:', err));

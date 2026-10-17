@@ -25,7 +25,7 @@ import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-state';
 import { fetchTeachers, useCatalogue, MONTH_LABEL } from '~/app/(app)/exams/exams-shared';
-import { ReservePreview, useRefundTerms } from '~/components/reservations/reserve';
+import { ReservePreview, useRefundTerms, FORM_BOARD } from '~/components/reservations/reserve';
 import { ClassFollowNotice } from '~/components/reservations/class-follow';
 import { followSentences, type FollowSentence } from '~/lib/groups-followed';
 import {
@@ -523,7 +523,7 @@ function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCre
           // read back (the review of d3f62cf, item 2; F6's review, finding 2) — kept, its old ticks would send
           // the teacher who left back with the next Save. What else was typed on it comes across (F6, the
           // follow-ups' queued note): only the teachers are read again.
-          onReplaced={(edits, back) => { setCarry(edits); setReadBack(back); if (!back.failed) setVersion((v) => v + 1); }}
+          onReplaced={(edits, back, message) => { if (message) setSaved(message); setCarry(edits); setReadBack(back); if (!back.failed) setVersion((v) => v + 1); }}
           onPreview={onPreview} onRemoved={onClose} />
       )}
     </Drawer>
@@ -532,7 +532,7 @@ function SubjectDrawer({ session, data, sheetAt, target, canEdit, onClose, onCre
 
 function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved, onReplaced, onPreview, onRemoved }: {
   session: SessionDetail; shares: Shares; offer: OfferRow | null; addable: AddableRow | null; canEdit: boolean; carry: Carry | null;
-  onSaved: (message: string, back: ReadBack, createdId?: string) => void; onReplaced: (edits: Carry, back: ReadBack) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
+  onSaved: (message: string, back: ReadBack, createdId?: string) => void; onReplaced: (edits: Carry, back: ReadBack, message?: string) => void; onPreview: (o: OfferRow) => void; onRemoved: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: catalogue } = useCatalogue();
@@ -838,6 +838,13 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
         </section>
       )}
 
+      {/* F8-04: a second qualification beside the subject's own (Arabic A.L.: the Edexcel GCE 9AA0 beside the IAL
+          YAA01), the family choosing it with its teacher (decision 3); what was typed on the form is kept. */}
+      {offer && canEdit && offer.qualificationsToAdd.length > 0 && (
+        <AddQualification session={session} offer={offer} pool={pool}
+          onAdded={async (message) => { const back = await refresh(offer.id); onReplaced(base ? typedSince(base, f) : {}, back, message); }} />
+      )}
+
       {/* (f) Grade 10 core (June only), (g) course starts, (h) notes */}
       <section className="grid gap-3 sm:grid-cols-2">
         {session.sessionType === 'june' && (
@@ -893,6 +900,86 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
         </Modal>
       )}
     </form>
+  );
+}
+
+/**
+ * "Add a qualification" (F8-04): another award of the subject's board, area and level, entered beside the subject's
+ * own as one choice — the family chooses the qualification with its teacher, as the form does ("T1 (Edexcel YAA01)",
+ * "T2 (Edexcel 9AA01)"; decision 3). It is made through the item endpoint (decision 4's tool, now on the form): the
+ * subject's own item joins one exclusive group first, so the two can never be reserved together, then the new item
+ * is made in that group, labelled as the form names it ("Edexcel 9AA0"), with its own teacher.
+ */
+function AddQualification({ session, offer, pool, onAdded }: {
+  session: SessionDetail; offer: OfferRow; pool: string[]; onAdded: (message: string) => Promise<void>;
+}) {
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [teachers, setTeachers] = useState<TeacherPick[]>([]);
+  const [fee, setFee] = useState('');
+  const board = FORM_BOARD[offer.subject.council] ?? offer.subject.boardName;
+  const picked = offer.qualificationsToAdd.find((q) => q.id === pickedId) ?? null;
+  const add = useMutation({
+    mutationFn: async (q: OfferRow['qualificationsToAdd'][number]) => {
+      // The API offers a qualification only beside a single whole item (the review of 744e553, item 5): without it
+      // nothing would make the new one a choice against the subject's own entry.
+      const whole = offer.items.find((i) => i.kind === 'whole');
+      if (!whole) throw new Error("This subject has no whole-subject item for the new qualification to be a choice against");
+      const group = whole.exclusiveGroup ?? 'qualification';
+      if (!whole.exclusiveGroup) {
+        await apiResponse(api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+          param: { id: session.id, offerId: offer.id, itemId: whole.id },
+          json: { exclusiveGroup: group, reason: `${board} ${q.code} is added beside it: one qualification or the other` },
+        }));
+      }
+      await apiResponse(api.v1.sessions[':id'].offers[':offerId'].items.$post({
+        param: { id: session.id, offerId: offer.id },
+        json: {
+          label: `${board} ${q.code}`, kind: 'qualification', enters: { kind: 'award', qualificationId: q.id }, availability: 'open', requiredInSeries: false,
+          exclusiveGroup: group, teachers, courseFee: fee.trim() === '' ? null : Number(fee),
+          // After the subject's own rows: the form lists it below them.
+          sortOrder: Math.max(0, ...offer.items.map((i) => i.sortOrder)) + 1,
+        },
+      }));
+      return q;
+    },
+    onSuccess: async (q) => { await onAdded(`Added ${board} ${q.code}. Each qualification's teacher is set below; the family chooses the qualification with the teacher.`); },
+  });
+  return (
+    <section className="space-y-2" aria-labelledby="sf-add-qualification">
+      <h3 id="sf-add-qualification" className="font-semibold text-foreground">Another qualification</h3>
+      <p className="text-sm text-muted-foreground">
+        <span>The board has another award of this subject at this level. Offered beside this one, the family chooses one of the two with its teacher.</span>
+      </p>
+      {!picked ? (
+        <div className="flex flex-wrap gap-2">
+          {offer.qualificationsToAdd.map((q) => (
+            <Button key={q.id} type="button" variant="outline" size="sm" onClick={() => { setPickedId(q.id); setTeachers([]); setFee(''); add.reset(); }}>
+              <span>Add a qualification:</span>&nbsp;<bdi data-i18n-skip="true">{`${board} ${q.code}`}</bdi>&nbsp;<span className="text-muted-foreground">(<bdi data-i18n-skip="true">{q.title}</bdi>)</span>
+            </Button>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3 rounded-lg border border-border p-3 text-sm">
+          <p className="font-medium"><bdi data-i18n-skip="true">{`${picked.title} (${board} ${picked.code})`}</bdi></p>
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Its teacher (the family chooses the qualification with the teacher)</p>
+            <TeacherPicker compact value={teachers} onChange={setTeachers} pool={pool} />
+          </div>
+          <div className="w-48">
+            <Field label="Its course fee (EGP)" htmlFor="sf-q-fee" hint="Empty: the subject's.">
+              <input id="sf-q-fee" className={INPUT_CLASS} type="number" min={0} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} />
+            </Field>
+          </div>
+          <ErrorLine message={add.error ? errorText(add.error) : null} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setPickedId(null)} disabled={add.isPending}>Cancel</Button>
+            <Button type="button" size="sm" disabled={add.isPending || teachers.length === 0} onClick={() => add.mutate(picked)}>
+              {add.isPending ? 'Adding…' : 'Add the qualification'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

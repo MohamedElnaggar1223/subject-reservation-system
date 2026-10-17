@@ -16,7 +16,7 @@
 
 import { db } from '@repo/db';
 import type { LinePolicyKey } from '@repo/validations';
-import { activeExceptions, exceptionsByIds, markExceptionsUsed, type RegistryException } from './exception-registry.services';
+import { activeExceptions, activeExceptionsHeld, exceptionsByIds, markExceptionsUsed, scopeCovers, type RegistryException } from './exception-registry.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -43,10 +43,20 @@ export type PolicyException = {
 export interface LineExceptionSource {
   /** Active, unexpired exceptions of these keys covering the scope, for the student or their family. */
   active(executor: Executor, studentId: string, keys: LinePolicyKey[], scope: ExceptionScope, opts?: { lock?: 'share' | 'update' }): Promise<PolicyException[]>;
+  /**
+   * Every active, unexpired exception of these keys the student or their family holds, whatever its scope,
+   * read once for a read that asks about many items; match each with `coversScope` (no lock: a read).
+   */
+  held(executor: Executor, studentId: string, keys: LinePolicyKey[]): Promise<PolicyException[]>;
   /** Exactly these (a re-price re-applies the ids its basis recorded, whatever their status now). */
   byIds(executor: Executor, ids: string[]): Promise<PolicyException[]>;
   /** Mark one-shot gates used, in the caller's transaction. */
   markUsed(tx: Tx, ids: string[], ctx: { registrationIds: string[]; actorId: string | null }): Promise<void>;
+}
+
+/** Whether an exception `held` read covers a scope (the registry's rule: every scope column it sets must match). */
+export function coversScope(e: PolicyException, scope: ExceptionScope): boolean {
+  return scopeCovers(e.scope, scope);
 }
 
 function toPolicy(r: RegistryException): PolicyException {
@@ -70,6 +80,9 @@ export const lineExceptions: LineExceptionSource = {
       return [...(await planDueDate(executor, studentId, scope.registrationId)), ...rows];
     }
     return rows;
+  },
+  async held(executor, studentId, keys) {
+    return (await activeExceptionsHeld(executor, studentId, keys)).map(toPolicy);
   },
   async byIds(executor, ids) {
     return (await exceptionsByIds(executor, ids)).map(toPolicy);

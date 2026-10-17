@@ -1,0 +1,13 @@
+Control c-r2a (review item 2): the exception refusal's old sentence put back ('... has exceptions granted for it: revoke them on the Exceptions page first'), 08n -t 'kept as history' run, then the file restored.
+
+ ❯ test/08n-session-offers.test.ts (42 tests | 1 failed | 41 skipped) 1964ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 41 skipped (42)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08n-session-offers.test.ts > 08n: a draft session nobody reserved in is deleted from its Session screen (F8-01) > refused, nothing deleted, for a draft whose exception was revoked and for one a reminder went out for: both are kept as history (the review of 744e553, item 2)
+AssertionError: expected { status: 409, …(1) } to deeply equal { status: 409, …(1) }
+- Expected
++ Received
+-   "error": "An exception was granted for June 2027 — n08-del-exc-dgw6: it is kept as history and cannot be deleted",
++   "error": "June 2027 — n08-del-exc-dgw6 has exceptions granted for it: revoke them on the Exceptions page first",
+ ❯ test/08n-session-offers.test.ts:1453:72

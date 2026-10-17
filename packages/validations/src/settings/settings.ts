@@ -178,7 +178,7 @@ export const SETTINGS = {
     group: 'import',
     label: 'Self-study on a subject the school teaches',
     description:
-      'The school\'s sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today\'s rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
+      'The school\'s sheet marks some rows self-study on subjects the school also teaches. Today\'s rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
     editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
     source: 'IS-03',
     input: 'choice',
@@ -190,7 +190,7 @@ export const SETTINGS = {
     group: 'import',
     label: 'What "Carry forward on …" means in the sheet',
     description:
-      'Staff wrote "Carry forward on June 2022" on some A2 rows (IMPORT_SPIKE.md IS-02, DISCOVERY.md Q-02): an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.',
+      'Staff wrote "Carry forward on June 2022" on some A2 rows: an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.',
     editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
     source: 'IS-02',
     input: 'choice',
@@ -272,7 +272,7 @@ export const SETTINGS = {
     group: 'refund',
     label: 'Refund policy of a new June session',
     description:
-      'Copied into each new June session, in weeks from the first lesson: the share of the course fee a family gets back on a drop. The session can change it until the first family consents to it (SCHOOL_FORMS.md §2.1).',
+      'Copied into each new June session, in weeks from the first lesson: the share of the course fee a family gets back on a drop. The session can change it until the first family consents to it.',
     editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
     source: 'Q-11',
     input: 'refundPolicy',

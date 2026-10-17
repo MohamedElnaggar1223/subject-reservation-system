@@ -55,6 +55,57 @@ export class SessionError extends Error {
 }
 
 /**
+ * Delete a draft session nobody has reserved in (F8-01: the seed's stale November 2026 – January 2027 draft
+ * stayed on Home and on a student's record, and no screen removed a draft). Only a draft, only with no line in
+ * it (any status), and none of the school's exceptions (granted, revoked, used or lapsed) or sent reminders
+ * scoped to it — those are history and stay, so the refusal says so and sends nobody to revoke anything (the
+ * review of 744e553, item 2: revoking keeps the row). Its sheet (subjects, items, teachers, fee keys) and its
+ * links to the boards' series go with it; the series themselves and their fee lists stay (the boards' data).
+ * One audit row, in the same transaction, keeps what was deleted and why.
+ *
+ * Locks before it counts: the session, then its subjects, its items and its reminder rules (FOR UPDATE, in id
+ * order). A grant or a reminder writing a row that names one of them takes a key-share lock on it, so one
+ * committed before the locks is counted and one after them waits and then fails its foreign key, never deleted
+ * by the cascade unseen (finding 8). A reservation names the session, locked first.
+ */
+export async function deleteDraftSession(id: string, reason: string, actorId: string, ctx?: AuditContext) {
+  return db.transaction(async (tx) => {
+    const [s] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
+    if (!s) throw new SessionError('Session not found', 404);
+    if (s.status !== 'draft') {
+      throw new SessionError(`${s.name} is ${s.status === 'active' ? 'open' : 'closed'}: only a draft session can be deleted${s.status === 'active' ? ' (close it instead)' : ''}`, 409);
+    }
+    await tx.select({ id: sessionOffer.id }).from(sessionOffer).where(eq(sessionOffer.sessionId, id)).orderBy(sessionOffer.id).for('update');
+    await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(eq(sessionOfferItem.sessionId, id)).orderBy(sessionOfferItem.id).for('update');
+    await tx.execute(sql`select id from reminder_rule where session_id = ${id} order by id for update`);
+    const [lines] = await tx.select({ n: sql<number>`count(*)::int` }).from(registration).where(eq(registration.sessionId, id)) as [{ n: number }];
+    if (lines.n > 0) throw new SessionError(`${s.name} has ${lines.n === 1 ? 'a reservation' : `${lines.n} reservations`}: a session with reservations is never deleted`, 409);
+    const [held] = await tx.execute(sql`
+      select
+        (select count(*)::int from exception e where e.session_id = ${id}
+          or e.offer_id in (select o.id from session_offer o where o.session_id = ${id})
+          or e.offer_item_id in (select i.id from session_offer_item i where i.session_id = ${id})) as exceptions,
+        (select count(*)::int from reminder_rule r where r.session_id = ${id}
+          and (exists (select 1 from reminder_sent x where x.rule_id = r.id) or exists (select 1 from message m where m.reminder_rule_id = r.id))) as reminders`)
+      .then((r) => r.rows as { exceptions: number; reminders: number }[]);
+    if (held!.exceptions > 0) throw new SessionError(`An exception was granted for ${s.name}: it is kept as history and cannot be deleted`, 409);
+    if (held!.reminders > 0) throw new SessionError(`Reminders were sent for ${s.name}: it is kept as history and cannot be deleted`, 409);
+    const offers = await tx.select({ id: sessionOffer.id, subjectId: sessionOffer.subjectId }).from(sessionOffer).where(eq(sessionOffer.sessionId, id));
+    const links = await tx.select({ seriesId: sessionBoardSeries.boardSeriesId }).from(sessionBoardSeries).where(eq(sessionBoardSeries.sessionId, id));
+    // The sheet first (its items, teachers, units and fee keys go with each subject), then the series links,
+    // the session's reminder rules (none ever sent), then the session (its refund windows and remark deadlines with it).
+    if (offers.length) await tx.delete(sessionOffer).where(eq(sessionOffer.sessionId, id));
+    await tx.delete(sessionBoardSeries).where(eq(sessionBoardSeries.sessionId, id));
+    await tx.execute(sql`delete from reminder_rule where session_id = ${id}`);
+    await tx.delete(registrationSession).where(eq(registrationSession.id, id));
+    await logAction(actorId, 'SESSION_DELETED', 'session', id,
+      { ...s, subjects: offers.map((o) => o.subjectId), boardSeries: links.map((l) => l.seriesId) } as unknown as Record<string, unknown>,
+      { deleted: true, reason }, ctx, tx);
+    return { deleted: id, name: s.name, subjects: offers.length };
+  });
+}
+
+/**
  * Check whether a session exists by ID.
  */
 export async function sessionExists(id: string): Promise<boolean> {
@@ -788,7 +839,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
           studentId,
           'SESSION_CLOSED',
           `Your pending registrations for ${sessionName} were not completed`,
-          `The registration window for ${sessionName} has closed. The following pending registration(s) were not completed and have been expired: ${subjectNames.join(', ')}. Any escrow already credited to your account from earlier actions is unaffected.`,
+          `The registration window for ${sessionName} has closed. The following pending registration(s) were not completed and have been expired: ${subjectNames.join(', ')}. Your balance with the school is unaffected.`,
           { sessionId, sessionName, subjectNames, reason: 'session_closed' }
         );
       }

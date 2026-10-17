@@ -17,7 +17,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InferRequestType } from 'hono/client';
 import { api } from '~/lib/hono';
-import { apiResponse, REGISTRATION_STATUS_LABELS, RECEIPT_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, REGISTRATION_STATUS_LABELS, RECEIPT_STATUS_LABELS, paidByWords } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, type Tone } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
@@ -267,7 +267,8 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
               <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2">
                 <div>
                   <div><Day iso={p.at} /> · <span>{p.purpose === 'registration' ? 'Subjects' : p.purpose === 'school_fee' ? 'School fee' : p.purpose === 'remark' ? 'Remark' : p.purpose === 'preregistration' ? 'Preregistration' : p.purpose === 'charge' ? 'Charges' : p.purpose}</span>
-                    {' '}<span className="text-muted-foreground">({p.instrument ?? p.method})</span></div>
+                    {/* F8-10: how it was paid in words ("in cash at the school", "by InstaPay"), never the code. */}
+                    {' '}<span className="text-muted-foreground">{paidByWords(p.method, p.instrument)}</span></div>
                   {p.covers.length > 0 && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{p.covers.map((c) => `${c.label}${c.receipt ? ` · ${c.receipt}` : ''}`).join(', ')}</bdi></div>}
                   {p.series.length > 0 && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{p.series.join(', ')}</bdi>{p.deadline && <> · <span>deadline</span> <Day iso={p.deadline} /></>}</div>}
                 </div>

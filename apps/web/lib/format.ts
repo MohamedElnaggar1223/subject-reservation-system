@@ -1,12 +1,5 @@
-const priceFormatter = new Intl.NumberFormat('en-EG', {
-  style: 'currency',
-  currency: 'EGP',
-  maximumFractionDigits: 0,
-});
-
-export function formatPrice(price: number): string {
-  return priceFormatter.format(price);
-}
+// Money is written by one formatter, @repo/validations' formatEgp ("EGP 9,850"; "EGP 9,412.50" with piastres): the
+// review of 744e553, item 9 — this file's formatPrice dropped the piastres the API's sentences keep.
 
 /**
  * A label for a value the API returns as text (a status, a kind): the map's entry, else the value itself.

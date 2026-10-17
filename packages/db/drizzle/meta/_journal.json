@@ -435,6 +435,27 @@
       "when": 1792161944346,
       "tag": "0061_rule_source_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792192465430,
+      "tag": "0062_board_one_paper_fee",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1792192466026,
+      "tag": "0063_board_one_paper_fee_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1792217882012,
+      "tag": "0064_one_paper_whole_item_row",
+      "breakpoints": true
     }
   ]
 }

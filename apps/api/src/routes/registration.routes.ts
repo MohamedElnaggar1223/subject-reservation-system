@@ -63,6 +63,7 @@ import * as linkService from '../services/link.services';
 import { mayRegisterFor } from '../services/eligibility.services';
 import { offersForStudent, offersPreview } from '../services/offers-read.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
+import { isInsufficientBalance } from '../services/escrow.services';
 
 /**
  * A refusal's status: the sentence's own mapping where a route has one, else the status the
@@ -401,7 +402,7 @@ export const registrations = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to process desk registration');
         const status =
           message.includes('already') || message.includes('Already') ? 409 :
-          message.includes('not open') || message.includes('insufficient') || message.includes('Insufficient') ? 422 : 400;
+          message.includes('not open') || isInsufficientBalance(err) ? 422 : 400;
         return error(c, message, statusOf(err, status));
       }
     }
@@ -427,7 +428,7 @@ export const registrations = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to collect payment');
         const status =
           message.includes('in progress') ? 409 :
-          message.includes('not open') || message.includes('nsufficient') ? 422 : 400;
+          message.includes('not open') || isInsufficientBalance(err) ? 422 : 400;
         return error(c, message, status);
       }
     }

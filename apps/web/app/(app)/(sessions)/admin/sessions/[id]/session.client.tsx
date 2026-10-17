@@ -14,6 +14,7 @@
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
@@ -99,7 +100,20 @@ function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
   const [closing, setClosing] = useState(false);
   const [opening, setOpening] = useState(false);
   const [correcting, setCorrecting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
   const refresh = () => queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
+  // F8-01: a draft nobody reserved in goes (a stale sample draft, one made by mistake); the API refuses otherwise.
+  // Deleted, the screen goes back to the Sessions list at once, and only the lists are fetched again: the deleted
+  // session's own queries are left alone, since each would answer 404 (the review of 744e553, item 2: the lead's
+  // drive stayed on the deleted session's address with four of them).
+  const remove = useMutation({
+    mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].$delete({ param: { id: s.id }, json: { reason } })),
+    onSuccess: () => {
+      router.replace('/admin/sessions');
+      void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY, predicate: (q) => q.queryKey[1] !== s.id });
+    },
+  });
   const close = useMutation({
     mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: { reason } })),
     onSuccess: () => { setClosing(false); refresh(); },
@@ -133,7 +147,13 @@ function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
           {s.status === 'draft' && <Button variant="outline" onClick={() => setOpening(true)}>Open now</Button>}
           {s.status === 'active' && <Button variant="outline" onClick={() => setClosing(true)}>Close</Button>}
           <Button variant="ghost" onClick={() => setCorrecting(true)}>Correct the sitting</Button>
+          {s.status === 'draft' && <Button variant="ghost" className="text-destructive" onClick={() => setDeleting(true)}>Delete this draft</Button>}
         </div>
+      )}
+      {deleting && (
+        <ReasonModal title="Delete this draft session" description="Only a draft nobody has reserved in can be deleted. Its subjects, items and fees on this sheet go with it; the subjects stay in the catalogue and the boards' series keep their dates and fee lists. Recorded in the audit trail with your reason."
+          confirmLabel="Delete the draft" destructive minLength={5} isPending={remove.isPending || remove.isSuccess} error={remove.error ? errorText(remove.error) : undefined}
+          onConfirm={(reason) => remove.mutate(reason)} onClose={() => setDeleting(false)} />
       )}
       {correcting && <CorrectSeries s={s} onClose={() => setCorrecting(false)} />}
       {editing && <EditHeader s={s} onClose={() => setEditing(false)} />}

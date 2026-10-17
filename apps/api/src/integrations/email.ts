@@ -21,7 +21,8 @@
  */
 
 import { Resend } from 'resend';
-import { gradeLabel } from '@repo/validations';
+import { gradeLabel, formatEgp } from '@repo/validations';
+import { senderNames, APP_NAME } from '../services/settings.services';
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -72,9 +73,13 @@ export type EmailResult = {
 
 export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
   if (STUB_MODE) {
+    // The heading too (the school's name, the app's under it): what a reader sees first, checked without a mailbox.
+    const header = payload.html.match(/<div class="header">([\s\S]*?)<\/div>/)?.[1] ?? '';
+    const heading = [...header.matchAll(/<(?:h1|p class="app")>([^<]*)<\/(?:h1|p)>/g)].map((m) => m[1]).join(' / ');
     console.log(
       '[email:stub] To:', payload.to,
       '| Subject:', payload.subject,
+      heading ? `| Heading: ${heading}` : '',
       payload.attachments ? `| Attachments: ${payload.attachments.map((a) => a.filename).join(', ')}` : '',
     );
     return { success: true, stubbed: true, messageId: `stub-${Date.now()}` };
@@ -115,7 +120,9 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
 
 // ─── HTML Layout Helpers ──────────────────────────────────────────────────────
 
-function emailLayout(title: string, body: string): string {
+async function emailLayout(title: string, body: string): Promise<string> {
+  // Who it is from (the review of 744e553, item 7): the school's name with the app's under it, the app's alone.
+  const names = await senderNames();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,6 +135,7 @@ function emailLayout(title: string, body: string): string {
     .header { background: #1e40af; padding: 24px 32px; }
     .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 600; }
     .header p { margin: 4px 0 0; color: #bfdbfe; font-size: 13px; }
+    .header p.app { color: #dbeafe; font-weight: 600; }
     .content { padding: 32px; color: #1f2937; font-size: 15px; line-height: 1.6; }
     .content h2 { margin-top: 0; font-size: 18px; color: #111827; }
     .info-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px 20px; margin: 20px 0; }
@@ -146,12 +154,13 @@ function emailLayout(title: string, body: string): string {
 <body>
   <div class="wrapper">
     <div class="header">
-      <h1>IGCSE Subject Reservation System</h1>
+      <h1>${esc(names.school ?? names.app)}</h1>
+      ${names.school ? `<p class="app">${names.app}</p>` : ''}
       <p>Automated notification — please do not reply to this email</p>
     </div>
     <div class="content">${body}</div>
     <div class="footer">
-      &copy; ${new Date().getFullYear()} IGCSE Subject Reservation System &middot;
+      &copy; ${new Date().getFullYear()} ${names.school ? `${esc(names.school)} &middot; ` : ''}${names.app} &middot;
       <a href="${APP_URL}/notifications" style="color:#6b7280">View in app</a>
     </div>
   </div>
@@ -174,7 +183,7 @@ export async function sendSessionOpenedEmail(to: string, data: {
   sessionType: string;
   deadline: string;
 }): Promise<EmailResult> {
-  const html = emailLayout('Registration Window Now Open', `
+  const html = await emailLayout('Registration Window Now Open', `
     <h2>A registration window is now open</h2>
     <p>Hello ${esc(data.recipientName)},</p>
     <p>A new subject registration window has opened. Register before the deadline to secure your subjects.</p>
@@ -197,7 +206,7 @@ export async function sendSessionClosingSoonEmail(to: string, data: {
   sessionName: string;
   deadline: string;
 }): Promise<EmailResult> {
-  const html = emailLayout('Registration Closing in 24 Hours', `
+  const html = await emailLayout('Registration Closing in 24 Hours', `
     <h2>Reminder: Registration closes soon</h2>
     <p>Hello ${esc(data.recipientName)},</p>
     <p>The registration window for <strong>${esc(data.sessionName)}</strong> closes in approximately 24 hours.</p>
@@ -219,7 +228,7 @@ export async function sendSessionClosedEmail(to: string, data: {
   sessionName: string;
   reason?: string;
 }): Promise<EmailResult> {
-  const html = emailLayout('Registration Window Closed', `
+  const html = await emailLayout('Registration Window Closed', `
     <h2>Registration window closed</h2>
     <p>Hello ${esc(data.recipientName)},</p>
     <p>The registration window for <strong>${esc(data.sessionName)}</strong> has been closed.</p>
@@ -240,10 +249,10 @@ export async function sendRegistrationRequestReceivedEmail(to: string, data: {
   totalCost: number;
 }): Promise<EmailResult> {
   const subjectRows = data.subjects
-    .map((s) => `<tr><td>${esc(s.name)}</td><td>EGP ${s.price.toFixed(2)}</td></tr>`)
+    .map((s) => `<tr><td>${esc(s.name)}</td><td>${formatEgp(s.price)}</td></tr>`)
     .join('');
 
-  const html = emailLayout('Registration Request Requires Your Approval', `
+  const html = await emailLayout('Registration Request Requires Your Approval', `
     <h2>Your child has submitted a registration request</h2>
     <p>Hello ${esc(data.parentName)},</p>
     <p><strong>${esc(data.studentName)}</strong> has submitted a registration request for the following subjects. Your approval is required before payment can proceed.</p>
@@ -264,7 +273,7 @@ export async function sendRegistrationRequestReceivedEmail(to: string, data: {
       <tfoot>
         <tr>
           <td style="padding:10px 12px;font-weight:600;border-top:2px solid #e5e7eb;">Total</td>
-          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">EGP ${data.totalCost.toFixed(2)}</td>
+          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">${formatEgp(data.totalCost)}</td>
         </tr>
       </tfoot>
     </table>
@@ -288,10 +297,10 @@ export async function sendDirectRegistrationEmail(to: string, data: {
   totalCost: number;
 }): Promise<EmailResult> {
   const subjectRows = data.subjects
-    .map((s) => `<tr><td>${esc(s.name)}</td><td>EGP ${s.price.toFixed(2)}</td></tr>`)
+    .map((s) => `<tr><td>${esc(s.name)}</td><td>${formatEgp(s.price)}</td></tr>`)
     .join('');
 
-  const html = emailLayout('Your parent registered subjects for you', `
+  const html = await emailLayout('Your parent registered subjects for you', `
     <h2>${esc(data.parentName)} registered subjects for you</h2>
     <p>Hello ${esc(data.studentName)},</p>
     <p>Your parent has registered the following subjects for you in <strong>${esc(data.sessionName)}</strong>. Payment is pending; you'll receive a confirmation once payment is complete.</p>
@@ -306,7 +315,7 @@ export async function sendDirectRegistrationEmail(to: string, data: {
       <tfoot>
         <tr>
           <td style="padding:10px 12px;font-weight:600;border-top:2px solid #e5e7eb;">Total</td>
-          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">EGP ${data.totalCost.toFixed(2)}</td>
+          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">${formatEgp(data.totalCost)}</td>
         </tr>
       </tfoot>
     </table>
@@ -334,7 +343,7 @@ export async function sendRegistrationDecisionEmail(to: string, data: {
     ? 'Your registration request has been <strong>approved</strong>. Payment can now be completed by your parent.'
     : 'Your registration request has been <strong>rejected</strong>.';
 
-  const html = emailLayout(`Registration ${badgeLabel}`, `
+  const html = await emailLayout(`Registration ${badgeLabel}`, `
     <h2>Registration request ${badgeLabel.toLowerCase()}</h2>
     <p>Hello ${esc(data.studentName)},</p>
     <p>${intro}</p>
@@ -375,7 +384,7 @@ export async function sendPaymentReceiptEmail(to: string, data: {
 }): Promise<EmailResult> {
   const subjectList = data.subjects.map((s) => `<li>${esc(s)}</li>`).join('');
 
-  const html = emailLayout('Payment Confirmed', `
+  const html = await emailLayout('Payment Confirmed', `
     <h2>Payment confirmed</h2>
     <p>Hello ${esc(data.parentName)},</p>
     <p>Payment for <strong>${esc(data.studentName)}</strong>'s registration has been confirmed. The subjects are now fully registered.</p>
@@ -383,8 +392,8 @@ export async function sendPaymentReceiptEmail(to: string, data: {
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
         <tr><td>Session</td><td><strong>${esc(data.sessionName)}</strong></td></tr>
-        <tr><td>Amount paid</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
-        <tr><td>Payment method</td><td>${esc(data.method)}</td></tr>
+        <tr><td>Amount paid</td><td><strong>${formatEgp(data.amount)}</strong></td></tr>
+        <tr><td>How it was paid</td><td>${esc(data.method.charAt(0).toUpperCase() + data.method.slice(1))}</td></tr>
         <tr><td>Reference #</td><td><code>${data.paymentId}</code></td></tr>
       </table>
     </div>
@@ -425,7 +434,7 @@ export async function sendDropSwapRequestEmail(to: string, data: {
     ? `swap <strong>${esc(data.subjectName)}</strong> for <strong>${esc(data.newSubjectName)}</strong>`
     : `drop <strong>${esc(data.subjectName)}</strong>`;
 
-  const html = emailLayout('Subject Change Request Requires Approval', `
+  const html = await emailLayout('Subject Change Request Requires Approval', `
     <h2>Your child has requested a subject ${verb}</h2>
     <p>Hello ${esc(data.parentName)},</p>
     <p><strong>${esc(data.studentName)}</strong> has requested to ${changeDesc}. Your approval is required.</p>
@@ -463,7 +472,7 @@ export async function sendDropSwapProcessedEmail(to: string, data: {
   const badgeLabel = data.approved ? 'Approved' : 'Rejected';
   const verb = data.changeType === 'drop' ? 'drop' : 'swap';
 
-  const html = emailLayout(`Subject ${data.changeType.toUpperCase()} Request ${badgeLabel}`, `
+  const html = await emailLayout(`Subject ${data.changeType.toUpperCase()} Request ${badgeLabel}`, `
     <h2>Your ${verb} request was ${badgeLabel.toLowerCase()}</h2>
     <p>Hello ${esc(data.studentName)},</p>
     <div class="info-box">
@@ -504,7 +513,7 @@ export async function sendDirectDropSwapEmail(to: string, data: {
   const verb = data.changeType === 'drop' ? 'dropped' : 'swapped';
   const titleCase = data.changeType === 'drop' ? 'Drop' : 'Swap';
 
-  const html = emailLayout(`Subject ${titleCase} — Processed by Your Parent`, `
+  const html = await emailLayout(`Subject ${titleCase} — Processed by Your Parent`, `
     <h2>${esc(data.parentName)} ${verb} a subject for you</h2>
     <p>Hello ${esc(data.studentName)},</p>
     <p>Your parent has processed a ${data.changeType} on your behalf. No approval from you is required because parents act as the approving party.</p>
@@ -536,27 +545,28 @@ export async function sendEscrowBalanceChangedEmail(to: string, data: {
   changeAmount: number;
   reason: string;
 }): Promise<EmailResult> {
-  const direction = data.changeAmount >= 0 ? 'Credited' : 'Debited';
+  const direction = data.changeAmount >= 0 ? 'Added' : 'Taken';
   const badgeClass = data.changeAmount >= 0 ? 'badge-green' : 'badge-yellow';
   const absAmount = Math.abs(data.changeAmount);
 
-  const html = emailLayout("Child's Escrow Balance Updated", `
-    <h2>Escrow balance updated for ${esc(data.studentName)}</h2>
+  // The family's word for its money with the school is its balance (the lead's decision 14; F8-10).
+  const html = await emailLayout("Your Child's Balance Changed", `
+    <h2>Balance updated for ${esc(data.studentName)}</h2>
     <p>Hello ${esc(data.parentName)},</p>
-    <p>Your child's escrow account balance has been updated.</p>
+    <p>Your child's balance with the school has changed.</p>
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Previous balance</td><td>EGP ${data.previousBalance.toFixed(2)}</td></tr>
-        <tr><td>Change</td><td><span class="badge ${badgeClass}">${direction}: EGP ${absAmount.toFixed(2)}</span></td></tr>
-        <tr><td>New balance</td><td><strong>EGP ${data.newBalance.toFixed(2)}</strong></td></tr>
+        <tr><td>Previous balance</td><td>${formatEgp(data.previousBalance)}</td></tr>
+        <tr><td>Change</td><td><span class="badge ${badgeClass}">${direction}: ${formatEgp(absAmount)}</span></td></tr>
+        <tr><td>New balance</td><td><strong>${formatEgp(data.newBalance)}</strong></td></tr>
         <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
       </table>
     </div>
-    ${actionButton('View Escrow', `${APP_URL}/escrow`)}
+    ${actionButton('View the balance', `${APP_URL}/escrow`)}
   `);
 
-  return sendEmail({ to, subject: `Escrow balance updated for ${data.studentName}`, html });
+  return sendEmail({ to, subject: `Balance updated for ${data.studentName}`, html });
 }
 
 /** NOT-009: Parent notified when a withdrawal request is fulfilled */
@@ -570,23 +580,23 @@ export async function sendWithdrawalFulfilledEmail(to: string, data: {
 }): Promise<EmailResult> {
   const partial = data.amountReleased < data.amountRequested;
 
-  const html = emailLayout('Escrow Withdrawal Fulfilled', `
+  const html = await emailLayout('Balance Withdrawal Fulfilled', `
     <h2>Withdrawal ${partial ? 'partially ' : ''}fulfilled</h2>
     <p>Hello ${esc(data.parentName)},</p>
-    <p>An escrow withdrawal for <strong>${esc(data.studentName)}</strong> has been ${partial ? 'partially ' : ''}processed. Please collect from the school office.</p>
+    <p>A withdrawal from <strong>${esc(data.studentName)}</strong>'s balance has been ${partial ? 'partially ' : ''}processed. Please collect from the school office.</p>
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Amount requested</td><td>EGP ${data.amountRequested.toFixed(2)}</td></tr>
-        <tr><td>Amount released</td><td><strong>EGP ${data.amountReleased.toFixed(2)}</strong></td></tr>
-        <tr><td>Remaining balance</td><td>EGP ${data.remainingBalance.toFixed(2)}</td></tr>
+        <tr><td>Amount requested</td><td>${formatEgp(data.amountRequested)}</td></tr>
+        <tr><td>Amount released</td><td><strong>${formatEgp(data.amountReleased)}</strong></td></tr>
+        <tr><td>Remaining balance</td><td>${formatEgp(data.remainingBalance)}</td></tr>
         ${data.adminNotes ? `<tr><td>Admin notes</td><td>${esc(data.adminNotes)}</td></tr>` : ''}
       </table>
     </div>
-    ${actionButton('View Escrow', `${APP_URL}/escrow`)}
+    ${actionButton('View the balance', `${APP_URL}/escrow`)}
   `);
 
-  return sendEmail({ to, subject: `Escrow withdrawal processed for ${data.studentName}`, html });
+  return sendEmail({ to, subject: `Balance withdrawal processed for ${data.studentName}`, html });
 }
 
 /** GRADE-001/002: Student and parents notified when a grade change occurs */
@@ -600,7 +610,7 @@ export async function sendGradeChangedEmail(to: string, data: {
 }): Promise<EmailResult> {
   // F0a: the shared label (above 12 graduated, null not recorded).
 
-  const html = emailLayout(
+  const html = await emailLayout(
     `Grade Updated: ${gradeLabel(data.newGrade)}`,
     `
     <h2>${data.isStudent ? 'Your grade has been updated' : `${esc(data.studentName)}'s grade has been updated`}</h2>
@@ -615,7 +625,7 @@ export async function sendGradeChangedEmail(to: string, data: {
       </table>
     </div>
     ${data.newGrade === null
-      ? '<p>Congratulations on completing your IGCSE journey! Your registration features are now disabled, but you can still view your history and manage your escrow balance.</p>'
+      ? '<p>Congratulations on completing your IGCSE journey! Your registration features are now disabled, but you can still view your history and manage your balance.</p>'
       : `${actionButton('View Dashboard', `${APP_URL}/dashboard`)}`
     }
   `);
@@ -633,7 +643,7 @@ export async function sendLinkRequestEmail(to: string, data: {
   parentName: string;
   parentEmail: string;
 }): Promise<EmailResult> {
-  const html = emailLayout('New Parent Link Request', `
+  const html = await emailLayout('New Parent Link Request', `
     <h2>New Parent Link Request</h2>
     <p>Hi ${esc(data.studentName)},</p>
     <p><strong>${esc(data.parentName)}</strong> (${esc(data.parentEmail)}) has requested to link to your account as your parent/guardian.</p>
@@ -654,16 +664,16 @@ export async function sendLinkDecisionEmail(to: string, data: {
 }): Promise<EmailResult> {
   const decision = data.approved ? 'approved' : 'rejected';
   const colour = data.approved ? '#16a34a' : '#dc2626';
-  const html = emailLayout(`Link Request ${data.approved ? 'Approved' : 'Rejected'}`, `
+  const html = await emailLayout(`Link Request ${data.approved ? 'Approved' : 'Rejected'}`, `
     <h2>Link Request ${data.approved ? 'Approved' : 'Rejected'}</h2>
     <p>Hi ${esc(data.parentName)},</p>
     <p><strong>${esc(data.studentName)}</strong> has <span style="color:${colour};font-weight:600;">${decision}</span> your request to link accounts.</p>
     ${data.approved
-      ? '<p>You can now view and manage your child\'s registrations, payments, and escrow balance from your parent dashboard.</p>'
+      ? '<p>You can now view and manage your child\'s registrations, payments, and balance from your parent dashboard.</p>'
       : '<p>If you believe this is a mistake, you may send a new link request. Please contact support if you need assistance.</p>'
     }
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-    <p style="font-size:12px;color:#9ca3af;">IGCSE Subject Reservation System</p>
+    <p style="font-size:12px;color:#9ca3af;">${esc((await senderNames()).school ?? APP_NAME)}</p>
   `);
 
   return sendEmail({ to, subject: `Your link request has been ${decision} by ${data.studentName}`, html });
@@ -680,7 +690,7 @@ export async function sendMessageEmail(to: string, data: { title: string; body: 
     const rtl = arabic.test(p);
     return `<p${rtl ? ' dir="rtl" style="text-align:right"' : ''}>${esc(p).replace(/\n/g, '<br>')}</p>`;
   }).join('\n');
-  const html = emailLayout(data.title, `
+  const html = await emailLayout(data.title, `
     <h2${arabic.test(data.title) && !/[A-Za-z]/.test(data.title) ? ' dir="rtl"' : ''}>${esc(data.title)}</h2>
     ${paragraphs}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
@@ -694,7 +704,7 @@ export async function sendPasswordResetEmail(to: string, data: {
   recipientName: string;
   resetUrl: string;
 }): Promise<EmailResult> {
-  const html = emailLayout('Reset Your Password', `
+  const html = await emailLayout('Reset Your Password', `
     <h2>Password Reset Request</h2>
     <p>Hello ${esc(data.recipientName)},</p>
     <p>We received a request to reset your password. Click the button below to set a new password.</p>
@@ -702,7 +712,7 @@ export async function sendPasswordResetEmail(to: string, data: {
     <p style="font-size:13px;color:#6b7280;margin-top:24px;">This link expires in 24 hours. If you did not request a password reset, you can safely ignore this email.</p>
   `);
 
-  return sendEmail({ to, subject: 'Reset your password — IGCSE System', html });
+  return sendEmail({ to, subject: `Reset your password — ${(await senderNames()).school ?? 'IGCSE System'}`, html });
 }
 
 /** AUTH-001/002: Email verification */
@@ -710,15 +720,15 @@ export async function sendEmailVerificationEmail(to: string, data: {
   recipientName: string;
   verificationUrl: string;
 }): Promise<EmailResult> {
-  const html = emailLayout('Verify Your Email', `
-    <h2>Welcome to IGCSE Subject Reservation System</h2>
+  const html = await emailLayout('Verify Your Email', `
+    <h2>Welcome to ${esc((await senderNames()).school ?? APP_NAME)}</h2>
     <p>Hello ${esc(data.recipientName)},</p>
     <p>Thank you for creating your account. Please verify your email address by clicking the button below.</p>
     ${actionButton('Verify Email', data.verificationUrl)}
     <p style="font-size:13px;color:#6b7280;margin-top:24px;">If you did not create an account, you can safely ignore this email.</p>
   `);
 
-  return sendEmail({ to, subject: 'Verify your email — IGCSE System', html });
+  return sendEmail({ to, subject: `Verify your email — ${(await senderNames()).school ?? 'IGCSE System'}`, html });
 }
 
 /**
@@ -737,14 +747,14 @@ export async function sendPaymentReversedEmail(to: string, data: {
   const receipts = data.voidedReceiptNumbers.length
     ? `<tr><td>Receipts now void</td><td>${data.voidedReceiptNumbers.map(esc).join(', ')}</td></tr>`
     : '';
-  const html = emailLayout('Payment Reversed', `
+  const html = await emailLayout('Payment Reversed', `
     <h2>Payment reversed</h2>
     <p>Hello ${esc(data.parentName)},</p>
     <p>The finance office has reversed a payment made for <strong>${esc(data.studentName)}</strong>. The subjects it covered are back to <strong>pending payment</strong> and are not registered until the amount is settled again.</p>
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Amount reversed</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
+        <tr><td>Amount reversed</td><td><strong>${formatEgp(data.amount)}</strong></td></tr>
         <tr><td>Registrations affected</td><td>${data.registrationsReverted}</td></tr>
         ${receipts}
         <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
@@ -768,7 +778,7 @@ export async function sendPaymentNoticeEmail(to: string, data: {
   title: string;
   body: string;
 }): Promise<EmailResult> {
-  const html = emailLayout(data.title, `
+  const html = await emailLayout(data.title, `
     <h2>${esc(data.title)}</h2>
     <p>Hello ${esc(data.parentName)},</p>
     <p>${esc(data.body)}</p>
@@ -790,19 +800,19 @@ export async function sendPaymentRejectedEmail(to: string, data: {
   registrationsExpired: number;
 }): Promise<EmailResult> {
   const escrowRow = data.escrowReturned > 0
-    ? `<tr><td>Returned to escrow</td><td>EGP ${data.escrowReturned.toFixed(2)}</td></tr>`
+    ? `<tr><td>Returned to the balance</td><td>${formatEgp(data.escrowReturned)}</td></tr>`
     : '';
   const next = data.registrationsExpired > 0
     ? 'The registration window has closed, so the subjects this payment covered are no longer reserved. If you did send this transfer, contact the finance desk with your bank receipt.'
     : 'The subjects this payment covered are still waiting for payment. If you did send this transfer, contact the finance desk with your bank receipt; otherwise pay again from the app or at the desk.';
-  const html = emailLayout('Payment Not Received', `
+  const html = await emailLayout('Payment Not Received', `
     <h2>Payment not received</h2>
     <p>Hello ${esc(data.parentName)},</p>
     <p>The finance office could not match a payment for <strong>${esc(data.studentName)}</strong> and has marked it as not received.</p>
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Amount</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
+        <tr><td>Amount</td><td><strong>${formatEgp(data.amount)}</strong></td></tr>
         ${escrowRow}
         <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
       </table>

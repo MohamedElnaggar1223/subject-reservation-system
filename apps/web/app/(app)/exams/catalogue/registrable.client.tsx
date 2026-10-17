@@ -10,10 +10,11 @@
  * Mapping is one dialog: pick the board, then the award or the units.
  */
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, type CreateSubjectInputType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -25,14 +26,19 @@ import {
   type CatalogueData, type RegistrableRow,
 } from '../exams-shared';
 
-export function RegistrableTab({ data }: { data: CatalogueData }) {
+export function RegistrableTab({ data, mayAddSubjects = false }: { data: CatalogueData; mayAddSubjects?: boolean }) {
   const [search, setSearch] = useState('');
   const [onlyUnmapped, setOnlyUnmapped] = useState(data.unmappedCount > 0);
   const [mapping, setMapping] = useState<RegistrableRow | null>(null);
+  const [adding, setAdding] = useState(false);
+  // The subject just added: its next step, mapping what it enters, is offered at once (F8-02).
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const added = addedId ? data.registrable.find((r) => r.id === addedId) ?? null : null;
   const boardName = new Map(data.boards.map((b) => [b.code, b.name]));
   const q = search.trim().toLowerCase();
+  // A deactivated subject is not offered: not one to map (F8-03).
   const rows = data.registrable
-    .filter((r) => (!onlyUnmapped || !r.mapped) && (!q || r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q)))
+    .filter((r) => (!onlyUnmapped || (!r.mapped && r.isActive)) && (!q || r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q)))
     .sort((a, b) => Number(a.mapped) - Number(b.mapped) || Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name));
 
   return (
@@ -40,6 +46,14 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
       {data.unmappedCount > 0 && (
         <Notice tone="warning" className="mb-4" title={`${data.unmappedCount} subjects are not mapped yet`}>
           These registrable subjects do not yet say what they enter with the board (the AS and A Level subjects that existed before the catalogue may be whole awards, single units or paper sets). Registration works either way; exam entries need the mapping.
+        </Notice>
+      )}
+      {added && (
+        <Notice tone="success" className="mb-4" title="Subject added">
+          <p>
+            <bdi data-i18n-skip="true">{added.name}</bdi> <span>is in the catalogue. Map what it enters with its board, then add it to a session on the Session screen.</span>{' '}
+            {!added.mapped && <Button size="sm" className="ms-1" onClick={() => setMapping(added)}>Map it</Button>}
+          </p>
         </Notice>
       )}
       <div className="mb-3 flex flex-wrap items-end gap-3">
@@ -51,6 +65,13 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
           <input type="checkbox" checked={onlyUnmapped} onChange={(e) => setOnlyUnmapped(e.target.checked)} className="size-4" />
           <span>Only subjects not mapped yet</span>
         </label>
+        {/* F8-02: a subject the forms name and the catalogue lacks is added here (the Subjects page stays off the sidebar). */}
+        {mayAddSubjects && (
+          <div className="ms-auto flex flex-wrap items-center gap-2">
+            <Button variant="outline" asChild><Link href="/admin/subjects?import=1">Import several from a list</Link></Button>
+            <Button onClick={() => setAdding(true)}>Add a subject</Button>
+          </div>
+        )}
       </div>
       {rows.length === 0 ? (
         <EmptyState title={onlyUnmapped ? 'Every subject is mapped' : 'No subject matches'} message={onlyUnmapped ? 'Untick the box to see them all.' : undefined} />
@@ -137,6 +158,103 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
         </div>
       )}
       {mapping && <MapDialog row={mapping} data={data} onClose={() => setMapping(null)} />}
+      {adding && <AddSubjectDialog data={data} onClose={() => setAdding(false)} onAdded={(id) => { setAdding(false); setAddedId(id); setOnlyUnmapped(false); }} />}
+    </div>
+  );
+}
+
+const LEVELS = [
+  { value: 'igcse', label: 'IGCSE (O.L.)' },
+  { value: 'as_level', label: 'AS Level' },
+  { value: 'a_level', label: 'A Level (A.S./A.L.)' },
+] as const;
+
+/**
+ * "Add a subject" (F8-02): the forms' subject the catalogue lacks — its name as the school writes it, its code,
+ * its board, its level and the default course fee the session's sheet prefills — through the Subjects page's own
+ * endpoint (POST /v1/subjects). No registration fee and no core flag: the session's fees and its sheet's grade-10
+ * core own those. Mapping what it enters comes next, on this tab.
+ */
+function AddSubjectDialog({ data, onClose, onAdded }: { data: CatalogueData; onClose: () => void; onAdded: (id: string) => void }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [boardCode, setBoardCode] = useState(data.boards[0]?.code ?? 'cambridge');
+  const [level, setLevel] = useState<(typeof LEVELS)[number]['value']>('igcse');
+  const [fee, setFee] = useState('');
+  const [error, setError] = useState('');
+  const add = useMutation({
+    mutationFn: (json: CreateSubjectInputType) => apiResponse(api.v1.subjects.$post({ json })),
+    onSuccess: (made) => {
+      queryClient.invalidateQueries({ queryKey: CATALOGUE_KEY });
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      onAdded(made.id);
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="add-subject-title">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl">
+        <h2 id="add-subject-title" className="font-display text-lg font-bold text-foreground">Add a subject</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A subject the school&apos;s forms name. Then map what it enters with its board, and add it to a session on the Session screen.
+        </p>
+        <form className="mt-4 space-y-4" onSubmit={(e) => {
+          e.preventDefault();
+          const courseFee = Number(fee.replace(/[,\s]/g, ''));
+          if (!name.trim() || !code.trim()) return setError('A subject needs its name and its code.');
+          if (!fee.trim() || !Number.isFinite(courseFee) || courseFee < 0) return setError('Give the course fee (0 or more).');
+          setError('');
+          add.mutate({ name: name.trim(), code: code.trim().toUpperCase(), council: boardCode as 'cambridge', qualificationLevel: level, courseFee });
+        }}>
+          <div>
+            <Label htmlFor="add-subject-name" className="mb-1 text-xs text-muted-foreground">Name, as the forms write it</Label>
+            <Input id="add-subject-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} placeholder="e.g. Psychology A.S./A.L." />
+          </div>
+          <div>
+            <Label htmlFor="add-subject-code" className="mb-1 text-xs text-muted-foreground">Code (the board&apos;s syllabus code where it has one)</Label>
+            <Input id="add-subject-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={50} placeholder="e.g. 9990" className="font-mono" />
+          </div>
+          <fieldset>
+            <legend className="mb-1 text-xs font-medium text-muted-foreground">Board</legend>
+            <div className="flex flex-wrap gap-1">
+              {data.boards.map((b) => (
+                <button
+                  key={b.code}
+                  type="button"
+                  aria-pressed={boardCode === b.code}
+                  onClick={() => setBoardCode(b.code)}
+                  className={cn(
+                    'h-10 rounded-lg border px-3 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    boardCode === b.code ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-foreground hover:bg-accent',
+                  )}
+                >
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="add-subject-level" className="mb-1 text-xs text-muted-foreground">Level</Label>
+              <select id="add-subject-level" value={level} onChange={(e) => setLevel(e.target.value as typeof level)} className={SELECT_CLASS}>
+                {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="add-subject-fee" className="mb-1 text-xs text-muted-foreground">Course fee (EGP)</Label>
+              <Input id="add-subject-fee" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="e.g. 15,000" />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">The course fee is the default the session&apos;s sheet offers when the subject is added; the board fees and grade-10 core are set on the session.</p>
+          {error && <Notice tone="danger">{error}</Notice>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={add.isPending}>Cancel</Button>
+            <Button type="submit" disabled={add.isPending}>{add.isPending ? 'Adding…' : 'Add the subject'}</Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

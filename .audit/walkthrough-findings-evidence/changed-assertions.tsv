@@ -1,0 +1,26 @@
+file	line	old	new
+02-money.test.ts	77	toContain('Payment of EGP 1500.00 via instapay has been confirmed')	toContain('Payment of EGP 1,500 by InstaPay has been confirmed')
+02-money.test.ts	134	expect(toParent[0]?.body).toContain('EGP 1500.00');	expect(toParent[0]?.body).toContain('EGP 1,500');
+03-v3-flows.test.ts	75	school fee (5000.00 EGP) must be paid before registering subjects` });	school fee (EGP 5,000) must be paid before registering subjects` });
+08-money-rules.test.ts	221	toContain('EGP 500.00 applied from escrow has been returned')	toContain('EGP 500 paid from the balance has been returned to it')
+08-money-rules.test.ts	849	toContain('EGP 250.00 applied from escrow has been returned')	toContain('EGP 250 paid from the balance has been returned to it')
+08-money-rules.test.ts	1002	'The amount found is more than this payment was for (EGP 1400.00) — record at most that'	'The amount found is more than this payment was for (EGP 1,400) — record at most that'
+08-money-rules.test.ts	1043	error: 'The escrow this transfer added has already been used, so it can no longer be undone' }	error: 'What this transfer added to the balance has already been used, so it can no longer be undone' }
+08-money-rules.test.ts	1222	toContain('EGP 1500.00 paid for Geography (AS, money rules) has been returned to your escrow balance in full')	toContain('EGP 1,500 paid for Geography (AS, money rules) has been returned to your balance in full')
+08d-foundation-grade.test.ts	396	'The 2027-2028 school fee (4000.00 EGP) must be paid before registering subjects'	'The 2027-2028 school fee (EGP 4,000) must be paid before registering subjects'
+08d-foundation-grade.test.ts	442	'The 2027-2028 school fee (6000.00 EGP) must be paid before registering subjects'	'The 2027-2028 school fee (EGP 6,000) must be paid before registering subjects'
+08n-session-offers.test.ts	1164	Admin move price (08n ${RUN}) was 1300.00 EGP and is now 1450.00 EGP.`	Admin move price (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`
+08n-session-offers.test.ts	1194	Correction priced (08n ${RUN}) was 1300.00 EGP and is now 1450.00 EGP.`	Correction priced (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`
+08n-session-offers.test.ts	1197	Correction carried (08n ${RUN}) stays at 1300.00 EGP, to be confirmed	Correction carried (08n ${RUN}) stays at EGP 1,300, to be confirmed
+08n-session-offers.test.ts	1218	Board change notice (08n ${RUN}) stays at 1300.00 EGP, to be confirmed	Board change notice (08n ${RUN}) stays at EGP 1,300, to be confirmed
+08n-import.test.ts	668	school fee (2500.00 EGP) must be paid before registering subjects`	school fee (EGP 2,500) must be paid before registering subjects`
+08p-pricing-policies.test.ts	457	toMatch(/was 10000\.00 EGP and is now 10500\.00 EGP/)	toMatch(/was EGP 10,000 and is now EGP 10,500/)
+08q-charges.test.ts	570	escrowAmountToApply: 500 } }))).error).toContain('insufficient');	escrowAmountToApply: 500 } }))).error).toContain('Not enough in the balance');
+08q-charges.test.ts	578	.error).toContain('never from escrow');	.error).toContain('never from the balance');
+08x4-exam-entries-rework.test.ts	327	(exams xw) (EGP 700.00) — entered once it is paid`	(exams xw) (EGP 700) — entered once it is paid`
+08u-session-form.test.ts	234	expect(await keysOf(b4.id)).toEqual([{ key_kind: 'qualification', key_id: bio }]);	expect(await keysOf(b4.id)).toEqual([{ key_kind: 'option', key_id: cx }]);  (answer 2, pre-authorised)
+08u-session-form.test.ts	281	expect(await priced(l4!.id)).toMatchObject({ price: 13850, rows: [{ keyKind: 'qualification', keyId: bio, amount: 10850 }] });	expect(await priced(l4!.id)).toMatchObject({ price: 13850, rows: [{ keyKind: 'option', keyId: cx, amount: 10850 }] });  (answer 2, pre-authorised)
+08u-session-form.test.ts	307	expect(await keysOf(e2)).toEqual([{ key_kind: 'qualification', key_id: bio }]);	expect(await keysOf(e2)).toEqual([{ key_kind: 'option', key_id: cx }]);  (answer 2, pre-authorised)
+08u-session-form.test.ts	245-259 (setup)	the Cambridge fee list: { keyKind: 'option', keyId: cx, amount: 10850 } and { keyKind: 'qualification', keyId: bio, amount: 10850 }	the Cambridge fee list from the Fees tab's paste 'F0970-RUN CX 10,850': the option's row alone, read by the whole subject and each paper (answer 2: the list names a syllabus once)
+08u-session-form.test.ts	309-324	coordinator.api.v1.catalogue.boards[':code'].$put({ ..., json: { onePaperFeeKey: 'unit' } }) and back, as the coordinator, no reason	the coordinator refused (403), the admin without a reason refused (400), the admin's flip and flip back with reasons, the reason read from the audit row (review item 1, as the lead asked)
+08q-charges.test.ts	570	.error).toContain('Not enough in the balance');	.toMatchObject({ status: 422, error: expect.stringContaining('Not enough in the balance') });  (review item 3: the status asserted once)

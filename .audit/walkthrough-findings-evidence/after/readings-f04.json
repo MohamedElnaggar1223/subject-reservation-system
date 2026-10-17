@@ -1,0 +1,48 @@
+{
+  "errors": [],
+  "readings": {
+    "after/f04-items-before-drive": [
+      {
+        "kind": "whole",
+        "label": "Arabic IAL (YAA01)",
+        "group": "qualification",
+        "q": "YAA01",
+        "teachers": [
+          "Teacher 25"
+        ]
+      }
+    ],
+    "after/f04-qualificationsToAdd": [
+      {
+        "id": "95dcc94e-c1de-49ca-8439-70980c385be0",
+        "code": "9AA0",
+        "title": "Arabic (GCE A Level)",
+        "level": "a_level"
+      }
+    ],
+    "after/f04-arabic-al-form-en": "Arabic A.L.\nPearson Edexcel · ARABIC-AL · 0 reservations\nTeachers this cycle\nTeacher 25\nonline only\nShow every teacher\nAn external team\nAn outside provider who teaches it, by the name the links sheet gives.\nAdd\nOffered as\nFirst entry and retakes\nTaught this cycle: a first entry, a retake in school, a retake in self study.\nRetakes only\n2nd entry only: a retake in school or in self study.\nRetake (Self Study ONLY)\nNot taught this cycle: self study at the self-study share of the course fee.\nNot offered this cycle\nFamilies do not see it.\nCourse fee\nCourse fee (EGP)\nSelf Study 50% School fees: EGP 6,000\nAnother qualification\nThe board has another award of this subject at this level. Offered beside this one, the family chooses one of the two with its teacher.\nAdd a qualification:\nEdexcel 9AA0\n(Arabic (GCE A Level))\nGrade 10 core\nCourse starts (if not the session's)\nNotes\nReplace teacher\nRemove subject\nPreview the family's form\nSave",
+    "after/f04-arabic-al-added-en": "Arabic A.L.\nPearson Edexcel · ARABIC-AL · 0 reservations\nAdded Edexcel 9AA0. Each qualification's teacher is set below; the family chooses the qualification with the teacher.\nTeachers this cycle\nTeacher 25\nonline only\nShow every teacher\nAn external team\nAn outside provider who teaches it, by the name the links sheet gives.\nAdd\nOffered as\nFirst entry and retakes\nTaught this cycle: a first entry, a retake in school, a retake in self study.\nRetakes only\n2nd entry only: a retake in school or in self study.\nRetake (Self Study ONLY)\nNot taught this cycle: self study at the self-study share of the course fee.\nNot offered this cycle\nFamilies do not see it.\nCourse fee\nCourse fee (EGP)\nSelf Study 50% School fees: EGP 6,000\nQualifications\nArabic (International A Level) (YAA01)\nOffered\nSelf study only\nNot offered this cycle\nIts teacher (the family chooses the qualification with the teacher)\nTeacher 25\nonline only\nShow every teacher\nArabic (GCE A Level) (9AA0)\nOffered\nSelf study only\nNot offered this cycle\nIts teacher (the family chooses the qualification with the teacher)\nTeacher 25\nTeacher 26\nonline only\nShow every teacher\nGrade 10 core\nCourse starts (if not the session's)\nNotes\nReplace teacher\nRemove subject\nPreview the family's form\nSave",
+    "after/f04-arabic-al-preview-en": "The family's form\nWhat a family sees for Arabic A.L. on the Reserve page, every choice open. Nothing is reserved from here.\n\tSUBJECT · PAPERS\tTEACHER\tENTRY\tPRICE\nArabic A.L. Pearson Edexcel\n\tArabic IAL (YAA01)\tTeacher 25 (Edexcel YAA01)\nFirst entry, in school\nRetake, in school — name the sitting\nRetake, self-study — name the sitting\nFirst entry, in school · EGP 30,300\nRetake, in school — name the sitting · EGP 30,300\nRetake, self-study — name the sitting · EGP 24,300\n\tEGP 30,300\n\tEdexcel 9AA0\tTeacher 26 (Edexcel 9AA0)\nFirst entry, in school\nRetake, in school — name the sitting\nRetake, self-study — name the sitting\nFirst entry, in school · EGP 30,300 ⓟ\nRetake, in school — name the sitting · EGP 30,300 ⓟ\nRetake, self-study — name the sitting · EGP 24,300 ⓟ\n\tEGP 30,300 ⓟ\nI confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.\nI confirm that the information given is true, complete and accurate.\nClose",
+    "after/f04-arabic-al-form-ar": "Arabic A.L.\nPearson Edexcel · ARABIC-AL · 0 حجوزات\nالمعلمون في هذه الدورة\nTeacher 25\nأونلاين فقط\nأظهر كل المعلمين\nفريق خارجي\nجهة خارجية تدرّسها، بالاسم الوارد في كشف الروابط.\nإضافة\nتُعرض على أنها\nقيد أول وإعادات\nتُدرَّس هذه الدورة: قيد أول، وإعادة في المدرسة، وإعادة دراسة ذاتية.\nإعادات فقط\nالقيد الثاني فقط: إعادة في المدرسة أو دراسة ذاتية.\nإعادة (دراسة ذاتية فقط)\nلا تُدرَّس هذه الدورة: دراسة ذاتية بنسبة الدراسة الذاتية من رسوم التدريس.\nغير معروضة هذه الدورة\nلا تراها الأسر.\nرسوم التدريس\nرسوم التدريس (جنيه)\nدراسة ذاتية 50% من رسوم المدرسة: 6,000 جنيه\nالمؤهلات\nArabic (International A Level) (YAA01)\nمعروضة\nدراسة ذاتية فقط\nغير معروضة هذه الدورة\nمعلمه (تختار الأسرة المؤهل مع المعلم)\nTeacher 25\nأونلاين فقط\nأظهر كل المعلمين\nArabic (GCE A Level) (9AA0)\nمعروضة\nدراسة ذاتية فقط\nغير معروضة هذه الدورة\nمعلمه (تختار الأسرة المؤهل مع المعلم)\nTeacher 25\nTeacher 26\nأونلاين فقط\nأظهر كل المعلمين\nأساسية للصف 10\nبداية الدراسة (إن اختلفت عن الجلسة)\nملاحظات\nاستبدال معلم\nإزالة المادة\nمعاينة نموذج الأسرة\nحفظ",
+    "after/f04-items-after-drive": [
+      {
+        "kind": "whole",
+        "label": "Arabic IAL (YAA01)",
+        "group": "qualification",
+        "q": "YAA01",
+        "teachers": [
+          "Teacher 25"
+        ]
+      },
+      {
+        "kind": "qualification",
+        "label": "Edexcel 9AA0",
+        "group": "qualification",
+        "q": "9AA0",
+        "teachers": [
+          "Teacher 26"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+Control c-r3 (review item 3): the routes put back on the refusal's words — isInsufficientBalance() made to read the message for 'insufficient' (as the routes did before), 08q -t 'three instalments' run, then the file restored.
+
+ ❯ test/08q-charges.test.ts (46 tests | 1 failed | 45 skipped) 2872ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 45 skipped (46)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08q-charges.test.ts > 08q: instalment plans > three instalments into the held wallet, earmarked for the line, each with a deposit slip and in the day's takings; the line captured at the last in one payment from its deposits
+AssertionError: expected { status: 400, …(1) } to match object { status: 422, …(1) }
+- Expected
++ Received
+-   "status": 422,
++   "status": 400,
+ ❯ test/08q-charges.test.ts:572:8

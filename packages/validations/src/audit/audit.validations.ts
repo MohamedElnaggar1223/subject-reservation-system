@@ -169,6 +169,8 @@ export const AUDIT_ACTIONS = [
   'SESSION_CLOSED',
   'SESSION_AUTO_CLOSED',
   'SESSION_AUTO_ACTIVATED',
+  // A draft session nobody reserved in, deleted by an admin with a reason (F8-01).
+  'SESSION_DELETED',
   // Registration flow
   'REGISTRATION_REQUESTED',
   'REGISTRATION_DIRECT',
@@ -468,6 +470,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   SESSION_CLOSED:             'Session Closed',
   SESSION_AUTO_CLOSED:        'Session Auto-Closed',
   SESSION_AUTO_ACTIVATED:     'Session Auto-Activated',
+  SESSION_DELETED:            'Draft Session Deleted',
   REGISTRATION_REQUESTED:     'Registration Request Submitted',
   REGISTRATION_DIRECT:        'Direct Registration by Parent',
   REGISTRATION_APPROVED:      'Registration Request Approved',

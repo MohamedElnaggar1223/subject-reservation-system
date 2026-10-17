@@ -47,7 +47,7 @@ import type {
   ListPaymentsQueryType,
   SubmitInstapayReferenceType,
 } from '@repo/validations';
-import { COUNCIL_LABELS } from '@repo/validations';
+import { COUNCIL_LABELS, formatEgp } from '@repo/validations';
 // V3 (§6.11): legacy provider integrations are disabled — only in-school and
 // InstaPay (manual verification) are active. Kept for when a PSP ships a real
 // InstaPay API (Paymob lists it "Coming Soon").
@@ -60,12 +60,14 @@ import {
   getEscrowBalance,
   creditEscrow,
   debitEscrow,
+  InsufficientBalanceError,
+  isInsufficientBalance,
 } from './escrow.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, schoolDateTime } from './window.services';
 import { effectiveDeadlinesOf, lineDeadlineSql, linesKeptByLateEntry } from './deadline.services';
-import { getSetting } from './settings.services';
+import { getSetting, senderNames } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { consentStanding, writeConsents, refundTermsFor, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { holdUnverifiedAtDeadline } from './verification.services';
@@ -265,7 +267,7 @@ export async function initiatePayment(
 
   // Held-wallet funding is provider money only — no escrow application
   if (isPrereg && (data.escrowAmountToApply ?? 0) > 0) {
-    throw new Error('Escrow cannot be applied to preregistration payments');
+    throw new Error('The balance cannot be used for a preregistration payment');
   }
 
   // Check for existing pending payments on any of these registrations
@@ -292,12 +294,12 @@ export async function initiatePayment(
   if (escrowToApply > 0) {
     const balance = await getEscrowBalance(studentId);
     if (escrowToApply > balance) {
-      throw new Error(
-        `Escrow balance insufficient. Available: ${balance.toFixed(2)} EGP, Requested: ${escrowToApply.toFixed(2)} EGP`
+      throw new InsufficientBalanceError(
+        `Not enough in the balance: ${formatEgp(balance)} available, ${formatEgp(escrowToApply)} asked for`
       );
     }
     if (escrowToApply > totalCost) {
-      throw new Error('Escrow amount cannot exceed the total registration cost');
+      throw new Error('The amount from the balance cannot be more than the subjects cost');
     }
   }
 
@@ -451,7 +453,7 @@ export async function initiatePayment(
       previousBalance: newBalance + escrowToApply,
       newBalance,
       changeAmount: -escrowToApply,
-      reason: `Escrow applied to payment for ${regs.length} subject(s)`,
+      reason: `Used toward the payment for ${regs.length === 1 ? '1 subject' : `${regs.length} subjects`}`,
     }).catch((err) => console.error('[notification] NOT-008 (payment debit) failed:', err));
   }
 
@@ -464,7 +466,7 @@ export async function initiatePayment(
       paymentId,
       parentId,
       undefined,
-      'Auto-confirmed: fully paid from escrow',
+      'Auto-confirmed: paid in full from the balance',
       undefined,
       auditCtx
     );
@@ -745,6 +747,7 @@ export async function confirmPayment(
         sessionName,
         amount:      totalAmount,
         method:      enriched.paymentMethod,
+        instrument:  enriched.instrumentUsed,
         paymentId:   enriched.id,
         subjects:    subjectNames,
         receiptPdf,
@@ -861,7 +864,7 @@ async function failOpenPayment(
       previousBalance: newBalance - pay.escrowAmountApplied,
       newBalance,
       changeAmount: pay.escrowAmountApplied,
-      reason: `Escrow refund — ${opts.action === 'PAYMENT_CANCELLED' ? 'payment cancelled' : opts.action === 'PAYMENT_REJECTED' ? 'payment not received' : 'payment failed'}`,
+      reason: `Returned to the balance — ${opts.action === 'PAYMENT_CANCELLED' ? 'payment cancelled' : opts.action === 'PAYMENT_REJECTED' ? 'payment not received' : 'payment failed'}`,
     }).catch((err) => console.error('[notification] NOT-008 (payment refund) failed:', err));
   }
 
@@ -1116,7 +1119,7 @@ export async function recordLateTransfer(
     if (p.amount <= 0) throw new Error('Nothing was due by transfer on this payment');
     // Nothing undoes a record, so a slip of the keyboard must not create escrow.
     if (data.amount > p.amount) {
-      throw new Error(`The amount found is more than this payment was for (EGP ${p.amount.toFixed(2)}) — record at most that`);
+      throw new Error(`The amount found is more than this payment was for (${formatEgp(p.amount)}) — record at most that`);
     }
     const familyReference = p.verificationReference && p.verificationReference !== reference ? p.verificationReference : null;
     // A family reference another record set aside is spent as well: recording
@@ -1168,7 +1171,7 @@ export async function recordLateTransfer(
     previousBalance: newBalance - pay.lateTransferAmount,
     newBalance,
     changeAmount: pay.lateTransferAmount,
-    reason: `Your InstaPay transfer (${pay.verificationReference}) was found on the bank statement after the payment had closed, so it was added to the escrow balance — use it for a later payment or ask for it back at the finance desk`,
+    reason: `Your InstaPay transfer (${pay.verificationReference}) was found on the bank statement after the payment had closed, so it was added to the balance — use it for a later payment or ask for it back at the finance desk`,
   }).catch((err) => console.error('[notification] late transfer credit failed:', err));
 
   return { id: pay.id, creditedToEscrow: pay.lateTransferAmount, reference: pay.verificationReference };
@@ -1197,8 +1200,8 @@ export async function undoLateTransfer(paymentId: string, financeAdminId: string
       { studentId: p.studentId, amount: p.lateTransferAmount, reason: 'late_transfer_undone', initiatedBy: financeAdminId, relatedPaymentId: paymentId },
       tx
     ).catch((err) => {
-      if (err instanceof Error && err.message.startsWith('Insufficient escrow balance')) {
-        throw new Error('The escrow this transfer added has already been used, so it can no longer be undone');
+      if (isInsufficientBalance(err)) {
+        throw new Error('What this transfer added to the balance has already been used, so it can no longer be undone');
       }
       throw err;
     });
@@ -1236,7 +1239,7 @@ export async function undoLateTransfer(paymentId: string, financeAdminId: string
     previousBalance: newBalance + pay.lateTransferAmount!,
     newBalance,
     changeAmount: -pay.lateTransferAmount!,
-    reason: `The transfer (${pay.verificationReference}) added to the escrow balance earlier today was recorded by mistake and has been removed`,
+    reason: `The transfer (${pay.verificationReference}) added to the balance earlier today was recorded by mistake and has been removed`,
   }).catch((err) => console.error('[notification] late transfer undo failed:', err));
 
   return { id: pay.id, debitedFromEscrow: pay.lateTransferAmount! };
@@ -1991,8 +1994,17 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   const hr = '='.repeat(60);
   const thin = '-'.repeat(60);
 
+  // Who it is from (the review of 744e553, item 7): the school's name with the app's under it, the app's alone when
+  // the setting is empty — as the emails' heading and the printed papers (F8-11).
+  const names = await senderNames();
+  const centred = (t: string) => `${' '.repeat(Math.max(0, Math.floor((60 - t.length) / 2)))}${t}`;
   lines.push(hr);
-  lines.push('          IGCSE SUBJECT RESERVATION SYSTEM');
+  if (names.school) {
+    lines.push(centred(names.school));
+    lines.push(centred(names.app));
+  } else {
+    lines.push('          IGCSE SUBJECT RESERVATION SYSTEM');
+  }
   lines.push('                 PAYMENT RECEIPT');
   lines.push(hr);
   lines.push('');
@@ -2026,18 +2038,18 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
     const councilLabel = COUNCIL_LABELS[subj.council as keyof typeof COUNCIL_LABELS] ?? subj.council;
     lines.push(`  ${subj.name} (${subj.code})`);
     lines.push(`    Council: ${councilLabel}`);
-    lines.push(`    Price:   EGP ${subj.price.toFixed(2)}`);
+    lines.push(`    Price:   ${formatEgp(subj.price)}`);
     lines.push('');
   }
 
   lines.push(thin);
   lines.push('PAYMENT SUMMARY');
   lines.push(thin);
-  lines.push(`Subtotal:                 EGP ${totalAmount.toFixed(2)}`);
+  lines.push(`Subtotal:                 ${formatEgp(totalAmount)}`);
   if (pay.escrowAmountApplied > 0) {
-    lines.push(`Escrow Applied:          -EGP ${pay.escrowAmountApplied.toFixed(2)}`);
+    lines.push(`From the balance:        -${formatEgp(pay.escrowAmountApplied)}`);
   }
-  lines.push(`Amount Charged:           EGP ${pay.amount.toFixed(2)}`);
+  lines.push(`Amount Charged:           ${formatEgp(pay.amount)}`);
   lines.push(`Payment Method:           ${PAYMENT_METHOD_DISPLAY[pay.paymentMethod] ?? pay.paymentMethod}`);
   if (pay.externalReference) {
     lines.push(`Provider Reference:       ${pay.externalReference}`);
@@ -2345,9 +2357,9 @@ export async function createChargePaymentsInTx(
   }
   const escrowable = round2(groups.filter((g) => !g.instalments).reduce((s, g) => s + g.total, 0));
   if (a.escrowToApply > 0 && escrowable === 0) {
-    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from escrow (its money is held for the line)');
+    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from the balance (its money is held for the line)');
   }
-  if (a.escrowToApply > escrowable + 0.001) throw new Error('Escrow amount cannot exceed the total of the charges it can pay');
+  if (a.escrowToApply > escrowable + 0.001) throw new Error('The amount from the balance cannot be more than the charges it can pay');
   let escrowLeft = a.escrowToApply;
   const out: CreatedChargePayment[] = [];
   for (const g of groups) {
@@ -2394,7 +2406,7 @@ export async function initiateChargePayment(parentId: string, data: InitiatePaym
   const rows = await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind }).from(charge).where(inArray(charge.id, data.chargeIds));
   if (rows.length === 0) throw new Error('No charges found');
   if ((data.escrowAmountToApply ?? 0) > 0 && rows.some((r) => r.kind === 'instalment')) {
-    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from escrow (its money is held for the line)');
+    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from the balance (its money is held for the line)');
   }
   const studentIds = [...new Set(rows.map((r) => r.studentId))];
   if (studentIds.length > 1) throw new Error('All charges must belong to the same student');
@@ -2404,7 +2416,7 @@ export async function initiateChargePayment(parentId: string, data: InitiatePaym
   if (escrowToApply > 0) {
     const balance = await getEscrowBalance(studentId);
     if (escrowToApply > balance) {
-      throw new Error(`Escrow balance insufficient. Available: ${balance.toFixed(2)} EGP, Requested: ${escrowToApply.toFixed(2)} EGP`);
+      throw new InsufficientBalanceError(`Not enough in the balance: ${formatEgp(balance)} available, ${formatEgp(escrowToApply)} asked for`);
     }
   }
   const expected = new Map(rows.map((r) => [r.id, r.amount]));
@@ -2416,11 +2428,11 @@ export async function initiateChargePayment(parentId: string, data: InitiatePaym
     const newBalance = await getEscrowBalance(studentId);
     notifyEscrowBalanceChanged({
       studentId, studentName: 'Student', previousBalance: newBalance + made!.escrowApplied, newBalance, changeAmount: -made!.escrowApplied,
-      reason: `Escrow applied to: ${made!.description}`,
+      reason: `Used toward: ${made!.description}`,
     }).catch((err) => console.error('[notification] NOT-008 (charge payment debit) failed:', err));
   }
   if (made!.amount === 0 && made!.escrowApplied > 0) {
-    const confirmed = await confirmPayment(made!.id, parentId, undefined, 'Auto-confirmed: fully paid from escrow', undefined, auditCtx);
+    const confirmed = await confirmPayment(made!.id, parentId, undefined, 'Auto-confirmed: paid in full from the balance', undefined, auditCtx);
     if (confirmed) return confirmed;
   }
   return created!;
@@ -2488,7 +2500,7 @@ export async function finishChargesInTx(tx: Tx, o: ChargeConfirmation, actorId: 
     captured = r.captured;
   }
   const total = round2(o.charges.reduce((s, c) => s + c.amount, 0));
-  await tellFamily(tx, o.payment.studentId, 'CHARGE_UPDATED', `Payment received: EGP ${total.toFixed(2)}`,
+  await tellFamily(tx, o.payment.studentId, 'CHARGE_UPDATED', `Payment received: ${formatEgp(total)}`,
     `Received with thanks: ${o.charges.map((c) => c.description).join(', ')}.${slip ? ` Deposit slip ${slip}: the money is held for the subject until its last instalment.` : ' The receipt is ready at the finance desk.'}${captured ? ' That was the last instalment: the subject is now paid in full.' : ''}`,
     { paymentId: o.payment.id, chargeIds: ids });
 }

@@ -28,7 +28,7 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  deriveLevelCode, STARTER_SET_DATA, COUNCIL_LABELS, IGCSE_NEVER_MONTHS, type SeriesMonth,
+  deriveLevelCode, STARTER_SET_DATA, COUNCIL_LABELS, IGCSE_NEVER_MONTHS, ROLES, type SeriesMonth,
   type UpdateBoardType, type CreateQualificationType, type UpdateQualificationType, type CreateUnitType,
   type UpdateUnitType, type SetQualificationUnitsType, type CreateQualificationOptionType,
   type UpdateQualificationOptionType, type MapRegistrableType, type StarterSet, type UnitLevel, type LevelCodeReading,
@@ -165,28 +165,37 @@ export async function getCatalogue() {
       registrableCount: subjectUnits.filter((su) => su.unitId === u.id).length,
     })),
     registrable,
-    unmappedCount: registrable.filter((r) => !r.mapped).length,
+    // A deactivated subject is not offered: it is not counted as one to map (F8-03).
+    unmappedCount: registrable.filter((r) => !r.mapped && r.isActive).length,
   };
 }
 
 // ─── Boards ──────────────────────────────────────────────────────────────────
 
-export async function updateBoard(code: string, data: UpdateBoardType, actorId: string, ctx?: AuditContext) {
+export async function updateBoard(code: string, data: UpdateBoardType, actorId: string, actorRole: string | null | undefined, ctx?: AuditContext) {
+  // The one-paper fee rule decides what every new one-paper retake of the board costs: the admin's alone, with a
+  // reason (the review of 744e553, item 1), as the board's entry deadline is (MO-10). The rest of the board is the
+  // coordinator's and the admin's, as before.
+  const { reason, ...fields } = data;
+  if (fields.onePaperFeeKey !== undefined) {
+    if (actorRole !== ROLES.ADMIN) throw new CatalogueError("Only an admin changes a board's one-paper fee rule: it decides what every new one-paper retake costs", 403);
+    if (!reason) throw new CatalogueError("Say why the board's one-paper fee rule changes");
+  }
   return db.transaction(async (tx) => {
     const [b] = await tx.select().from(examBoard).where(eq(examBoard.code, code)).for('update');
     if (!b) throw new CatalogueError('Board not found', 404);
-    if (data.seriesMonths) {
+    if (fields.seriesMonths) {
       // A month a series of this board already runs in stays: those series exist.
       const used = await tx.selectDistinct({ month: boardSeries.month }).from(boardSeries).where(eq(boardSeries.boardCode, code));
-      const dropped = used.map((u) => u.month).filter((m) => !data.seriesMonths!.includes(m as never));
+      const dropped = used.map((u) => u.month).filter((m) => !fields.seriesMonths!.includes(m as never));
       if (dropped.length) {
         throw new CatalogueError(`${b.name} already has ${dropped.join(' and ')} series on record — those months stay`, 409);
       }
     }
-    const [updated] = await tx.update(examBoard).set({ ...data, updatedAt: new Date() }).where(eq(examBoard.code, code)).returning();
+    const [updated] = await tx.update(examBoard).set({ ...fields, updatedAt: new Date() }).where(eq(examBoard.code, code)).returning();
     await logAction(actorId, 'BOARD_UPDATED', 'board', code,
-      { name: b.name, shortName: b.shortName, entryPortal: b.entryPortal, seriesMonths: b.seriesMonths, notes: b.notes },
-      data as Record<string, unknown>, ctx, tx);
+      { name: b.name, shortName: b.shortName, entryPortal: b.entryPortal, seriesMonths: b.seriesMonths, notes: b.notes, onePaperFeeKey: b.onePaperFeeKey },
+      { ...fields, ...(reason ? { reason } : {}) } as Record<string, unknown>, ctx, tx);
     return updated!;
   });
 }
@@ -682,6 +691,15 @@ export async function findRegistrable(term: string) {
 // ─── Starter sets ────────────────────────────────────────────────────────────
 
 /**
+ * The note each starter set writes on the units and awards it makes: the board's documents it came from
+ * (DISCOVERY_RESEARCH.md's sources P1, P4, P5 and P6), one per set (the decisions' review, low note 1).
+ */
+export const STARTER_SET_NOTES: Record<StarterSet, string> = {
+  pearson_ial_mathematics: 'Starter set from Pearson\'s IAL information manual 2025/26, the IAL Mathematics aggregation rules and the IAL January 2027 timetable — check it against the board\'s current specification.',
+  pearson_ial_biology: 'Starter set from Pearson\'s IAL information manual 2025/26, Pearson\'s unit aggregation and cash-in rules and the IAL January 2027 timetable — check it against the board\'s current specification.',
+};
+
+/**
  * Add a starter set the research confirmed (DISCOVERY_RESEARCH.md §1–2):
  * units and awards not yet in the catalogue are added with their map; what
  * is there already is left as it is. Loading it twice changes nothing.
@@ -691,8 +709,9 @@ export async function loadStarterSet(set: StarterSet, actorId: string, ctx?: Aud
   return db.transaction(async (tx) => {
     // One load at a time: the board row is the lock.
     await tx.select({ code: examBoard.code }).from(examBoard).where(eq(examBoard.code, data.boardCode)).for('update');
-    // The documents' names alone, not the research file's (the lead's decision of 16 Oct 2026, 16; the review of dd68598).
-    const note = 'Starter set from Pearson\'s IAL information manual 2025/26, the IAL Mathematics aggregation rules and the IAL January 2027 timetable — check it against the board\'s current specification.';
+    // The documents' names alone, not the research file's (the lead's decision of 16 Oct 2026, 16; the review of dd68598),
+    // each set's own: the aggregation rules are Mathematics'; Biology's units aggregate under Pearson's general rules.
+    const note = STARTER_SET_NOTES[set];
     const addedUnits = await tx.insert(examUnit).values(data.units.map((u) => ({
       id: randomUUID(), boardCode: data.boardCode, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, kind: 'unit', notes: note,
     }))).onConflictDoNothing().returning({ id: examUnit.id });

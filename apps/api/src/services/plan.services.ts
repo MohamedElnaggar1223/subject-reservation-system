@@ -45,6 +45,7 @@ import { refundFor } from './refund.services';
 import { effectiveDeadlineFor, dueDateFor } from './deadline.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { schoolDate } from './window.services';
+import { formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -135,7 +136,7 @@ export async function grantPlanInTx(tx: Tx, a: { planId: string; lineId: string;
   const rows = [...a.schedule].map((r) => ({ dueAt: new Date(r.dueAt), amount: round2(r.amount) }));
   const total = round2(rows.reduce((s, r) => s + r.amount, 0));
   if (Math.abs(total - line.priceAtRegistration) > 0.001) {
-    throw new PlanError(`The instalments add up to EGP ${total.toFixed(2)}; the line costs EGP ${line.priceAtRegistration.toFixed(2)}`);
+    throw new PlanError(`The instalments add up to ${formatEgp(total)}; the line costs ${formatEgp(line.priceAtRegistration)}`);
   }
   for (let i = 1; i < rows.length; i++) {
     if (rows[i]!.dueAt <= rows[i - 1]!.dueAt) throw new PlanError('Each instalment falls after the one before it');
@@ -179,7 +180,7 @@ export async function grantPlanInTx(tx: Tx, a: { planId: string; lineId: string;
     await logAction(a.actorId, 'LINE_DUE_MOVED', 'registration', line.id, { dueAt: line.dueAt.toISOString() }, { dueAt: due.toISOString(), reason: 'instalment plan granted' }, a.ctx, tx);
   }
   await tellFamily(tx, line.studentId, 'PLAN_UPDATED', `${name}: payment in ${rows.length} instalments`,
-    `The school agreed a plan for ${name}: ${rows.map((r, i) => `${i + 1}. EGP ${r.amount.toFixed(2)} by ${schoolDate(r.dueAt)}`).join('; ')}. Each instalment is held for this subject; it is paid from them at the last.`,
+    `The school agreed a plan for ${name}: ${rows.map((r, i) => `${i + 1}. ${formatEgp(r.amount)} by ${schoolDate(r.dueAt)}`).join('; ')}. Each instalment is held for this subject; it is paid from them at the last.`,
     { registrationId: line.id, planId: a.planId });
   return { charges: made.map((c) => ({ id: c.id, instalmentNo: c.instalmentNo, amount: c.amount, dueAt: c.dueAt })) };
 }
@@ -250,8 +251,8 @@ export async function settlePlanInTx(
   const name = await subjectNameOf(tx, line.id);
   await tellFamily(tx, line.studentId, 'PLAN_UPDATED', `${name}: the instalment plan ended`,
     a.cause === 'released_in_full'
-      ? `The instalment plan for ${name} was ended by the school and every deposit (EGP ${released.toFixed(2)}) is back in the escrow balance. ${name} can still be paid in full.`
-      : `The instalment plan for ${name} ended (${a.detail ?? a.cause}). Of the EGP ${deposits.toFixed(2)} paid in, EGP ${released.toFixed(2)} is back in the escrow balance and the school keeps EGP ${kept.toFixed(2)} — what a paid drop that day would have kept. Nothing more is owed.`,
+      ? `The instalment plan for ${name} was ended by the school and every deposit (${formatEgp(released)}) is back in the balance. ${name} can still be paid in full.`
+      : `The instalment plan for ${name} ended (${a.detail ?? a.cause}). Of the ${formatEgp(deposits)} paid in, ${formatEgp(released)} is back in the balance and the school keeps ${formatEgp(kept)} — what a paid drop that day would have kept. Nothing more is owed.`,
     { registrationId: line.id, planId: plan.id, kept, released });
   return out;
 }
@@ -308,7 +309,7 @@ export async function capturePlanInTx(
   if (d.at && d.at <= a.now) throw new PlanError(`The line's deadline (${schoolDate(d.at)}) has passed: it cannot be paid now`, 409);
   const held = await depositsOfLine(tx, line.studentId, line.id);
   if (Math.abs(held - line.priceAtRegistration) > 0.001) {
-    throw new PlanError(`The deposits held for this line (EGP ${held.toFixed(2)}) are not its price (EGP ${line.priceAtRegistration.toFixed(2)})`, 409);
+    throw new PlanError(`The deposits held for this line (${formatEgp(held)}) are not its price (${formatEgp(line.priceAtRegistration)})`, 409);
   }
   const slips = (await tx.execute(sql`
     select distinct p.metadata->>'depositSlip' as slip from payment p
@@ -348,7 +349,7 @@ export async function capturePlanInTx(
   await logAction(a.actorId, 'REGISTRATION_CONFIRMED', 'registration', line.id, null, { paymentId: id, planId: a.planId }, a.ctx, tx);
   const name = await subjectNameOf(tx, line.id);
   await tellFamily(tx, line.studentId, 'PLAN_UPDATED', `${name} is paid`,
-    `The last instalment arrived: ${name} is paid in full from the instalments (EGP ${line.priceAtRegistration.toFixed(2)}). Its receipt is ready at the finance desk.`,
+    `The last instalment arrived: ${name} is paid in full from the instalments (${formatEgp(line.priceAtRegistration)}). Its receipt is ready at the finance desk.`,
     { registrationId: line.id, paymentId: id });
   return { paymentId: made!.id, amount: line.priceAtRegistration, depositSlips: slips };
 }

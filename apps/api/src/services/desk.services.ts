@@ -30,7 +30,7 @@ import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
-import { getEscrowBalance, debitEscrow } from './escrow.services';
+import { getEscrowBalance, debitEscrow, InsufficientBalanceError } from './escrow.services';
 import { confirmPayment, failPayment, assertNoLivePlan, createChargePaymentsInTx } from './payment.services';
 import {
   academicYearForDate,
@@ -39,7 +39,7 @@ import {
 } from './school-fee.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, standingToday } from './eligibility.services';
 import { sectionOf } from './academic.services';
-import { academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel } from '@repo/validations';
+import { academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel, formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -209,7 +209,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     };
   } catch (err) {
     if (!schoolFee) throw err;
-    throw new Error(`The ${schoolFee.academicYear} school fee (EGP ${schoolFee.amount.toFixed(2)}) was collected; the subjects were not registered: ${err instanceof Error ? err.message : 'refused'}`);
+    throw new Error(`The ${schoolFee.academicYear} school fee (${formatEgp(schoolFee.amount)}) was collected; the subjects were not registered: ${err instanceof Error ? err.message : 'refused'}`);
   }
 }
 
@@ -245,8 +245,8 @@ async function registerAtDeskAfterChecks(
   if (escrowToApply > 0) {
     const balance = await getEscrowBalance(data.studentId);
     if (escrowToApply > balance) {
-      throw new Error(
-        `Escrow balance insufficient. Available: ${balance.toFixed(2)} EGP`
+      throw new InsufficientBalanceError(
+        `Not enough in the balance: ${formatEgp(balance)} available`
       );
     }
   }
@@ -268,8 +268,8 @@ async function registerAtDeskAfterChecks(
     const payableCost = round2(payable.reduce((sum, r) => sum + r.priceAtRegistration, 0));
     if (escrowToApply > payableCost) {
       throw new Error(held.length
-        ? `Escrow amount cannot exceed what is collected now (${payableCost.toFixed(2)} EGP): the lines on a provisional board fee are collected once it is confirmed`
-        : 'Escrow amount cannot exceed the total cost');
+        ? `The amount from the balance cannot be more than what is collected now (${formatEgp(payableCost)}): the lines on a provisional board fee are collected once it is confirmed`
+        : 'The amount from the balance cannot be more than the total cost');
     }
     if (!payable.length) {
       // Everything waits for a board fee to be confirmed: reserved, nothing collected.
@@ -524,7 +524,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
   const totalCost = Math.round(regs.reduce((s, r) => s + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = data.escrowAmountToApply ?? 0;
   const chargeTotal = Math.round(chargeRows.filter((c) => c.kind !== 'instalment').reduce((s, c) => s + c.amount, 0) * 100) / 100;
-  if (escrowToApply > totalCost + chargeTotal + 0.001) throw new Error('Escrow amount cannot exceed the total cost');
+  if (escrowToApply > totalCost + chargeTotal + 0.001) throw new Error('The amount from the balance cannot be more than the total cost');
   const payerParentId = await resolvePayerParent(data.studentId);
   const prices = new Map(regs.map((r) => [r.id, r.priceAtRegistration]));
 
@@ -826,11 +826,24 @@ export async function getStudentSummary(studentId: string) {
   const currentStanding = await getSchoolFeeStanding(studentId, student.grade, academicYear);
   const fee = currentStanding.fee;
 
+  // A payment under way for a waiting line (F8-09): the family's InstaPay transfer waiting for finance's check,
+  // or a checkout they started (pay at the desk, a transfer with no reference yet). Such a line is not collected
+  // at the desk — the collection would be refused — until the Finance Workbench confirms or rejects it.
+  const waitingLineIds = registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id);
+  const underWay = waitingLineIds.length
+    ? await db.select({ registrationId: paymentRegistration.registrationId, paymentId: payment.id, status: payment.status, method: payment.paymentMethod })
+      .from(paymentRegistration).innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
+      .where(and(inArray(paymentRegistration.registrationId, waitingLineIds), inArray(payment.status, ['pending', 'pending_verification'])))
+    : [];
+  const inProgressOf = new Map(underWay.map((u) => [u.registrationId, { paymentId: u.paymentId, status: u.status as 'pending' | 'pending_verification', method: u.method }]));
+
   // What does the family owe right now? A line on a provisional board fee is reserved, not
   // payable, until the fee is confirmed (§3.4) — unless the school takes payment at that price.
+  // A line with a payment under way is owed, not collectable now: it is counted apart (owingInProgress).
   const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
-  const payableNow = (r: (typeof registrations)[number]) =>
+  const owedNow = (r: (typeof registrations)[number]) =>
     r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional);
+  const payableNow = (r: (typeof registrations)[number]) => owedNow(r) && !inProgressOf.has(r.id);
   // A line under a live plan owes its price less the deposits held for it (its instalments still
   // to pay); the charges owed (not instalments — the line counts them — nor a pushed school fee,
   // which is the fee badge) are owed beside the lines (step C; the statement counts the same).
@@ -844,12 +857,12 @@ export async function getStudentSummary(studentId: string) {
     .where(and(eq(charge.studentId, studentId), eq(charge.status, 'pending_payment'), notInArray(charge.kind, ['instalment', 'school_fee_push'])));
   const owing = round2(registrations.filter(payableNow).reduce((sum, r) => sum + (planLineIds.has(r.id) ? Math.max(0, r.priceAtRegistration - (depositsOf.get(r.id) ?? 0)) : r.priceAtRegistration), 0)
     + owedCharges.reduce((sum, c) => sum + c.amount, 0));
+  const owingInProgress = round2(registrations.filter((r) => owedNow(r) && inProgressOf.has(r.id)).reduce((sum, r) => sum + r.priceAtRegistration, 0));
 
   // Which waiting lines carry the school's consent only (grade 10, reserved by the school): the desk
   // asks the parent's own tick when it collects those, and only those (F6: the tick showed for lines
   // the family had reserved itself, consent given). The checkout reads the same (`consentStanding`).
-  const waitingIds = registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id);
-  const familyConsentNeeded = new Set((await consentStanding(db, waitingIds)).schoolOnly);
+  const familyConsentNeeded = new Set((await consentStanding(db, waitingLineIds)).schoolOnly);
 
   // The academic record (F0a): grade, cohort, section, status.
   const today = standingToday(student);
@@ -882,9 +895,12 @@ export async function getStudentSummary(studentId: string) {
     // the year containing today
     schoolFeesDue,
     owing,
+    // Owed by lines whose payment is under way (the transfer's check, a started checkout): "Owes now" says it apart.
+    owingInProgress,
     registrations: registrations.map((r) => ({
       ...r,
       payableNow: payableNow(r),
+      paymentInProgress: inProgressOf.get(r.id) ?? null,
       // Under a live instalment plan (§3.6): paid by its instalments, never collected as a line. A
       // plan released in full or ended is not live: the line is collected in full again.
       livePlan: exceptions.some((e) => e.policyKey === 'plan.instalments' && e.registrationId === r.id),

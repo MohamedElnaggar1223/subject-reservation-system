@@ -78,6 +78,7 @@ import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, type El
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import { logAction, type AuditContext } from './audit.services';
+import { formatEgp } from '@repo/validations';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -349,7 +350,7 @@ export async function createDropRequest(
       studentName:   studentUser?.name ?? 'Student',
       changeType:    'drop',
       subjectName:   reg.subject.name,
-      financialImpact: `EGP ${reg.priceAtRegistration.toFixed(2)} will be credited to your child's escrow upon approval`,
+      financialImpact: `${formatEgp(reg.priceAtRegistration)} will be added to your child's balance once approved`,
       reason:        data.reason,
       changeRequestId: request!.id,
     }).catch((err) => console.error('[notification] NOT-006 (drop) failed:', err));
@@ -412,8 +413,8 @@ export async function createSwapRequest(
       priceDifference === 0
         ? 'No additional charge'
         : priceDifference > 0
-          ? `EGP ${priceDifference.toFixed(2)} additional payment will be required`
-          : `EGP ${Math.abs(priceDifference).toFixed(2)} will be credited to your child's escrow`;
+          ? `${formatEgp(priceDifference)} additional payment will be required`
+          : `${formatEgp(Math.abs(priceDifference))} will be added to your child's balance`;
 
     notifyDropSwapRequestReceived({
       studentId:      reg.studentId,
@@ -587,7 +588,7 @@ export async function approveChangeRequest(
       ? `No refund applies (${result.refundPercentage}% refund window)`
       : result.gated
         ? `${refundSentence(quote!)} will be credited once the subject's receipt is returned to the school`
-        : `${refundSentence(quote!)} credited to your escrow`;
+        : `${refundSentence(quote!)} added to your balance`;
   await tellWithdrawn(withdrawn, cr.type === 'drop' ? 'the family dropped the subject' : 'the family swapped the subject')
     .catch((err) => console.error('[notification] F4 entries withdrawn (approve) failed:', err));
 
@@ -753,7 +754,7 @@ export async function executeDirectDrop(
       ? `No refund applies (${pct}% refund window).`
       : result.gated
         ? `${refundSentence(quote)} will be credited once the receipt is returned to the school.`
-        : `${refundSentence(quote)} credited to your escrow.`;
+        : `${refundSentence(quote)} added to your balance.`;
 
   // NOT-007 / SWAP-004: Student receives email + in-app notification when
   // a parent directly drops a subject for them.
@@ -779,7 +780,7 @@ export async function executeDirectDrop(
       previousBalance: newBalance - refundAmount,
       newBalance,
       changeAmount:    refundAmount,
-      reason:          'Direct subject drop — refund to escrow',
+      reason:          'Subject dropped — refunded to the balance',
     }).catch((err) => console.error('[notification] NOT-008 (direct drop) failed:', err));
   }
 
@@ -882,7 +883,7 @@ export async function executeDirectSwap(
       ? `No refund applies for the dropped subject (${pct}% refund window); payment for the new subject is pending.`
       : result.gated
         ? `${refundSentence(quote!)} will be credited once the old receipt is returned; payment for the new subject is pending.`
-        : `${refundSentence(quote!)} credited to your escrow; payment for the new subject is pending.`;
+        : `${refundSentence(quote!)} added to your balance; payment for the new subject is pending.`;
 
   notifyDirectDropSwapExecuted({
     studentId: reg.studentId,
@@ -907,7 +908,7 @@ export async function executeDirectSwap(
       previousBalance: newBalance - refundAmount,
       newBalance,
       changeAmount:    refundAmount,
-      reason:          `Direct swap: ${reg.subject.name} → ${swap.name} (escrow refund)`,
+      reason:          `Subject swapped: ${reg.subject.name} → ${swap.name} (refunded to the balance)`,
     }).catch((err) => console.error('[notification] NOT-008 (direct swap) failed:', err));
   }
 

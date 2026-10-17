@@ -1,0 +1,10 @@
+Control c1 (item 1, F8-05): onePaperFeeKeys made to return the qualification key whatever the board (if (true || b?.key === 'qualification') ...), 08u -t F8-05 run, then the file restored.
+
+ ❯ test/08u-session-form.test.ts (13 tests | 1 failed | 12 skipped) 2095ms
+     → expected [ { key_kind: 'qualification', …(1) } ] to deeply equal [ { key_kind: 'unit', …(1) } ]
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > F8-05: a one-paper retake's board fee follows its board — Edexcel 4MA1's Paper 1H at the paper's own fee, Cambridge's Paper 4 at the syllabus's; the Fees tab names the paper once
+AssertionError: expected [ { key_kind: 'qualification', …(1) } ] to deeply equal [ { key_kind: 'unit', …(1) } ]
+ ❯ test/08u-session-form.test.ts:229:34
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)

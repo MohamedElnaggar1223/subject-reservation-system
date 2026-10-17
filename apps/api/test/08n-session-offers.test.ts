@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import {
   admin, staff, onboard, subject, refused, one, sql, audited, money, futureWindow, runPaymentDeadlines, runSessionRecovery,
-  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf,
+  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf, pauseAtAudits, lockWaiters,
 } from './helpers';
 
 /**
@@ -1033,7 +1033,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [lb!.id])).s).toBe(other);
   });
 
-  it("an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)", async () => {
+  it("an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the paper's own fee on a board that prices per paper (Pearson Edexcel), the qualification's on Cambridge (§3.2, Q-13, F8-05)", async () => {
     const q = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
       json: { boardCode: 'pearson_edexcel', code: `V4MA-${RUN}`, title: `Mathematics A (08n ${RUN})`, level: 'igcse', suite: 'Pearson Edexcel International GCSE', subjectArea: 'Mathematics', entryMethod: 'qualification' },
     })))!.id;
@@ -1052,7 +1052,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       ['Paper 1H only (retake)', 'one_paper', 'units', 'closed', 'entry', false, [h1]],
       ['Paper 2H only (retake)', 'one_paper', 'units', 'closed', 'entry', false, [h2]],
     ]);
-    expect(await sql(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1`, [items[1]!.id])).toEqual([{ key_kind: 'qualification', key_id: q }]);
+    expect(await sql(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1`, [items[1]!.id])).toEqual([{ key_kind: 'unit', key_id: h1 }]);
   });
 
   it("the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval", async () => {
@@ -1161,7 +1161,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     const [told] = await notified(studentEmail(`n08v-am-w-${RUN}`), 'PRICE_CHANGED', 1);
     expect(told).toEqual({
       type: 'PRICE_CHANGED', title: `The price of Admin move price (08n ${RUN}) changed`,
-      body: `The subject is now entered in another exam series, with its own board fee. Admin move price (08n ${RUN}) was 1300.00 EGP and is now 1450.00 EGP.`,
+      body: `The subject is now entered in another exam series, with its own board fee. Admin move price (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`,
     });
     expect(await notificationsFor(studentEmail(`n08v-am-p-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
   });
@@ -1191,10 +1191,10 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     await audited([la!.id, lb!.id], ['LINE_REPRICED', 'LINE_REPRICED']);
     const because = "The session's exam series was corrected, and with it the board fee";
     expect((await notified(studentEmail(`n08v-cor-${RUN}`), 'PRICE_CHANGED', 1))[0]!.body)
-      .toBe(`${because}. Correction priced (08n ${RUN}) was 1300.00 EGP and is now 1450.00 EGP.`);
+      .toBe(`${because}. Correction priced (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`);
     expect(await notified(studentEmail(`n08v-cor-${RUN}`), 'PRICE_TO_BE_CONFIRMED', 1)).toEqual([{
       type: 'PRICE_TO_BE_CONFIRMED', title: `The price of Correction carried (08n ${RUN}) is to be confirmed`,
-      body: `${because}. Correction carried (08n ${RUN}) stays at 1300.00 EGP, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
+      body: `${because}. Correction carried (08n ${RUN}) stays at EGP 1,300, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
     }]);
   });
 
@@ -1215,7 +1215,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     expect(await priceOf(line!.id)).toEqual({ price: 1300, provisional: true, series: pea, rows: [row.id] });
     expect(await notified(studentEmail(`n08v-bc-${RUN}`), 'PRICE_TO_BE_CONFIRMED', 1)).toEqual([{
       type: 'PRICE_TO_BE_CONFIRMED', title: `The price of Board change notice (08n ${RUN}) is to be confirmed`,
-      body: `The subject's exam board changed, and with it the board fee. Board change notice (08n ${RUN}) stays at 1300.00 EGP, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
+      body: `The subject's exam board changed, and with it the board fee. Board change notice (08n ${RUN}) stays at EGP 1,300, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
     }]);
     expect(await notificationsFor(studentEmail(`n08v-bc-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
     const { PROVISIONAL_REFUSAL } = await import('../src/services/pricing.services');
@@ -1373,6 +1373,128 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       spy.mockRestore();
       // Back to the default for the files after this one (refused when it is already off).
       await setting(false).catch(() => undefined);
+    }
+  });
+});
+
+describe('08n: a draft session nobody reserved in is deleted from its Session screen (F8-01)', () => {
+  let adm: Client, coordinator: Client, officer: Client, finadmin: Client;
+  let teacherId: string;
+  const mk = async (label: string, draft: boolean) => (await apiResponse(adm.api.v1.sessions.$post({
+    json: {
+      type: 'june', year: Y + 1, label,
+      startDate: new Date(Date.now() + (draft ? days(90) : -days(1))).toISOString(), endDate: new Date(Date.now() + (draft ? days(150) : days(60))).toISOString(),
+      courseStartsOn: cairoDate(new Date(Date.now() + days(90))), paymentDueAt: new Date(Date.now() + days(140)).toISOString(),
+    },
+  })))!;
+  const del = (who: Client, id: string, reason: string) => who.api.v1.sessions[':id'].$delete({ param: { id }, json: { reason } });
+  const exists = async (id: string) => Number((await one<{ n: string }>(`select count(*) as n from registration_session where id = $1`, [id])).n) === 1;
+
+  beforeAll(async () => {
+    adm = await admin('n08del');
+    coordinator = await staff(adm, 'coordinator', 'n08del');
+    officer = await staff(adm, 'finance_officer', 'n08del');
+    finadmin = await staff(adm, 'finance_admin', 'n08del');
+    teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher D (08n ${RUN})` } })))!.id;
+  });
+
+  it('a draft with its sheet is deleted with a reason, audited in the same change; its subjects and the boards\' series stay', async () => {
+    const d = await mk(`n08-del-${RUN}`, true);
+    expect(d.status).toBe('draft');
+    const sub = await subject(adm, `RWN-DEL-${RUN}`, `Deleted with its draft (08n ${RUN})`, { course: 1000, registration: 0 });
+    const made = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const linked = await sql<{ id: string }>(`select board_series_id as id from session_board_series where session_id = $1`, [d.id]);
+    expect(linked.length).toBeGreaterThan(0);
+    // A reason of a word is refused: the reason is what the audit keeps.
+    expect((await refused(del(adm, d.id, 'old'))).status).toBe(400);
+    expect(await exists(d.id)).toBe(true);
+    expect(await apiResponse(del(adm, d.id, 'the seed\'s sample draft: not this school\'s'))).toEqual({ deleted: d.id, name: d.name, subjects: 1 });
+    expect(await exists(d.id)).toBe(false);
+    expect(await sql(`select id from session_offer where id = $1`, [made.id])).toEqual([]);
+    expect(await sql(`select id from session_offer_item where offer_id = $1`, [made.id])).toEqual([]);
+    expect(await sql(`select id from session_board_series where session_id = $1`, [d.id])).toEqual([]);
+    expect(await one(`select count(*)::int as n from board_series where id in $1`, [linked.map((l) => l.id)])).toEqual({ n: linked.length });
+    expect(await one(`select is_active from subject where id = $1`, [sub])).toEqual({ is_active: true });
+    expect(await one(`select user_id, previous_data->>'name' as name, previous_data->'subjects' as subjects, new_data->>'reason' as reason from audit_log where action = 'SESSION_DELETED' and entity_id = $1`, [d.id]))
+      .toEqual({ user_id: expect.any(String), name: d.name, subjects: [sub], reason: 'the seed\'s sample draft: not this school\'s' });
+    expect((await refused(adm.api.v1.sessions[':id'].$get({ param: { id: d.id } }))).status).toBe(404);
+  });
+
+  it('refused, nothing deleted, for an open session, a draft with a reservation, and anyone but the admin', async () => {
+    const open = await mk(`n08-del-open-${RUN}`, false);
+    expect(open.status).toBe('active');
+    expect(await refused(del(adm, open.id, 'not wanted any more'))).toEqual({ status: 409, error: `${open.name} is open: only a draft session can be deleted (close it instead)` });
+    expect(await exists(open.id)).toBe(true);
+
+    const d = await mk(`n08-del-res-${RUN}`, true);
+    const sub = await subject(adm, `RWN-DELR-${RUN}`, `Preregistered in a draft (08n ${RUN})`, { course: 1000, registration: 0 });
+    const series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08-del-${RUN}`, entryDeadline: new Date(Date.now() + days(120)) } })))!.id;
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
+    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
+    })))!;
+    const f = await onboard(officer, `n08-del-${RUN}`, 11);
+    await reserve(f.studentId, d.id, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }], 'preregistered');
+    expect(await refused(del(adm, d.id, 'a draft with a family in it'))).toEqual({ status: 409, error: `${d.name} has a reservation: a session with reservations is never deleted` });
+    expect(await exists(d.id)).toBe(true);
+    expect((await refused(del(coordinator, d.id, 'the coordinator tries'))).status).toBe(403);
+    expect(await one(`select count(*)::int as n from audit_log where action = 'SESSION_DELETED' and entity_id in $1`, [[open.id, d.id]])).toEqual({ n: 0 });
+  });
+
+  it('refused, nothing deleted, for a draft whose exception was revoked and for one a reminder went out for: both are kept as history (the review of 744e553, item 2)', async () => {
+    // An exception granted on one of the draft's items, then revoked: revoking keeps the row, so the draft stays,
+    // and the refusal says it is kept rather than sending the admin to revoke it.
+    const d = await mk(`n08-del-exc-${RUN}`, true);
+    const sub = await subject(adm, `RWN-DELX-${RUN}`, `An exception in a draft (08n ${RUN})`, { course: 1000, registration: 0 });
+    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const f = await onboard(officer, `n08-delx-${RUN}`, 11);
+    const ex = await apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.availability', studentId: f.studentId, scope: { offerItemId: o.items[0]! }, reason: '08n: a first entry the item is not open to' } }));
+    const refusedWith = `An exception was granted for ${d.name}: it is kept as history and cannot be deleted`;
+    expect(await refused(del(adm, d.id, 'a draft with an exception'))).toEqual({ status: 409, error: refusedWith });
+    await apiResponse(coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: ex.id } }));
+    expect(await one(`select status from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked' });
+    expect(await refused(del(adm, d.id, 'the exception was revoked'))).toEqual({ status: 409, error: refusedWith });
+    expect(await exists(d.id)).toBe(true);
+    expect(await one(`select count(*)::int as n from session_offer_item where offer_id = $1`, [o.id])).toEqual({ n: o.items.length });
+    expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked', offer_item_id: o.items[0] });
+
+    // A reminder rule of the draft's own, and a reminder sent under it. No path sends one for a draft today (the
+    // step reminds lines and open sessions); the history the rule's foreign keys keep is written as the step writes it.
+    const r = await mk(`n08-del-rem-${RUN}`, true);
+    const rule = await apiResponse(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: r.id, offsetsDays: [-10], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: '08n: this draft reminds ten days ahead' } }));
+    const [aud, msg] = [`n08-del-aud-${RUN}`, `n08-del-msg-${RUN}`];
+    await sql(`insert into message_audience (id, kind, definition) values ($1, 'batch', '{"kind":"batch","list":"reminder"}'::jsonb)`, [aud]);
+    await sql(`insert into message (id, audience_id, template_id, channels, notification_type, source, reminder_rule_id, status, sent_at, recipient_count) values ($1, $2, 'tpl-payment-due', '{in_app}', 'PAYMENT_REMINDER', 'reminder', $3, 'sent', now(), 0)`, [msg, aud, rule.id]);
+    await sql(`insert into reminder_sent (id, rule_id, kind, target_kind, target_id, anchor_on, offset_days, session_id, message_id, sent_on) values ($1, $2, 'payment_due', 'line', $3, current_date + 10, -10, $4, $5, current_date)`, [`n08-del-sent-${RUN}`, rule.id, `n08-del-line-${RUN}`, r.id, msg]);
+    // Its audit row, as the step writes one with every send (09's rule: every message sent has one).
+    await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data) values ($1, null, 'REMINDERS_SENT', 'message', $2, null, $3::jsonb)`,
+      [`n08-del-audit-${RUN}`, msg, JSON.stringify({ kind: 'payment_due', ruleId: rule.id, sessionId: r.id, offsets: [-10], claimed: 1, people: 0, deliveries: 0 })]);
+    expect(await refused(del(adm, r.id, 'a draft a reminder went out for'))).toEqual({ status: 409, error: `Reminders were sent for ${r.name}: it is kept as history and cannot be deleted` });
+    expect(await exists(r.id)).toBe(true);
+    expect(await one(`select count(*)::int as n from reminder_rule where id = $1`, [rule.id])).toEqual({ n: 1 });
+    expect(await one(`select count(*)::int as n from audit_log where action = 'SESSION_DELETED' and entity_id in $1`, [[d.id, r.id]])).toEqual({ n: 0 });
+  });
+
+  it("finding 8: an exception granted on a draft's item while the deletion counts is seen and the deletion refused — never deleted unseen by the cascade", async () => {
+    const d = await mk(`n08-del-race-${RUN}`, true);
+    const sub = await subject(adm, `RWN-DELK-${RUN}`, `A grant during a deletion (08n ${RUN})`, { course: 1000, registration: 0 });
+    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const f = await onboard(officer, `n08-delk-${RUN}`, 11);
+    // The grant paused at its audit row: its exception is written, its transaction still open.
+    const p = await pauseAtAudits(['EXCEPTION_GRANTED']);
+    try {
+      const granting = apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.availability', studentId: f.studentId, scope: { offerItemId: o.items[0]! }, reason: '08n: granted while the draft is deleted' } }));
+      await p.paused('EXCEPTION_GRANTED');
+      // The deletion waits on the item the grant names (its lock before the count), then counts the grant.
+      const deleting = refused(del(adm, d.id, 'deleted while a grant is under way'));
+      await lockWaiters(2);
+      await p.release('EXCEPTION_GRANTED');
+      const ex = await granting;
+      expect(await deleting).toEqual({ status: 409, error: `An exception was granted for ${d.name}: it is kept as history and cannot be deleted` });
+      expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'active', offer_item_id: o.items[0] });
+      expect(await exists(d.id)).toBe(true);
+    } finally {
+      await p.releaseAll();
     }
   });
 });

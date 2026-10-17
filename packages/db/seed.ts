@@ -1,14 +1,19 @@
 /**
  * Database Seed Script
  *
- * Populates the database with realistic IGCSE subjects, sample registration
- * sessions, and promotes an admin user.
+ * Promotes the first admin: the account signed up with admin@igcse.local, or
+ * the email in ADMIN_EMAIL. It makes nothing else (F8-01: the samples it used
+ * to add — older Cambridge syllabus codes, unmapped, and two 2026 sessions, one
+ * a draft whose reserving had ended — led a new school's Home and its students'
+ * records).
  *
- * Usage:  npx tsx seed.ts
- * Or via: pnpm seed  (see package.json)
+ * `--with-samples` also adds the sample subjects and sessions, for a demo or a
+ * test system (the old behaviour).
  *
- * Safe to run multiple times -- uses upsert (ON CONFLICT DO UPDATE) so
- * existing rows are updated rather than duplicated.
+ * Usage:  pnpm --filter @repo/db seed                  (the admin only)
+ *         pnpm --filter @repo/db seed --with-samples   (the admin and the samples)
+ *
+ * Safe to run multiple times: rows that exist are left as the admins made them.
  */
 
 import { config } from "dotenv";
@@ -299,7 +304,20 @@ const sessions: SessionSeed[] = [
 
 async function seed() {
   console.log("--- Starting database seed ---\n");
+  const withSamples = process.argv.slice(2).includes("--with-samples");
 
+  if (withSamples) await seedSamples();
+  else {
+    console.log("No sample subjects or sessions (run with --with-samples to add them for a demo or a test system).\n");
+  }
+
+  await promoteAdmin();
+
+  console.log("\n--- Seed complete ---");
+}
+
+/** The sample subjects and sessions (`--with-samples`): a demo's or a test system's, never a school's. */
+async function seedSamples() {
   // ── 1. Upsert subjects ───────────────────────────────────────────
   console.log(`Seeding ${subjects.length} subjects...`);
   for (const s of subjects) {
@@ -342,9 +360,11 @@ async function seed() {
     console.log(`  [session] ${sess.name} (${sess.sessionType}) - ${sess.status} (created if missing)`);
   }
   console.log("");
+}
 
-  // ── 3. Promote admin user (if the account already exists) ────────
-  const adminEmail = "admin@igcse.local";
+/** The first admin: the account with ADMIN_EMAIL (default admin@igcse.local), if it exists. */
+async function promoteAdmin() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim() || "admin@igcse.local";
   console.log(`Looking for user ${adminEmail} to promote to admin...`);
 
   const existing = await db
@@ -367,8 +387,6 @@ async function seed() {
     console.log(`  User ${adminEmail} does not exist yet. Skipping promotion.`);
     console.log("  (Create the account via the app first, then re-run this seed.)");
   }
-
-  console.log("\n--- Seed complete ---");
 }
 
 /* ------------------------------------------------------------------ */

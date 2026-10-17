@@ -1,0 +1,9 @@
+Control c-r7 (review item 7): the emails' heading put back on the app's name alone (emailLayout's <h1>, the app's line under it removed), 08f -t 'say who they come from' run, then the file restored. The receipt PDF's own control is c-r7b.
+
+ ❯ test/08f-foundation-structure.test.ts (22 tests | 1 failed | 21 skipped) 2356ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08f-foundation-structure.test.ts > F0a: settings, uploads, academic structure, sections, teaching > the school's name (the lead's decision of 16 Oct 2026, 15) > the emails and the emailed PDF receipt say who they come from: the school's name with the app's name under it, the app's name alone when empty (the review of 744e553, item 7)
+AssertionError: expected '[email:stub] To: parent.f0s-rcpt-name…' to contain '| Heading: Placeholder International …'
+ ❯ test/08f-foundation-structure.test.ts:181:58

@@ -10,8 +10,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
-import { formatPrice } from '~/lib/format';
+import { apiResponse, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 
@@ -248,7 +247,7 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
                   <td className="px-4 py-3 text-card-foreground">
                     {row.grade ? `Grade ${row.grade}` : 'All grades'}
                   </td>
-                  <td className="px-4 py-3 text-end text-foreground"><span dir="ltr">{formatPrice(row.amount)}</span></td>
+                  <td className="px-4 py-3 text-end text-foreground"><span dir="ltr">{formatEgp(row.amount)}</span></td>
                   {/* The school's dates ("1 Sep 2026"), as every other screen writes them — not the browser's "9/1/2026". */}
                   <td className="px-4 py-3 text-card-foreground"><Day iso={String(row.opensAt)} /></td>
                   <td className="px-4 py-3 text-card-foreground"><Day iso={row.dueAt ? String(row.dueAt) : null} /></td>

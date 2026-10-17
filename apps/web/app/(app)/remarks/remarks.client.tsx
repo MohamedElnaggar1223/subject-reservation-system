@@ -17,9 +17,8 @@ import {
   REMARK_SERVICE_TYPES,
   REMARK_SERVICE_LABELS,
   REMARK_STATUS_LABELS,
-  COUNCIL_LABELS,
+  COUNCIL_LABELS, formatEgp,
 } from '@repo/validations';
-import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 import { RemarkServicePicker, type PickedService } from './remark-service-picker.client';
 
@@ -285,7 +284,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
             <div className="text-sm text-foreground bg-muted rounded-lg p-3">
               {COUNCIL_LABELS[selectedReg.subject.council as keyof typeof COUNCIL_LABELS] ?? selectedReg.subject.council} ·{' '}
               {feePerPaper != null
-                ? <>Fee: {formatPrice(feePerPaper)} × {validPapers.length || 1} paper(s) = <span className="font-semibold">{formatPrice(feePerPaper * Math.max(validPapers.length, 1))}</span> (refunded if the grade changes)</>
+                ? <>Fee: {formatEgp(feePerPaper)} × {validPapers.length || 1} paper(s) = <span className="font-semibold">{formatEgp(feePerPaper * Math.max(validPapers.length, 1))}</span> (refunded if the grade changes)</>
                 : 'Fee not configured yet — the school must set it before this request can proceed.'}
             </div>
           )}
@@ -351,7 +350,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_STYLES[r.status] ?? 'bg-muted text-muted-foreground'}`}>
                     {REMARK_STATUS_LABELS[r.status as keyof typeof REMARK_STATUS_LABELS] ?? r.status}
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatPrice(r.feeCharged)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatEgp(r.feeCharged)}</span>
                 </div>
               </div>
 
@@ -422,7 +421,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-xl shadow-xl border border-border max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-foreground font-display mb-2">
-              Pay Remark Fee — {formatPrice(payTarget.feeCharged)}
+              Pay Remark Fee — {formatEgp(payTarget.feeCharged)}
             </h2>
 
             {!payResult ? (
@@ -472,7 +471,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
                       ['Bank', payMeta.instapay.account.bankName],
                       ['Account Name', payMeta.instapay.account.accountName],
                       ['Account Number', payMeta.instapay.account.accountNumber],
-                      ['Exact Amount', formatPrice(payMeta.instapay.amountDue)],
+                      ['Exact Amount', formatEgp(payMeta.instapay.amountDue)],
                     ].map(([label, value]) => (
                       <div key={label as string} className="flex justify-between gap-4">
                         <dt className="text-violet-700 dark:text-violet-400">{label}</dt>

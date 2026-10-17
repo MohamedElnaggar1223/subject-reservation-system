@@ -287,8 +287,8 @@ export const sessionsArabic: Record<string, string> = {
   'A line reserved after its session\'s payment due date is due this many days after it is reserved; a line whose board fee is provisional, this many days after the fee is confirmed. Never later than its series\' deadline.':
     'السطر المحجوز بعد موعد سداد جلسته يستحق بعد هذا العدد من الأيام من حجزه؛ والسطر ذو رسوم المجلس المؤقتة بعد هذا العدد من الأيام من تأكيد الرسوم. ولا يتجاوز موعد دورته أبدًا.',
   'Refund policy of a new June session': 'سياسة الاسترداد لجلسة يونيو الجديدة',
-  'Copied into each new June session, in weeks from the first lesson: the share of the course fee a family gets back on a drop. The session can change it until the first family consents to it (SCHOOL_FORMS.md §2.1).':
-    'تُنسخ إلى كل جلسة يونيو جديدة، بالأسابيع من أول درس: نسبة رسوم التدريس التي تستردها الأسرة عند السحب. ويمكن للجلسة تغييرها حتى توافق عليها أول أسرة (SCHOOL_FORMS.md §2.1).',
+  'Copied into each new June session, in weeks from the first lesson: the share of the course fee a family gets back on a drop. The session can change it until the first family consents to it.':
+    'تُنسخ إلى كل جلسة يونيو جديدة، بالأسابيع من أول درس: نسبة رسوم التدريس التي تستردها الأسرة عند السحب. ويمكن للجلسة تغييرها حتى توافق عليها أول أسرة.',
   'Refund policy of a new winter session': 'سياسة الاسترداد لجلسة الشتاء الجديدة',
   'Copied into each new November – January session, in weeks from the first lesson (the November forms: 100% within 2 weeks, 50% in weeks 3 to 6, nothing after).':
     'تُنسخ إلى كل جلسة نوفمبر – يناير جديدة، بالأسابيع من أول درس (نماذج نوفمبر: 100% خلال أسبوعين، و50% في الأسابيع 3 إلى 6، ولا شيء بعد ذلك).',

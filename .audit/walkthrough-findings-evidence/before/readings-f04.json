@@ -1,0 +1,39 @@
+{
+  "errors": [],
+  "readings": {
+    "before/f04-items-before-drive": [
+      {
+        "kind": "qualification",
+        "label": "Arabic GCE (9AA0)",
+        "group": "qualification",
+        "q": "9AA0",
+        "teachers": [
+          "Teacher 26"
+        ]
+      },
+      {
+        "kind": "whole",
+        "label": "Arabic IAL (YAA01)",
+        "group": "qualification",
+        "q": "YAA01",
+        "teachers": [
+          "Teacher 25"
+        ]
+      }
+    ],
+    "before/f04-qualificationsToAdd": "(not in main's read)",
+    "before/f04-arabic-al-form-en": "Arabic A.L.\nPearson Edexcel · ARABIC-AL · 0 reservations\nTeachers this cycle\nTeacher 25\nonline only\nShow every teacher\nAn external team\nAn outside provider who teaches it, by the name the links sheet gives.\nAdd\nOffered as\nFirst entry and retakes\nTaught this cycle: a first entry, a retake in school, a retake in self study.\nRetakes only\n2nd entry only: a retake in school or in self study.\nRetake (Self Study ONLY)\nNot taught this cycle: self study at the self-study share of the course fee.\nNot offered this cycle\nFamilies do not see it.\nCourse fee\nCourse fee (EGP)\nSelf Study 50% School fees: EGP 6,000\nGrade 10 core\nCourse starts (if not the session's)\nNotes\nReplace teacher\nRemove subject\nPreview the family's form\nSave",
+    "before/f04-arabic-al-form-ar": "Arabic A.L.\nPearson Edexcel · ARABIC-AL · 0 حجوزات\nالمعلمون في هذه الدورة\nTeacher 25\nأونلاين فقط\nأظهر كل المعلمين\nفريق خارجي\nجهة خارجية تدرّسها، بالاسم الوارد في كشف الروابط.\nإضافة\nتُعرض على أنها\nقيد أول وإعادات\nتُدرَّس هذه الدورة: قيد أول، وإعادة في المدرسة، وإعادة دراسة ذاتية.\nإعادات فقط\nالقيد الثاني فقط: إعادة في المدرسة أو دراسة ذاتية.\nإعادة (دراسة ذاتية فقط)\nلا تُدرَّس هذه الدورة: دراسة ذاتية بنسبة الدراسة الذاتية من رسوم التدريس.\nغير معروضة هذه الدورة\nلا تراها الأسر.\nرسوم التدريس\nرسوم التدريس (جنيه)\nدراسة ذاتية 50% من رسوم المدرسة: 6,000 جنيه\nأساسية للصف 10\nبداية الدراسة (إن اختلفت عن الجلسة)\nملاحظات\nاستبدال معلم\nإزالة المادة\nمعاينة نموذج الأسرة\nحفظ",
+    "before/f04-items-after-drive": [
+      {
+        "kind": "whole",
+        "label": "Arabic IAL (YAA01)",
+        "group": "qualification",
+        "q": "YAA01",
+        "teachers": [
+          "Teacher 25"
+        ]
+      }
+    ]
+  }
+}

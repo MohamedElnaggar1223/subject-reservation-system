@@ -221,6 +221,12 @@ export const CorrectSessionSeries = z.object({
 export type CorrectSessionSeriesType = z.infer<typeof CorrectSessionSeries>;
 
 /** Close a session early. */
+/** Delete a draft session nobody has reserved in (F8-01): the admin says why; the reason is kept in the audit row. */
+export const DeleteSession = z.object({
+  reason: z.string().trim().min(5, 'Say why the session is deleted (at least 5 characters)').max(500, 'Reason too long'),
+});
+export type DeleteSessionType = z.infer<typeof DeleteSession>;
+
 export const CloseSession = z.object({
   reason: z
     .string()
