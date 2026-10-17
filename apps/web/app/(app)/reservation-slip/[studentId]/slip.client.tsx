@@ -7,6 +7,7 @@ import { Button } from '~/components/ui/button';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { fetchStatement, statementKey } from '~/components/reservations/statement';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { PrintHeading } from '~/components/print-heading';
 
 const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed'];
 
@@ -23,7 +24,7 @@ function linesToPrint<L extends { id: string; status: string }>(sessions: { line
   return latest ? latest.lines.filter((l) => LIVE.includes(l.status)) : [];
 }
 
-export default function SlipClient({ studentId, ids }: { studentId: string; ids: string[] }): React.JSX.Element {
+export default function SlipClient({ studentId, ids, schoolName }: { studentId: string; ids: string[]; schoolName: string }): React.JSX.Element {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: statementKey({ studentId }), queryFn: () => fetchStatement({ studentId }) });
   const s = data?.students[0];
   const lines = s ? linesToPrint(s.sessions, ids) : [];
@@ -45,10 +46,7 @@ export default function SlipClient({ studentId, ids }: { studentId: string; ids:
   return (
     <div className="mx-auto max-w-2xl p-8 print:max-w-none print:p-0">
       <div className="rounded-xl border border-border bg-card p-8 print:rounded-none print:border-0 print:bg-white print:text-black">
-        <div className="mb-4 border-b border-border pb-4 text-center">
-          <h1 className="font-display text-xl font-bold">IGCSE Subject Reservation System</h1>
-          <p className="mt-1 text-sm text-muted-foreground print:text-black">Reservation slip</p>
-        </div>
+        <PrintHeading schoolName={schoolName} subtitle="Reservation slip" className="mb-4 border-b border-border pb-4 text-center" />
         <dl className="mb-4 grid grid-cols-2 gap-2 text-sm">
           <dt className="text-muted-foreground print:text-black">Student</dt><dd className="text-end font-medium"><bdi data-i18n-skip="true">{s.student.name}</bdi> · <span>{s.student.gradeLabel}</span></dd>
           <dt className="text-muted-foreground print:text-black">Student ID</dt><dd className="text-end font-mono">{s.student.number ?? '—'}</dd>

@@ -82,7 +82,7 @@ export async function deskDrop(registrationId: string, staffId: string, reason: 
     await tellFamily(tx, reg.studentId, 'DROP_SWAP_PROCESSED', 'A subject was dropped at the finance desk',
       drop.gated
         ? `The subject was dropped at the finance desk (${reason}). ${refundSentence(quote)} will be credited once its receipt ${rc?.receiptNumber ?? ''} is returned to the school.`
-        : `The subject was dropped at the finance desk (${reason}). ${quote.amount > 0 ? `${refundSentence(quote)} was credited to the escrow balance.` : 'No refund applies.'}${quote.boardSent ? ` ${quote.boardNote ?? 'The board fee stays with the board: the entry had been sent.'}` : ''}`,
+        : `The subject was dropped at the finance desk (${reason}). ${quote.amount > 0 ? `${refundSentence(quote)} was added to the balance.` : 'No refund applies.'}${quote.boardSent ? ` ${quote.boardNote ?? 'The board fee stays with the board: the entry had been sent.'}` : ''}`,
       { registrationId });
     return outcome;
   });

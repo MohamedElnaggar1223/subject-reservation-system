@@ -1,0 +1,2 @@
+ALTER TABLE "exam_board" ADD COLUMN "one_paper_fee_key" text DEFAULT 'qualification' NOT NULL;--> statement-breakpoint
+ALTER TABLE "exam_board" ADD CONSTRAINT "exam_board_one_paper_fee_key" CHECK ("exam_board"."one_paper_fee_key" IN ('qualification', 'unit'));

@@ -353,6 +353,13 @@ export const examBoard = pgTable(
     // carried from and the series it is carried into (Cambridge: 13). Null: no
     // limit on record. F4 reads it.
     carryForwardMonths: integer("carry_forward_months"),
+    // F8-05 (docs/features/WALKTHROUGH_FINDINGS.md §1): what a one-paper retake's board fee is
+    // read for. 'qualification': the syllabus's fee (Cambridge charges the syllabus for a
+    // carry-forward re-entry, Q-13). 'unit': the paper's own fee, where the board's list prices
+    // per paper or unit (Pearson Edexcel: "4MA1 1H 4,600", SCHOOL_FORMS.md §3.2). Read when a
+    // one-paper item is made (offer.services.ts withOnePaper and insertItem's default fee keys);
+    // an item made keeps its keys.
+    onePaperFeeKey: text("one_paper_fee_key").notNull().default("qualification"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -361,6 +368,7 @@ export const examBoard = pgTable(
   },
   (table) => [
     check("exam_board_carry_forward_months_range", sql`${table.carryForwardMonths} IS NULL OR ${table.carryForwardMonths} BETWEEN 1 AND 60`),
+    check("exam_board_one_paper_fee_key", sql`${table.onePaperFeeKey} IN ('qualification', 'unit')`),
   ]
 );
 

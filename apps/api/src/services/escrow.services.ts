@@ -47,6 +47,10 @@ import {
   createNotification,
 } from './notification.services';
 import { logAction, type AuditContext } from './audit.services';
+import { formatEgp } from '@repo/validations';
+
+/** The refusal of a debit the free balance cannot cover (its start is what callers match on). */
+export const INSUFFICIENT_BALANCE = 'Not enough in the balance';
 
 // ─── Core Escrow Primitives ───────────────────────────────────────────────────
 // These are also imported by payment.services.ts and (future) swap.services.ts
@@ -168,7 +172,7 @@ export async function debitEscrow(params: EscrowMutationParams, tx?: DbConn): Pr
   // If no row was updated, the balance was insufficient at the DB level
   if (!updated) {
     throw new Error(
-      `Insufficient escrow balance. Requested: ${params.amount.toFixed(2)} EGP`
+      `${INSUFFICIENT_BALANCE}: ${formatEgp(params.amount)} asked for`
     );
   }
 
@@ -271,14 +275,14 @@ export async function debitHeld(params: EscrowMutationParams, tx?: DbConn & Pick
     if (!params.relatedRegistrationId) throw new Error('A plan debit names its line');
     const line = await earmarkedHeld(conn, account.id, params.relatedRegistrationId);
     if (line + 0.001 < params.amount) {
-      throw new Error(`Insufficient held deposits for this line. Held: ${line.toFixed(2)} EGP, requested: ${params.amount.toFixed(2)} EGP`);
+      throw new Error(`Insufficient held deposits for this line. Held: ${formatEgp(line)}, requested: ${formatEgp(params.amount)}`);
     }
   } else {
     // A preregistration's money: never the deposits earmarked for a plan's line.
     const earmarked = await earmarkedHeld(conn, account.id);
     const [w] = await conn.select({ held: escrow.heldBalance }).from(escrow).where(eq(escrow.id, account.id));
     if ((w?.held ?? 0) - earmarked + 0.001 < params.amount) {
-      throw new Error(`Insufficient held balance. Requested: ${params.amount.toFixed(2)} EGP`);
+      throw new Error(`Insufficient held balance. Requested: ${formatEgp(params.amount)}`);
     }
   }
 
@@ -298,7 +302,7 @@ export async function debitHeld(params: EscrowMutationParams, tx?: DbConn & Pick
 
   if (!updated) {
     throw new Error(
-      `Insufficient held balance. Requested: ${params.amount.toFixed(2)} EGP`
+      `Insufficient held balance. Requested: ${formatEgp(params.amount)}`
     );
   }
 
@@ -426,7 +430,7 @@ export async function transferEscrow(
   const fromBalance = await getEscrowBalance(data.fromStudentId);
   if (fromBalance < data.amount) {
     throw new Error(
-      `Insufficient balance. Available: ${fromBalance.toFixed(2)} EGP, Requested: ${data.amount.toFixed(2)} EGP`
+      `Insufficient balance. Available: ${formatEgp(fromBalance)}, Requested: ${formatEgp(data.amount)}`
     );
   }
 
@@ -555,7 +559,7 @@ export async function createWithdrawalRequest(
     parentId,
     'ESCROW_BALANCE_CHANGED',
     `Withdrawal request submitted for ${studentUser?.name ?? 'your child'}`,
-    `Your withdrawal request of EGP ${data.amount.toFixed(2)} from ${studentUser?.name ?? 'your child'}'s escrow has been submitted and is pending admin processing.`,
+    `Your withdrawal request of ${formatEgp(data.amount)} from ${studentUser?.name ?? 'your child'}'s balance has been submitted and is pending admin processing.`,
     { withdrawalRequested: true, amount: data.amount, studentId: data.studentId },
   ).catch((err) => console.error('[notification] withdrawal-request parent confirm failed:', err));
 
@@ -672,7 +676,7 @@ export async function fulfillWithdrawalRequest(
 
     if (newTotalReleased > req.requestedAmount) {
       throw new Error(
-        `Cannot release more than the requested amount. Remaining: ${(req.requestedAmount - currentReleased).toFixed(2)} EGP`
+        `Cannot release more than the requested amount. Remaining: ${formatEgp(req.requestedAmount - currentReleased)}`
       );
     }
 

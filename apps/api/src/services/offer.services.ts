@@ -292,9 +292,22 @@ export async function generateItems(executor: Executor, subjectId: string): Prom
 }
 
 /**
+ * What a one-paper item's board fee is read for (F8-05): the board's `one_paper_fee_key`. Cambridge's
+ * 'qualification' — the syllabus's fee (the board charges the syllabus for a carry-forward re-entry,
+ * Q-13); Pearson Edexcel's 'unit' — the paper's own row, as its list prices it ("4MA1 1H 4,600").
+ * A row with no award falls back to its units.
+ */
+async function onePaperFeeKeys(executor: Executor, boardCode: string, qualificationId: string | null, unitIds: string[]): Promise<FeeKeyInputType[]> {
+  const [b] = await executor.select({ key: examBoard.onePaperFeeKey }).from(examBoard).where(eq(examBoard.code, boardCode));
+  if (b?.key === 'qualification' && qualificationId) return [{ kind: 'qualification', id: qualificationId }];
+  return unitIds.map((id) => ({ kind: 'unit' as const, id }));
+}
+
+/**
  * An IGCSE award's one-paper retake items (§3.2's table: "Paper 4 only (retake)", "Paper 1H only"):
  * one per component the catalogue says the award requires (its own, or its option's), each
- * entering that component, retakes only, its board fee read for the qualification (Q-13), in one
+ * entering that component, retakes only, its board fee read as its board prices one paper
+ * (`onePaperFeeKeys`: the qualification's on Cambridge, Q-13; the paper's own on Pearson Edexcel), in one
  * exclusive group with the whole subject, carrying the other components on a Cambridge syllabus.
  * They come **unticked** (closed): the school opens the ones it offers on the drawer, with their
  * course fee.
@@ -311,14 +324,15 @@ async function withOnePaper(executor: Executor, q: typeof qualification.$inferSe
     : [];
   const components = [...new Map([...own, ...viaOption].map((u) => [u.id, u])).values()].sort((a, b) => a.code.localeCompare(b.code));
   if (!components.length) return [whole];
-  return [
-    { ...whole, exclusiveGroup: 'entry' },
-    ...components.map((u, i): ItemDraft => ({
+  const drafts: ItemDraft[] = [{ ...whole, exclusiveGroup: 'entry' }];
+  for (const [i, u] of components.entries()) {
+    drafts.push({
       label: `${u.shortCode ?? u.code} only (retake)`, kind: 'one_paper', enters: { kind: 'units', unitIds: [u.id] },
-      feeKeys: [{ kind: 'qualification', id: q.id }], availability: 'closed', needsPriorSeries: q.boardCode === 'cambridge',
+      feeKeys: await onePaperFeeKeys(executor, q.boardCode, q.id, [u.id]), availability: 'closed', needsPriorSeries: q.boardCode === 'cambridge',
       requiredInSeries: false, exclusiveGroup: 'entry', sortOrder: 10 + i,
-    })),
-  ];
+    });
+  }
+  return drafts;
 }
 
 /** What an item enters, checked against the subject's board; the default fee keys follow from it. */
@@ -395,7 +409,11 @@ async function insertItem(
     sortOrder: d.sortOrder ?? 0, createdBy: actorId,
   });
   if (enters.unitIds.length) await tx.insert(sessionOfferItemUnit).values(enters.unitIds.map((unitId) => ({ itemId: id, unitId })));
-  await writeFeeKeys(tx, id, d.feeKeys ?? enters.feeKeys);
+  // A one-paper item made without fee keys (the item endpoint) reads them as its board prices one paper (F8-05).
+  const defaultKeys = d.kind === 'one_paper' && d.enters.kind === 'units'
+    ? await onePaperFeeKeys(tx, subjectRow.council, enters.qualificationId, enters.unitIds)
+    : enters.feeKeys;
+  await writeFeeKeys(tx, id, d.feeKeys ?? defaultKeys);
   if (d.teachers?.length) await writeItemTeachers(tx, id, await resolveTeachers(tx, offer.subjectId, d.teachers, actorId));
   return id;
 }

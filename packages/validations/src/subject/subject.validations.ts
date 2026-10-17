@@ -89,19 +89,28 @@ export const CreateSubject = z.object({
     .transform((s) => s.trim().toUpperCase()),
   council: CouncilSchema,
   qualificationLevel: QualificationLevelSchema.default('igcse'),
+  /** The default course fee the session's sheet prefills when the subject is added to a session (F8-02). */
   courseFee: z
     .number()
     .min(0, 'Course fee cannot be negative')
     .max(1_000_000, 'Course fee seems too high'),
+  /**
+   * The old registration fee: the session's fees (the boards' fee lists) price a line now, so neither the
+   * Subjects page nor the Catalogue asks it (F8-02); 0 when not given.
+   */
   registrationFee: z
     .number()
     .min(0, 'Registration fee cannot be negative')
-    .max(1_000_000, 'Registration fee seems too high'),
+    .max(1_000_000, 'Registration fee seems too high')
+    .default(0),
   isOfferedAtSchool: z.boolean().default(true),
+  /** The old core flag: the session's sheet sets grade-10 core per session (F8-02); false when not given. */
   isCore: z.boolean().default(false),
 });
 
 export type CreateSubjectType = z.infer<typeof CreateSubject>;
+/** What a screen sends to add a subject (the defaults filled by the API). */
+export type CreateSubjectInputType = z.input<typeof CreateSubject>;
 
 /**
  * Update Subject

@@ -19,6 +19,7 @@ import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
 import { uiAuditArabic } from './i18n-ui-audit';
 import { decisionsArabic, translateDecisionsText } from './i18n-decisions';
+import { findingsArabic, translateFindingsText } from './i18n-findings';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
 import { LANGUAGE_COOKIE } from './language';
 
@@ -1595,6 +1596,8 @@ for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicT
 Object.assign(autoArabicText, uiAuditArabic);
 // The lead's decisions of 16 Oct 2026 (lib/i18n-decisions.ts): last, so a sentence they rewrote wins.
 Object.assign(autoArabicText, decisionsArabic);
+// The fix round of F8's findings (lib/i18n-findings.ts): after the decisions', so a sentence it rewrote wins.
+Object.assign(autoArabicText, findingsArabic);
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1611,6 +1614,9 @@ function translateDynamicText(text: string): string | null {
   // sentence's end, so none takes another screen's text.
   const decisionsText = translateDecisionsText(text);
   if (decisionsText) return decisionsText;
+  // The fix round of F8's findings (lib/i18n-findings.ts): its sentences with data, each anchored to its end.
+  const findingsText = translateFindingsText(text);
+  if (findingsText) return findingsText;
 
   const gradeMatch = /^Grade (\d+)$/.exec(text);
   if (gradeMatch) return `الصف ${gradeMatch[1]}`;

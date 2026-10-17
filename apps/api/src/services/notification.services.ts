@@ -53,7 +53,7 @@ import {
   sendLinkRequestEmail,
   sendLinkDecisionEmail,
 } from '../integrations/email';
-import { gradeLabel } from '@repo/validations';
+import { gradeLabel, formatEgp, paidByWords } from '@repo/validations';
 import { schoolDate, schoolDateTime } from './window.services';
 
 // ─── Core Primitives ──────────────────────────────────────────────────────────
@@ -456,7 +456,7 @@ export async function notifyRegistrationRequestReceived(data: {
   if (parents.length === 0) return;
 
   const title = `Action Required: ${data.studentName} submitted a registration request`;
-  const body = `${data.studentName} has requested to register ${data.subjects.length} subject(s) for ${data.sessionName}. Total: EGP ${data.totalCost.toFixed(2)}. Your approval is needed.`;
+  const body = `${data.studentName} has requested to register ${data.subjects.length} subject(s) for ${data.sessionName}. Total: ${formatEgp(data.totalCost)}. Your approval is needed.`;
   const notifData = {
     studentId: data.studentId,
     sessionName: data.sessionName,
@@ -512,7 +512,7 @@ export async function notifyDirectRegistrationCreated(data: {
   const parentName = parentUser?.name ?? 'Your parent';
   const subjectNames = data.subjects.map((s) => s.name).join(', ');
   const title = `${parentName} registered subjects for you`;
-  const body = `${parentName} has registered the following subjects for you in ${data.sessionName}: ${subjectNames}. Total: EGP ${data.totalCost.toFixed(2)}. Payment is now pending.`;
+  const body = `${parentName} has registered the following subjects for you in ${data.sessionName}: ${subjectNames}. Total: ${formatEgp(data.totalCost)}. Payment is now pending.`;
 
   const created = await createNotification(
     data.studentId,
@@ -614,6 +614,8 @@ export async function notifyPaymentConfirmed(data: {
   sessionName: string;
   amount: number;
   method: string;
+  /** What was handed over at the desk (cash, card…), said with the method (F8-10: "in cash at the school"). */
+  instrument?: string | null;
   paymentId: string;
   subjects: string[];
   /**
@@ -632,7 +634,9 @@ export async function notifyPaymentConfirmed(data: {
   if (!parentUser) return;
 
   const title = `Payment confirmed — ${data.sessionName}`;
-  const body = `Payment of EGP ${data.amount.toFixed(2)} via ${data.method} has been confirmed for ${studentUser?.name ?? 'your child'}'s registration.`;
+  // The method in words, never its code (F8-10: "via in_school").
+  const how = paidByWords(data.method, data.instrument);
+  const body = `Payment of ${formatEgp(data.amount)} ${how} has been confirmed for ${studentUser?.name ?? 'your child'}'s registration.`;
   const notifData = {
     paymentId: data.paymentId,
     studentId: data.studentId,
@@ -646,7 +650,7 @@ export async function notifyPaymentConfirmed(data: {
   // Also notify the student that payment was confirmed
   if (studentUser) {
     const studentTitle = `Payment confirmed — ${data.sessionName}`;
-    const studentBody = `Payment of EGP ${data.amount.toFixed(2)} via ${data.method} has been confirmed for your registration in ${data.sessionName}. Your subjects are now fully registered.`;
+    const studentBody = `Payment of ${formatEgp(data.amount)} ${how} has been confirmed for your registration in ${data.sessionName}. Your subjects are now fully registered.`;
     await createNotification(data.studentId, 'PAYMENT_CONFIRMED', studentTitle, studentBody, notifData);
   }
 
@@ -657,7 +661,7 @@ export async function notifyPaymentConfirmed(data: {
         studentName: studentUser?.name ?? 'your child',
         sessionName: data.sessionName,
         amount: data.amount,
-        method: data.method,
+        method: how,
         paymentId: data.paymentId,
         subjects: data.subjects,
         receiptPdf: data.receiptPdf,
@@ -699,7 +703,7 @@ export async function notifyPaymentReversed(data: {
     : ' It had been recorded by mistake: no money was received for it.';
   const title = 'Payment reversed';
   const body =
-    `The finance office reversed a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}).${moneyNote} ` +
+    `The finance office reversed a payment of ${formatEgp(data.amount)} for ${studentName} (${data.reason}).${moneyNote} ` +
     (data.pastEntryDeadline
       ? `The exam board's entry deadline for this series has passed, so ${data.registrationsReverted === 1 ? 'this subject' : 'these subjects'} can no longer be entered.${receiptNote}`
       : `${data.registrationsReverted} registration${data.registrationsReverted === 1 ? ' is' : 's are'} back to pending payment.${receiptNote} ` +
@@ -754,14 +758,14 @@ export async function notifyPaymentRejected(data: {
   ]);
   const studentName = studentUser?.name ?? 'your child';
   const escrowNote = data.escrowReturned > 0
-    ? ` EGP ${data.escrowReturned.toFixed(2)} applied from escrow has been returned.`
+    ? ` ${formatEgp(data.escrowReturned)} paid from the balance has been returned to it.`
     : '';
   const next = data.registrationsExpired > 0
     ? 'The registration window has closed, so these subjects are no longer reserved; if you did send the transfer, contact the finance desk with your bank receipt.'
     : 'The subjects are still waiting for payment; if you did send the transfer, contact the finance desk with your bank receipt.';
   const title = 'Payment not received';
   const body =
-    `The finance office could not match a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}).` +
+    `The finance office could not match a payment of ${formatEgp(data.amount)} for ${studentName} (${data.reason}).` +
     `${escrowNote} ${next}`;
   const notifData = { paymentId: data.paymentId, studentId: data.studentId, amount: data.amount, escrowReturned: data.escrowReturned };
 
@@ -813,7 +817,7 @@ async function notifyFamilyOfPayment(
   const studentName = studentUser?.name ?? 'your child';
   const text = body({
     studentName,
-    amount: `EGP ${(pay.amount + pay.escrowAmountApplied).toFixed(2)}`,
+    amount: formatEgp(pay.amount + pay.escrowAmountApplied),
     subjects: pay.paymentRegistrations.map((pr) => pr.registration.subject.name).join(', '),
     sessionName: pay.paymentRegistrations[0]?.registration.session.name ?? 'the session',
   });
@@ -845,7 +849,7 @@ export async function notifyPaymentReferenceDue(paymentId: string) {
 
 /** After the grace period: no reference came, so the checkout lapsed. */
 export async function notifyPaymentExpired(paymentId: string, escrowReturned: number) {
-  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  const escrowNote = escrowReturned > 0 ? ` ${formatEgp(escrowReturned)} paid from the balance has been returned to it.` : '';
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'InstaPay payment not completed', (c) =>
     `No transfer reference was submitted for the InstaPay payment of ${c.amount} for ${c.studentName} (${c.subjects}) in the time allowed after the ${c.sessionName} window closed, ` +
     `so the payment was cancelled and the subjects were released.${escrowNote} If you did transfer, contact the finance desk with your bank receipt.`
@@ -859,11 +863,11 @@ export async function notifyPaymentExpired(paymentId: string, escrowReturned: nu
  * credits it to escrow once it is found.
  */
 export async function notifyPaymentClosedAtEntryDeadline(paymentId: string, entryDeadline: Date, escrowReturned: number) {
-  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  const escrowNote = escrowReturned > 0 ? ` ${formatEgp(escrowReturned)} paid from the balance has been returned to it.` : '';
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed at the exam board deadline', (c) =>
     `The exam board's entry deadline for ${c.sessionName} (${schoolDate(entryDeadline)}) passed before the payment of ${c.amount} for ${c.studentName} was confirmed, ` +
     `so the payment was closed and its subjects in that series were not entered.${escrowNote} ` +
-    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance, to use or to take back.`
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your balance, to use or to take back.`
   );
 }
 
@@ -893,13 +897,13 @@ export async function notifyPreregistrationsRefundedAtDeadline(
     const names = (list: typeof rows) => list.map((r) => nameOf.get(r.subjectId) ?? 'a subject').join(', ');
     const now = mine.filter((r) => r.refunded > 0 && !r.gated);
     const onReturn = mine.filter((r) => r.refunded > 0 && r.gated);
-    const total = (list: typeof rows) => list.reduce((s, r) => s + r.refunded, 0).toFixed(2);
+    const total = (list: typeof rows) => formatEgp(list.reduce((s, r) => s + r.refunded, 0));
     const title = `Refunded: ${sessionName} did not open`;
     const body =
       `The exam board's entry deadline for ${sessionName} (${schoolDate(entryDeadline)}) passed before the school opened registration, ` +
       `so these preregistered subjects will not be entered: ${names(mine)}.` +
-      (now.length ? ` EGP ${total(now)} paid for ${names(now)} has been returned to your escrow balance in full.` : '') +
-      (onReturn.length ? ` EGP ${total(onReturn)} for ${names(onReturn)} is returned in full once the paper receipt is brought back to the finance desk.` : '');
+      (now.length ? ` ${total(now)} paid for ${names(now)} has been returned to your balance in full.` : '') +
+      (onReturn.length ? ` ${total(onReturn)} for ${names(onReturn)} is returned in full once the paper receipt is brought back to the finance desk.` : '');
     const meta = { sessionId, subjectNames: mine.map((r) => nameOf.get(r.subjectId)), reason: 'entry_deadline_unopened' };
     await createNotification(studentId, 'SESSION_CLOSED', title, body, meta);
     for (const { parentId } of await getLinkedParents(studentId)) {
@@ -910,10 +914,10 @@ export async function notifyPreregistrationsRefundedAtDeadline(
 
 /** The recovery sweep closed a payment whose registrations had all expired. */
 export async function notifyStrandedPaymentClosed(paymentId: string, escrowReturned: number) {
-  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  const escrowNote = escrowReturned > 0 ? ` ${formatEgp(escrowReturned)} paid from the balance has been returned to it.` : '';
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed', (c) =>
     `The subjects this payment of ${c.amount} for ${c.studentName} covered (${c.subjects}) are no longer open for registration, so the payment was closed before it was confirmed.${escrowNote} ` +
-    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance.`
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your balance.`
   );
 }
 
@@ -928,7 +932,7 @@ export async function notifyPaymentClosedIneligible(
   escrowReturned: number,
   cause: 'withdrawn' | 'transferred' | 'cohort_corrected' | 'graduate_retakes_off' | 'series_corrected' | 'exception_revoked' | 'exception_lapsed',
 ) {
-  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  const escrowNote = escrowReturned > 0 ? ` ${formatEgp(escrowReturned)} paid from the balance has been returned to it.` : '';
   const because: Record<typeof cause, (name: string) => string> = {
     withdrawn: (n) => `${n} has been withdrawn from the school`,
     transferred: (n) => `${n} has transferred to another school`,
@@ -940,7 +944,7 @@ export async function notifyPaymentClosedIneligible(
   };
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed', (c) =>
     `${because[cause](c.studentName)}, so the payment of ${c.amount} for ${c.subjects} (${c.sessionName}) was closed before it was confirmed.${escrowNote} ` +
-    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance.`
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your balance.`
   );
 }
 
@@ -964,7 +968,7 @@ export async function notifyFinanceOfHeldPreregistration(registrationId: string,
   if (!reg) return;
   const staff = await db.select({ id: user.id }).from(user)
     .where(and(inArray(user.role, ['finance_officer', 'finance_admin', 'admin']), or(eq(user.banned, false), isNull(user.banned))));
-  const money = heldAmount > 0 ? `EGP ${heldAmount.toFixed(2)} stays held in the family's wallet` : 'It was not paid for';
+  const money = heldAmount > 0 ? `${formatEgp(heldAmount)} stays held in the family's balance` : 'It was not paid for';
   const title = `Preregistration held: ${reg.student.name}`;
   const body = `${reg.student.name}'s preregistration for ${reg.subject.name} (${reg.subject.code}), ${reg.session.name}, was not confirmed when the series opened: ${reason}. ` +
     `${money}. Nothing releases it until the school decides what to do with it (a refund is the owner's decision); ` +
@@ -1193,8 +1197,9 @@ export async function notifyEscrowBalanceChanged(data: {
 
   const direction = data.changeAmount >= 0 ? 'credited' : 'debited';
   const absAmount = Math.abs(data.changeAmount);
-  const title = `Escrow balance ${direction} for ${data.studentName}`;
-  const body = `EGP ${absAmount.toFixed(2)} was ${direction} to ${data.studentName}'s escrow. New balance: EGP ${data.newBalance.toFixed(2)}. Reason: ${data.reason}`;
+  // The family's word (the lead's decision 14; F8-10): the balance, money added to it or taken from it.
+  const title = data.changeAmount >= 0 ? `Added to ${data.studentName}'s balance` : `Taken from ${data.studentName}'s balance`;
+  const body = `${formatEgp(absAmount)} was ${data.changeAmount >= 0 ? 'added to' : 'taken from'} ${data.studentName}'s balance. New balance: ${formatEgp(data.newBalance)}. Reason: ${data.reason}`;
   const notifData = {
     studentId: data.studentId,
     previousBalance: data.previousBalance,
@@ -1245,8 +1250,8 @@ export async function notifyWithdrawalFulfilled(data: {
   const parentUser = await getUserDetails(data.parentId);
   if (!parentUser) return;
 
-  const title = `Escrow withdrawal fulfilled for ${data.studentName}`;
-  const body = `EGP ${data.amountReleased.toFixed(2)} was released from ${data.studentName}'s escrow. Remaining balance: EGP ${data.remainingBalance.toFixed(2)}.`;
+  const title = `Balance withdrawal fulfilled for ${data.studentName}`;
+  const body = `${formatEgp(data.amountReleased)} was released from ${data.studentName}'s balance. Remaining balance: ${formatEgp(data.remainingBalance)}.`;
 
   const parentNotif = await createNotification(data.parentId, 'ESCROW_WITHDRAWAL_FULFILLED', title, body, {
     studentId: data.studentId,
@@ -1258,8 +1263,8 @@ export async function notifyWithdrawalFulfilled(data: {
   await createNotification(
     data.studentId,
     'ESCROW_BALANCE_CHANGED',
-    `Escrow withdrawal processed`,
-    `EGP ${data.amountReleased.toFixed(2)} was withdrawn from your escrow. Remaining balance: EGP ${data.remainingBalance.toFixed(2)}.`,
+    `Balance withdrawal processed`,
+    `${formatEgp(data.amountReleased)} was withdrawn from your balance. Remaining balance: ${formatEgp(data.remainingBalance)}.`,
     { amountReleased: data.amountReleased, remainingBalance: data.remainingBalance }
   );
 
@@ -1287,8 +1292,8 @@ export async function notifyWithdrawalRequested(data: {
   amount: number;
   parentName: string;
 }) {
-  const title = `Escrow withdrawal requested`;
-  const body = `${data.parentName} has requested a withdrawal of EGP ${data.amount.toFixed(2)} from your escrow account. The request is pending admin processing.`;
+  const title = `Balance withdrawal requested`;
+  const body = `${data.parentName} has requested a withdrawal of ${formatEgp(data.amount)} from your balance. The request is pending admin processing.`;
 
   await createNotification(data.studentId, 'ESCROW_BALANCE_CHANGED', title, body, {
     withdrawalRequested: true,
@@ -1309,7 +1314,7 @@ export async function notifyWithdrawalRejected(data: {
 }) {
   const title = `Withdrawal request rejected for ${data.studentName}`;
   const body = data.amount > 0
-    ? `The withdrawal request for ${data.studentName} was rejected. EGP ${data.amount.toFixed(2)} has been returned to the escrow balance. Reason: ${data.reason}`
+    ? `The withdrawal request for ${data.studentName} was rejected. ${formatEgp(data.amount)} has been returned to the balance. Reason: ${data.reason}`
     : `The withdrawal request for ${data.studentName} was rejected. Reason: ${data.reason}`;
 
   // Dedicated type so the inbox distinguishes fulfilled vs rejected

@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
 import { apiResponse, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
+import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -160,20 +161,21 @@ function ChangeRequestCard({ request }: { request: ChangeRequest }) {
       <div className="mt-3 flex items-center gap-4 text-sm">
         <div>
           <span className="text-muted-foreground text-xs">Original price</span>
-          <p className="font-medium text-foreground">{request.registration.priceAtRegistration.toFixed(2)} EGP</p>
+          <p className="font-medium text-foreground" dir="ltr">{formatPrice(request.registration.priceAtRegistration)}</p>
         </div>
         {request.type === 'swap' && (
           <div>
             <span className="text-muted-foreground text-xs">New subject price</span>
-            <p className="font-medium text-foreground">{request.priceAtRequest.toFixed(2)} EGP</p>
+            <p className="font-medium text-foreground" dir="ltr">{formatPrice(request.priceAtRequest)}</p>
           </div>
         )}
         <div>
           <span className="text-muted-foreground text-xs">Financial impact</span>
+          {/* F8-10: the amount as every screen writes it ("EGP 16,850"), each part its own text for the translator. */}
           <p className={`font-semibold ${isCredit ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
             {isCredit
-              ? `+${absImpact.toFixed(2)} EGP to the balance`
-              : `-${absImpact.toFixed(2)} EGP additional payment needed`}
+              ? <><span dir="ltr">+{formatPrice(absImpact)}</span> <span>to the balance</span></>
+              : <><span dir="ltr">{formatPrice(absImpact)}</span> <span>more to pay</span></>}
           </p>
         </div>
       </div>

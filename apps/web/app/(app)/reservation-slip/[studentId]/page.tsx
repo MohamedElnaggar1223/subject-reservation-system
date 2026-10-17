@@ -5,6 +5,7 @@
  */
 
 import { requireAuth } from '~/lib/auth/session';
+import { readSchoolName } from '~/lib/school-name-server';
 import SlipClient from './slip.client';
 
 export const metadata = {
@@ -15,5 +16,6 @@ export default async function SlipPage({ params, searchParams }: { params: Promi
   await requireAuth();
   const { studentId } = await params;
   const { ids } = await searchParams;
-  return <SlipClient studentId={studentId} ids={(ids ?? '').split(',').filter(Boolean)} />;
+  // F8-11: the school's name heads the slip (the app's name alone while the setting is empty).
+  return <SlipClient studentId={studentId} ids={(ids ?? '').split(',').filter(Boolean)} schoolName={await readSchoolName()} />;
 }

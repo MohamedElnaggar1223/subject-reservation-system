@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
+import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 import { Money } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
@@ -267,19 +268,19 @@ export default function EscrowAdminClient() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Requested</span>
-                <span className="font-medium text-foreground">{fulfillTarget.requestedAmount.toFixed(2)} EGP</span>
+                <span className="font-medium text-foreground">{formatPrice(fulfillTarget.requestedAmount)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Already Released</span>
-                <span className="font-medium text-emerald-700 dark:text-emerald-400">{(fulfillTarget.releasedAmount ?? 0).toFixed(2)} EGP</span>
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">{formatPrice((fulfillTarget.releasedAmount ?? 0))}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Remaining</span>
-                <span className="font-semibold text-foreground">{(fulfillTarget.requestedAmount - (fulfillTarget.releasedAmount ?? 0)).toFixed(2)} EGP</span>
+                <span className="font-semibold text-foreground">{formatPrice((fulfillTarget.requestedAmount - (fulfillTarget.releasedAmount ?? 0)))}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Current balance</span>
-                <span className="font-medium text-primary">{fulfillTarget.escrow.balance.toFixed(2)} EGP</span>
+                <span className="font-medium text-primary">{formatPrice(fulfillTarget.escrow.balance)}</span>
               </div>
             </div>
 
@@ -348,7 +349,7 @@ export default function EscrowAdminClient() {
             <p className="text-sm text-muted-foreground">
               Rejecting this request for{' '}
               <span className="font-semibold text-foreground">{rejectTarget.escrow.student.name}</span>{' '}
-              ({rejectTarget.requestedAmount.toFixed(2)} EGP). The unreleased held amount will be returned to the balance.
+              ({formatPrice(rejectTarget.requestedAmount)}). The unreleased held amount will be returned to the balance.
             </p>
 
             <div>

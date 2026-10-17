@@ -302,4 +302,40 @@ describe('F0b: the exam catalogue', () => {
       }))).toEqual({ status: 400, error: '4GE1 is a Pearson Edexcel qualification, not Cambridge International' });
     });
   });
+
+  describe("adding and retiring a subject (F8-02, F8-03)", () => {
+    const tag = Math.random().toString(36).slice(2, 6).toUpperCase();
+
+    it('a subject is added with its name, code, board, level and default course fee alone — no registration fee, no core — and the session sheet can add it', async () => {
+      const made = await apiResponse(adm.api.v1.subjects.$post({
+        json: { name: `Psychology A.S./A.L. (08h ${tag})`, code: `F802-PSY-${tag}`, council: 'oxford', qualificationLevel: 'a_level', courseFee: 15000 },
+      }));
+      expect(made).toMatchObject({ code: `F802-PSY-${tag}`, council: 'oxford', qualificationLevel: 'a_level', courseFee: 15000, registrationFee: 0, isCore: false, isActive: true });
+      await audited([made!.id], ['SUBJECT_CREATED']);
+      // The Catalogue lists it to map; the session's sheet offers it on its Add subject, with its course fee to prefill.
+      expect((await fetchCatalogue()).registrable.find((r) => r.id === made!.id)).toMatchObject({ mapped: false, isActive: true });
+      const sessionId = await session(adm, '08h F8-02', 'june', 'a_level', futureWindow());
+      const addable = await apiResponse(adm.api.v1.sessions[':id'].offers.addable.$get({ param: { id: sessionId } }));
+      expect(addable.find((s) => s.id === made!.id)).toMatchObject({ courseFee: 15000, mapped: false });
+      // Adding a subject stays the admin's: the coordinator maps it on the Catalogue, but cannot make one.
+      expect((await refused(coordinator.api.v1.subjects.$post({ json: { name: 'x', code: `F802-X-${tag}`, council: 'oxford', courseFee: 1 } }))).status).toBe(403);
+    });
+
+    it('a subject marked core is deactivated whatever its flag, the flag cleared with it and audited in the same change; deactivated, it is not counted as one to map', async () => {
+      const before = (await fetchCatalogue()).unmappedCount;
+      const s = await subject(adm, `F803-CORE-${tag}`, `Core sample (08h ${tag})`, { course: 1000, registration: 0 }, { isCore: true });
+      expect((await fetchCatalogue()).unmappedCount).toBe(before + 1);
+      expect(await apiResponse(adm.api.v1.subjects[':id'].$delete({ param: { id: s } }))).toMatchObject({ isActive: false, isCore: false });
+      expect(await one(`select previous_data->>'isCore' as was, new_data->>'isCore' as now, new_data->>'reason' as why from audit_log where action = 'SUBJECT_DEACTIVATED' and entity_id = $1`, [s]))
+        .toEqual({ was: 'true', now: 'false', why: 'Deactivated; its core designation cleared with it (grade-10 core is set on the session sheet)' });
+      const cat = await fetchCatalogue();
+      expect(cat.unmappedCount).toBe(before);
+      expect(cat.registrable.find((r) => r.id === s)).toMatchObject({ isActive: false, mapped: false });
+      // Reactivated, it is one to map again; its old core flag stays cleared.
+      await apiResponse(adm.api.v1.subjects[':id'].activate.$put({ param: { id: s } }));
+      expect((await fetchCatalogue()).unmappedCount).toBe(before + 1);
+      expect(await one(`select is_core from subject where id = $1`, [s])).toEqual({ is_core: false });
+      await apiResponse(adm.api.v1.subjects[':id'].$delete({ param: { id: s } }));
+    });
+  });
 });

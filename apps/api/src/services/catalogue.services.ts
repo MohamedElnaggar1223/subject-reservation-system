@@ -165,7 +165,8 @@ export async function getCatalogue() {
       registrableCount: subjectUnits.filter((su) => su.unitId === u.id).length,
     })),
     registrable,
-    unmappedCount: registrable.filter((r) => !r.mapped).length,
+    // A deactivated subject is not offered: it is not counted as one to map (F8-03).
+    unmappedCount: registrable.filter((r) => !r.mapped && r.isActive).length,
   };
 }
 
@@ -185,7 +186,7 @@ export async function updateBoard(code: string, data: UpdateBoardType, actorId: 
     }
     const [updated] = await tx.update(examBoard).set({ ...data, updatedAt: new Date() }).where(eq(examBoard.code, code)).returning();
     await logAction(actorId, 'BOARD_UPDATED', 'board', code,
-      { name: b.name, shortName: b.shortName, entryPortal: b.entryPortal, seriesMonths: b.seriesMonths, notes: b.notes },
+      { name: b.name, shortName: b.shortName, entryPortal: b.entryPortal, seriesMonths: b.seriesMonths, notes: b.notes, onePaperFeeKey: b.onePaperFeeKey },
       data as Record<string, unknown>, ctx, tx);
     return updated!;
   });
@@ -682,6 +683,15 @@ export async function findRegistrable(term: string) {
 // ─── Starter sets ────────────────────────────────────────────────────────────
 
 /**
+ * The note each starter set writes on the units and awards it makes: the board's documents it came from
+ * (DISCOVERY_RESEARCH.md's sources P1, P4, P5 and P6), one per set (the decisions' review, low note 1).
+ */
+export const STARTER_SET_NOTES: Record<StarterSet, string> = {
+  pearson_ial_mathematics: 'Starter set from Pearson\'s IAL information manual 2025/26, the IAL Mathematics aggregation rules and the IAL January 2027 timetable — check it against the board\'s current specification.',
+  pearson_ial_biology: 'Starter set from Pearson\'s IAL information manual 2025/26, Pearson\'s unit aggregation and cash-in rules and the IAL January 2027 timetable — check it against the board\'s current specification.',
+};
+
+/**
  * Add a starter set the research confirmed (DISCOVERY_RESEARCH.md §1–2):
  * units and awards not yet in the catalogue are added with their map; what
  * is there already is left as it is. Loading it twice changes nothing.
@@ -691,8 +701,9 @@ export async function loadStarterSet(set: StarterSet, actorId: string, ctx?: Aud
   return db.transaction(async (tx) => {
     // One load at a time: the board row is the lock.
     await tx.select({ code: examBoard.code }).from(examBoard).where(eq(examBoard.code, data.boardCode)).for('update');
-    // The documents' names alone, not the research file's (the lead's decision of 16 Oct 2026, 16; the review of dd68598).
-    const note = 'Starter set from Pearson\'s IAL information manual 2025/26, the IAL Mathematics aggregation rules and the IAL January 2027 timetable — check it against the board\'s current specification.';
+    // The documents' names alone, not the research file's (the lead's decision of 16 Oct 2026, 16; the review of dd68598),
+    // each set's own: the aggregation rules are Mathematics'; Biology's units aggregate under Pearson's general rules.
+    const note = STARTER_SET_NOTES[set];
     const addedUnits = await tx.insert(examUnit).values(data.units.map((u) => ({
       id: randomUUID(), boardCode: data.boardCode, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, kind: 'unit', notes: note,
     }))).onConflictDoNothing().returning({ id: examUnit.id });

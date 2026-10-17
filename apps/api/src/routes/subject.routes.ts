@@ -207,7 +207,9 @@ export const subjects = new Hono<HonoEnv>()
    * DELETE /subjects/:id
    *
    * Admin only. Soft delete — subject is hidden from new registrations
-   * but existing registration data is preserved.
+   * but existing registration data is preserved. A subject marked core is
+   * deactivated too, its old core flag cleared with it (F8-03): the
+   * session's sheet sets grade-10 core now.
    */
   .delete('/:id',
     requireAdmin(),
@@ -225,19 +227,12 @@ export const subjects = new Hono<HonoEnv>()
         return error(c, 'Subject is already deactivated', 400);
       }
 
-      // Prevent deactivating core subjects without removing the core designation first
-      if (existing.isCore) {
-        return error(c, 'Cannot deactivate a core subject. Remove the core designation first.', 409);
-      }
-
-      const updated = await subjectService.deactivateSubject(id);
+      // Its audit row is written in the deactivation's own transaction.
+      const updated = await subjectService.deactivateSubject(id, user.id, extractAuditContext(c));
 
       if (!updated) {
         return error(c, 'Failed to deactivate subject', 500);
       }
-
-      await logAction(user.id, 'SUBJECT_DEACTIVATED', 'subject', id, existing as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
-        .catch((err) => console.error('[audit] SUBJECT_DEACTIVATED failed:', err));
 
       return success(c, updated);
     }

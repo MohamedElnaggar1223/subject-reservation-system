@@ -1033,7 +1033,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [lb!.id])).s).toBe(other);
   });
 
-  it("an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)", async () => {
+  it("an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the paper's own fee on a board that prices per paper (Pearson Edexcel), the qualification's on Cambridge (§3.2, Q-13, F8-05)", async () => {
     const q = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
       json: { boardCode: 'pearson_edexcel', code: `V4MA-${RUN}`, title: `Mathematics A (08n ${RUN})`, level: 'igcse', suite: 'Pearson Edexcel International GCSE', subjectArea: 'Mathematics', entryMethod: 'qualification' },
     })))!.id;
@@ -1052,7 +1052,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       ['Paper 1H only (retake)', 'one_paper', 'units', 'closed', 'entry', false, [h1]],
       ['Paper 2H only (retake)', 'one_paper', 'units', 'closed', 'entry', false, [h2]],
     ]);
-    expect(await sql(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1`, [items[1]!.id])).toEqual([{ key_kind: 'qualification', key_id: q }]);
+    expect(await sql(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1`, [items[1]!.id])).toEqual([{ key_kind: 'unit', key_id: h1 }]);
   });
 
   it("the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval", async () => {

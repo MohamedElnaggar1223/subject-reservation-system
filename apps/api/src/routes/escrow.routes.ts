@@ -83,7 +83,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
           targetStudentId = queryStudentId;
         } else {
           // No specific child — return parent's own escrow (parents may not have one; return 0)
-          return success(c, { studentId: user.id, balance: 0, message: 'Parents manage children\'s escrow' });
+          return success(c, { studentId: user.id, balance: 0, message: 'Parents see each child\'s balance' });
         }
       } else if (user.role === ROLES.ADMIN) {
         if (!queryStudentId) return error(c, 'studentId is required for admin queries', 400);

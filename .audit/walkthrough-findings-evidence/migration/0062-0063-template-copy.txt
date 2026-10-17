@@ -1,0 +1,94 @@
+== The migration proof of 0062 and 0063 (item 1, F8-05), 2026-10-16T23:55:33Z
+igcse_findings_mig: a fresh copy of igcse_template_dev (34 migrations), migrated with main 2a149dd's 62 (/tmp/wf/main-src/packages/db),
+then the fixture /tmp/wf/mig/fixture-at-62.sql (main's one-paper items, keyed on the qualification).
+
+== Before (main's 62 + the fixture)
+ migrations 
+------------
+         62
+
+psql:/tmp/wf/mig/read.sql:3: ERROR:  column "one_paper_fee_key" does not exist
+LINE 1: SELECT code, one_paper_fee_key FROM exam_board ORDER BY code...
+                     ^
+    item     |           label           |   key_kind    |  key_id   
+-------------+---------------------------+---------------+-----------
+ mig_i_1h    | Paper 1H only (retake)    | qualification | mig_q_ma
+ mig_i_both  | Papers 1H and 2H (retake) | qualification | mig_q_ma
+ mig_i_cam   | Paper 4 only (retake)     | qualification | mig_q_cam
+ mig_i_whole | Whole subject             | qualification | mig_q_ma
+
+ action | entity_type | entity_id | was | now 
+--------+-------------+-----------+-----+-----
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     8 |    11600.00 | cd5ea2152b6f79ea8de6dd6114679e37
+
+
+== drizzle-kit migrate with the branch's set
+Reading config file '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/walkthrough-findings/packages/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+
+== After
+ migrations 
+------------
+         64
+
+      code       | one_paper_fee_key 
+-----------------+-------------------
+ cambridge       | qualification
+ oxford          | qualification
+ pearson_edexcel | unit
+
+    item     |           label           |   key_kind    |  key_id   
+-------------+---------------------------+---------------+-----------
+ mig_i_1h    | Paper 1H only (retake)    | unit          | mig_u_1h
+ mig_i_both  | Papers 1H and 2H (retake) | qualification | mig_q_ma
+ mig_i_cam   | Paper 4 only (retake)     | qualification | mig_q_cam
+ mig_i_whole | Whole subject             | qualification | mig_q_ma
+
+       action       | entity_type |    entity_id    |                            was                             |                                                                                                now                                                                                                
+--------------------+-------------+-----------------+------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ OFFER_ITEM_UPDATED | offer_item  | mig_i_1h        | {"feeKeys": [{"id": "mig_q_ma", "kind": "qualification"}]} | {"reason": "A one-paper retake of a board that prices per paper reads the paper's own fee; its lines keep their prices (F8-05; migration 0063)", "feeKeys": [{"id": "mig_u_1h", "kind": "unit"}]}
+ BOARD_UPDATED      | board       | pearson_edexcel | {"onePaperFeeKey": "qualification"}                        | {"reason": "Pearson Edexcel prices a one-paper retake per paper (F8-05; migration 0063)", "onePaperFeeKey": "unit"}
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     8 |    11600.00 | cd5ea2152b6f79ea8de6dd6114679e37
+
+
+== A second migrate
+Reading config file '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/walkthrough-findings/packages/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+
+== 0063's statements run again by hand
+INSERT 0 0
+INSERT 0 0
+
+== After both
+ migrations 
+------------
+         64
+
+      code       | one_paper_fee_key 
+-----------------+-------------------
+ cambridge       | qualification
+ oxford          | qualification
+ pearson_edexcel | unit
+
+    item     |           label           |   key_kind    |  key_id   
+-------------+---------------------------+---------------+-----------
+ mig_i_1h    | Paper 1H only (retake)    | unit          | mig_u_1h
+ mig_i_both  | Papers 1H and 2H (retake) | qualification | mig_q_ma
+ mig_i_cam   | Paper 4 only (retake)     | qualification | mig_q_cam
+ mig_i_whole | Whole subject             | qualification | mig_q_ma
+
+       action       | entity_type |    entity_id    |                            was                             |                                                                                                now                                                                                                
+--------------------+-------------+-----------------+------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ OFFER_ITEM_UPDATED | offer_item  | mig_i_1h        | {"feeKeys": [{"id": "mig_q_ma", "kind": "qualification"}]} | {"reason": "A one-paper retake of a board that prices per paper reads the paper's own fee; its lines keep their prices (F8-05; migration 0063)", "feeKeys": [{"id": "mig_u_1h", "kind": "unit"}]}
+ BOARD_UPDATED      | board       | pearson_edexcel | {"onePaperFeeKey": "qualification"}                        | {"reason": "Pearson Edexcel prices a one-paper retake per paper (F8-05; migration 0063)", "onePaperFeeKey": "unit"}
+
+ lines | total_price |           lines_digest           
+-------+-------------+----------------------------------
+     8 |    11600.00 | cd5ea2152b6f79ea8de6dd6114679e37
+

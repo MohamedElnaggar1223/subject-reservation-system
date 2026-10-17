@@ -293,6 +293,14 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                   <p className={`text-lg font-bold ${summary.owing > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`} dir="ltr">
                     {formatPrice(summary.owing)}
                   </p>
+                  {/* F8-09: what a payment under way covers is owed, not collected here: said apart. */}
+                  {summary.owingInProgress > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      <span dir="ltr">+{formatPrice(summary.owingInProgress)}</span>{' '}
+                      <span>{summary.registrations.every((r) => !r.paymentInProgress || r.paymentInProgress.status === 'pending_verification')
+                        ? "awaiting the transfer's check" : 'with a payment under way'}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Balance</p>

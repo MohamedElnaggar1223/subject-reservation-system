@@ -788,7 +788,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
           studentId,
           'SESSION_CLOSED',
           `Your pending registrations for ${sessionName} were not completed`,
-          `The registration window for ${sessionName} has closed. The following pending registration(s) were not completed and have been expired: ${subjectNames.join(', ')}. Any escrow already credited to your account from earlier actions is unaffected.`,
+          `The registration window for ${sessionName} has closed. The following pending registration(s) were not completed and have been expired: ${subjectNames.join(', ')}. Your balance with the school is unaffected.`,
           { sessionId, sessionName, subjectNames, reason: 'session_closed' }
         );
       }

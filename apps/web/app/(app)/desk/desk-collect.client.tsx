@@ -40,7 +40,10 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     // instalments stay paid; their deposits went back to escrow).
     const waiting = (summary?.registrations ?? []).filter((r) => r.status === 'pending_payment' && !r.livePlan);
     const lines = waiting.filter((r) => r.payableNow);
-    const provisional = waiting.filter((r) => !r.payableNow);
+    // F8-09: a line whose payment is under way (the family's transfer waiting for finance's check, a checkout
+    // they started) is listed apart, never ticked: the Finance Workbench confirms or rejects that payment.
+    const underWay = waiting.filter((r) => r.paymentInProgress);
+    const provisional = waiting.filter((r) => !r.payableNow && !r.paymentInProgress);
     const payable = rows.filter((c) => c.status === 'pending_payment' && c.kind !== 'school_fee_push' && !c.openPaymentId);
     const requested = rows.filter((c) => c.status === 'requested');
     const pushes = rows.filter((c) => c.kind === 'school_fee_push' && c.status === 'pending_payment');
@@ -59,7 +62,7 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     const laterInstalments = new Set(payable
       .filter((c) => c.kind === 'instalment' && nextOfPlan.get(c.registration?.id ?? c.id) !== c.id && !(c.dueAt && schoolDateString(new Date(c.dueAt)) <= today))
       .map((c) => `c:${c.id}`));
-    return { lines, provisional, payable, requested, fees, laterInstalments, loading: charges.isLoading };
+    return { lines, underWay, provisional, payable, requested, fees, laterInstalments, loading: charges.isLoading };
   }, [charges.data, charges.isLoading, summary]);
 }
 
@@ -92,7 +95,7 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
     onError: (err: Error) => setError(err.message),
   });
 
-  if (!owed.lines.length && !owed.provisional.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
+  if (!owed.lines.length && !owed.underWay.length && !owed.provisional.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
     return result ? <Notice tone="success" title="Collected at the desk"><CollectedNotice r={result} /></Notice> : null;
   }
   return (
@@ -115,6 +118,22 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
         {owed.payable.map((c) => (
           <Row key={`c:${c.id}`} checked={isOn(`c:${c.id}`)} onChange={() => flip(`c:${c.id}`)}
             title={<bdi>{c.description}</bdi>} detail={<><span>{kindLabel(c.kind)}</span> · <span>due</span> <Day iso={c.dueAt} /></>} amount={c.amount} />
+        ))}
+        {owed.underWay.map((l) => (
+          <li key={`w:${l.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
+            <span className="flex min-w-0 items-start gap-3">
+              <span aria-hidden className="mt-1 h-4 w-4 shrink-0" />
+              <span>
+                <span className="block font-medium text-foreground"><bdi>{l.subject.name}</bdi></span>
+                <span className="block text-xs">
+                  <span>{l.paymentInProgress?.status === 'pending_verification' ? "awaiting the transfer's check" : 'a payment the family started'}</span>
+                  {' · '}<bdi>{l.session.name}</bdi>{' · '}
+                  <span>confirm or reject it on the</span> <Link href="/finance" className="text-primary underline">Finance Workbench</Link>
+                </span>
+              </span>
+            </span>
+            <Money amount={l.priceAtRegistration} />
+          </li>
         ))}
         {owed.provisional.length > 0 && (
           <li className="px-5 py-2.5 text-xs text-muted-foreground">

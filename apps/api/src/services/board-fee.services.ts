@@ -26,6 +26,7 @@ import { repriceBoardPart, round2 } from './pricing.services';
 import { dueDateFor } from './deadline.services';
 import { createNotification } from './notification.services';
 import { lockFeeGrids } from '../lib/fee-grid-lock';
+import { formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -391,7 +392,7 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
   for (const r of outcome.repriced) {
     const subjectName = subjects.get(r.subjectId) ?? 'a subject';
     await createNotification(r.studentId, 'PRICE_CHANGED', `The price of ${subjectName} changed`,
-      `The exam board confirmed its fee for ${outcome.seriesName}. ${subjectName} was ${r.from.toFixed(2)} EGP and is now ${r.to.toFixed(2)} EGP.`,
+      `The exam board confirmed its fee for ${outcome.seriesName}. ${subjectName} was ${formatEgp(r.from)} and is now ${formatEgp(r.to)}.`,
       { registrationId: r.id, from: r.from, to: r.to })
       .catch((err) => console.error('[board-fees] Price change notice failed:', err));
   }

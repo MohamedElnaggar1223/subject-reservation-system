@@ -36,6 +36,7 @@ import type { CreateRefundWindowType, RefundPolicy } from '@repo/validations';
 import { academicYearForDate } from './school-fee.services';
 import { activeExceptions } from './exception-registry.services';
 import { effectiveDeadlineFor } from './deadline.services';
+import { formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -237,8 +238,8 @@ export async function refundFor(
 
 /** How a refund reads in a notice: "EGP 1,000.00 (50% of the course fee and the board fee)". */
 export function refundSentence(q: Pick<RefundQuote, 'amount' | 'percent' | 'basis' | 'boardPart'>): string {
-  if (q.basis === 'windows') return `EGP ${q.amount.toFixed(2)} (${q.percent}%)`;
-  return `EGP ${q.amount.toFixed(2)} (${q.percent}% of the course fee${q.boardPart > 0 ? ' and the board fee' : ''})`;
+  if (q.basis === 'windows') return `${formatEgp(q.amount)} (${q.percent}%)`;
+  return `${formatEgp(q.amount)} (${q.percent}% of the course fee${q.boardPart > 0 ? ' and the board fee' : ''})`;
 }
 
 /**

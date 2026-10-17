@@ -54,8 +54,19 @@ export const UpdateBoard = z.object({
     .refine((m) => new Set(m).size === m.length, 'Each month once')
     .optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
+  /** What a one-paper retake's board fee is read for (F8-05): see ONE_PAPER_FEE_KEYS. */
+  onePaperFeeKey: z.enum(['qualification', 'unit']).optional(),
 });
 export type UpdateBoardType = z.infer<typeof UpdateBoard>;
+
+/**
+ * What a one-paper retake's board fee is read for, per board (F8-05; exam_board.one_paper_fee_key):
+ * - `qualification` the syllabus's fee — Cambridge charges the syllabus for a carry-forward re-entry (Q-13)
+ * - `unit`          the paper's own fee — where the board's list prices per paper or unit (Pearson Edexcel)
+ * Read when a one-paper item is made; an item made keeps its fee keys.
+ */
+export const ONE_PAPER_FEE_KEYS = ['qualification', 'unit'] as const;
+export type OnePaperFeeKey = (typeof ONE_PAPER_FEE_KEYS)[number];
 
 // ─── Qualifications (awards) ─────────────────────────────────────────────────
 

@@ -21,7 +21,7 @@
  */
 
 import { Resend } from 'resend';
-import { gradeLabel } from '@repo/validations';
+import { gradeLabel, formatEgp } from '@repo/validations';
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -240,7 +240,7 @@ export async function sendRegistrationRequestReceivedEmail(to: string, data: {
   totalCost: number;
 }): Promise<EmailResult> {
   const subjectRows = data.subjects
-    .map((s) => `<tr><td>${esc(s.name)}</td><td>EGP ${s.price.toFixed(2)}</td></tr>`)
+    .map((s) => `<tr><td>${esc(s.name)}</td><td>${formatEgp(s.price)}</td></tr>`)
     .join('');
 
   const html = emailLayout('Registration Request Requires Your Approval', `
@@ -264,7 +264,7 @@ export async function sendRegistrationRequestReceivedEmail(to: string, data: {
       <tfoot>
         <tr>
           <td style="padding:10px 12px;font-weight:600;border-top:2px solid #e5e7eb;">Total</td>
-          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">EGP ${data.totalCost.toFixed(2)}</td>
+          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">${formatEgp(data.totalCost)}</td>
         </tr>
       </tfoot>
     </table>
@@ -288,7 +288,7 @@ export async function sendDirectRegistrationEmail(to: string, data: {
   totalCost: number;
 }): Promise<EmailResult> {
   const subjectRows = data.subjects
-    .map((s) => `<tr><td>${esc(s.name)}</td><td>EGP ${s.price.toFixed(2)}</td></tr>`)
+    .map((s) => `<tr><td>${esc(s.name)}</td><td>${formatEgp(s.price)}</td></tr>`)
     .join('');
 
   const html = emailLayout('Your parent registered subjects for you', `
@@ -306,7 +306,7 @@ export async function sendDirectRegistrationEmail(to: string, data: {
       <tfoot>
         <tr>
           <td style="padding:10px 12px;font-weight:600;border-top:2px solid #e5e7eb;">Total</td>
-          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">EGP ${data.totalCost.toFixed(2)}</td>
+          <td style="padding:10px 12px;font-weight:600;text-align:right;border-top:2px solid #e5e7eb;">${formatEgp(data.totalCost)}</td>
         </tr>
       </tfoot>
     </table>
@@ -383,8 +383,8 @@ export async function sendPaymentReceiptEmail(to: string, data: {
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
         <tr><td>Session</td><td><strong>${esc(data.sessionName)}</strong></td></tr>
-        <tr><td>Amount paid</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
-        <tr><td>Payment method</td><td>${esc(data.method)}</td></tr>
+        <tr><td>Amount paid</td><td><strong>${formatEgp(data.amount)}</strong></td></tr>
+        <tr><td>How it was paid</td><td>${esc(data.method.charAt(0).toUpperCase() + data.method.slice(1))}</td></tr>
         <tr><td>Reference #</td><td><code>${data.paymentId}</code></td></tr>
       </table>
     </div>
@@ -536,27 +536,28 @@ export async function sendEscrowBalanceChangedEmail(to: string, data: {
   changeAmount: number;
   reason: string;
 }): Promise<EmailResult> {
-  const direction = data.changeAmount >= 0 ? 'Credited' : 'Debited';
+  const direction = data.changeAmount >= 0 ? 'Added' : 'Taken';
   const badgeClass = data.changeAmount >= 0 ? 'badge-green' : 'badge-yellow';
   const absAmount = Math.abs(data.changeAmount);
 
-  const html = emailLayout("Child's Escrow Balance Updated", `
-    <h2>Escrow balance updated for ${esc(data.studentName)}</h2>
+  // The family's word for its money with the school is its balance (the lead's decision 14; F8-10).
+  const html = emailLayout("Your Child's Balance Changed", `
+    <h2>Balance updated for ${esc(data.studentName)}</h2>
     <p>Hello ${esc(data.parentName)},</p>
-    <p>Your child's escrow account balance has been updated.</p>
+    <p>Your child's balance with the school has changed.</p>
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Previous balance</td><td>EGP ${data.previousBalance.toFixed(2)}</td></tr>
-        <tr><td>Change</td><td><span class="badge ${badgeClass}">${direction}: EGP ${absAmount.toFixed(2)}</span></td></tr>
-        <tr><td>New balance</td><td><strong>EGP ${data.newBalance.toFixed(2)}</strong></td></tr>
+        <tr><td>Previous balance</td><td>${formatEgp(data.previousBalance)}</td></tr>
+        <tr><td>Change</td><td><span class="badge ${badgeClass}">${direction}: ${formatEgp(absAmount)}</span></td></tr>
+        <tr><td>New balance</td><td><strong>${formatEgp(data.newBalance)}</strong></td></tr>
         <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
       </table>
     </div>
-    ${actionButton('View Escrow', `${APP_URL}/escrow`)}
+    ${actionButton('View the balance', `${APP_URL}/escrow`)}
   `);
 
-  return sendEmail({ to, subject: `Escrow balance updated for ${data.studentName}`, html });
+  return sendEmail({ to, subject: `Balance updated for ${data.studentName}`, html });
 }
 
 /** NOT-009: Parent notified when a withdrawal request is fulfilled */
@@ -570,23 +571,23 @@ export async function sendWithdrawalFulfilledEmail(to: string, data: {
 }): Promise<EmailResult> {
   const partial = data.amountReleased < data.amountRequested;
 
-  const html = emailLayout('Escrow Withdrawal Fulfilled', `
+  const html = emailLayout('Balance Withdrawal Fulfilled', `
     <h2>Withdrawal ${partial ? 'partially ' : ''}fulfilled</h2>
     <p>Hello ${esc(data.parentName)},</p>
-    <p>An escrow withdrawal for <strong>${esc(data.studentName)}</strong> has been ${partial ? 'partially ' : ''}processed. Please collect from the school office.</p>
+    <p>A withdrawal from <strong>${esc(data.studentName)}</strong>'s balance has been ${partial ? 'partially ' : ''}processed. Please collect from the school office.</p>
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Amount requested</td><td>EGP ${data.amountRequested.toFixed(2)}</td></tr>
-        <tr><td>Amount released</td><td><strong>EGP ${data.amountReleased.toFixed(2)}</strong></td></tr>
-        <tr><td>Remaining balance</td><td>EGP ${data.remainingBalance.toFixed(2)}</td></tr>
+        <tr><td>Amount requested</td><td>${formatEgp(data.amountRequested)}</td></tr>
+        <tr><td>Amount released</td><td><strong>${formatEgp(data.amountReleased)}</strong></td></tr>
+        <tr><td>Remaining balance</td><td>${formatEgp(data.remainingBalance)}</td></tr>
         ${data.adminNotes ? `<tr><td>Admin notes</td><td>${esc(data.adminNotes)}</td></tr>` : ''}
       </table>
     </div>
-    ${actionButton('View Escrow', `${APP_URL}/escrow`)}
+    ${actionButton('View the balance', `${APP_URL}/escrow`)}
   `);
 
-  return sendEmail({ to, subject: `Escrow withdrawal processed for ${data.studentName}`, html });
+  return sendEmail({ to, subject: `Balance withdrawal processed for ${data.studentName}`, html });
 }
 
 /** GRADE-001/002: Student and parents notified when a grade change occurs */
@@ -615,7 +616,7 @@ export async function sendGradeChangedEmail(to: string, data: {
       </table>
     </div>
     ${data.newGrade === null
-      ? '<p>Congratulations on completing your IGCSE journey! Your registration features are now disabled, but you can still view your history and manage your escrow balance.</p>'
+      ? '<p>Congratulations on completing your IGCSE journey! Your registration features are now disabled, but you can still view your history and manage your balance.</p>'
       : `${actionButton('View Dashboard', `${APP_URL}/dashboard`)}`
     }
   `);
@@ -659,7 +660,7 @@ export async function sendLinkDecisionEmail(to: string, data: {
     <p>Hi ${esc(data.parentName)},</p>
     <p><strong>${esc(data.studentName)}</strong> has <span style="color:${colour};font-weight:600;">${decision}</span> your request to link accounts.</p>
     ${data.approved
-      ? '<p>You can now view and manage your child\'s registrations, payments, and escrow balance from your parent dashboard.</p>'
+      ? '<p>You can now view and manage your child\'s registrations, payments, and balance from your parent dashboard.</p>'
       : '<p>If you believe this is a mistake, you may send a new link request. Please contact support if you need assistance.</p>'
     }
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
@@ -744,7 +745,7 @@ export async function sendPaymentReversedEmail(to: string, data: {
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Amount reversed</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
+        <tr><td>Amount reversed</td><td><strong>${formatEgp(data.amount)}</strong></td></tr>
         <tr><td>Registrations affected</td><td>${data.registrationsReverted}</td></tr>
         ${receipts}
         <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
@@ -790,7 +791,7 @@ export async function sendPaymentRejectedEmail(to: string, data: {
   registrationsExpired: number;
 }): Promise<EmailResult> {
   const escrowRow = data.escrowReturned > 0
-    ? `<tr><td>Returned to escrow</td><td>EGP ${data.escrowReturned.toFixed(2)}</td></tr>`
+    ? `<tr><td>Returned to the balance</td><td>${formatEgp(data.escrowReturned)}</td></tr>`
     : '';
   const next = data.registrationsExpired > 0
     ? 'The registration window has closed, so the subjects this payment covered are no longer reserved. If you did send this transfer, contact the finance desk with your bank receipt.'
@@ -802,7 +803,7 @@ export async function sendPaymentRejectedEmail(to: string, data: {
     <div class="info-box">
       <table>
         <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
-        <tr><td>Amount</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
+        <tr><td>Amount</td><td><strong>${formatEgp(data.amount)}</strong></td></tr>
         ${escrowRow}
         <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
       </table>
