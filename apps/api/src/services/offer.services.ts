@@ -993,7 +993,12 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
             }
             grouped = true;
           }
-          await createItemInTx(tx, session, offer, subjectRow, { ...draft, exclusiveGroup: group, availability: f.availability, courseFee: f.courseFee },
+          // Its fee keys are the sheet's, not the draft's: the draft is read from the Catalogue as it is now, and on a
+          // syllabus-keyed board its keys name the option the Catalogue's whole item would enter, which may no longer
+          // be the one this sheet's whole item enters. Made without keys, insertItem reads them as the item endpoint
+          // does (onePaperFeeKeys with wholeItemOption): the sheet's whole item's row (the reviewer's low note on
+          // round 2's answer 2).
+          await createItemInTx(tx, session, offer, subjectRow, { ...draft, feeKeys: undefined, exclusiveGroup: group, availability: f.availability, courseFee: f.courseFee },
             { offerId, label: draft.label, kind: draft.kind, enters: draft.enters, availability: f.availability, courseFee: f.courseFee, exclusiveGroup: group, via: 'form' }, actorId, ctx);
           done.itemsCreated++;
         }

@@ -324,6 +324,40 @@ describe('08u: the session in the school\'s words — one form per subject, the 
     expect((await apiResponse(coordinator.api.v1.catalogue.$get())).boards.find((b) => b.code === 'oxford')!.onePaperFeeKey).toBe('qualification');
   });
 
+  it("the form's \"Paper N only\" reads the sheet's whole item's row, not the Catalogue's: a paper gained after the syllabus's option changed still reads the option this sheet enters (the reviewer's low note on answer 2)", async () => {
+    // Cambridge 0972-like: one option code (CX) entering Paper 2 and Paper 4; the subject added while CX was the option.
+    const syl = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
+      json: { boardCode: 'cambridge', code: `N0972-${RUN}`, title: `Physics (08u note ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: 'Physics', entryMethod: 'syllabus_option' },
+    })))!.id;
+    const [p2, p4, p6] = [await unit('cambridge', 'N22', 'Paper 2', 'igcse', 'component'), await unit('cambridge', 'N42', 'Paper 4', 'igcse', 'component'), await unit('cambridge', 'N62', 'Paper 6', 'igcse', 'component')];
+    await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].units.$put({ param: { id: syl }, json: { units: [p2, p4].map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
+    const cx = (await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].options.$post({ param: { id: syl }, json: { code: 'CX', label: 'Extended, Papers 2 and 4', unitIds: [p2, p4] } })))!.id;
+    const physics = await subject(adm, `N972-PH-${RUN}`, `Physics O.L. (08u note ${RUN})`, { course: 12000, registration: 0 });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: physics }, json: { boardCode: 'cambridge', qualificationId: syl, unitIds: [], reason: '08u note: mapped' } }));
+    const made = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: june }, json: { subjectId: physics, courseFee: 12000, teachers: [{ teacherId: t1, mode: 'in_school' }] } })))!;
+    let o = await offerRow(june, made.id);
+    const whole = o.items.find((i) => i.kind === 'whole')!;
+    const keysOf = (itemId: string) => sql<{ key_kind: string; key_id: string }>(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1 order by key_kind`, [itemId]);
+    expect(await keysOf(whole.id)).toEqual([{ key_kind: 'option', key_id: cx }]);
+
+    // The Catalogue then changes: CX retired for a new option CY that adds Paper 6, which the syllabus now requires.
+    await apiResponse(coordinator.api.v1.catalogue.options[':id'].$put({ param: { id: cx }, json: { isActive: false } }));
+    await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].units.$put({ param: { id: syl }, json: { units: [p2, p4, p6].map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
+    const cy = (await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].options.$post({ param: { id: syl }, json: { code: 'CY', label: 'Extended, Papers 2, 4 and 6', unitIds: [p2, p4, p6] } })))!.id;
+    o = await offerRow(june, made.id);
+    expect(o.papersToAdd.map((p) => p.unitId)).toEqual([p6]);
+
+    // "Paper 6 only" offered on the form: it reads the row this sheet's whole item reads (CX), as one made through the
+    // item endpoint does — not CY, the option the Catalogue's whole item would enter now.
+    expect(await apiResponse(save(coordinator, june, made.id, { ...asIs(o), items: [{ paperUnitId: p6, availability: 'retake_only' as const, courseFee: 3000 }] })))
+      .toMatchObject({ itemsCreated: 1 });
+    o = await offerRow(june, made.id);
+    const paper6 = o.items.find((i) => i.kind === 'one_paper' && i.units.some((u) => u.unitId === p6))!;
+    expect(await keysOf(paper6.id)).toEqual([{ key_kind: 'option', key_id: cx }]);
+    expect(await keysOf(whole.id)).toEqual([{ key_kind: 'option', key_id: cx }]);
+    expect(cy).not.toBe(cx);
+  });
+
   it('an IAL subject per unit: a teacher per unit (P1 and P2 online), M1 with two, S1 self-study only, P4 not this cycle — the units keep their codes', async () => {
     await apiResponse(coordinator.api.v1.catalogue.starter.$post({ json: { set: 'pearson_ial_mathematics' } }));
     const units = await sql<{ id: string; code: string }>(`select id, code from exam_unit where board_code = 'pearson_edexcel' and code in $1`, [['WMA11', 'WMA12', 'WMA13', 'WMA14', 'WME01', 'WST01']]);

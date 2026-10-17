@@ -225,8 +225,11 @@ export const escrowRoutes = new Hono<HonoEnv>()
         return success(c, result, 201);
       } catch (err) {
         const message = clientMessage(err, 'Failed to create withdrawal request');
+        // A request is held from the free balance at once (debitEscrow): one it cannot cover is answered 422 by the
+        // refusal's code, as the other balance routes are (round 2's item 3 left this route matching "exceeds",
+        // which no refusal says, so it answered 400).
         const status = message.includes('not linked') ? 403 :
-                       message.includes('exceeds') ? 422 : 400;
+                       isInsufficientBalance(err) || message.includes('exceeds') ? 422 : 400;
         return error(c, message, status);
       }
     }

@@ -280,6 +280,11 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
     expect((await escrowOf(f.studentId)).free).toBe(credit);
     expect((await escrowOf(sibling.studentId)).free).toBe(0);
 
+    // More than the child holds: refused 422 by the refusal's code, nothing moved.
+    expect(await refused(f.parent.api.v1.escrow.transfer.$post({ json: { fromStudentId: f.studentId, toStudentId: sibling.studentId, amount: credit + 1 } })))
+      .toMatchObject({ status: 422, error: expect.stringContaining('Insufficient balance') });
+    expect((await escrowOf(f.studentId)).free).toBe(credit);
+    expect((await escrowOf(sibling.studentId)).free).toBe(0);
     await apiResponse(transfer());
     expect((await escrowOf(f.studentId)).free).toBe(money(credit - 200));
     expect((await escrowOf(sibling.studentId)).free).toBe(200);

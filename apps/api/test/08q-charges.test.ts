@@ -654,6 +654,11 @@ describe('08q: instalment plans', () => {
     // Its two paid instalments stay paid, and the line is collectable in full again.
     expect([await statusOf('charge', p.i[0]!), await statusOf('charge', p.i[1]!), await statusOf('charge', p.i[2]!)]).toEqual(['paid', 'paid', 'cancelled']);
     expect(await lineOn360()).toMatchObject({ status: 'pending_payment', livePlan: false, payableNow: true });
+    // More from the balance than is free (1,200 of 1,000): refused 422 by the refusal's code, the line still unpaid.
+    expect(await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [l!], instrumentUsed: 'cash', escrowAmountToApply: 1200 } })))
+      .toMatchObject({ status: 422, error: expect.stringContaining('Not enough in the balance') });
+    expect(await statusOf('registration', l!)).toBe('pending_payment');
+    expect(await wallet(f.studentId)).toEqual({ free: 1000, held: 0 });
     const col = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [l!], instrumentUsed: 'cash', escrowAmountToApply: 1000 } }));
     expect(col.collected).toBe(500);
     expect(await statusOf('registration', l!)).toBe('confirmed');

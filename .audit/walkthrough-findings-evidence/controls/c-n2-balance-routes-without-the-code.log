@@ -1,0 +1,87 @@
+Control c-n2 (round 3, the reviewer's note 2): isInsufficientBalance() made to answer false, so no route recognises the refusal's code (each falls back to 400), the five scenarios' files run (01-desk, 02-money, 06-auth-surface, 08c, 08q), then the file restored. Each new 422 assertion on a balance refusal goes red; the fulfilment's (a release beyond the request, matched by its words) stays green.
+
+ ❯ test/01-desk.test.ts (8 tests | 6 failed) 2192ms
+ ❯ test/02-money.test.ts (4 tests | 2 failed) 1492ms
+ ❯ test/06-auth-surface.test.ts (19 tests | 1 failed) 3171ms
+ ❯ test/08c-audit-in-transaction.test.ts (18 tests | 1 failed) 5440ms
+ ❯ test/08q-charges.test.ts (46 tests | 2 failed) 21857ms
+ Test Files  5 failed (5)
+      Tests  12 failed | 83 passed (95)
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/01-desk.test.ts > the desk > registers two subjects and takes 3000 EGP cash in one action
+AssertionError: expected { status: 400, …(1) } to match object { status: 422, …(1) }
+- Expected
++ Received
+-   "status": 422,
++   "status": 400,
+ ❯ test/01-desk.test.ts:44:10
+ FAIL  test/01-desk.test.ts > the desk > records the family as payer of record and tells the parent and student, not the officer (RF-03)
+Error: Failed query: select u.email, u.role, p.confirmed_by from payment p join "user" u on u.id = p.parent_id where p.id = 
+ ❯ test/01-desk.test.ts:93:19
+ ❯ test/01-desk.test.ts:93:19
+ FAIL  test/01-desk.test.ts > the desk > shows the whole student on one screen for the desk
+AssertionError: expected +0 to be 2 // Object.is equality
+- Expected
++ Received
+ ❯ test/01-desk.test.ts:136:36
+ FAIL  test/01-desk.test.ts > the desk > lets the family read their own receipt with the tracked number
+Error: Failed query: select id, receipt_number from receipt where registration_id = 
+ ❯ test/01-desk.test.ts:142:22
+ ❯ test/01-desk.test.ts:142:22
+ FAIL  test/01-desk.test.ts > the desk > gates the refund on the paper receipt: drop parks 100%, money moves only when the receipt is back
+TypeError: Cannot read properties of undefined (reading 'id')
+ ❯ test/01-desk.test.ts:148:96
+ FAIL  test/01-desk.test.ts > the desk > reconciles the day: this family added 3000 cash in and nothing out
+AssertionError: expected { moneyIn: +0, …(12) } to match object { moneyIn: 3000, …(7) }
+- Expected
++ Received
+-   "byInstrument": {
+-     "cash": 3000,
++   "byInstrument": {},
+-     "cashIn": 3000,
++     "cashIn": 0,
+-     "net": 3000,
++     "net": 0,
+-   "moneyIn": 3000,
++   "moneyIn": 0,
+-   "net": 3000,
++   "net": 0,
+ ❯ test/01-desk.test.ts:177:19
+ FAIL  test/02-money.test.ts > money paths > cash refund is maker-checker: officer disburses, only the finance admin completes
+AssertionError: expected { status: 400, …(1) } to match object { status: 422, …(1) }
+- Expected
++ Received
+-   "status": 422,
++   "status": 400,
+ ❯ test/02-money.test.ts:96:8
+ FAIL  test/02-money.test.ts > money paths > finance-admin reversal restores every row and tells the family which receipt is void (RF-08)
+AssertionError: expected 1500 to be 500 // Object.is equality
+- Expected
++ Received
+ ❯ test/02-money.test.ts:133:126
+ FAIL  test/06-auth-surface.test.ts > auth surface > a family cannot spend or withdraw escrow it does not hold
+AssertionError: expected 400 to be 422 // Object.is equality
+- Expected
++ Received
+ ❯ test/06-auth-surface.test.ts:356:24
+ FAIL  test/08c-audit-in-transaction.test.ts > an audit row commits with its movement, or neither does (SO-1) > a transfer between two children of one parent moves both balances with one audit row, or nothing
+AssertionError: expected { status: 400, …(1) } to match object { status: 422, …(1) }
+- Expected
++ Received
+-   "status": 422,
++   "status": 400,
+ ❯ test/08c-audit-in-transaction.test.ts:285:8
+ FAIL  test/08q-charges.test.ts > 08q: instalment plans > three instalments into the held wallet, earmarked for the line, each with a deposit slip and in the day's takings; the line captured at the last in one payment from its deposits
+AssertionError: expected { status: 400, …(1) } to match object { status: 422, …(1) }
+- Expected
++ Received
+-   "status": 422,
++   "status": 400,
+ ❯ test/08q-charges.test.ts:572:8
+ FAIL  test/08q-charges.test.ts > 08q: instalment plans > released in full by finance: every deposit back in escrow, the line still payable and paid normally
+AssertionError: expected { status: 400, …(1) } to match object { status: 422, …(1) }
+- Expected
++ Received
+-   "status": 422,
++   "status": 400,
+ ❯ test/08q-charges.test.ts:659:8

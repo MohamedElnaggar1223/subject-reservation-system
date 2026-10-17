@@ -37,6 +37,12 @@ describe('the desk', () => {
   });
 
   it('registers two subjects and takes 3000 EGP cash in one action', async () => {
+    // More from the balance than the student holds (none): refused 422 by the refusal's code, nothing made (the
+    // reviewer's note on round 2's item 3: the status asserted on each balance route).
+    expect(await refused(officer.api.v1.registrations.desk.$post({
+      json: { studentId, sessionId, ...(await reservationOf(sessionId, [physics, chemistry])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 500 } },
+    }))).toMatchObject({ status: 422, error: expect.stringContaining('Not enough in the balance') });
+    expect(await sql(`select 1 from registration where student_id = $1`, [studentId])).toEqual([]);
     const r = await apiResponse(
       officer.api.v1.registrations.desk.$post({
         json: { studentId, sessionId, ...(await reservationOf(sessionId, [physics, chemistry])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },

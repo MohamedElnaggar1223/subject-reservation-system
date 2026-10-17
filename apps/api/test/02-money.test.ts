@@ -91,9 +91,16 @@ describe('money paths', () => {
   });
 
   it('cash refund is maker-checker: officer disburses, only the finance admin completes', async () => {
+    // More than the balance (1,500 of 1,000): refused 422 by the refusal's code, nothing held.
+    expect(await refused(parent.api.v1.escrow.withdraw.$post({ json: { studentId, amount: 1500 } })))
+      .toMatchObject({ status: 422, error: expect.stringContaining('Not enough in the balance') });
+    expect(money((await one<{ balance: string }>(`select balance from escrow where student_id = $1`, [studentId])).balance)).toBe(1000);
     const w = await apiResponse(parent.api.v1.escrow.withdraw.$post({ json: { studentId, amount: 1000 } }));
     expect(money((await one<{ balance: string }>(`select balance from escrow where student_id = $1`, [studentId])).balance)).toBe(0);
 
+    // The fulfilment hands over money already held: its 422 is a release beyond the request.
+    expect(await refused(officer.api.v1.escrow.admin.withdrawals[':id'].fulfill.$post({ param: { id: w.id }, json: { releasedAmount: 1500, notes: 'too much' } })))
+      .toMatchObject({ status: 422, error: expect.stringContaining('Cannot release more than the requested amount') });
     await apiResponse(officer.api.v1.escrow.admin.withdrawals[':id'].fulfill.$post({ param: { id: w.id }, json: { releasedAmount: 1000, notes: 'cash handed at desk' } }));
     const afterFulfil = await one<{ status: string; released: string; approved_by: string | null }>(
       `select status, released_amount as released, approved_by from withdrawal_request where id = $1`, [w.id]

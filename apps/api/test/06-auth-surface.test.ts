@@ -353,10 +353,12 @@ describe('auth surface', () => {
     const reg = (await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [econ])), studentId } })))[0]!.id;
     const pay = await parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 1000 } });
     expect([400, 422]).toContain(pay.status);
+    expect(pay.status).toBe(422);
     expect(await sql(`select 1 from payment_registration where registration_id = $1`, [reg])).toEqual([]);
 
     const w = await parent.api.v1.escrow.withdraw.$post({ json: { studentId, amount: 1000 } });
     expect([400, 422]).toContain(w.status);
+    expect(w.status).toBe(422);
     expect(await sql(`select 1 from withdrawal_request w join escrow e on e.id = w.escrow_id where e.student_id = $1`, [studentId])).toEqual([]);
   });
 });

@@ -1,0 +1,13 @@
+Control c-n1 (round 3, the reviewer's note 1): the form's 'Paper N only' given the Catalogue draft's fee keys again (feeKeys: undefined removed from step (d) of saveOfferForm), 08u -t "reads the sheet's whole item" run, then the file restored.
+
+ ❯ test/08u-session-form.test.ts (15 tests | 1 failed | 14 skipped) 2483ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > the form's "Paper N only" reads the sheet's whole item's row, not the Catalogue's: a paper gained after the syllabus's option changed still reads the option this sheet enters (the reviewer's low note on answer 2)
+AssertionError: expected [ { key_kind: 'option', …(1) } ] to deeply equal [ { key_kind: 'option', …(1) } ]
+- Expected
++ Received
+-     "key_id": "e1f8892b-7af4-4ea2-b1e7-9170dad395e6",
++     "key_id": "d2f0a042-db60-47dd-a331-bf156bc08bee",
+ ❯ test/08u-session-form.test.ts:356:37
