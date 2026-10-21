@@ -12,7 +12,7 @@ import { SchoolNameProvider } from '~/components/school-name';
  */
 async function schoolName(): Promise<string> {
   try {
-    return (await apiResponse(hc<AppType>(env.apiUrl).v1.settings.public.$get())).schoolName;
+    return (await apiResponse(hc<AppType>(env.serverApiUrl).v1.settings.public.$get())).schoolName;
   } catch (err) {
     // The name is the page's heading, not its use: an API that does not answer leaves the app's name alone
     // and the sign-in form working; the failure is logged, not hidden.

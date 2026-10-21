@@ -27,20 +27,21 @@ const nextConfig = {
             },
         ];
     },
-    // async rewrites() {
-    //     return {
-    //         beforeFiles: [
-    //             {
-    //                 source: '/api/:path*',
-    //                 destination: 'https://turborepo-hono-nextjs-expo.onrender.com/api/:path*',
-    //             },
-    //             {
-    //                 source: '/v1/:path*',
-    //                 destination: 'https://turborepo-hono-nextjs-expo.onrender.com/v1/:path*',
-    //             },
-    //         ]
-    //     }
-    // },
+    // Deployed (DEPLOYMENT.md): the browser reaches the API through this
+    // origin, so the session cookie is first-party on the web host and no
+    // cross-site cookie is needed. API_URL is the API's own address, read at
+    // build time (turbo.json lists it). Unset, as in local development,
+    // nothing is rewritten and the browser calls NEXT_PUBLIC_API_URL directly.
+    async rewrites() {
+        const apiUrl = process.env.API_URL?.replace(/\/$/, '');
+        if (!apiUrl) return [];
+        return {
+            beforeFiles: [
+                { source: '/api/auth/:path*', destination: `${apiUrl}/api/auth/:path*` },
+                { source: '/v1/:path*', destination: `${apiUrl}/v1/:path*` },
+            ],
+        };
+    },
 };
 
 export default nextConfig;

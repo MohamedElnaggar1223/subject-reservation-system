@@ -21,7 +21,7 @@ export const getServerApi = cache(async () => {
     console.warn(`[hono-server] Cookie "${cookieName}" not found. Available cookies:`, cookieStore.getAll().map(c => c.name))
   }
 
-  return hc<AppType>(env.apiUrl, {
+  return hc<AppType>(env.serverApiUrl, {
     headers: {
       cookie: cookieHeader,
     },

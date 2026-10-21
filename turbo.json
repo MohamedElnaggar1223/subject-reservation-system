@@ -4,7 +4,7 @@
   "globalEnv": ["NEXT_PUBLIC_API_URL"],
   "tasks": {
     "build": {
-      "env": ["NEXT_PUBLIC_API_URL"],
+      "env": ["NEXT_PUBLIC_API_URL", "API_URL"],
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
