@@ -408,7 +408,7 @@ SHEET_FORMS = {
 SS_YN = f'The form\'s "Self Study 50% fees (ONLY 2nd entry)" Yes / No is the retake in self study that {L("First entry and retakes")} already offers: nothing more to set.'
 ALL_YN = f'"Retake Self Study 50% fees (All Papers)" Yes / No is the whole-subject retake in self study that {L("First entry and retakes")} offers.'
 ONE_PAPER_FEE = f'In the box beside it, the school\'s course fee for one paper. Left empty, a one-paper retake costs the whole subject\'s course fee; the self-study share applies to it'
-FROM_SITTING = 'The form\'s "From June 2026 / From November 2026" is asked of the family on its Reserve page: a one-paper retake asks "Carried from the sitting…" and the school verifies it; "None" is simply not ticking it'
+FROM_SITTING = 'The form\'s "From June 2026 / From November 2026" is asked of the family on its Reserve page: a one-paper retake asks "Carried from the sitting…", whose list also holds the board\'s earlier sittings, and the school verifies the one chosen; "None" is simply not ticking it'
 
 TEACHER_WORDS = {'3180': 'T1, T2, T3', '0970': 'T1, T2, T3', '0971': 'T1, T2, T3', '4MA1': 'T1, T2, T3', 'ESL-OXFORD': 'T1 (Oxford), T2 (Oxford)',
                  '0972': 'the teacher your form names (T1 on the form)', 'PHYS-ASAL': 'the teacher your form names (T1 on the form, inside the A.S. option)'}
