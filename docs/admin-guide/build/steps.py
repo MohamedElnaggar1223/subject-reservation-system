@@ -42,7 +42,10 @@ subject. These are the school's own figures: no list the school has shared holds
 <li><b>Your own dates for the session:</b> the first day families may reserve, the last day, the first lesson, and the day
 payment is due.</li>
 </ul>
-<p>Plan on a few sittings. Everything is saved as you go: you can stop after any step and come back to the next one.</p>''')
+<p>Plan on a few sittings. Everything is saved as you go: you can stop after any step and come back to the next one.</p>
+<p class="note"><b>Build the session before families are given the system's address.</b> A parent who already has an account
+sees a session that is still being prepared on Home, with its dates, and can preregister in it at the price shown that
+day.</p>''')
 step('Open the system', do=f'''<ol>
 <li>On a computer (the screens are wide; a laptop is fine), open Chrome, Edge, Safari or Firefox.</li>
 <li>Type this address in the address bar and press Enter: <code>{ADDRESS}</code></li>
@@ -54,8 +57,8 @@ step('Sign in', where='the sign-in page.', do=f'''<ol>
 <li>{L("Password")}: its password.</li>
 <li>Click {L("Sign in")}.</li></ol>''', see='your Home page (next step).', img='sign-in-filled', key='sign-in')
 step('Your Home page and the column on the left', where='Home.', do=f'''<p>Home says where each session stands and what it
-still needs. Today it says {L("No session is open or being prepared.")} Leave its button {L("Start the next session")} alone: it
-copies the last session, and there is none yet.</p>
+still needs. Today it says {L("No session is open or being prepared.")} Its button {L("Start the next session")} opens {L("Sessions")},
+the screen [[ch:session]] uses; leave it for now.</p>
 <p>The column on the left lists the screens. Everything in this guide is under its first heading, {L("SET UP")}:
 {L("Sessions")}, {L("Exam Catalogue")}, {L("Board Series")}, {L("Board Services")}, {L("School Fees")}, {L("Settings")},
 {L("Day-one Import")} and {L("Team")}. {L("Home")} is above them. At the bottom are your name and {L("Sign Out")}.</p>''',
@@ -242,8 +245,10 @@ issues: a Cambridge syllabus, a Pearson qualification. Each subject needs its aw
 leave {L("Chosen per entry")}.</li>
 <li>Click {L("Add the award")}.</li></ol>''', see='the card "0970 Biology" under Cambridge International.', img='award-add-0970', key='award-first')
 step('The other awards', where=f'{L("Exam Catalogue")}, {L("Qualifications")}.', do=f'''<p>Add each award of the table the same
-way (Biology is in it too). The box keeps nothing between two awards: choose the {L("Board")} first, since the {L("Suite")} list
-follows it.</p>
+way. Biology is already added ([[award-first]]): skip its line. After {L("Add the award")} the box empties {L("Code (cash-in or syllabus)")},
+{L("Title")} and {L("Subject (AS and A Level share it)")} but keeps {L("Board")}, {L("Level")}, {L("Suite")},
+{L("How the board takes the entry")} and the tier: check each of them on every line and change the ones that differ. Choose the
+{L("Board")} first, since the {L("Suite")} list follows it.</p>
 {table(['Board', 'Code', 'Title', 'Level', 'Suite', 'Subject (AS and A Level share it)', 'How the board takes the entry'], award_rows())}
 <p>Why two awards for some subjects:</p><ul>
 <li>A Cambridge A level has two awards under one code: its AS Level and its A Level (9701, 9618, 9898, 9702). Type the same
@@ -251,7 +256,15 @@ follows it.</p>
 <li>Arabic A.L. has two qualifications, one per teacher: the International A Level <code>YAA01</code> and the GCE A Level
 <code>9AA0</code> (the form writes "9AA01"). The GCE has no suite in the list: leave {L("Suite")} at {L("—")}, and type
 <i>Arabic</i> as the subject for both.</li>
-<li>The two Pearson IAL subjects need no award here: their units came with the starter sets.</li></ul>''',
+<li>The two Pearson IAL subjects need no award here: their units came with the starter sets.</li></ul>
+<p class="warn"><b>Codes to confirm with the coordinator before [[ch:fees]].</b> The French and Psychology A level codes
+(<code>9898</code> with its options <code>S1</code> and <code>AX</code>, <code>9990</code>), Global Citizenship
+(<code>GLOBAL-CIT</code>) and the two OxfordAQA codes (<code>ESL-OXFORD</code>, <code>PSY-OXFORD</code>) are on no list the
+school has: they are this guide's best reading of the boards' current codes, and the coordinator checks them against the boards'
+entry codes. An award's code cannot be changed on its card (the card has only {L("Edit units")} and {L("Retire")}): a wrong one is
+retired with {L("Retire")}, added again with the right code, and its subject mapped again as in [[map-first]]. Arabic
+<code>3180</code> is a Cambridge O Level syllabus, though the fee list prints it under IGCSE: choose the {L("Suite")}
+{L("Cambridge O Level")} for it if the coordinator says so.</p>''',
      form=['Arabic A.L.: "T1 (Edexcel YAA01)", "T2 (Edexcel 9AA01)" — the teacher choice chooses the qualification'],
      img=['award-add-9aa0', 'awards-pearson'], cap=['The GCE award of Arabic A.L.: no suite.', 'The Pearson Edexcel awards once added (beside the starter sets\' four).'])
 step("Each award's papers", where=f'{L("Exam Catalogue")}, {L("Qualifications")}.', do=f'''<ol>
@@ -276,7 +289,10 @@ A level forms offer "A.S.", "A.2. (Carry forward)" and "A.L.". Each is an option
 read the words you type in the long box. Add these options the same way; on each A.2. option also tick
 {L("Carries forward marks from an earlier series")}.</p>
 {table(['Award', 'Small box', 'Long box (families read it)', 'Carries forward…'], option_rows(['as_level', 'a_level']))}
-<p>Psychology A.L. (<code>9990</code>) has one route, the full A level: it gets no option.</p>''',
+<p>Psychology A.L. (<code>9990</code>) has one route, the full A level: it gets no option.</p>
+<p class="note">Where Cambridge's list prints two codes for one route (<code>S1 / S2</code>, <code>BY / CT</code>,
+<code>BX / CQ</code>, <code>AX / HX</code>), the price is the same but the code is the one the school enters with the board. This
+guide uses the first; the coordinator decides which the school enters. Use that one here and in the fee list of [[fees-cambridge]].</p>''',
      form=['Computer Science A.S./A.L.: "Computer Science A.S. · A.2. (Carry forward on June) · A.2. (Carry forward on November) · A.L."',
            'Chemistry A.S.: "Chemistry A.S. / Chemistry A.L."'], img=['award-9702-al-option-carry', 'award-9702-done'],
      cap=[None, 'Physics: A.S. on its AS award; A.2. (Carry forward) and A.L. on its A Level award.'])
@@ -342,7 +358,9 @@ refunds.</li>
 <li>Click {L("Create session")}.</li></ol>
 <p class="warn"><b>Choose a {L("Reserve from")} day after the day you expect to finish this guide.</b> A session whose reserving
 starts today or earlier opens to families at once — before its sheet is ready. Until that day it stays a draft, and when you are
-ready you can open it earlier yourself ([[open-now]]). Every date can be changed later with {L("Edit")} on the session.</p>''',
+ready you can open it earlier yourself ([[open-now]]). If the {L("Reserve from")} day comes before you have finished, the session
+opens by itself that day: move the day later first, with {L("Edit")} at the top of the session (while it is a draft). The other
+dates can be changed with {L("Edit")} at any time.</p>''',
      see='the Session screen of June 2027 (next step).', img='session-new-filled')
 step('The Session screen', where=f'{L("Sessions")} → June 2027.', do=f'''<p>This screen is where the rest of the guide happens.
 At the top: the name, {L("Draft")}, the dates and the refunds, and the buttons {L("Edit")}, {L("Open now")},
@@ -423,7 +441,7 @@ def sheet_do(code):
         if code == '0984':
             items.append(f'{L("An external team")}: type the team\'s name as the links sheet gives it, click {L("Add")}. It appears under the list, marked {L("External team")}. Leave the teachers in the list above it unticked: since no teacher was given to this subject in [[ch:subjects]], the list shows everyone. (In the picture, the team is <i>External Team</i>.)')
         else:
-            items.append(f'{L("Teachers this cycle")}: the team you named for Computer Science O.L. is now in the list, marked {L("External team")}: tick it. (The list shows every teacher, since no teacher was given to this subject in [[ch:subjects]].)')
+            items.append(f'{L("Teachers this cycle")}: the team you named for Computer Science O.L. is now in the list, marked {L("External team")}: tick it. (The list shows every teacher, since no teacher was given to this subject in [[ch:subjects]].) If a different team teaches it, type that team\'s name under {L("An external team")} and click {L("Add")} instead.')
     items.append(f'{OFFERED}.')
     unit = {'IAL-BIOLOGY': 'one unit of Biology A.S./A.L.', 'IAL-MATHS': 'one unit of Mathematics A.S./A.L.'}.get(code, f'{esc(s["name"])}{" O.L." if s["group"] == "O.L." else ""}')
     items.append(fee_line(s, unit) + '.')
@@ -459,7 +477,7 @@ def sheet_do(code):
 SHEET_NOTES = {
  '3180': f'<p>Every option of the form has its place: the first three are {L("First entry and retakes")}; the two "(One paper ONLY)" options are Paper 1 and Paper 2 "in school or self study" (the form does not ask which paper; the family chooses Paper 1 or Paper 2 here). The teacher list\'s "Self study" is the retake in self study. {FROM_SITTING}.</p>',
  '0970': f'<p>{ALL_YN} "(Paper 41/42 ONLY)" is the paper you added in [[ch:catalogue]], offered in self study only, as the form says. {FROM_SITTING}.</p>',
- '0986': f'<p>{ss_note('0986')}</p>', '0680': f'<p>{ss_note('0680')}</p>', '7156': f'<p>{ss_note('7156')}</p>', '7159': f'<p>{ss_note('7159')}</p>', '4HB1': f'<p>{ss_note('4HB1')}</p>',
+ '0986': f'<p>{ss_note('0986')} After {L("Add subject")}, under {L("One paper only")}, the form shows {L("The Catalogue gives this subject no papers yet.")} That is right for Business, which has no one-paper retake: nothing to do. The same holds for the nine other O.L. subjects without a paper.</p>', '0680': f'<p>{ss_note('0680')}</p>', '7156': f'<p>{ss_note('7156')}</p>', '7159': f'<p>{ss_note('7159')}</p>', '4HB1': f'<p>{ss_note('4HB1')}</p>',
  'PSY-OXFORD': f'<p>{ss_note('PSY-OXFORD')}</p>', 'PSY-AL': f'<p>{ss_note('PSY-AL')}</p>', 'ESL-OXFORD': f'<p>{ss_note('ESL-OXFORD')} The form\'s title carries no session; it is this June 2027 sheet\'s.</p>',
  '0971': f'<p>{ALL_YN} Paper 41/42 in self study only, as the form says. {FROM_SITTING}.</p>',
  '0653': f'<p>{ALL_YN} Paper 41/42 in self study only. {FROM_SITTING}.</p>',
@@ -470,12 +488,12 @@ SHEET_NOTES = {
  '0983': f'<p>{ALL_YN} The "Theory Paper ONLY" retake is the paper <code>0983/01</code>, in self study only. {FROM_SITTING}.</p>',
  '4MA1': f'<p>{ALL_YN} "(One Paper ONLY): 1H / 2H / None" are the two papers, each in self study only; "None" is not ticking them. Here the form names the paper; the family\'s Reserve page also asks which sitting the other paper comes from, and the school verifies it.</p>',
  'ARABIC-AL': f'<p>{ss_note('ARABIC-AL')} The second teacher and the GCE qualification are the next step.</p>',
- 'IAL-BIOLOGY': f'<p>In June only Units 5 and 6 are taught; the four others (and 5 and 6 again) are self-study retakes. {L("Taught by")} offers a unit for a first entry, a retake in school and a retake in self study; {L("Self study only")} offers it in self study only. Each unit is reserved and priced on its own, so the course fee is for one unit.</p>',
+ 'IAL-BIOLOGY': f'<p>In June only Units 5 and 6 are taught; the four others (and 5 and 6 again) are self-study retakes. {L("Taught by")} offers a unit for a first entry, a retake in school and a retake in self study (so Units 5 and 6 also offer a retake in school, which the form does not list; if a family chooses it, the desk can turn it down); {L("Self study only")} offers it in self study only. Each unit is reserved and priced on its own, so the course fee is for one unit.</p>',
  'CHEM-AS': f'<p>The form offers A.S. or the full A level in one sitting, not A.2.: so {L("A.2. (carry forward on an earlier June or November)")} is not offered this cycle. {ss_note('CHEM-AS')}</p>',
  'CS-ASAL': f'<p>All three routes are offered. The form\'s two A.2. options, "Carry forward on June" and "Carry forward on November", are one route here: the family names the sitting its A.S. result comes from, and the school verifies it. {ss_note('CS-ASAL')}</p>',
  'FRENCH-ASAL': f'<p>French has no A.2. route (you gave it no A.2. option in [[ch:catalogue]]): only {L("A.S.")} and {L("A.L.")} appear. {ss_note('FRENCH-ASAL')}</p>',
  'IAL-MATHS': f'<p>Each unit has its own teachers, as the form asks unit by unit: P1 and P2 by T1 online only, P3 and P4 by T1, M1 and S1 by T2 or T1 (the family chooses). A unit left with none ticked is taught by the subject\'s teachers. Each unit is reserved and priced on its own, so the course fee is for one unit. Every unit is also offered as a self-study retake, the form\'s "Self Study 50% School fees (2nd entry ONLY)".</p>',
- 'PHYS-ASAL': f'<p>A.S. is taught by the subject\'s teacher (T1 on the form). The form\'s three A.2. options are all the A.2. in self study in June 2027; two of them name the sitting the A.S. result is carried from (June 2026, November 2025). On the sheet they are one route, {L("A.2. (carry forward on an earlier June or November)")} in self study only: the family names the sitting its A.S. comes from, and the school verifies it. The full A level in one sitting is not on the form, so {L("A.L.")} is not offered. {ss_note('PHYS-ASAL')}</p>',
+ 'PHYS-ASAL': f'<p>A.S. is taught by the subject\'s teacher (T1 on the form). The form\'s three A.2. options are all the A.2. in self study in June 2027; two of them name the sitting the A.S. result is carried from (June 2026, November 2025), and the second, "Physics A.2. (Self Study 50% fees in June 2027)", names none. This guide reads all three as the one route {L("A.2. (carry forward on an earlier June or November)")} in self study only: the family names the sitting its A.S. comes from, and the school verifies it. If the school means by that second option an A.2. sat together with the A.S. in June 2027 (the full A level in one year), the coordinator decides; then {L("A.L.")} is {L("Offered")} rather than {L("Not offered this cycle")}. As this guide reads the form, {L("A.L.")} is not offered. {ss_note('PHYS-ASAL')}</p>',
 }
 
 chapter('sheet', 'The sheet: the 25 forms, one subject each',
@@ -496,7 +514,11 @@ self study). The other choices are for a subject offered to re-sitters only ({L(
 no June 2027 form is.</li>
 <li>{L("Course fee")}: the school's course fee, with the self-study half beside it.</li>
 <li>Then {L("Add subject")}. Once added, the form shows what the Catalogue gave the subject: {L("One paper only")},
-{L("Components")}, {L("Units")} or {L("Qualifications")}. Set them and click {L("Save")}.</li>
+{L("Components")}, {L("Units")} or {L("Qualifications")}. Set them and click {L("Save")}. Each of those lines has its own course
+fee box at its end, showing the subject's fee in grey: leave it empty to use the subject's fee, or type that line's own fee (an
+A.L. often costs more than an A.S.).</li>
+<li>An O.L. subject with no paper of its own shows, once added, {L("The Catalogue gives this subject no papers yet.")} and
+{L("Set this subject's papers on the Catalogue")}. For such a subject that is right: there is nothing to do.</li>
 <li>{L("Grade 10 core")}, {L("Course starts (if not the session's)")} and {L("Notes")}: leave them.</li></ul>
 <p>The form closes with the cross at its top right, or the Esc key. Click a subject's name on the sheet to open its form again.</p>''',
      img='sheet-form-new', tall=True)
@@ -565,8 +587,8 @@ step('Paste the Cambridge list', where=f'the {L("Fees")} tab, the block <b>Cambr
 {paste(D['fees']['cambridge_paste'])}
 <p>These are the June 2026 list's lines for the session's Cambridge subjects, written with the codes the Exam Catalogue holds: the syllabus and its
 option code, then the fee. Two differences from the printed list: the A.S. of Computer Science is printed under its old code
-<code>9608 SY</code> and is pasted under <code>9618 SY</code>; where the list prints two option codes (<code>BX / CQ</code>,
-<code>AX / HX</code>), the line takes the one you added in [[ch:catalogue]]. The one-paper retakes (Paper 41/42, the ICT theory
+<code>9608 SY</code> and is pasted under <code>9618 SY</code>; where the list prints two option codes for one route (<code>BX / CQ</code>,
+<code>AX / HX</code>…), the line takes the one the coordinator chose and you added in [[ch:catalogue]] (this guide uses the first). The one-paper retakes (Paper 41/42, the ICT theory
 paper, Arabic Paper 1 and 2) need no line of their own: Cambridge prices the syllabus, and they read its fee.</p>''',
      form=['Cambridge Registration Fees June 2026 (Year 11 & 12): "IGCSE Biology 0970 CX 10,850" · "AS Level 9700/9701/9702 S1/S2 14,100" · "A2 Level BY/CT 11,400" · "A Level AX/HX 18,600" · "AS Computer Science 9608 SY 11,400" · "A2 9618 BY/CT 12,450" · "A Level 9618 AY 16,950"'],
      img='fees-paste-cambridge_typed' if False else 'fees-paste-cambridge-typed')
@@ -575,16 +597,20 @@ step('Check, then add', where=f'the window {L("Paste the fee list")}.', do=f'''<
 know as written: compare it with [[ch:catalogue]] and correct it.</li>
 <li><b>Untick</b> {L("These are the board's published fees")}: this is last cycle's list.</li>
 <li>Click {L("Add these fees")}.</li></ol>''', see=f'the Cambridge rows with their amounts, each {L("provisional")}.', img='fees-paste-cambridge-read')
-step('Paste the Edexcel list', where=f'the {L("Fees")} tab, the block <b>Pearson Edexcel June 2027</b>.', do=f'''<p>The same:
+step('Paste the Edexcel list', where=f'the {L("Fees")} tab, the block <b>Pearson Edexcel June 2027</b>.', key='fees-edexcel', do=f'''<p>The same:
 {L("Paste the fee list")}, paste, {L("Read the list")} ({L("12 matched · 0 not recognised")}), untick
 {L("These are the board's published fees")}, {L("Add these fees")}.</p>
 {paste(D['fees']['edexcel_paste'])}
 <ul><li>Pearson prices each unit and each paper: <code>WMA11</code> to <code>WST01</code> are the IAL Mathematics units,
 <code>WBI15</code> and <code>WBI16</code> Biology's Units 5 and 6.</li>
 <li><code>4MA1/1H</code> and <code>4MA1/2H</code> are the list's two IGCSE Mathematics paper rows (4,600 each): the one-paper
-retakes read them. <code>4MA1 9,200</code>, the whole subject, is the two added together, since the list prints no row for the
-subject itself.</li>
-<li><code>YAA01 18,300</code> is the list's two IAL Arabic units added together (<code>WAA01</code> 8,950 + <code>WAA02</code> 9,350).</li></ul>''',
+retakes read them.</li></ul>
+<p class="warn"><b>Two lines are this guide's reading: check them with finance before you paste.</b> <code>4MA1 9,200</code>, the
+whole of Mathematics O.L.: the list prints no row for the whole subject, so the guide adds the two papers together. That is
+doubtful: the November 2026 list prices each Mathematics paper at the same figure as a whole qualification (Human Biology
+<code>4HB1</code> 9,840). Ask finance what the board charges for the whole qualification and change the figure on that line before you paste.
+<code>YAA01 18,300</code>, Arabic A.L.'s International A Level: the list's two units added together (<code>WAA01</code> 8,950 +
+<code>WAA02</code> 9,350), unless the board's list prices the award itself; then use that figure.</p>''',
      form=['Edexcel June 2026: "IAL Mathematics P1–P4 WMA11–WMA14 4,800 each; M1, M2, S1 4,450 each" · "IAL Biology Paper 5, Paper 6 WBI15, WBI16 4,450 each" · "IGCSE Mathematics one row per paper 4,600 each" · "IAL Arabic WAA01 / WAA02 8,950 / 9,350"'],
      img='fees-paste-pearson_edexcel-read')
 step('The rows no list has', where=f'the {L("Fees")} tab.', key='fees-typed', do=f'''<p>The rows still {L("No fee")} come first in
@@ -602,12 +628,20 @@ step('Every row priced', where=f'the {L("Fees")} tab.', see=f'''each block with 
 {L("Confirm all")} with their number. The sheet's {L("Board fee")} column now shows each fee with {L("not published yet")}.''',
      img=['fees-cambridge-priced', 'fees-pearson_edexcel-priced', 'fees-oxford-priced'])
 step("When a board publishes its June 2027 list", key='fees-later', where=f'the {L("Fees")} tab, the board\'s block.', do=f'''<ol>
-<li>Click {L("Paste the fee list")} and paste the board's new list, written as in [[fees-cambridge]] (with the Exam Catalogue's codes).</li>
+<li>Click {L("Paste the fee list")} and paste the board's new list, written as in [[fees-cambridge]] and [[fees-edexcel]] (the
+Exam Catalogue's codes and the same rewrites).</li>
 <li>Leave {L("These are the board's published fees")} <b>ticked</b>.</li>
 <li>{L("Read the list")}, {L("Add these fees")}.</li></ol>
-<p>Each row becomes {L("confirmed")} at the new amount, and families can pay. For rows typed by hand, type the published amount
-in the box and click {L("Confirm all")}. Once a fee is confirmed it changes only by its {L("Change")} and {L("Confirm")}; if
-families had already reserved at another price, the block offers {L("Re-price unpaid lines")}.</p>''')
+<p>Each pasted row becomes {L("confirmed")} at the new amount.</p>
+<p class="warn"><b>Before you click {L("Confirm all")}:</b> it confirms <b>every</b> row of the block still
+{L("provisional")}, at the amount in its box. First type the published amount into every row that still shows last cycle's
+figure or a figure you typed by hand; then click {L("Confirm all")}.</p>
+<p class="warn"><b>Families who reserved before the board published.</b> A reservation made at last cycle's fee stays
+provisional, and cannot be paid, if the confirmed fee is a different amount. The block then says
+{L("A confirmed fee differs from what lines were priced at")}: click {L("Re-price unpaid lines")}, give a reason and click
+{L("Re-price")}. Those reservations take the new fee, each family is told the old and the new price, and they can pay. A
+reservation whose fee did not change can be paid as soon as the row is confirmed.</p>
+<p>Once a fee is confirmed it changes only by its {L("Change")} and {L("Confirm")}.</p>''')
 
 # ═══════════════════════════════════════ 10. Board Services, School Fees ═══════════════════════════════════════
 chapter('services', 'Board Services and School Fees',
@@ -672,16 +706,17 @@ teacher), the entries {L("First entry, in school")}, {L("Retake, in school — n
 step('Arabic A.L.', key='preview-arabic', where=f'{L("The family\'s form")}, Arabic A.L.', do='''<p>Two lines, one per qualification,
 each with its own teacher: the family chooses the qualification by choosing the teacher, as on the form.</p>''',
      form=['Teacher: T1 "(Edexcel YAA01)", T2 "(Edexcel 9AA01)"'], img='preview-arabic-al')
-step('Computer Science A.S./A.L.', where=f'{L("The family\'s form")}, Computer Science A.S./A.L.', do=f'''<p>{L("A.S.")},
-{L("A.2. (Carry forward)")} with {L("Carried from the sitting…")} (June or November, the form's two A.2. options), and
-{L("A.L.")}, each by the external team.</p>''', form=['Components: "Computer Science A.S. · A.2. (Carry forward on June) · A.2. (Carry forward on November) · A.L."'],
+step('Computer Science A.S./A.L.', where=f'{L("The family\'s form")}, Computer Science A.S./A.L.', do=f'''<p>The routes, in this order:
+{L("A.L.")}, then {L("A.2. (Carry forward)")} with {L("Carried from the sitting…")} (June or November, the form's two A.2. options),
+then {L("A.S.")}, each by the external team. The order is the reverse of the school's form; the choices are the same.</p>''', form=['Components: "Computer Science A.S. · A.2. (Carry forward on June) · A.2. (Carry forward on November) · A.L."'],
      img='preview-cs-asal')
 step('Mathematics A.S./A.L.', where=f'{L("The family\'s form")}, Mathematics A.S./A.L.', do='''<p>One line per unit, each with its
 teacher: P1 and P2 "(online)", M1 and S1 with a choice of two teachers, every unit also as a self-study retake.</p>''',
      form=['"P1: T1 (ONLINE ONLY) / Self Study 50% School fees (2nd entry ONLY)" · "P2: the same" · "P3: T1 / SS" · "P4: T1 / SS" · "M1: T2 / T1 / SS" · "S1: T2 / T1 / SS"'],
      img='preview-ial-maths')
-step('Physics A.S./A.L.', where=f'{L("The family\'s form")}, Physics A.S./A.L.', do=f'''<p>{L("A.S.")} taught by the teacher;
-{L("A.2. (Carry forward)")} in self study only, with the sitting the A.S. result comes from.</p>''',
+step('Physics A.S./A.L.', where=f'{L("The family\'s form")}, Physics A.S./A.L.', do=f'''<p>In this order:
+{L("A.2. (Carry forward)")} in self study only, with the sitting the A.S. result comes from, then {L("A.S.")} taught by the
+teacher. The order is the reverse of the school's form; the choices are the same.</p>''',
      form=['"Physics A.S. in School 100% fees (T1)" · "Physics A.2. (Self Study 50% fees in June 2027)" · "A.2. Self Study 50% (Carry forward on June 2026)" · "A.2. Self Study 50% (Carry forward on November 2025)"'],
      img='preview-physics-asal')
 
