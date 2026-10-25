@@ -1,0 +1,1 @@
+{ "name": "admin-guide-build", "private": true, "type": "module", "description": "The admin guide's drive and page check (playwright-core, the system's Chrome).", "dependencies": { "playwright-core": "^1.56.0" } }

@@ -1,0 +1,21 @@
+// Chapter 6: the two settings the forms set — the self-study shares and the June refund policy. Checked, not changed.
+import { BASE, signIn, shot, out, browser, report, settingCard, toTop, mark, unmark } from './lib.mjs';
+import { ADMIN } from './data.mjs';
+const page = await signIn(ADMIN.email, ADMIN.password);
+await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(1000);
+const ss = settingCard(page, 'Self-study: share of the course fee');
+await toTop(page, ss, 70);
+await mark(page, ss.locator('span', { hasText: /^50%$/ }).first()).catch(() => {});
+await shot(page, 'settings-self-study');
+await unmark(page);
+out(await ss.innerText());
+out(await settingCard(page, 'Self-study: share of the board fee').innerText());
+const rp = settingCard(page, 'Refund policy of a new June session');
+await toTop(page, rp, 70);
+await shot(page, 'settings-refund-june');
+out(await rp.innerText());
+const pp = settingCard(page, 'Take payment while a board fee is provisional');
+out(await pp.innerText());
+report();
+await browser.close();
