@@ -1,0 +1,25 @@
+{
+ "file": "docs/admin-guide/build/../index.html",
+ "copyButtons": 3,
+ "results": [
+  {
+   "step": "4.2",
+   "lines": 26,
+   "buttonAfterClick": "Copied",
+   "copiedEqualsBlock": true
+  },
+  {
+   "step": "9.3",
+   "lines": 19,
+   "buttonAfterClick": "Copied",
+   "copiedEqualsBlock": true
+  },
+  {
+   "step": "9.5",
+   "lines": 12,
+   "buttonAfterClick": "Copied",
+   "copiedEqualsBlock": true
+  }
+ ]
+}
+exit 0

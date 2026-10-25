@@ -1,0 +1,22 @@
+Regeneration check, 2026-10-25T21:35:46Z: the page rebuilt from commit e43f4ff's files alone
+$ git archive e43f4ff docs/admin-guide | tar -x -C <empty dir>
+$ SHOTS=<no such folder> python3 docs/admin-guide/build/gen.py
+15 chapters, 93 steps, 102 images (102 kept from img/), index.html 171 KB
+   1. Before you start: 4 steps, 2 images
+   2. The school's name: 4 steps, 4 images
+   3. Your team: 4 steps, 4 images
+   4. The 25 subjects and their teachers: 8 steps, 8 images
+   5. What each subject enters with its board (the Exam Catalogue): 13 steps, 17 images
+   6. The settings the forms set: 2 steps, 2 images
+   7. The June 2027 session: 3 steps, 3 images
+   8. The sheet: the 25 forms, one subject each: 29 steps, 33 images
+   9. The boards' fees: 8 steps, 9 images
+  10. Board Services and School Fees: 2 steps, 2 images
+  11. The boards' dates: 4 steps, 4 images
+  12. Grade 10: 1 steps, 1 images
+  13. Check the family's form: 6 steps, 6 images
+  14. Open the session: 4 steps, 6 images
+  15. What happens next: 1 steps, 1 images
+$ diff <committed index.html> <regenerated index.html>
+index.html: identical
+img/: 102 files regenerated, 0 differ from the commit
