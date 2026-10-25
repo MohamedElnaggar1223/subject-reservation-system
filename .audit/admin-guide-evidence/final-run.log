@@ -1,0 +1,990 @@
+== 2026-10-25T20:11:10Z stop the API started for the guide
+== 2026-10-25T20:11:13Z recreate igcse_guide_dev
+DROP DATABASE
+CREATE DATABASE
+[⣷] applying migrations...[2K[1G[⣯] applying migrations...[2K[1G[⣟] applying migrations...[2K[1G[⡿] applying migrations...[2K[1G[⢿] applying migrations...[2K[1G[⣻] applying migrations...[2K[1G[✓] migrations applied successfully!migrations: 65
+== 2026-10-25T20:11:18Z API up (pnpm pid 79466)
+after sign-up: http://localhost:3230/
+no failed request, no page error
+No sample subjects or sessions (run with --with-samples to add them for a demo or a test system).
+  Promoted admin@igcse.local to admin.
+--- Seed complete ---
+== 2026-10-25T20:11:26Z d1-start
+shot sign-in-filled 49 KB q74
+landed http://localhost:3230/
+shot home-empty 44 KB q74
+Welcome back, School Admin
+
+The reservation cycle: where each session stands, and what comes next.
+
+No session is open or being prepared.
+
+Start the next one: copy the last session of its kind and its subjects, teachers and course fees come across.
+
+Start the next session
+shot settings-school-name 99 KB q74
+shot settings-school-name-typed 82 KB q74
+shot settings-school-name-saved 97 KB q74
+The school's name
+
+Shown on the sign-in, sign-up and account pages, above the app's name, so a family knows the account is their school's. Empty: the app's name alone. A logo waits until the school provides one.
+
+Demo International School
+Last changed 25 Oct 2026, 23:11 · School Admin · Who may change it: Admin
+Change
+shot sign-in-with-school-name 47 KB q74
+no failed request, no page error
+== 2026-10-25T20:11:40Z d2-team
+shot team-open 60 KB q74
+shot team-coordinator-filled 62 KB q74
+Account created for coordinator@igcse.local. Share the temporary password with them directly.
+shot team-finance_officer-filled 72 KB q74
+Account created for finance@igcse.local. Share the temporary password with them directly.
+shot team-list 75 KB q74
+Team & Accounts
+
+Create accounts and assign roles. Anyone on the staff can also teach: link their account to a teacher record and they get the teaching screens for their own lessons.
+
+Name
+Email
+Temp. password
+Role
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+Teaches as
+Does not teach
+New teacher record (this name)
+
+Runs the desk: payments, receipts and registrations on a family’s behalf.
+
+Account created for finance@igcse.local. Share the temporary password with them directly.
+
+Create Account
+Staff
+Students
+Parents
+Name	Email	Role	Teaches as
+Finance Officer One	finance@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+No unlinked record
+
+Coordinator One	coordinator@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+No unlinked record
+
+School Admin	admin@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+No unlinked record
+no failed request, no page error
+== 2026-10-25T20:11:51Z d3-subjects
+shot catalogue-import-button 91 KB q74
+shot subjects-paste 83 KB q74
+Imported 25 subject(s).
+shot subjects-imported 88 KB q74
+shot subjects-teachers-button 98 KB q74
+shot teachers-arabic-typed 78 KB q74
+shot teachers-arabic-added 77 KB q74
+shot teachers-arabic-al-added 77 KB q74
+shot teachers-later-subject 81 KB q74
+shot team-teacher-account 72 KB q74
+Account created for teacher1@igcse.local. Share the temporary password with them directly.
+shot team-teacher-account-made 79 KB q74
+no failed request, no page error
+== 2026-10-25T20:13:08Z d4-catalogue
+shot catalogue-starter-buttons 115 KB q74
+Added 9 units and 2 awards.
+Added 6 units and 2 awards.
+shot catalogue-starter-loaded 112 KB q74
+shot units-add-paper 103 KB q74
+shot units-papers-added 103 KB q74
+shot award-add-0970 105 KB q74
+shot award-add-9aa0 103 KB q74
+shot award-add-9702-al 105 KB q74
+shot award-0970-units 101 KB q74
+shot award-0970-option 98 KB q74
+shot award-9702-al-option-carry 98 KB q74
+shot award-0970-done 98 KB q74
+shot award-9702-done 89 KB q74
+shot awards-pearson 106 KB q74
+shot map-button 111 KB q74
+shot map-biology 86 KB q74
+shot map-arabic-al 86 KB q74
+shot map-chemistry-as 79 KB q74
+shot map-ial-maths 82 KB q74
+shot catalogue-all-mapped 106 KB q74
+shot catalogue-mapped-table 105 KB q74
+Exam catalogue
+
+The boards, the awards they issue, the units or papers that count toward each, and what every subject families register for enters with its board. The school's level codes are worked out from these, never typed.
+
+Load a starter set from the research
+
+Adds what is missing; changes nothing already there. Check it against the board's current specification.
+
+Pearson IAL Mathematics
+Pearson IAL Biology
+Pearson Edexcel
+
+Edexcel Online
+
+Edit
+January
+June
+October
+November
+
+8 awards · 17 units · 5 subjects
+
+A one-paper retake: the paper's own board fee
+
+Cambridge International
+
+Cambridge Direct
+
+Edit
+June
+November
+
+22 awards · 7 units · 18 subjects
+
+A one-paper retake: the syllabus's board fee
+
+OxfordAQA
+
+Centre Services
+
+Edit
+January
+June
+November
+
+2 awards · 0 units · 2 subjects
+
+A one-paper retake: the syllabus's board fee
+
+"A.S./A.2." on a single AS unit means: An AS entry of a student who also sits A2 units in that series. Change it on the Settings page when the coordinator confirms what the school means.
+
+Subjects families register
+Qualifications
+32
+Units and papers
+24
+Search
+Only subjects not mapped yet
+Import several from a list
+Add a subject
+Subject	Board	Enters	Counts toward	School's code	Actions
+
+
+Arabic
+
+3180 · IGCSE
+
+	Cambridge International	
+
+3180 Arabic
+
+	—	
+O.L.
+	Change
+
+
+Arabic A.L.
+
+ARABIC-AL · A Level
+
+	Pearson Edexcel	
+
+YAA01 Arabic (International A Level)
+
+	—	
+A.L.
+	Change
+
+
+Biology
+
+0970 · IGCSE
+
+	Cambridge International	
+
+0970 Biology
+
+	—	
+O.L.
+	Change
+
+
+Biology A.S./A.L.
+
+IAL-BIOLOGY · A Level
+
+	Pearson Edexcel	
+Unit 1
+ 
+AS
+Unit 2
+ 
+AS
+Unit 3
+ 
+AS
+Unit 4
+ 
+A2
+Unit 5
+ 
+A2
+Unit 6
+ 
+A2
+	
+XBI11 AS Level
+YBI11 A Level
+	
+A.S./A.2.
+	Change
+
+
+Business
+
+0986 · IGCSE
+
+	Cambridge International	
+
+0986 Business Studies
+
+	—	
+O.L.
+	Change
+
+
+Chemistry
+
+0971 · IGCSE
+
+	Cambridge International	
+
+0971 Chemistry
+
+	—	
+O.L.
+	Change
+
+
+Chemistry A.S.
+
+CHEM-AS · AS Level
+
+	Cambridge International	
+
+9701 Chemistry (AS Level)
+
+	—	
+A.S.
+	Change
+
+
+Combined Science
+
+0653 · IGCSE
+
+	Cambridge International	
+
+0653 Combined Science
+
+	—	
+O.L.
+	Change
+
+
+Computer Science
+
+0984 · IGCSE
+
+	Cambridge International	
+
+0984 Computer Science
+
+	—	
+O.L.
+	Change
+
+
+Computer Science A.S./A.L.
+
+CS-ASAL · AS Level
+
+	Cambridge International	
+
+9618 Computer Science (AS Level)
+
+	—	
+A.S.
+	Change
+
+
+English as a Second Language
+
+ESL-OXFORD · IGCSE
+
+	OxfordAQA	
+
+ESL-OXFORD English as a Second Language
+
+	—	
+O.L.
+	Change
+
+
+Environmental Management
+
+0680 · IGCSE
+
+	Cambridge International	
+
+0680 Environmental Management
+
+	—	
+O.L.
+	Change
+
+
+French
+
+7156 · IGCSE
+
+	Cambridge International	
+
+7156 French
+
+	—	
+O.L.
+	Change
+
+
+French A.S./A.L.
+
+FRENCH-ASAL · AS Level
+
+	Cambridge International	
+
+9898 French (AS Level)
+
+	—	
+A.S.
+	Change
+
+
+German
+
+7159 · IGCSE
+
+	Cambridge International	
+
+7159 German
+
+	—	
+O.L.
+	Change
+
+
+Global Citizenship
+
+GLOBAL-CIT · IGCSE
+
+	Cambridge International	
+
+GLOBAL-CIT Global Citizenship
+
+	—	
+O.L.
+	Change
+
+
+Global Perspectives
+
+0457 · IGCSE
+
+	Cambridge Internatio
+no failed request, no page error
+== 2026-10-25T20:15:21Z d5-settings
+shot settings-self-study 98 KB q74
+Self-study: share of the course fee
+
+A self-study line pays this share of the school's course fee ("Self Study 50% School fees" on every form).
+
+50%
+School default
+Never changed · Who may change it: Admin, Finance Admin
+Change
+Self-study: share of the board fee
+
+A self-study line pays this share of the board's fee. The forms halve the "School fees" only, so the board fee is paid in full by default (A-16, question Q-12 to the admin).
+
+100%
+School default
+Never changed · Who may change it: Admin, Finance Admin
+Change
+shot settings-refund-june 102 KB q74
+Refund policy of a new June session
+
+Copied into each new June session, in weeks from the first lesson: the share of the course fee a family gets back on a drop. The session can change it until the first family consents to it.
+
+100% to week 2 · 50% in week 3 · 0% from week 4
+School default
+Never changed · Who may change it: Admin, Finance Admin
+Change
+Take payment while a board fee is provisional
+
+Off: a line whose board fee is still provisional (copied from an earlier series, or typed before the board publishes) can be reserved but not paid; the checkout and the desk say "board fee provisional, confirmed before payment". On: it can be paid at the provisional price, and a later difference is a price adjustment by finance.
+
+Off
+School default
+Never changed · Who may change it: Admin, Finance Admin
+Change
+no failed request, no page error
+== 2026-10-25T20:15:28Z d6-session
+shot sessions-empty 38 KB q74
+shot session-new-filled 60 KB q74
+shot session-empty-sheet 53 KB q74
+← Sessions
+June 2027
+Draft
+
+Reserve 1 Nov 2026 08:00 – 15 Feb 2027 23:00
+Course starts 1 Nov 2026
+Due 30 Nov 2026 23:00
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+
+Edit
+Open now
+Correct the sitting
+Delete this draft
+
+No sittings yet: a subject's sitting is added with the subject.
+
+Subjects
+Fees
+Money
+Grade 10
+To verify
+
+0 subjects
+
+No subjects on this sheet yet
+
+Bring last cycle's subjects with their teachers and fees, then change what differs; or add the subjects one by one.
+
+Add subjects
+session /admin/sessions/8db30a75-29b1-40c2-bebb-4ed1453062f4
+shot sheet-add-button 54 KB q74
+shot sheet-add-search 43 KB q74
+shot sheet-form-new 45 KB q70
+shot sheet-01-3180-a 47 KB q70
+shot sheet-01-3180-b 69 KB q70
+01 3180 added
+shot sheet-02-0970-a 47 KB q70
+shot sheet-02-0970-b 64 KB q70
+02 0970 added
+shot sheet-03-0986 44 KB q70
+03 0986 added
+shot sheet-04-0971-a 47 KB q70
+shot sheet-04-0971-b 64 KB q70
+04 0971 added
+shot sheet-05-0653-a 45 KB q70
+shot sheet-05-0653-b 62 KB q70
+05 0653 added
+shot sheet-06-0984 55 KB q70
+06 0984 added
+shot sheet-07-esl-oxford 49 KB q70
+07 ESL-OXFORD added
+shot sheet-08-0680 46 KB q70
+08 0680 added
+shot sheet-09-7156 44 KB q70
+09 7156 added
+shot sheet-10-7159 44 KB q70
+10 7159 added
+shot sheet-11-0457 45 KB q70
+11 0457 added
+shot sheet-12-global-cit 46 KB q70
+12 GLOBAL-CIT added
+shot sheet-13-4hb1 45 KB q70
+13 4HB1 added
+shot sheet-14-0983-a 50 KB q70
+shot sheet-14-0983-b 61 KB q70
+14 0983 added
+shot sheet-15-4ma1-a 47 KB q70
+shot sheet-15-4ma1-b 68 KB q70
+15 4MA1 added
+shot sheet-16-0972-a 44 KB q70
+shot sheet-16-0972-b 61 KB q70
+16 0972 added
+shot sheet-17-psy-oxford 45 KB q70
+17 PSY-OXFORD added
+shot sheet-18-arabic-al-a 44 KB q70
+shot sheet-18-arabic-al-b 63 KB q70
+shot sheet-18-arabic-al-c 76 KB q70
+shot sheet-18-arabic-al-d 79 KB q70
+18 ARABIC-AL added
+shot sheet-19-ial-biology-a 42 KB q70
+shot sheet-19-ial-biology-b 85 KB q70
+19 IAL-BIOLOGY added
+shot sheet-20-chem-as-a 42 KB q70
+shot sheet-20-chem-as-b 70 KB q70
+20 CHEM-AS added
+shot sheet-21-cs-asal-a 49 KB q70
+shot sheet-21-cs-asal-b 71 KB q70
+21 CS-ASAL added
+shot sheet-22-french-asal-a 42 KB q70
+shot sheet-22-french-asal-b 63 KB q70
+22 FRENCH-ASAL added
+shot sheet-23-ial-maths-a 45 KB q70
+shot sheet-23-ial-maths-b 116 KB q70
+23 IAL-MATHS added
+shot sheet-24-phys-asal-a 42 KB q70
+shot sheet-24-phys-asal-b 70 KB q70
+24 PHYS-ASAL added
+shot sheet-25-psy-al 43 KB q70
+25 PSY-AL added
+shot sheet-after-25 71 KB q74
+no failed request, no page error
+== 2026-10-25T20:19:04Z d7-fees-dates
+shot fees-empty 84 KB q74
+shot fees-paste-button 85 KB q74
+shot fees-paste-cambridge-typed 71 KB q74
+cambridge 19 matched · 0 not recognised
+shot fees-paste-cambridge-read 82 KB q74
+shot fees-paste-pearson_edexcel-typed 73 KB q74
+pearson_edexcel 12 matched · 0 not recognised
+shot fees-paste-pearson_edexcel-read 79 KB q74
+shot fees-cambridge-no-fee 92 KB q74
+shot fees-cambridge-typed 94 KB q74
+shot fees-cambridge-priced 97 KB q74
+shot fees-pearson_edexcel-priced 102 KB q74
+shot fees-oxford-priced 98 KB q74
+← Sessions
+June 2027
+Draft
+
+Reserve 1 Nov 2026 08:00 – 15 Feb 2027 23:00
+Course starts 1 Nov 2026
+Due 30 Nov 2026 23:00
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+
+Edit
+Open now
+Correct the sitting
+Delete this draft
+Deadlines
+Cambridge International June 2027: Dates not set
+OxfordAQA June 2027: Dates not set
+Pearson Edexcel June 2027: Dates not set
+Subjects
+Fees
+Money
+Grade 10
+To ve
+shot board-services 65 KB q74
+shot school-fees 84 KB q74
+shot dates-button 73 KB q74
+shot dates-cambridge 78 KB q74
+shot dates-set 74 KB q74
+shot board-series 82 KB q74
+Board series
+
+Every sitting of every board this academic year, with the dates the boards set. The entry deadline is the school's hard stop: past it, nothing more is entered, paid or confirmed for that series. Late-fee dates are shown for information.
+
+Academic year
+2025/26
+2026/27
+2027/28
+
+Next entry deadline
+
+Pearson Edexcel June 2027 · 13 Feb 2027 23:59 · 
+111
+ 
+days left
+
+It will close 0 registrations still waiting · 0 payments still open
+
+Add a series
+
+Pearson Edexcel
+Cambridge International
+OxfordAQA
+Month
+Choose…
+October 2026
+November 2026
+January 2027
+June 2027
+Label (only if the board runs two calendars that month)
+Add the series
+Series	Entry deadline	Sessions	Registrations	Actions
+Pearson Edexcel June 2027
+
+Academic year 2026/27
+
+	
+13 Feb 2027 23:59
+111
+ 
+days left
+	
+June 2027
+	0 confirmed	
+Dates
+
+Cambridge International June 2027
+
+Academic year 2026/27
+
+	
+21 Feb 2027 23:59
+119
+ 
+days left
+
+Retakes until 21 Mar 2027 23:59
+
+	
+June 2027
+	0 confirmed	
+Dates
+
+OxfordAQA June 2027
+
+Academic year 2026/27
+
+	
+21 Feb 2027 23:59
+119
+ 
+days left
+	
+June 2027
+	0 confirmed	
+Dates
+shot grade-10 82 KB q74
+← Sessions
+June 2027
+Draft
+
+Reserve 1 Nov 2026 08:00 – 15 Feb 2027 23:00
+Course starts 1 Nov 2026
+Due 30 Nov 2026 23:00
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+
+Edit
+Open now
+Correct the sitting
+Delete this draft
+Deadlines
+Pearson Edexcel June 2027: entries by 13 Feb 2027
+Cambridge International June 2027: entries by 21 Feb 2027 · retakes by 21 Mar 2027
+OxfordAQA June 2027: entries by 21 Feb 2027
+Subjects
+Fees
+Money
+Grade 10
+To verify
+The core
+
+Every grade-10 student sits these in June; a family reserving on its own must include them.
+
+Arabic
+Biology
+Business
+Chemistry
+Combined Science
+Computer Science
+English as a Second Language
+Environmental Management
+French
+German
+Global Perspectives
+Global Citizenship
+Human Biology
+ICT
+Mathematics
+Physics
+Psychology
+Preview
+no failed request, no page error
+== 2026-10-25T20:19:58Z d8-preview-open
+shot preview-link 71 KB q74
+shot preview-biology 78 KB q74
+== Biology
+The family's form
+
+What a family sees for Biology on the Reserve page, every choice open. Nothing is reserved from here.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+Biology Cambridge International
+	All papers	
+No preference
+Teacher 4
+Teacher 5
+Teacher 6
+	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 22,850 ⓟ
+Retake, in school — name the sitting · EGP 22,850 ⓟ
+Retake, self-study — name the sitting · EGP 16,850 ⓟ
+	EGP 22,850 ⓟ
+	Paper 41/42 only (retake) Self-study only (not taught this cycle) to be verified by the school	— self-study	
+Retake, self-study — name the sitting
+Carried from the sitting…
+Cambridge International November 2026
+Cambridge International June 2026
+Cambridge International November 2025
+Cambridge International June 2025
+Retake, self-study — name the sitting · EGP 12,850 ⓟ
+	EGP 12,850 ⓟ
+I confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.
+I confirm that the information given is true, complete and accurate.
+Close
+shot preview-arabic-al 87 KB q74
+== Arabic A.L.
+The family's form
+
+What a family sees for Arabic A.L. on the Reserve page, every choice open. Nothing is reserved from here.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+Arabic A.L. Pearson Edexcel
+	All papers	Teacher 25 (Edexcel YAA01)	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 30,300 ⓟ
+Retake, in school — name the sitting · EGP 30,300 ⓟ
+Retake, self-study — name the sitting · EGP 24,300 ⓟ
+	EGP 30,300 ⓟ
+	Edexcel 9AA0	Teacher 26 (Edexcel 9AA0)	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 30,300 ⓟ
+Retake, in school — name the sitting · EGP 30,300 ⓟ
+Retake, self-study — name the sitting · EGP 24,300 ⓟ
+	EGP 30,300 ⓟ
+I confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.
+I confirm that the information given is true, complete and accurate.
+Close
+shot preview-cs-asal 87 KB q74
+== Computer Science A.S./A.L.
+The family's form
+
+What a family sees for Computer Science A.S./A.L. on the Reserve page, every choice open. Nothing is reserved from here.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+Computer Science A.S./A.L. Cambridge International
+	A.L.	External Team	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 31,950 ⓟ
+Retake, in school — name the sitting · EGP 31,950 ⓟ
+Retake, self-study — name the sitting · EGP 24,450 ⓟ
+	EGP 31,950 ⓟ
+	A.2. (Carry forward) to be verified by the school	External Team	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+Carried from the sitting…
+Cambridge International November 2026
+Cambridge International June 2026
+Cambridge International November 2025
+Cambridge International June 2025
+First entry, in school · EGP 27,450 ⓟ
+Retake, in school — name the sitting · EGP 27,450 ⓟ
+Retake, self-study — name the sitting · EGP 19,950 ⓟ
+	EGP 27,450 ⓟ
+	A.S.	External Team	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 26,400 ⓟ
+Retake, in school — name the sitting · EGP 26,400 ⓟ
+Retake, self-study — name the sitting · EGP 18,900 ⓟ
+	EGP 26,400 ⓟ
+I confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.
+I confirm that the information given is true, complete and accurate.
+Close
+shot preview-ial-maths 89 KB q74
+== Mathematics A.S./A.L.
+The family's form
+
+What a family sees for Mathematics A.S./A.L. on the Reserve page, every choice open. Nothing is reserved from here.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+Mathematics A.S./A.L. Pearson Edexcel
+	P1	Teacher 30 (online)	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 8,800 ⓟ
+Retake, in school — name the sitting · EGP 8,800 ⓟ
+Retake, self-study — name the sitting · EGP 6,800 ⓟ
+	EGP 8,800 ⓟ
+	P2	Teacher 30 (online)	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 8,800 ⓟ
+Retake, in school — name the sitting · EGP 8,800 ⓟ
+Retake, self-study — name the sitting · EGP 6,800 ⓟ
+	EGP 8,800 ⓟ
+	P3	Teacher 30	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 8,800 ⓟ
+Retake, in school — name the sitting · EGP 8,800 ⓟ
+Retake, self-study — name the sitting · EGP 6,800 ⓟ
+	EGP 8,800 ⓟ
+	P4	Teacher 30	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 8,800 ⓟ
+Retake, in school — name the sitting · EGP 8,800 ⓟ
+Retake, self-study — name the sitting · EGP 6,800 ⓟ
+	EGP 8,800 ⓟ
+	M1	
+No preference
+Teacher 31
+Teacher 30
+	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 8,450 ⓟ
+Retake, in school — name the sitting · EGP 8,450 ⓟ
+Retake, self-study — name the sitting · EGP 6,450 ⓟ
+	EGP 8,450 ⓟ
+	S1	
+No preference
+Teacher 31
+Teacher 30
+	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 8,450 ⓟ
+Retake, in school — name the s
+shot preview-physics-asal 90 KB q74
+== Physics A.S./A.L.
+The family's form
+
+What a family sees for Physics A.S./A.L. on the Reserve page, every choice open. Nothing is reserved from here.
+
+	SUBJECT · PAPERS	TEACHER	ENTRY	PRICE
+Physics A.S./A.L. Cambridge International
+	A.2. (Carry forward) Self-study only (not taught this cycle) to be verified by the school	— self-study	
+First entry, self-study (not taught this cycle)
+Retake, self-study — name the sitting
+Carried from the sitting…
+Cambridge International November 2026
+Cambridge International June 2026
+Cambridge International November 2025
+Cambridge International June 2025
+First entry, self-study (not taught this cycle) · EGP 18,900 ⓟ
+Retake, self-study — name the sitting · EGP 18,900 ⓟ
+	EGP 18,900 ⓟ
+	A.S.	Teacher 32	
+First entry, in school
+Retake, in school — name the sitting
+Retake, self-study — name the sitting
+First entry, in school · EGP 29,100 ⓟ
+Retake, in school — name the sitting · EGP 29,100 ⓟ
+Retake, self-study — name the sitting · EGP 21,600 ⓟ
+	EGP 29,100 ⓟ
+I confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.
+I confirm that the information given is true, complete and accurate.
+Close
+shot home-before-opening 58 KB q74
+Welcome back, School Admin
+
+The reservation cycle: where each session stands, and what comes next.
+
+June 2027
+Draft
+
+Being prepared: not open to families yet. Families reserve from 1 Nov 2026 to 15 Feb 2027.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+25 board fees not published yet
+Families can reserve these subjects, not pay for them, until the fee is confirmed.
+Confirm the fees
+ENTRIES TO THE BOARD
+Pearson Edexcel June 2027: entries by 13 Feb 2027
+Cambridge International June 2027: entries by 21 Feb 2027
+OxfordAQA June 2027: entries by 21 Feb 2027
+shot open-now-button 75 KB q74
+shot open-now-dialog 65 KB q74
+shot session-open 73 KB q74
+shot reminders-on 100 KB q74
+shot reminders-saved 105 KB q74
+shot home-open 63 KB q74
+Welcome back, School Admin
+
+The reservation cycle: where each session stands, and what comes next.
+
+June 2027
+Open
+
+Open: families reserve until 15 Feb 2027. Payment due 30 Nov 2026.
+
+Open the sheet
+WHAT THE SHEET STILL NEEDS
+25 board fees not published yet
+Families can reserve these subjects, not pay for them, until the fee is confirmed.
+Confirm the fees
+WHAT FAMILIES ARE DOING
+No family has reserved yet.
+Reserve for a family at the desk
+ENTRIES TO THE BOARD
+Pearson Edexcel June 2027: entries by 13 Feb 2027
+Cambridge International June 2027: entries by 21 Feb 2027
+OxfordAQA June 2027: entries by 21 Feb 2027
+no failed request, no page error
+== 2026-10-25T20:20:40Z done:      121 shots

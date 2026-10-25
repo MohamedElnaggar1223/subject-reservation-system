@@ -1,0 +1,15 @@
+{
+ "file": "../index.html",
+ "chapters": 15,
+ "steps": 93,
+ "images": 102,
+ "broken": [],
+ "links": 182,
+ "missing": [],
+ "otherLinks": [],
+ "pasteBlocks": 3,
+ "imageFilesOnDisk": 102,
+ "externalRequests": [],
+ "pageErrors": []
+}
+exit 0
