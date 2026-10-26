@@ -26,6 +26,7 @@ import { repriceBoardPart, round2 } from './pricing.services';
 import { dueDateFor } from './deadline.services';
 import { createNotification } from './notification.services';
 import { lockFeeGrids } from '../lib/fee-grid-lock';
+import { LIVE_LINE_STATUSES as LIVE } from './setup/model';
 import { formatEgp } from '@repo/validations';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -38,7 +39,6 @@ export class BoardFeeError extends Error {
 }
 
 const WAITING = ['pending_approval', 'pending_payment', 'preregistered'] as const;
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'] as const;
 
 async function seriesOrThrow(executor: Executor, seriesId: string) {
   const [s] = await executor.select().from(boardSeries).where(eq(boardSeries.id, seriesId));
@@ -256,7 +256,7 @@ async function lockLinesOfFees(tx: Tx, feeIds: string[]) {
   const ids = await tx.execute(sql`
     select distinct r.id from registration r
     cross join lateral jsonb_array_elements(coalesce(r.pricing_basis->'feeRows', '[]'::jsonb)) fr
-    where r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt')
+    where r.status in (${sql.join(LIVE.map((st) => sql`${st}`), sql`, `)})
       and fr->>'id' in (${sql.join(feeIds.map((id) => sql`${id}`), sql`, `)})`).then((x) => (x.rows as { id: string }[]).map((r) => r.id));
   if (!ids.length) return [];
   return tx.select().from(registration).where(inArray(registration.id, ids)).orderBy(registration.id).for('update');
