@@ -43,3 +43,6 @@ AI_CONTEXT.md
 
 # F0a local upload store (development and tests)
 .uploads/
+
+# Teachers' names for the seeds (COORDINATOR_REWORK.md §7.1): placeholder key → name, kept local
+packages/db/seeds/local/
