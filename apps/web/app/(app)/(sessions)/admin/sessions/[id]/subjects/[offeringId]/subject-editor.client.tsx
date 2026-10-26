@@ -164,6 +164,53 @@ function bodyOf(d: Draft, o: OfferingData, s: SetupSession) {
   };
 }
 
+/** A stored row's value for each field a save may send (the names bodyOf uses). */
+const storedRow = (r: RowData) => ({
+  name: r.label, sitting: r.sitting, closesAt: r.closesAt, payBy: r.payBy, examFee: r.examFee, courseFee: r.courseFee, selfStudyFee: r.selfStudyFee,
+  cells: r.cells, allowedPriorSittings: r.allowedPriorSittings.map((p) => `${p.month}-${p.year}`),
+  teachers: r.teachers.map((t) => `${t.teacherId}:${t.online}:${t.external}`),
+});
+/** The stored subject's value for each of its own fields a save may send. */
+const storedOffering = (x: OfferingData) => ({
+  note: x.note, teacherChoice: x.teacherChoice, teacherTbc: x.teacherTbc, accepting: x.accepting, closesAt: x.closesAt, courseFee: x.courseFee,
+  teachers: x.teachers.map((t) => `${t.teacherId}:${t.online}:${t.external}`),
+  questions: x.questions.map((q) => `${q.id}:${q.kind}:${q.prompt}:${q.choices.join('|')}:${q.required}`),
+});
+/** The subject's own fields, as she reads them when they changed elsewhere. */
+const OFFERING_FIELD_WORDS: Record<keyof ReturnType<typeof storedOffering>, string> = {
+  note: 'the note on the subject', teacherChoice: 'who picks the teacher', teacherTbc: 'teacher to be confirmed', accepting: 'the subject\'s switch',
+  closesAt: 'the subject\'s close date', courseFee: 'the subject\'s course fee', teachers: 'the teachers', questions: 'the extra questions',
+};
+type Elsewhere = { kind: 'added' | 'removed' | 'changed'; name: string; field?: boolean };
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * L15: what changed elsewhere since the editor read the subject, among what this save would write — a row added (the
+ * save sends the whole set of rows, so it would remove it), a row removed, a field the save sends that another save
+ * changed meanwhile. Nothing listed: saving loses nothing.
+ */
+function changedElsewhere(body: ReturnType<typeof bodyOf>, was: OfferingData, now: OfferingData): Elsewhere[] {
+  const out: Elsewhere[] = [];
+  const before = new Map(was.rows.map((r) => [r.id, r]));
+  const after = new Map(now.rows.map((r) => [r.id, r]));
+  for (const r of now.rows) if (!before.has(r.id)) out.push({ kind: 'added', name: rowName(r) });
+  for (const b of body.rows) {
+    if (!b.id) continue;
+    const w = before.get(b.id);
+    const n = after.get(b.id);
+    if (!w) continue;
+    if (!n) { out.push({ kind: 'removed', name: rowName(w) }); continue; }
+    const [sw, sn] = [storedRow(w), storedRow(n)];
+    const sent = (Object.keys(sw) as (keyof typeof sw)[]).filter((k) => k in b);
+    if (sent.some((k) => !same(sw[k], sn[k]))) out.push({ kind: 'changed', name: rowName(n) });
+  }
+  const [ow, on] = [storedOffering(was), storedOffering(now)];
+  for (const k of Object.keys(ow) as (keyof typeof ow)[]) {
+    if (k in body && !same(ow[k], on[k])) out.push({ kind: 'changed', name: OFFERING_FIELD_WORDS[k], field: true });
+  }
+  return out;
+}
+
 export default function SubjectEditor({ sessionId, offeringId, viewerRole }: { sessionId: string; offeringId: string; viewerRole: string }): React.JSX.Element {
   // Read once and again only after a save (its invalidation): a refetch under her would remount the editor
   // and lose what she has not saved.
@@ -210,6 +257,17 @@ function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; ca
       apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId: o.id }, json: { ...body, ...(expected ? { expected } : {}) } })),
     async () => { saved.announce(); await queryClient.invalidateQueries({ queryKey: ['sessions', s.id] }); },
   );
+  // Before saving, the subject is read again: what was added or changed elsewhere since the page loaded is said, and
+  // she reloads rather than write over it (L15).
+  const [elsewhere, setElsewhere] = useState<Elsewhere[] | null>(null);
+  const check = useMutation({
+    mutationFn: async () => {
+      const body = bodyOf(d, o, s);
+      return { body, changes: changedElsewhere(body, o, await fetchOffering(s.id, o.id)) };
+    },
+    onSuccess: ({ body, changes }) => { if (changes.length) setElsewhere(changes); else save.save(body); },
+  });
+  const reload = async () => { setElsewhere(null); await queryClient.invalidateQueries({ queryKey: ['sessions', s.id] }); };
   const statusRef = useRef<HTMLSpanElement>(null);
   const { refocus } = saved;
   useEffect(() => {
@@ -264,17 +322,36 @@ function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; ca
           <ForFamilies d={d} setD={setD} canEdit={canEdit} />
           {canEdit && (
             <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-md">
-              <Button disabled={!dirty || save.isPending} onClick={() => save.save(bodyOf(d, o, s))}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+              <Button disabled={!dirty || save.isPending || check.isPending} onClick={() => check.mutate()}>{save.isPending || check.isPending ? 'Saving…' : 'Save'}</Button>
               <Button variant="outline" disabled={!dirty || save.isPending} onClick={() => { setD(initial); save.reset(); }}>Undo the changes</Button>
               <span ref={statusRef} tabIndex={-1} className="flex-1 text-xs text-muted-foreground outline-none">{dirty ? 'Changes not saved yet.' : 'Saved.'}</span>
               <Button variant="ghost" className="text-destructive" onClick={() => setRemoving(true)}>Remove this subject</Button>
-              <div className="basis-full"><ErrorLine message={save.error} /></div>
+              <div className="basis-full"><ErrorLine message={save.error ?? (check.error ? refusalText(check.error) : null)} /></div>
             </div>
           )}
         </div>
         <aside aria-label="What families see"><Preview o={o} s={s} dirty={dirty} /></aside>
       </div>
       <ImpactDialog save={save} />
+      {elsewhere && (
+        <Modal title="Changed elsewhere since you opened this subject" onClose={() => setElsewhere(null)}>
+          <div className="space-y-3 text-sm text-foreground">
+            <ul className="list-disc space-y-1 ps-5">
+              {elsewhere.map((x, i) => (
+                <li key={i}>
+                  <span>{x.kind === 'added' ? 'A row added:' : x.kind === 'removed' ? 'A row removed:' : 'Changed:'}</span>{' '}
+                  {x.field ? <span>{x.name}</span> : <bdi data-i18n-skip="true">{x.name}</bdi>}
+                </li>
+              ))}
+            </ul>
+            <p>Saving now would remove what was added and write over what was changed. Reload the subject to see it; the changes you made here are not kept.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setElsewhere(null)}>Keep editing</Button>
+              <Button onClick={() => void reload()}>Reload the subject</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {removing && (
         <Modal title={`Remove ${subjectTitle(o)}`} onClose={() => setRemoving(false)}>
           <div className="space-y-3 text-sm">

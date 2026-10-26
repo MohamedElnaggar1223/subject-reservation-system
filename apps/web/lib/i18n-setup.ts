@@ -468,6 +468,22 @@ export const setupArabic: Record<string, string> = {
   'When did you sit it?': 'متى جلست له؟',
   'Sat it before? Show retake choices': 'جلس له من قبل؟ اعرض خيارات الإعادة',
 
+  // The editor's check before saving (L15)
+  'Changed elsewhere since you opened this subject': 'تغيّر شيء في مكان آخر منذ فتحت هذه المادة',
+  'A row added:': 'صف أُضيف:',
+  'A row removed:': 'صف أُزيل:',
+  'Changed:': 'تغيّر:',
+  'the note on the subject': 'الملاحظة على المادة',
+  'who picks the teacher': 'من يختار المعلم',
+  'the subject\'s switch': 'مفتاح المادة',
+  'the subject\'s close date': 'تاريخ إغلاق المادة',
+  'the subject\'s course fee': 'رسوم مقرر المادة',
+  'the teachers': 'المعلمون',
+  'the extra questions': 'الأسئلة الإضافية',
+  'Saving now would remove what was added and write over what was changed. Reload the subject to see it; the changes you made here are not kept.': 'الحفظ الآن يزيل ما أُضيف ويكتب فوق ما تغيّر. أعد تحميل المادة لتراه؛ ولن تُحفظ التغييرات التي أجريتها هنا.',
+  'Keep editing': 'متابعة التعديل',
+  'Reload the subject': 'أعد تحميل المادة',
+
   // The API's refusals she can meet, in her words (herWords runs first)
   'What this change does to families changed while you were looking: look at the new counts and save again': 'تغيّر ما يفعله هذا التعديل بالعائلات أثناء المراجعة: راجع الأعداد الجديدة واحفظ مرة أخرى',
   'The close date must be in the future (switch Accepting off to close it now)': 'يجب أن يكون تاريخ الإغلاق في المستقبل (أوقف قبول الحجوزات للإغلاق الآن)',
