@@ -1,0 +1,720 @@
+[
+  {
+    "code": "3180",
+    "name": "Arabic",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Cambridge O Level (Cambridge's timetable tags 3180 OL); the school groups it with its O.L. subjects. Papers 3180/01 and 3180/02 as on Cambridge's November 2026 timetable.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "3180"
+        ],
+        "priceCodes": [
+          "3180 A"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      },
+      {
+        "key": "paper-1",
+        "kind": "paper",
+        "codes": [
+          "3180/01"
+        ],
+        "priceCodes": [],
+        "short": "Paper 1",
+        "label": {
+          "en": "Paper 1 only",
+          "ar": "الورقة 1 فقط"
+        }
+      },
+      {
+        "key": "paper-2",
+        "kind": "paper",
+        "codes": [
+          "3180/02"
+        ],
+        "priceCodes": [],
+        "short": "Paper 2",
+        "label": {
+          "en": "Paper 2 only",
+          "ar": "الورقة 2 فقط"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0970",
+    "name": "Biology",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0970"
+        ],
+        "priceCodes": [
+          "0970 CX"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      },
+      {
+        "key": "paper-41-42",
+        "kind": "paper",
+        "codes": [
+          "0970/41",
+          "0970/42"
+        ],
+        "priceCodes": [],
+        "short": "Paper 41/42",
+        "label": {
+          "en": "Paper 41/42 only",
+          "ar": "الورقة 41/42 فقط"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0986",
+    "name": "Business",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Cambridge IGCSE (9–1) Business Studies; the school says Business.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0986"
+        ],
+        "priceCodes": [
+          "0986 AX"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0971",
+    "name": "Chemistry",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0971"
+        ],
+        "priceCodes": [
+          "0971 CX"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      },
+      {
+        "key": "paper-41-42",
+        "kind": "paper",
+        "codes": [
+          "0971/41",
+          "0971/42"
+        ],
+        "priceCodes": [],
+        "short": "Paper 41/42",
+        "label": {
+          "en": "Paper 41/42 only",
+          "ar": "الورقة 41/42 فقط"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0653",
+    "name": "Combined Science",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0653"
+        ],
+        "priceCodes": [
+          "0653 CX"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      },
+      {
+        "key": "paper-41-42",
+        "kind": "paper",
+        "codes": [
+          "0653/41",
+          "0653/42"
+        ],
+        "priceCodes": [],
+        "short": "Paper 41/42",
+        "label": {
+          "en": "Paper 41/42 only",
+          "ar": "الورقة 41/42 فقط"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0984",
+    "name": "Computer Science",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "No one-paper row: the June 2027 form's 'Paper 41/42' question has no such paper in 0984 (COORDINATOR_REWORK.md Q14).",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0984"
+        ],
+        "priceCodes": [
+          "0984 AX"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0680",
+    "name": "Environmental Management",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": false,
+    "note": "Code not on any of the school's fee lists, forms or links sheets. Cambridge IGCSE Environmental Management is 0680 (on Cambridge's November 2026 timetable); Cambridge O Level Environmental Management is 5014. To confirm which the school enters; no option code known, so no price code.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0680"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "7156",
+    "name": "French",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Cambridge IGCSE (9–1) French (foreign language), as on the June 2026 fee list.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "7156"
+        ],
+        "priceCodes": [
+          "7156 X"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "7159",
+    "name": "German",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Cambridge IGCSE (9–1) German (foreign language), as on the June 2026 fee list.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "7159"
+        ],
+        "priceCodes": [
+          "7159 Y"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0457",
+    "name": "Global Perspectives",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": false,
+    "note": "Code not on any of the school's fee lists, forms or links sheets. Cambridge IGCSE Global Perspectives is 0457 (on Cambridge's November 2026 timetable); Cambridge O Level Global Perspectives is 2069. To confirm; no option code known.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0457"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "X-cambridge-global-citizenship",
+    "name": "Global Citizenship",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": false,
+    "note": "No Cambridge IGCSE or O Level syllabus named Global Citizenship was found on cambridgeinternational.org (26 Oct 2026); the school's form names the board Cambridge. To ask the school what is entered; loads as a subject not on the list until then.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "X-cambridge-global-citizenship"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "0983",
+    "name": "ICT",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Cambridge IGCSE (9–1) Information and Communication Technology.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0983"
+        ],
+        "priceCodes": [
+          "0983 DY"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      },
+      {
+        "key": "paper-theory",
+        "kind": "paper",
+        "codes": [
+          "0983/11",
+          "0983/12",
+          "0983/13"
+        ],
+        "priceCodes": [],
+        "short": "Theory paper",
+        "label": {
+          "en": "Theory paper only",
+          "ar": "الورقة النظرية فقط"
+        },
+        "note": "Paper 1, Theory (variants 11, 12, 13)."
+      }
+    ]
+  },
+  {
+    "code": "0972",
+    "name": "Physics",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "0972"
+        ],
+        "priceCodes": [
+          "0972 CX"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      },
+      {
+        "key": "paper-41-42",
+        "kind": "paper",
+        "codes": [
+          "0972/41",
+          "0972/42"
+        ],
+        "priceCodes": [],
+        "short": "Paper 41/42",
+        "label": {
+          "en": "Paper 41/42 only",
+          "ar": "الورقة 41/42 فقط"
+        }
+      }
+    ]
+  },
+  {
+    "code": "9700",
+    "name": "Biology",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "note": "On the Cambridge June 2026 fee list; not on the 2026–27 links sheets (the school's Biology A.S./A.L. is Pearson's IAL).",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "as",
+        "kind": "as",
+        "codes": [
+          "9700"
+        ],
+        "priceCodes": [
+          "9700 S1",
+          "9700 S2"
+        ],
+        "label": {
+          "en": "A.S.",
+          "ar": "A.S."
+        }
+      },
+      {
+        "key": "a2",
+        "kind": "a2",
+        "codes": [
+          "9700"
+        ],
+        "priceCodes": [
+          "9700 BY",
+          "9700 CT"
+        ],
+        "label": {
+          "en": "A.2. (carry forward)",
+          "ar": "A.2. (نقل نتيجة)"
+        }
+      },
+      {
+        "key": "al",
+        "kind": "al",
+        "codes": [
+          "9700"
+        ],
+        "priceCodes": [
+          "9700 AX",
+          "9700 HX"
+        ],
+        "label": {
+          "en": "A.L.",
+          "ar": "A.L."
+        }
+      }
+    ]
+  },
+  {
+    "code": "9701",
+    "name": "Chemistry",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "note": "The school's form calls it 'Chemistry A.S.' and offers A.S. and A.L.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "as",
+        "kind": "as",
+        "codes": [
+          "9701"
+        ],
+        "priceCodes": [
+          "9701 S1",
+          "9701 S2"
+        ],
+        "label": {
+          "en": "A.S.",
+          "ar": "A.S."
+        }
+      },
+      {
+        "key": "a2",
+        "kind": "a2",
+        "codes": [
+          "9701"
+        ],
+        "priceCodes": [
+          "9701 BY",
+          "9701 CT"
+        ],
+        "label": {
+          "en": "A.2. (carry forward)",
+          "ar": "A.2. (نقل نتيجة)"
+        }
+      },
+      {
+        "key": "al",
+        "kind": "al",
+        "codes": [
+          "9701"
+        ],
+        "priceCodes": [
+          "9701 AX",
+          "9701 HX"
+        ],
+        "label": {
+          "en": "A.L.",
+          "ar": "A.L."
+        }
+      }
+    ]
+  },
+  {
+    "code": "9618",
+    "name": "Computer Science",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "note": "The June 2026 fee list prints the AS row as '9608 SY' (the previous syllabus code): a board alias. '9618 SY' is inferred from it.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "as",
+        "kind": "as",
+        "codes": [
+          "9618"
+        ],
+        "priceCodes": [
+          "9618 SY"
+        ],
+        "label": {
+          "en": "A.S.",
+          "ar": "A.S."
+        }
+      },
+      {
+        "key": "a2",
+        "kind": "a2",
+        "codes": [
+          "9618"
+        ],
+        "priceCodes": [
+          "9618 BY",
+          "9618 CT"
+        ],
+        "label": {
+          "en": "A.2. (carry forward)",
+          "ar": "A.2. (نقل نتيجة)"
+        }
+      },
+      {
+        "key": "al",
+        "kind": "al",
+        "codes": [
+          "9618"
+        ],
+        "priceCodes": [
+          "9618 AY"
+        ],
+        "label": {
+          "en": "A.L.",
+          "ar": "A.L."
+        }
+      }
+    ]
+  },
+  {
+    "code": "9898",
+    "name": "French",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": false,
+    "note": "Codes not on any of the school's fee lists, forms or links sheets. Cambridge's June 2026 timetable has AS French Language 8028 and A Level French Language & Literature 9898; the school's form offers 'French A.S.' and 'French A.L.'. To confirm; no option codes known.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "as",
+        "kind": "as",
+        "codes": [
+          "8028"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "A.S.",
+          "ar": "A.S."
+        },
+        "note": "Cambridge International AS Level French Language (8028), AS only."
+      },
+      {
+        "key": "al",
+        "kind": "al",
+        "codes": [
+          "9898"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "A.L.",
+          "ar": "A.L."
+        },
+        "note": "Cambridge International A Level French Language & Literature (9898)."
+      }
+    ]
+  },
+  {
+    "code": "9702",
+    "name": "Physics",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "as",
+        "kind": "as",
+        "codes": [
+          "9702"
+        ],
+        "priceCodes": [
+          "9702 S1",
+          "9702 S2"
+        ],
+        "label": {
+          "en": "A.S.",
+          "ar": "A.S."
+        }
+      },
+      {
+        "key": "a2",
+        "kind": "a2",
+        "codes": [
+          "9702"
+        ],
+        "priceCodes": [
+          "9702 BX",
+          "9702 CQ"
+        ],
+        "label": {
+          "en": "A.2. (carry forward)",
+          "ar": "A.2. (نقل نتيجة)"
+        }
+      },
+      {
+        "key": "al",
+        "kind": "al",
+        "codes": [
+          "9702"
+        ],
+        "priceCodes": [
+          "9702 AX",
+          "9702 HX"
+        ],
+        "label": {
+          "en": "A.L.",
+          "ar": "A.L."
+        }
+      }
+    ]
+  },
+  {
+    "code": "9990",
+    "name": "Psychology",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": false,
+    "note": "Code not on any of the school's fee lists, forms or links sheets. Cambridge International AS & A Level Psychology is 9990 (on Cambridge's November 2026 timetable). To confirm; no option codes known.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "as",
+        "kind": "as",
+        "codes": [
+          "9990"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "A.S.",
+          "ar": "A.S."
+        }
+      },
+      {
+        "key": "a2",
+        "kind": "a2",
+        "codes": [
+          "9990"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "A.2. (carry forward)",
+          "ar": "A.2. (نقل نتيجة)"
+        }
+      },
+      {
+        "key": "al",
+        "kind": "al",
+        "codes": [
+          "9990"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "A.L.",
+          "ar": "A.L."
+        }
+      }
+    ]
+  }
+]

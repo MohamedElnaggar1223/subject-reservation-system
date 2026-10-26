@@ -55,9 +55,9 @@ What the review found (the session of 26 Oct; evidence in that transcript and §
   prevents: CS O.L. offers "From June 2025 / From November 2025"; CS O.L. class list has "Option 9"
   and no 11E; Chemistry O.L. has no 11E; Mathematics A.S./A.L. leaves the student's name optional;
   Global Citizenship's refund box has no policy text; the ESL form's title has no session; six
-  teacher names disagree between the links sheet and the forms (ESL: Nevine Atabany / Mai Hesham;
-  Mathematics O.L.: Bothaina Hamed / Seif Thabet; Global Citizenship: May Magdy / "Ms. Mai"; Engy
-  Henein / Henin; Mo'men / Mo'man Fadly; Layla Elgueretly / Lyla El Gueretly); Arabic A.L. "9AA01"
+  teacher names disagree between the links sheet and the forms (three are different people —
+  English as a Second Language, Mathematics O.L., Global Citizenship — and three are spellings —
+  Combined Science, Chemistry A.S., Global Perspectives); Arabic A.L. "9AA01"
   on the form, "9AA1" on the sheet; the links sheet numbers two rows 11, two rows 7 and has no 14;
   "50&" for "50%" on two forms.
 
@@ -107,7 +107,7 @@ Each decision is the owner's (26 Oct 2026) or follows from her forms (§1); her 
 | D1 | **Subjects are picked from a reference list we maintain** (§7): board, name, code, level, its papers, units and routes, the board's rules. "Not on the list" lets her add one (board, name, level, group; code optional), flagged for us. |
 | D2 | **Rows — what can be entered**, suggested from the reference: all papers; each one-paper retake; each IAL unit; A.S., A.2. (carry forward), A.L.; a second qualification (Arabic A.L.). She ticks the rows the school offers and may add a custom row (name, optional code, its own price). |
 | D3 | **Columns — how it is studied**, fixed: first entry in school · retake in school · retake self study. A fourth, **first entry self study** (not taught this cycle), sits under "more options" on a row (amendment 7). |
-| D4 | **Teachers**: per subject, with an override per row (IAL Mathematics units, Arabic A.L. qualifications). Picked from the school's list or added with a duplicate check (spelling and initials: "Ms. Mai" against "May Magdy"). Tags: online, external team. **"Teacher to be confirmed"** is allowed (amendment 3); families then read "teacher to be announced". |
+| D4 | **Teachers**: per subject, with an override per row (IAL Mathematics units, Arabic A.L. qualifications). Picked from the school's list or added with a duplicate check (spelling and initials: a title and first name against a full name). Tags: online, external team. **"Teacher to be confirmed"** is allowed (amendment 3); families then read "teacher to be announced". |
 | D5 | **Teacher choice**: families choose the teacher, required, when they pick an in-school option and the row has more than one teacher (her forms require it); one teacher is preselected. Per subject she can switch to "the school assigns". |
 | D6 | **"Carried from" sittings** (one-paper retakes, A.2.): the default list is the board's two previous sittings, worked out from the session (June 2027 → June 2026, November 2026); she unticks any and can add an older one (amendment 2); her list wins over the board's carry-forward months (an older sitting than the board allows — Cambridge: 13 months — shows a warning on her screen, not a refusal). A rule per board in the reference decides whether the question is asked at all (Edexcel International GCSE 1H/2H: not asked). |
 | D7 | **"2nd entry only"**: enforced when the system holds the student's earlier entry for the subject; otherwise trusted, as her forms trust it. A one-paper or A.2. retake names its sitting from her list; the list of declared sittings is on the session for anyone who wants to check it (no verification step by default). |
@@ -115,7 +115,7 @@ Each decision is the owner's (26 Oct 2026) or follows from her forms (§1); her 
 | D9 | **Wording families read** is generated from her ticks, the same for every subject, in English and Arabic, in the school's vocabulary ("First entry · in school · all papers", "Retake · self study 50% · Paper 41/42 only"), plus an optional note per subject. No free-text choice labels. |
 | D10 | **Order**: O.L. subjects, then A.S. / A.L.; inside a subject: all papers, one-paper rows, units in order, A.S., A.2., A.L. (her forms' order). |
 | D11 | **Who may reserve**: grades 11 and 12 and graduates retaking (her class lists run 11A–12D). A session setting "grades that may reserve" (10, 11, 12, graduates), default 11, 12, graduates. |
-| D12 | **Winter rows**: each row sits in November or January (dropdown, default from the reference), and may have its own close date and pay-by date. |
+| D12 | **Winter rows**: each row sits in November or January (dropdown, default from the reference), and may have its own close date and pay-by date. The school's "November" for Pearson IAL units is Pearson's October sitting (entries by 28 August); the reference maps it by level, so she still picks "November" (P0, 26 Oct). |
 | D13 | **Extra questions** (amendment 6): optional, per session or per subject — yes/no, short text or a choice — that never affect price or eligibility; answers go into the reservations export. |
 
 ### E. Prices
@@ -299,10 +299,16 @@ it, never edit it, except the admin filling a missing board date from the check 
 one-paper fee rule, whether a one-paper retake asks its sitting, code aliases. For each subject:
 code, name, group, its rows (kind, code, label), default sitting for a winter session.
 
-First version: the school's subjects in the June 2027 and November 2026 / January 2027 links sheets
-(§8), drafted from the forms and fee lists. Codes on no list we hold are marked to check (Global
-Citizenship; French A level; Psychology A level 9990; the two OxfordAQA subjects); until checked
-they load as "not on the list" subjects with no code.
+First version (P0, 26 Oct): 27 subjects and 61 rows — the 25 June 2027 subjects, Cambridge 9700
+Biology AS/A Level (on the June 2026 list) and Pearson Arabic 4AA1 (named on the winter links
+sheet). Codes on no school artefact are marked to check: Environmental Management 0680 (an O Level
+5014 also exists), Global Perspectives 0457 (O Level 2069), Global Citizenship (no Cambridge
+syllabus of that name; placeholder `X-cambridge-global-citizenship`), French AS 8028 and A Level
+9898 (two syllabuses), Psychology A Level 9990, OxfordAQA English as a Second Language 9280 and
+Psychology 9218, Pearson Arabic 4AA1. Board dates come from the boards' own documents with the URL
+kept: Pearson June 2027 entries by 21 March 2027 (international centres); OxfordAQA by 1 March 2027;
+**Cambridge June 2027 is not published yet** (its 2027 handbook appears in November 2026), so a June
+2027 session cannot open until it is entered; Cambridge June sittings have no retake deadline.
 
 ### 7.1 Data format (P0 writes it, P1a loads it)
 
@@ -311,19 +317,21 @@ Validated by a zod schema in `packages/validations/src/offering/reference.ts` (P
 - `packages/db/reference/boards.json` — an array of boards:
   `{ code: 'cambridge' | 'pearson_edexcel' | 'oxford', name, onePaperFee: 'syllabus' | 'paper',
   onePaperAsksSitting: boolean, carryForwardMonths: number | null,
-  sittings: [{ month: 1 | 6 | 10 | 11, year, entryDeadline: 'YYYY-MM-DD' | null,
-  retakeDeadline: 'YYYY-MM-DD' | null, examsStart: 'YYYY-MM-DD' | null, source, confirmed }],
+  sittings: [{ month: 1 | 6 | 10 | 11, year, levels, entryDeadline: 'YYYY-MM-DD' | null,
+  retakeDeadline: 'YYYY-MM-DD' | null, examsStart: 'YYYY-MM-DD' | null, source, confirmed, note? }],
   aliases: [{ printed: '9608 SY', subject: '9618', row: 'as' }] }`.
 - `packages/db/reference/subjects/<board>.json` — an array of subjects:
   `{ code, name, group: 'O.L.' | 'A.S./A.L.', level: 'igcse' | 'as_al', confirmed, note?,
   winterSitting: 'november' | 'january' | null,
-  rows: [{ key, kind: 'all_papers' | 'paper' | 'unit' | 'as' | 'a2' | 'al' | 'qualification',
+  rows: [{ key, winterSitting?, kind: 'all_papers' | 'paper' | 'unit' | 'as' | 'a2' | 'al' | 'qualification',
   codes: string[], priceCodes: string[], short?: string, label: { en, ar }, sumOfUnits?: string[] }] }`.
   `key` is stable across years (it is what a copied row and a price-list match refer to);
   `priceCodes` are the codes a printed price list uses for that row ("0970 CX", "WMA11", "4MA1H").
 - `packages/db/seeds/june-2027.json` — the pre-load of §8: the session (type, year, refund policy,
   self-study share) and its offerings (subject code, teachers by placeholder key, note, rows by
-  `key` with the four cells, exam fee and its source, course fee null, allowed prior sittings).
+  `key` with the four cells and `cellsByDefault` for Q10's defaults, exam fee and its source, course
+  fee null, allowed prior sittings; P0 also records `order`, `board`, `teacherTbc`, `teacherChoice`,
+  `flags` and `examFeeList`, documented in `reference.ts`).
   Teachers' names are the forms' names and live in the git-ignored
   `packages/db/seeds/local/june-2027.teachers.json` (placeholder key → name), following the data
   rule of SCHOOL_FORMS.md; the seed uses the placeholder when the local file is absent.
@@ -335,35 +343,36 @@ Validated by a zod schema in `packages/validations/src/offering/reference.ts` (P
 The session she copies June 2028 from. FI first entry in school · RI retake in school · RS retake
 self study · FS first entry self study. RI marked * is Q10's default. Exam fees are her latest
 lists, "not final"; course fees are not set (Q1). Sittings carried from are D6's defaults unless
-the form named others.
+the form named others. Teachers are numbered per form (T1, T2, T3 as the form lists them); their
+names live in the git-ignored local teachers file (§7.1), never in a committed document.
 
 | # | Subject (board, code) | Teachers (form) | Rows → cells | Carried from | Exam fee (source) | Flags |
 |---|---|---|---|---|---|---|
-| 1 | Arabic O.L. (Cambridge 3180) | Hamdy Elshal, Mohamed Hamed, Wael Ehsan | All papers FI RI RS · Paper 1 only RI RS · Paper 2 only RI RS | June 2026 | 9,850 (Cambridge Jun 26, 3180 A); one-paper rows 9,850 (syllabus rule) | the June form does not ask which paper; the split follows her November form |
-| 2 | Biology O.L. (Cambridge 0970) | Ahmed Rady, Heba Rashed, Kirolos Nabil | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0970 CX) | — |
-| 3 | Business O.L. (Cambridge 0986) | Karim Ashmawy | All papers FI RI* RS | — | 9,850 (0986 AX) | — |
-| 4 | Chemistry O.L. (Cambridge 0971) | Mo'men Fadly, Dina Mohsen, Engy Henein | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0971 CX) | — |
-| 5 | Combined Science O.L. (Cambridge 0653) | Engy Henein | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0653 CX) | spelling (Henin) |
-| 6 | Computer Science O.L. (Cambridge 0984) | Ismail El Badawy — external (Komy's team) | All papers FI RI* RS | — | 9,850 (0984 AX) | Q14 |
-| 7 | English as a Second Language (OxfordAQA) | Magda Morcos, Mai Hesham | All papers FI RI* RS | — | not set (no Oxford list) | Q15 (Nevine Atabany); code to check |
-| 8 | Environmental Management O.L. (Cambridge 0680) | Heba Rashed | All papers FI RI* RS | — | not set | — |
-| 9 | French O.L. (Cambridge 7156) | Rania Sabry | All papers FI RI* RS | — | 12,550 (7156 X) | — |
-| 10 | German O.L. (Cambridge 7159) | Abir Ezz | All papers FI RI* RS | — | 12,550 (7159 Y) | — |
-| 11 | Global Perspectives O.L. (Cambridge 0457) | Layla Elgueretly — online | All papers FI RI* RS | — | not set | spelling (Lyla El Gueretly) |
-| 12 | Global Citizenship O.L. (Cambridge) | May Magdy | All papers FI RI* RS | — | not set | Q15 ("Ms. Mai"); code to check |
-| 13 | Human Biology O.L. (Edexcel 4HB1) | Heba Rashed | All papers FI RI* RS | — | 9,840 (Edexcel Nov 26 — not June) | price source |
-| 14 | ICT O.L. (Cambridge 0983) | Hossam Badawy — external (Komy's team) | All papers FI RI* RS · Theory paper only RS | June 2026, November 2026 | 12,950 (0983 DY) | — |
-| 15 | Mathematics O.L. (Edexcel 4MA1) | Manar Madkour, Seif Thabet, Nevine El Khawaga | All papers FI RI* RS · Paper 1H only RS · Paper 2H only RS | not asked (Edexcel) | papers 4,600 each (Jun 26); all papers 9,200 (sum) | price to check (Nov 26 lists 9,840 per paper); Q15 (Bothaina Hamed) |
-| 16 | Physics O.L. (Cambridge 0972) | John William | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0972 CX) | — |
-| 17 | Psychology O.L. (OxfordAQA) | Maria Maged | All papers FI RI* RS | — | not set | code to check |
-| 18 | Arabic A.L. (Edexcel) | per row | International A Level (YAA01 = WAA01 + WAA02): FI Hamdy Elshal, RI*, RS · GCE A Level (9AA0): FI Wael Ehsan, RI*, RS | — | YAA01 18,300 (sum of 8,950 + 9,350, Jun 26); 9AA0 not set | Q13; code 9AA0 (form "9AA01", sheet "9AA1") |
-| 19 | Biology A.S./A.L. (Edexcel IAL) | Rasha Nada | Units 1–4 (WBI11–14) RS · Units 5–6 (WBI15–16) FI RS (the form names no retake in school) | — | WBI15/16 4,450 (Jun 26); WBI11–14 4,790 (Nov 26) | price source (units 1–4) |
-| 20 | Chemistry A.S. (Cambridge 9701) | Mo'men Fadly | A.S. FI RI* RS · A.L. FI RI* RS | — | A.S. 14,100 · A.L. 18,600 | Q12; spelling (Mo'man) |
+| 1 | Arabic O.L. (Cambridge 3180) | T1, T2, T3 | All papers FI RI RS · Paper 1 only RI RS · Paper 2 only RI RS | June 2026 | 9,850 (Cambridge Jun 26, 3180 A); one-paper rows 9,850 (syllabus rule) | the June form does not ask which paper; the split follows her November form |
+| 2 | Biology O.L. (Cambridge 0970) | T1, T2, T3 | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0970 CX) | — |
+| 3 | Business O.L. (Cambridge 0986) | T1 | All papers FI RI* RS | — | 9,850 (0986 AX) | — |
+| 4 | Chemistry O.L. (Cambridge 0971) | T1, T2, T3 | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0971 CX) | — |
+| 5 | Combined Science O.L. (Cambridge 0653) | T1 | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0653 CX) | spelling differs on the form |
+| 6 | Computer Science O.L. (Cambridge 0984) | T1 — external team | All papers FI RI* RS | — | 9,850 (0984 AX) | Q14 |
+| 7 | English as a Second Language (OxfordAQA) | T1, T2 | All papers FI RI* RS | — | not set (no Oxford list) | Q15 (the sheet names another teacher); code to check |
+| 8 | Environmental Management O.L. (Cambridge 0680) | T1 | All papers FI RI* RS | — | not set | — |
+| 9 | French O.L. (Cambridge 7156) | T1 | All papers FI RI* RS | — | 12,550 (7156 X) | — |
+| 10 | German O.L. (Cambridge 7159) | T1 | All papers FI RI* RS | — | 12,550 (7159 Y) | — |
+| 11 | Global Perspectives O.L. (Cambridge 0457) | T1 — online | All papers FI RI* RS | — | not set | spelling differs on the form |
+| 12 | Global Citizenship O.L. (Cambridge) | T1 | All papers FI RI* RS | — | not set | Q15 (the form names her differently); code to check |
+| 13 | Human Biology O.L. (Edexcel 4HB1) | T1 | All papers FI RI* RS | — | 9,840 (Edexcel Nov 26 — not June) | price source |
+| 14 | ICT O.L. (Cambridge 0983) | T1 — external team | All papers FI RI* RS · Theory paper only RS | June 2026, November 2026 | 12,950 (0983 DY) | — |
+| 15 | Mathematics O.L. (Edexcel 4MA1) | T1, T2, T3 | All papers FI RI* RS · Paper 1H only RS · Paper 2H only RS | not asked (Edexcel) | papers 4,600 each (Jun 26); all papers 9,200 (sum) | price to check (Nov 26 lists 9,840 per paper); Q15 (the sheet names another teacher) |
+| 16 | Physics O.L. (Cambridge 0972) | T1 | All papers FI RI* RS · Paper 41/42 only RS | June 2026, November 2026 | 10,850 (0972 CX) | — |
+| 17 | Psychology O.L. (OxfordAQA) | T1 | All papers FI RI* RS | — | not set | code to check |
+| 18 | Arabic A.L. (Edexcel) | per row | International A Level (YAA01 = WAA01 + WAA02): FI T1, RI*, RS · GCE A Level (9AA0): FI T2, RI*, RS | — | YAA01 18,300 (sum of 8,950 + 9,350, Jun 26); 9AA0 not set | Q13; code 9AA0 (form "9AA01", sheet "9AA1") |
+| 19 | Biology A.S./A.L. (Edexcel IAL) | T1 | Units 1–4 (WBI11–14) RS · Units 5–6 (WBI15–16) FI RS (the form names no retake in school) | — | WBI15/16 4,450 (Jun 26); WBI11–14 4,790 (Nov 26) | price source (units 1–4) |
+| 20 | Chemistry A.S. (Cambridge 9701) | T1 | A.S. FI RI* RS · A.L. FI RI* RS | — | A.S. 14,100 · A.L. 18,600 | Q12; spelling differs on the form |
 | 21 | Computer Science A.S./A.L. (Cambridge 9618) | to be confirmed | A.S. FI RI* RS · A.2. FI RI* RS · A.L. FI RI* RS | A.2.: June 2026, November 2026 | A.S. 11,400 (list prints 9608 SY) · A.2. 12,450 · A.L. 16,950 | Q12; teacher |
-| 22 | French A.S./A.L. (Cambridge) | Rania Sabry | A.S. FI RI* RS · A.L. FI RI* RS | — | not set | Q12; code to check |
-| 23 | Mathematics A.S./A.L. (Edexcel IAL) | per row | one row per unit — P1 (WMA11), P2 (WMA12): FI Seif Thabet online, RI*, RS · P3 (WMA13), P4 (WMA14): FI Seif Thabet, RI*, RS · M1 (WME01), S1 (WST01): FI Manar Madkour or Seif Thabet, RI*, RS | — | P1–P4 4,800 · M1, S1 4,450 (Jun 26) | Q10 (the form offers a teacher or self study per unit) |
-| 24 | Physics A.S./A.L. (Cambridge 9702) | John William | A.S. FI RI* RS · A.2. FS RS | A.2.: June 2026, November 2025 | A.S. 14,100 · A.2. 11,400 | Q11; November 2025 is past Cambridge's 13 months: kept (her list), warned (D6) |
-| 25 | Psychology A.L. (Cambridge 9990) | Maria Maged | A.L. FI RI* RS | — | not set | code to check |
+| 22 | French A.S./A.L. (Cambridge) | T1 | A.S. FI RI* RS · A.L. FI RI* RS | — | not set | Q12; code to check |
+| 23 | Mathematics A.S./A.L. (Edexcel IAL) | per row | one row per unit — P1 (WMA11), P2 (WMA12): FI T1 online, RI*, RS · P3 (WMA13), P4 (WMA14): FI T1, RI*, RS · M1 (WME01), S1 (WST01): FI T2 or T1, RI*, RS | — | P1–P4 4,800 · M1, S1 4,450 (Jun 26) | Q10 (the form offers a teacher or self study per unit) |
+| 24 | Physics A.S./A.L. (Cambridge 9702) | T1 | A.S. FI RI* RS · A.2. FS RS | A.2.: June 2026, November 2025 | A.S. 14,100 · A.2. 11,400 | Q11; November 2025 is past Cambridge's 13 months: kept (her list), warned (D6) |
+| 25 | Psychology A.L. (Cambridge 9990) | T1 | A.L. FI RI* RS | — | not set | code to check |
 
 Not pre-loaded from any form: a close date, a payment date, a first-lesson date, course fees.
 

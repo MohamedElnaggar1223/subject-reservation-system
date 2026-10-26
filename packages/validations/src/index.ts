@@ -82,3 +82,9 @@ export * from './scheduling/engine'
 export * from './scheduling/generator'
 export * from './scheduling/scheduling.validations'
 export * from './scheduling/schedule-types'
+/**
+ * The coordinator rework (COORDINATOR_REWORK.md §7.1, D9–D10): reference data — boards,
+ * sittings, subjects and their rows, the June 2027 pre-load — and the wording families read.
+ */
+export * from './offering/reference'
+export * from './offering/labels'

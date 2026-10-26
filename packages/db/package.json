@@ -12,7 +12,9 @@
         "db:studio": "drizzle-kit studio",
         "db:up": "docker compose up -d",
         "seed": "tsx seed.ts",
-        "seed:reference": "tsx load-reference.ts"
+        "seed:reference": "tsx load-reference.ts",
+        "reference:check": "tsx scripts/reference-check.ts",
+        "reference:labels": "tsx scripts/reference-labels.ts"
     },
     "exports": {
         ".": {
@@ -25,6 +27,7 @@
     "devDependencies": {
         "@repo/eslint-config": "workspace:*",
         "@repo/typescript-config": "workspace:*",
+        "@repo/validations": "workspace:*",
         "@types/eslint": "9.6.1",
         "@types/node": "^22.15.3",
         "@types/pg": "^8.16.0",
