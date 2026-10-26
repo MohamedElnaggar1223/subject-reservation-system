@@ -364,6 +364,8 @@ export const setupArabic: Record<string, string> = {
   // The subject editor
   'This subject accepts reservations': 'هذه المادة تقبل الحجوزات',
   'Closes on': 'تُغلق في',
+  'closes on': 'تُغلق في',
+  'Closing a row stops new reservations of it; waiting ones can still be paid.': 'إغلاق الصف يوقف حجوزاته الجديدة؛ ويمكن دفع الحجوزات المنتظرة.',
   'Closing stops new reservations; waiting ones can still be paid.': 'الإغلاق يوقف الحجوزات الجديدة؛ ويمكن دفع المنتظرة.',
   'To look at (from the check list)': 'للمراجعة (من قائمة المراجعة)',
   'Save': 'حفظ',

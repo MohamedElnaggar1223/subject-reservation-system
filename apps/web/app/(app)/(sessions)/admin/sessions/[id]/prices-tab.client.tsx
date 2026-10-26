@@ -15,7 +15,7 @@
  * Finance reads it (B3): no paste, no field to change.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, type ParsePriceListType } from '@repo/validations';
@@ -303,7 +303,12 @@ function CourseFees({ s, edit }: { s: SetupSession; edit: boolean }) {
 
 function CourseRow({ s, o, edit }: { s: SetupSession; o: SetupSession['offerings'][number]; edit: boolean }) {
   const queryClient = useQueryClient();
-  const [value, setValue] = useState(o.courseFee === null ? '' : String(o.courseFee));
+  const stored = o.courseFee === null ? '' : String(o.courseFee);
+  const [value, setValue] = useState(stored);
+  // The field follows the stored fee (a save elsewhere, a refetch) while she is not in it; leaving it saves only what
+  // she changed since she entered it, so a value read before a refetch is never written back.
+  const entered = useRef<string | null>(null);
+  useEffect(() => { if (entered.current === null) setValue(stored); }, [stored]);
   const save = useImpactSave(
     (courseFee: number | null, expected) => apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId: o.id }, json: { courseFee, ...(expected ? { expected } : {}) } })),
     () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
@@ -316,9 +321,13 @@ function CourseRow({ s, o, edit }: { s: SetupSession; o: SetupSession['offerings
       <td className={td}>
         <input type="number" min={0} step={50} inputMode="decimal" className={cn(INPUT_CLASS, 'h-9 w-32')} placeholder="not set" aria-label={`${subjectTitle(o)}: course fee`}
           disabled={!edit || save.isPending} value={value} onChange={(e) => setValue(e.target.value)}
+          onFocus={() => { entered.current = value; }}
           onBlur={() => {
+            const was = entered.current;
+            entered.current = null;
             const next = value === '' ? null : Number(value);
-            if (next !== o.courseFee && (next === null || next >= 0)) save.save(next);
+            if (value !== was && next !== o.courseFee && (next === null || next >= 0)) save.save(next);
+            else if (value === was) setValue(stored);
           }}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
       </td>

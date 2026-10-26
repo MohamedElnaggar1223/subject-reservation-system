@@ -33,7 +33,7 @@ import { Switch } from '~/components/ui/switch';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
 import { useI18n } from '~/lib/i18n';
-import { Money, Modal, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../../../sessions-shared';
+import { Day, Money, Modal, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../../../sessions-shared';
 import {
   fetchOffering, fetchSetupSession, fetchTeachers, fetchReferenceBoards, fetchFamilyPreview, offeringKey, setupKey, previewKey,
   TEACHERS_KEY, REFERENCE_BOARDS_KEY, CELLS, CELL_WORDS, subjectTitle, examMonth, monthIndex, pickerValue, endOfSchoolDay,
@@ -427,6 +427,7 @@ function RowLines({ r, o, s, cols, on, open, canEdit, setRow, setMore, feeNote }
           {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
           {r.teachers && <span className="block text-xs"><bdi data-i18n-skip="true">{r.teachers.map((t) => t.name + (t.online ? ' (online)' : '')).join(' / ')}</bdi></span>}
           {s.sessionType === 'winter' && <span className="mt-1 block"><Badge tone="info">{r.sitting === 'january' ? 'exam in January' : 'exam in November'}</Badge></span>}
+          {r.closesAt && <span className="block text-xs text-muted-foreground"><span>closes on</span> <Day iso={endOfSchoolDay(r.closesAt)} /></span>}
           {r.lines > 0 && <span className="block text-xs text-muted-foreground"><span>{r.lines}</span> <span>{r.lines === 1 ? 'reservation' : 'reservations'}</span></span>}
           <button type="button" className="mt-1 block text-xs font-medium text-primary hover:underline" aria-expanded={open} onClick={() => setMore(open ? null : r.key)}>
             {open ? 'Fewer options' : 'More options'}
@@ -518,8 +519,10 @@ function MoreOptions({ r, s, o, canEdit, setRow }: { r: DraftRow; s: SetupSessio
           )}
         </div>
       )}
-      {s.sessionType === 'winter' && (
-        <div className="flex flex-wrap items-center gap-3">
+      {/* A row's close date in any session: closing the row is how new reservations stop where reservations use a
+          cell (§6), so it is offered on every row; a winter row also has its exam month and pay-by date (D12). */}
+      <div className="flex flex-wrap items-center gap-3">
+        {s.sessionType === 'winter' && (
           <label className="flex items-center gap-2">
             <span>Exam in</span>
             <select className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.sitting ?? 'november'} disabled={!canEdit || r.linesAll > 0} onChange={(e) => setRow(r.key, { sitting: e.target.value as DraftRow['sitting'] })}>
@@ -527,10 +530,13 @@ function MoreOptions({ r, s, o, canEdit, setRow }: { r: DraftRow; s: SetupSessio
               <option value="january">January</option>
             </select>
           </label>
-          <label className="flex items-center gap-2"><span>Closes on</span><input type="date" className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.closesAt} disabled={!canEdit} onChange={(e) => setRow(r.key, { closesAt: e.target.value })} /></label>
+        )}
+        <label className="flex items-center gap-2"><span>Closes on</span><input type="date" className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.closesAt} disabled={!canEdit} onChange={(e) => setRow(r.key, { closesAt: e.target.value })} /></label>
+        {s.sessionType === 'winter' && (
           <label className="flex items-center gap-2"><span>Pay by</span><input type="date" className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.payBy} disabled={!canEdit} onChange={(e) => setRow(r.key, { payBy: e.target.value })} /></label>
-        </div>
-      )}
+        )}
+        <span className="basis-full text-xs text-muted-foreground">Closing a row stops new reservations of it; waiting ones can still be paid.</span>
+      </div>
       {r.needsCarriedFrom
         ? <p className="text-xs text-muted-foreground">Families taking it say which earlier exam it follows, from the subject&apos;s list below.</p>
         : r.kind === 'paper' && <p className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{o.board.name}</bdi> <span>does not ask which earlier exam a one-paper retake follows.</span></p>}
