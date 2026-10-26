@@ -138,6 +138,8 @@ export const endOfSchoolDay = (day: string) => `${day}T20:59:00.000Z`;
 // ─── A select that acts ──────────────────────────────────────────────────────
 
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+/** How long after an arrow key a change is still that key's (far less than a person takes to open a list and pick). */
+const ARROW_MS = 250;
 
 /**
  * A select whose choice does something at once (adds a teacher, an earlier exam; saves the share). Picked
@@ -155,9 +157,10 @@ export function CommitSelect({ value, onCommit, reset, pending = false, children
 }) {
   // Walked to with the arrow keys and not yet committed.
   const walking = useRef(false);
-  // Set by an arrow key until the browser has handled it: the change it fires is a walk, not a pick. A change
-  // with no arrow key just before it is a pick (the mouse, or Enter in the opened list, which the list takes).
-  const arrow = useRef(false);
+  // When an arrow key was last pressed on the closed select: a change within ARROW_MS of it is that key's walk (some
+  // browsers fire it in the key's own task, others a moment later), not a pick. A change with no arrow key just
+  // before it is a pick: the mouse, or Enter in the opened list (the list takes the keys, the select sees none).
+  const arrowAt = useRef(-Infinity);
   // A choice shown in place of `value`: walked to, or picked and being saved.
   const [local, setLocal] = useState<string | null>(null);
   useEffect(() => { if (!pending && !walking.current) setLocal(null); }, [pending, value]);
@@ -173,12 +176,11 @@ export function CommitSelect({ value, onCommit, reset, pending = false, children
       onKeyDown={(e) => {
         if (ARROWS.has(e.key)) {
           walking.current = true;
-          arrow.current = true;
-          window.setTimeout(() => { arrow.current = false; }, 0);
+          arrowAt.current = performance.now();
         }
         if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget.value); }
       }}
-      onChange={(e) => { if (arrow.current) setLocal(e.target.value); else commit(e.target.value); }}
+      onChange={(e) => { if (performance.now() - arrowAt.current < ARROW_MS) setLocal(e.target.value); else commit(e.target.value); }}
       onBlur={(e) => { if (walking.current) commit(e.currentTarget.value); }}
     >
       {children}
@@ -200,6 +202,9 @@ export function useImpactSave<V, R extends { saved: boolean; impact: ImpactType 
   onCancel?: () => void,
 ) {
   const [asking, setAsking] = useState<{ vars: V; impact: ImpactType; changed: boolean } | null>(null);
+  // Sent and not settled, or asking her: true from the moment a save is sent (isPending follows a render later, so a
+  // second action in the same moment would read it stale).
+  const live = useRef(false);
   const m = useMutation({
     mutationFn: async ({ vars, expected }: { vars: V; expected?: ImpactType }) => {
       try {
@@ -215,14 +220,18 @@ export function useImpactSave<V, R extends { saved: boolean; impact: ImpactType 
         setAsking({ vars, impact: res.impact, changed });
         return;
       }
+      live.current = false;
       setAsking(null);
       await onSaved(res, vars);
     },
+    onError: () => { live.current = false; },
   });
   return {
-    save: (vars: V) => m.mutate({ vars }),
-    confirm: () => { if (asking) m.mutate({ vars: asking.vars, expected: asking.impact }); },
-    cancel: () => { setAsking(null); m.reset(); onCancel?.(); },
+    save: (vars: V) => { live.current = true; m.mutate({ vars }); },
+    confirm: () => { if (asking) { live.current = true; m.mutate({ vars: asking.vars, expected: asking.impact }); } },
+    cancel: () => { live.current = false; setAsking(null); m.reset(); onCancel?.(); },
+    /** A save sent and not settled, or a question open: read at once, not a render later. */
+    busy: () => live.current,
     asking,
     isPending: m.isPending,
     error: m.error ? refusalText(m.error) : null,

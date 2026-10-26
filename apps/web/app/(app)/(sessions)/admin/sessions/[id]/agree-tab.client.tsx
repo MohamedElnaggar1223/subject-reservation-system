@@ -14,9 +14,10 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { api } from '~/lib/hono';
 import {
-  apiResponse, refundPolicySentence, DECLARATION_TEXT, ALLOWED_GRADES, QUESTION_KINDS, QuestionKindSchema, RefundPolicySchema, AllowedGradeSchema,
+  apiResponse, refundPolicySentence, DECLARATION_TEXT, ALLOWED_GRADES, QUESTION_KINDS, QuestionKindSchema, RefundPolicyStepSchema, AllowedGradeSchema,
   type RefundPolicy, type AllowedGrade, type UpdateSessionType, type QuestionInputType, type ImpactType,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
@@ -94,7 +95,9 @@ export default function AgreeTab({ s }: { s: SetupSession }) {
 
 /** C7: "until week N → P%" rows; the sentence families read made from them; fixed once a family agrees. */
 function RefundPolicyCard({ s, onSave, pending }: { s: SetupSession; onSave: (p: RefundPolicy) => void; pending: boolean }) {
-  const stored = RefundPolicySchema.safeParse(s.refundPolicy);
+  // The stored policy as it is: its rows read by their own schema (a policy that breaks a rule between rows, which
+  // no save lets through, is still shown as stored, not replaced); none stored, one row of 0%.
+  const stored = z.object({ steps: z.array(RefundPolicyStepSchema).min(1) }).safeParse(s.refundPolicy);
   const saved: RefundPolicy = stored.success ? stored.data : { steps: [{ throughWeek: null, percent: 0 }] };
   const [steps, setSteps] = useState(saved.steps);
   const locked = s.refundPolicyLocked || s.status === 'closed';

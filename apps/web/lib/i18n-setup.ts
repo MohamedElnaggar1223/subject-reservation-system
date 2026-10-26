@@ -505,8 +505,8 @@ export const setupArabic: Record<string, string> = {
   'No session is open or being prepared.': 'لا جلسة مفتوحة أو قيد الإعداد.',
   'Start the next one: copy the last session of its type, and its subjects, teachers and policy come across.': 'ابدأ الجلسة التالية: انسخ آخر جلسة من نوعها، فتنتقل موادها ومعلموها وسياستها.',
   'What families are doing:': 'ما تفعله العائلات:',
-  'Families here still owe money, or a payment is not confirmed yet.': 'لا تزال العائلات هنا مدينة بمبالغ، أو لم يُؤكَّد دفع بعد.',
-  'not confirmed yet': 'لم يُؤكَّد بعد',
+  'Reservations here still wait for payment, or for a parent to approve them.': 'لا تزال حجوزات هنا بانتظار الدفع، أو بانتظار موافقة ولي الأمر.',
+  'waiting for payment or approval': 'بانتظار الدفع أو الموافقة',
 };
 
 /** Her screens' sentences that carry a number, a name or a date (aria-labels and options among them). */

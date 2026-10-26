@@ -260,10 +260,14 @@ function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; ca
   // Before saving, the subject is read again: what was added or changed elsewhere since the page loaded is said, and
   // she reloads rather than write over it (L15).
   const [elsewhere, setElsewhere] = useState<Elsewhere[] | null>(null);
+  // The draft as it stands when the stored subject comes back (an edit typed while it is read is saved with the rest).
+  const latest = useRef(d);
+  useEffect(() => { latest.current = d; }, [d]);
   const check = useMutation({
     mutationFn: async () => {
-      const body = bodyOf(d, o, s);
-      return { body, changes: changedElsewhere(body, o, await fetchOffering(s.id, o.id)) };
+      const now = await fetchOffering(s.id, o.id);
+      const body = bodyOf(latest.current, o, s);
+      return { body, changes: changedElsewhere(body, o, now) };
     },
     onSuccess: ({ body, changes }) => { if (changes.length) setElsewhere(changes); else save.save(body); },
   });

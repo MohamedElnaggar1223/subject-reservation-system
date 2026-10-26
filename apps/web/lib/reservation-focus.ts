@@ -174,9 +174,10 @@ function onAnyList(href: string): boolean {
 
 /**
  * Whether a link on a kept screen opens a screen hidden for the signed-in role: outside the cycle for it (with the
- * switch on), or a set-up screen the coordinator rework parked for it. Each role's list is its own — Exam Deadlines'
- * "Open candidates" stays for finance, whose list does not hold Candidates. Without a role (a component that cannot
- * know the viewer) a link is hidden when any role's list holds it, as before.
+ * switch on), or a set-up screen the coordinator rework parked for it. Each role's list is its own, so a screen the
+ * rework parked for the coordinator and the admin (Candidates, Entries) no longer hides a link from a role whose list
+ * does not hold it; whether that role may open the screen is still the page's own guard. Without a role (a component
+ * that cannot know the viewer) a link is hidden when any role's list holds it, as before.
  */
 export function leadsOutsideTheCycle(href: string, role: string | null | undefined): boolean {
   if (role && isRole(role)) return isOutsideTheCycle(role, href) || parkedForSetUp(role, href);

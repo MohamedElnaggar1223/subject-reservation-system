@@ -9,8 +9,8 @@
  *
  * Her spreadsheet version: open the links sheet and each form, scan for a missing teacher or price,
  * open each response sheet to count who has paid, and remember which board has not published its dates.
- * Here the scan is done for her, per session. A closed session still shows while families owe money on it or a
- * payment is not confirmed (main's "still in progress"), under its own heading, with what families are doing.
+ * Here the scan is done for her, per session. A closed session still shows while a reservation in it waits for
+ * payment or for a parent's approval (main's "still in progress"), under its own heading, with what families are doing.
  */
 
 import Link from 'next/link';
@@ -33,8 +33,9 @@ export default function CycleLanding({ viewerRole, userName }: { viewerRole: str
   // The one taking reservations first, then those being prepared, newest year first.
   const rank = (s: SessionRow) => (s.status === 'active' ? 0 : 1);
   const shown = (data ?? []).filter((s) => s.status !== 'closed').sort((a, b) => rank(a) - rank(b) || b.seriesYear - a.seriesYear);
-  // Closed, but families still owe money or a payment is not confirmed (any live line not paid): still in progress.
-  const inProgress = (data ?? []).filter((s) => s.status === 'closed' && (s.summary.unpaid > 0 || s.summary.lines > s.summary.paid))
+  // Closed, but a reservation still waits for payment or a parent's approval (the summary's unpaid: pending payment and
+  // pending approval; a dropped line waiting for its receipt, or a preregistration, is neither).
+  const inProgress = (data ?? []).filter((s) => s.status === 'closed' && s.summary.unpaid > 0)
     .sort((a, b) => b.seriesYear - a.seriesYear);
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -63,7 +64,7 @@ export default function CycleLanding({ viewerRole, userName }: { viewerRole: str
             <section aria-labelledby="home-in-progress" className="space-y-3 pt-2">
               <div>
                 <h2 id="home-in-progress" className="font-display text-base font-semibold text-foreground">Closed to new reservations — still in progress</h2>
-                <p className="text-sm text-muted-foreground">Families here still owe money, or a payment is not confirmed yet.</p>
+                <p className="text-sm text-muted-foreground">Reservations here still wait for payment, or for a parent to approve them.</p>
               </div>
               {inProgress.map((s) => <ClosedCard key={s.id} row={s} />)}
             </section>
@@ -108,7 +109,6 @@ function SessionCard({ row, viewerRole }: { row: SessionRow; viewerRole: string 
 /** A closed session still in progress: what families are doing, and the session to open. */
 function ClosedCard({ row }: { row: SessionRow }) {
   const href = `/admin/sessions/${row.id}`;
-  const notConfirmed = row.summary.lines - row.summary.paid - row.summary.unpaid;
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby={`home-${row.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -122,8 +122,7 @@ function ClosedCard({ row }: { row: SessionRow }) {
         <Button asChild variant="outline"><Link href={href as never}>{`Open ${row.name}`}</Link></Button>
       </div>
       <p className="mt-3 text-sm text-foreground">
-        <span>What families are doing:</span> <strong>{row.summary.lines}</strong> <span>{row.summary.lines === 1 ? 'reservation' : 'reservations'}</span> · <strong>{row.summary.paid}</strong> <span>paid</span> · <strong>{row.summary.unpaid}</strong> <span>waiting for payment</span>
-        {notConfirmed > 0 && <> · <strong>{notConfirmed}</strong> <span>not confirmed yet</span></>}
+        <span>What families are doing:</span> <strong>{row.summary.lines}</strong> <span>{row.summary.lines === 1 ? 'reservation' : 'reservations'}</span> · <strong>{row.summary.paid}</strong> <span>paid</span> · <strong>{row.summary.unpaid}</strong> <span>waiting for payment or approval</span>
       </p>
     </section>
   );

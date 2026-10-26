@@ -76,6 +76,16 @@ test('the sentences of @repo/validations her screens show are checked, and a new
   assert.ok(hits.some((h) => h.includes('makeLabel') && h.includes('no sample')));
 });
 
+test("the Arabic another dictionary gives a phrase of hers is checked: the translator may render it", async () => {
+  const web = tree({
+    'screen.tsx': 'export const A = () => <p>This cycle</p>;\nexport const B = () => <p>Fine</p>;',
+    'lib/i18n-other.ts': "export const other = { 'This cycle': 'هذه الدورة', 'Fine': 'جيد', 'Not hers': 'السلسلة' };",
+  });
+  const { hits } = await check({ web, screens: ['screen.tsx'], shared: [], wording: null, lib: LIB });
+  assert.equal(hits.length, 1, hits.join('\n'));
+  assert.ok(hits[0].includes("'This cycle' renders"));
+});
+
 test('validationsSentences calls each sample and reads strings, lists and records', () => {
   const out = validationsSentences(['f', 'S', 'L', 'R'], { f: (n) => `n=${n}`, S: 'one', L: ['two', 3], R: { a: 'three' } }, { f: [[1], [2]] }, new Set());
   assert.deepEqual(out.map((x) => x.v), ['n=1', 'n=2', 'one', 'two', 'three']);

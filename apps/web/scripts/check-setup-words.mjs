@@ -13,7 +13,9 @@
  * - the sentences of @repo/validations her screens show: every string or list of strings they import, and each
  *   function that makes a sentence, called with a sample (a function not named below fails the check, so a new one
  *   is added here before it reaches her);
- * - every Arabic and English phrase of lib/i18n-setup.ts.
+ * - every Arabic and English phrase of lib/i18n-setup.ts, and the Arabic every other dictionary (lib/i18n*.ts, .tsx) gives
+ *   a phrase her screens use: the page translator takes a phrase's Arabic from the first dictionary that has it, so a
+ *   word she shares with another screen may render that screen's Arabic.
  * Run from the repository or apps/web: `node apps/web/scripts/check-setup-words.mjs` (exit 1 on a hit); `--list`
  * prints the strings it checked. The planted-word controls are its test, `check-setup-words.test.mjs`
  * (`node --test`).
@@ -21,7 +23,7 @@
  * What the screens render from the API (check-list notes, refusals) is checked on the rendered pages by the drive
  * of P2 (.audit/coordinator-p2.tsv); refusals pass through herWords (lib/i18n-setup.ts) first.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -116,6 +118,25 @@ export function stringsOf(file, only) {
   return out;
 }
 
+/** Every `'English': 'Arabic'` pair of a dictionary file, with its line (keys and values as plain strings). */
+export function dictionaryPairs(file) {
+  const text = readFileSync(file, 'utf8');
+  const src = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const out = [];
+  const visit = (node) => {
+    if (ts.isPropertyAssignment(node) && (ts.isStringLiteral(node.name) || ts.isIdentifier(node.name))
+      && (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer))) {
+      out.push({ key: node.name.text.replace(/\s+/g, ' ').trim(), value: node.initializer.text, line: src.getLineAndCharacterOfPosition(node.getStart()).line + 1 });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(src);
+  return out;
+}
+
+/** The app's dictionaries: lib/i18n*.ts and .tsx. */
+export const DICTIONARIES = (web = WEB) => readdirSync(path.join(web, 'lib')).filter((f) => /^i18n.*\.tsx?$/.test(f)).map((f) => `lib/${f}`);
+
 /** The names a file imports from @repo/validations (values only: a type is never on the screen). */
 export function validationsImportsOf(file) {
   const text = readFileSync(file, 'utf8');
@@ -164,14 +185,15 @@ export function validationsSentences(names, lib, samples = SENTENCE_SAMPLES, not
 }
 
 /** Every hit: "file:line: text". */
-export async function check({ web = WEB, screens = HER_SCREENS, shared = SHARED, wording = 'lib/i18n-setup.ts', lib, list = false } = {}) {
+export async function check({ web = WEB, screens = HER_SCREENS, shared = SHARED, wording = 'lib/i18n-setup.ts', dictionaries, lib, list = false } = {}) {
   const hits = [];
   const seen = new Set();
   const read = (rel, only) => {
     const file = path.join(web, rel);
     if (!existsSync(file)) { hits.push(`${rel}: missing`); return; }
     for (const s of stringsOf(file, only)) {
-      if (list && !seen.has(s.v)) { seen.add(s.v); console.log(s.v); }
+      if (list && !seen.has(s.v)) console.log(s.v);
+      seen.add(s.v);
       if (forbidden(s.v)) hits.push(`${rel}:${s.line}: ${s.v}`);
     }
   };
@@ -179,6 +201,10 @@ export async function check({ web = WEB, screens = HER_SCREENS, shared = SHARED,
   for (const s of shared) read(s.file, s.only);
   // Her wording file: every phrase, both languages (its comments name the words on purpose, so only strings are read).
   if (wording) for (const s of stringsOf(path.join(web, wording))) if (forbidden(s.v)) hits.push(`${wording}:${s.line}: ${s.v}`);
+  // The Arabic any dictionary gives a phrase her screens use (the translator may take it from another screen's).
+  for (const rel of dictionaries ?? (existsSync(path.join(web, 'lib')) ? DICTIONARIES(web) : [])) {
+    for (const p of dictionaryPairs(path.join(web, rel))) if (seen.has(p.key) && FORBIDDEN_AR.test(p.value)) hits.push(`${rel}:${p.line}: '${p.key}' renders '${p.value}' on her screens`);
+  }
   // The sentences @repo/validations makes for her screens.
   const names = [...new Set(screens.filter((rel) => existsSync(path.join(web, rel))).flatMap((rel) => validationsImportsOf(path.join(web, rel))))];
   const validations = lib ?? await import(pathToFileURL(createRequire(path.join(web, 'package.json')).resolve('@repo/validations')).href);

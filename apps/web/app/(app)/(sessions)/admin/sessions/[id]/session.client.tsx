@@ -219,19 +219,28 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
     (json: { closesAt?: string | null; paymentDueAt?: string; courseStartsOn?: string }, expected) =>
       apiResponse(api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { ...json, ...(expected ? { expected } : {}) } })),
     () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
-    () => { setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn); },
+    () => { sentClose.current = null; setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn); },
   );
   const [close, setClose] = useState(pickerValue(s.closesAt));
   const [due, setDue] = useState(pickerValue(s.paymentDueAt));
   const [first, setFirst] = useState(s.courseStartsOn);
-  useEffect(() => { setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn); }, [s.closesAt, s.paymentDueAt, s.courseStartsOn]);
-  // Clear pressed while another date was being saved: sent once that save is done, so the two never race.
+  // The close date last sent and not read back yet: leaving the field does not send it a second time (the API would
+  // answer "Nothing to change" under a save that worked). Forgotten once read back, cancelled or refused.
+  const sentClose = useRef<string | null>(null);
+  const saveClose = (v: string) => { sentClose.current = v; save.save({ closesAt: v ? endOfSchoolDay(v) : null }); };
+  useEffect(() => { if (save.error) sentClose.current = null; }, [save.error]);
+  useEffect(() => {
+    sentClose.current = null;
+    setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn);
+  }, [s.closesAt, s.paymentDueAt, s.courseStartsOn]);
+  // Clear pressed while another date was being saved or asked about: sent once that is settled (saved, cancelled or
+  // refused), so the two never race and a question she has open is never dismissed by the clear.
   const clearNext = useRef(false);
   useEffect(() => {
-    if (save.isPending || !clearNext.current) return;
+    if (save.isPending || save.asking || save.busy() || !clearNext.current) return;
     clearNext.current = false;
-    save.save({ closesAt: null });
-  }, [save.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
+    saveClose('');
+  }, [save.isPending, save.asking]); // eslint-disable-line react-hooks/exhaustive-deps
   const valid = (d: string) => /^\d{4}-\d\d-\d\d$/.test(d) && Number(d.slice(0, 4)) >= 2000;
   const field = 'mt-1 h-10';
   return (
@@ -241,12 +250,13 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
         <div className="flex items-center gap-2">
           <input id="sess-close" type="date" className={cn(INPUT_CLASS, field)} value={close} disabled={!canSetUp || s.status === 'closed'}
             onChange={(e) => setClose(e.target.value)}
-            onBlur={() => { if (close !== pickerValue(s.closesAt) && (close === '' || valid(close))) save.save({ closesAt: close ? endOfSchoolDay(close) : null }); }} />
-          {/* Clear takes the place of a date typed and not saved yet: pressing it keeps the focus in the field, so
-              leaving the field never sends the typed date first; a save already running is let finish, then cleared. */}
+            onBlur={() => { if (close !== pickerValue(s.closesAt) && close !== sentClose.current && (close === '' || valid(close))) saveClose(close); }} />
+          {/* Clear takes the place of a close date typed and not saved yet: pressed from the close field it keeps the
+              focus there, so leaving the field never sends the typed date first. From another date field, that field
+              is left (and saved) as usual; a save running or asking is let settle, then the close date is cleared. */}
           {canSetUp && s.closesAt && (
-            <Button type="button" size="sm" variant="ghost" onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setClose(''); if (save.isPending) clearNext.current = true; else save.save({ closesAt: null }); }}>Clear</Button>
+            <Button type="button" size="sm" variant="ghost" onMouseDown={(e) => { if (document.activeElement?.id === 'sess-close') e.preventDefault(); }}
+              onClick={() => { setClose(''); if (save.busy()) clearNext.current = true; else saveClose(''); }}>Clear</Button>
           )}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">Switches Accepting off at the end of that day.</p>
