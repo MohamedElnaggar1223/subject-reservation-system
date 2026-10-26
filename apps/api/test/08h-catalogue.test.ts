@@ -140,15 +140,16 @@ describe('F0b: the exam catalogue', () => {
 
     it('"A.S./A.2." is derived per registration from the unit\'s level, the awards and the student\'s year — and nothing stored moves when the reading changes', async () => {
       // An AS window and an A Level window feed one Pearson January series.
-      asWindow = await session(adm, 'January (AS, catalogue)', 'january', 'as_level', futureWindow());
-      alWindow = await session(adm, 'January (A-Level, catalogue)', 'january', 'a_level', futureWindow());
+      // P1b (C4): reserved in open sessions (they were preregistrations in drafts; a draft takes none now).
+      asWindow = await session(adm, 'January (AS, catalogue)', 'january', 'as_level', { ...futureWindow(), activate: true });
+      alWindow = await session(adm, 'January (A-Level, catalogue)', 'january', 'a_level', { ...futureWindow(), activate: true });
       const seriesId = await feedSeries(adm, asWindow, { label: 'catalogue' });
       await placeItemsIn(adm, alWindow, seriesId);
 
       g11 = await onboard(officer, 'cat-g11', 11);
       g12 = await onboard(officer, 'cat-g12', 12);
       const prereg = async (f: { parent: Client; studentId: string }, sessionId: string, subjectIds: string[]) =>
-        apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId, ...(await reservationOf(sessionId, subjectIds)), studentId: f.studentId } }));
+        apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, subjectIds)), studentId: f.studentId } }));
       // Grade 11 sits P1 and M1 (AS units only); grade 12 sits M1 with P3 (an A2 unit) in the same series.
       const [g11p1, g11m1] = await prereg(g11, asWindow, [p1Subject, m1Subject]).then((r) => [r.find((x) => x.subjectId === p1Subject)!.id, r.find((x) => x.subjectId === m1Subject)!.id]);
       const g12m1 = (await prereg(g12, asWindow, [m1Subject]))[0]!.id;
