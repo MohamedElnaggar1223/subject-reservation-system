@@ -23,7 +23,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, ROLES } from '@repo/validations';
@@ -37,7 +37,7 @@ import { Money, Modal, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../../../s
 import {
   fetchOffering, fetchSetupSession, fetchTeachers, fetchReferenceBoards, fetchFamilyPreview, offeringKey, setupKey, previewKey,
   TEACHERS_KEY, REFERENCE_BOARDS_KEY, CELLS, CELL_WORDS, subjectTitle, examMonth, monthIndex, pickerValue, endOfSchoolDay,
-  useImpactSave, ImpactDialog, refusalText, type CellKey, type SetupSession,
+  useImpactSave, ImpactDialog, CommitSelect, refusalText, type CellKey, type SetupSession,
 } from '../../../setup-shared';
 import { shownCode } from '../../subjects-tab.client';
 
@@ -47,10 +47,10 @@ type Cells = Record<CellKey, boolean>;
 type TeacherPick = { teacherId?: string; newName?: string; name: string; online: boolean; external: boolean; confirmNew?: boolean };
 type DraftRow = {
   key: string; id?: string; kind: string; label: string; labelAr: string; referenceKey: string | null; referenceCodes: string[]; name?: string;
-  sitting: 'june' | 'november' | 'january'; closesAt: string; payBy: string;
+  sitting: 'june' | 'november' | 'january' | null; closesAt: string; payBy: string;
   examFee: string; courseFee: string; selfStudyOwn: boolean; selfStudyFee: string;
   cells: Cells; teachers: TeacherPick[] | null; needsCarriedFrom: boolean; fromReference: boolean;
-  examFeeSource: string | null; lines: number;
+  examFeeSource: string | null; lines: number; linesAll: number; byDefault: CellKey[];
 };
 type Earlier = { month: string; year: number };
 type Question = { id?: string; kind: 'yes_no' | 'text' | 'choice'; prompt: string; choices: string[]; required: boolean };
@@ -72,7 +72,10 @@ const num = (v: string) => (v.trim() === '' ? null : Number(v));
 const rowName = (r: { kind: string; label: string }) => (r.kind === 'all_papers' ? 'All papers' : r.label);
 
 function draftOf(o: OfferingData): Draft {
-  const asking = o.rows.filter((r) => r.needsCarriedFrom);
+  // The subject's earlier exams: the lists of the rows that ask and are offered (all that ask, when none is).
+  const asks = o.rows.filter((r) => r.needsCarriedFrom);
+  const offeredAsks = asks.filter((r) => anyCell(r.cells));
+  const asking = offeredAsks.length ? offeredAsks : asks;
   const earlier: Earlier[] = [];
   for (const r of asking) for (const p of r.allowedPriorSittings) if (!earlier.some((e) => e.month === p.month && e.year === p.year)) earlier.push({ month: p.month, year: p.year });
   earlier.sort((a, b) => monthIndex(b.month, b.year) - monthIndex(a.month, a.year));
@@ -89,11 +92,11 @@ function draftOf(o: OfferingData): Draft {
 function rowDraft(r: RowData): DraftRow {
   return {
     key: r.id, id: r.id, kind: r.kind, label: rowName(r), labelAr: r.labelAr, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
-    ...(r.kind === 'custom' ? { name: r.label } : {}),
-    sitting: (r.sitting ?? 'june') as DraftRow['sitting'], closesAt: pickerValue(r.closesAt), payBy: pickerValue(r.payBy),
+    sitting: r.sitting as DraftRow['sitting'], closesAt: pickerValue(r.closesAt), payBy: pickerValue(r.payBy),
     examFee: money(r.examFee), courseFee: money(r.courseFee), selfStudyOwn: r.selfStudyFee !== null, selfStudyFee: money(r.selfStudyFee),
     cells: { ...r.cells }, teachers: r.teachers.length ? r.teachers.map((t) => ({ teacherId: t.teacherId, name: t.name, online: t.online, external: t.external })) : null,
-    needsCarriedFrom: r.needsCarriedFrom, fromReference: r.fromReference, examFeeSource: r.examFeeSource, lines: r.lines.live,
+    needsCarriedFrom: r.needsCarriedFrom, fromReference: r.fromReference, examFeeSource: r.examFeeSource, lines: r.lines.live, linesAll: r.lines.all,
+    byDefault: r.cellsByDefault as CellKey[],
   };
 }
 
@@ -101,54 +104,97 @@ const teacherInput = (t: TeacherPick) => (t.teacherId
   ? { teacherId: t.teacherId, online: t.online, external: t.external }
   : { newName: t.newName!, online: t.online, external: t.external, confirmNew: !!t.confirmNew });
 
-/** The body PUT /offerings/:id takes: the whole subject, and her look at the default ticks done. */
-function bodyOf(d: Draft, o: OfferingData) {
+/** A row's own exam as a month index: its sitting in this session's year (January is the next year's). */
+function ownExam(s: SetupSession, r: DraftRow, before: RowData | undefined) {
+  if (r.sitting === 'january') return monthIndex('january', s.seriesYear + 1);
+  if (r.sitting === 'june' || r.sitting === 'november') return monthIndex(r.sitting, s.seriesYear);
+  return before?.series ? monthIndex(before.series.month, before.series.year) : monthIndex(s.sessionType === 'june' ? 'june' : 'november', s.seriesYear);
+}
+
+/**
+ * The body PUT /offerings/:id takes. The rows are the whole set (a row left out is removed); everything else
+ * only when she changed it, so a change made elsewhere since the page loaded (a course fee on Prices, a subject
+ * switched on from the check list) is not written back. The subject's earlier exams go to each offered row that
+ * asks, less any not before that row's own exam. Her look at the ticks a default made (marked on the grid) is
+ * said done when the subject has any.
+ */
+function bodyOf(d: Draft, o: OfferingData, s: SetupSession) {
+  const was = draftOf(o);
+  const changed = <K extends keyof Draft>(k: K) => JSON.stringify(d[k]) !== JSON.stringify(was[k]);
   return {
-    note: d.note.trim() || null,
-    teacherChoice: d.teacherChoice,
-    teacherTbc: d.teacherTbc,
-    accepting: d.accepting,
-    closesAt: d.closesAt ? endOfSchoolDay(d.closesAt) : null,
-    courseFee: num(d.courseFee),
-    teachers: d.teachers.map(teacherInput),
+    ...(changed('note') ? { note: d.note.trim() || null } : {}),
+    ...(changed('teacherChoice') ? { teacherChoice: d.teacherChoice } : {}),
+    ...(changed('teacherTbc') ? { teacherTbc: d.teacherTbc } : {}),
+    ...(changed('accepting') ? { accepting: d.accepting } : {}),
+    // A date kept as it is keeps its own instant.
+    ...(changed('closesAt') ? { closesAt: d.closesAt ? endOfSchoolDay(d.closesAt) : null } : {}),
+    ...(changed('courseFee') ? { courseFee: num(d.courseFee) } : {}),
+    ...(changed('teachers') ? { teachers: d.teachers.map(teacherInput) } : {}),
     rows: d.rows.map((r) => {
       const before = r.id ? o.rows.find((x) => x.id === r.id) : undefined;
+      const prev = r.id ? was.rows.find((x) => x.id === r.id) : undefined;
       const examFee = num(r.examFee);
+      const own = ownExam(s, r, before);
       return {
         ...(r.id ? { id: r.id } : {}),
         kind: r.kind as 'custom',
         ...(r.referenceKey ? { referenceKey: r.referenceKey } : {}),
         ...(!r.id ? { referenceCodes: r.referenceCodes } : {}),
-        ...(r.name ? { name: r.name } : {}),
-        sitting: r.sitting,
-        closesAt: r.closesAt ? endOfSchoolDay(r.closesAt) : null,
-        payBy: r.payBy ? endOfSchoolDay(r.payBy) : null,
+        // A row of her own keeps the name she gave it unless she gives another.
+        ...(r.name && (!prev || r.name !== prev.label) ? { name: r.name } : {}),
+        // The sitting and the dates only when new or changed (a sitting the API has none for is its to decide).
+        ...(r.sitting && (!before || r.sitting !== before.sitting) ? { sitting: r.sitting } : {}),
+        ...(!prev || r.closesAt !== prev.closesAt ? { closesAt: r.closesAt ? endOfSchoolDay(r.closesAt) : null } : {}),
+        ...(!prev || r.payBy !== prev.payBy ? { payBy: r.payBy ? endOfSchoolDay(r.payBy) : null } : {}),
         // A fee left as it was keeps where it came from (a list, the board's rule, the sum of its units).
-        ...(before && before.examFee === examFee ? {} : { examFee, examFeeSource: examFee === null ? null : 'typed' as const }),
-        courseFee: num(r.courseFee),
-        selfStudyFee: r.selfStudyOwn ? num(r.selfStudyFee) : null,
+        ...(prev && prev.examFee === r.examFee ? {} : { examFee, examFeeSource: examFee === null ? null : 'typed' as const }),
+        ...(!prev || prev.courseFee !== r.courseFee ? { courseFee: num(r.courseFee) } : {}),
+        ...(!prev || prev.selfStudyOwn !== r.selfStudyOwn || prev.selfStudyFee !== r.selfStudyFee ? { selfStudyFee: r.selfStudyOwn ? num(r.selfStudyFee) : null } : {}),
         cells: r.cells,
-        ...(r.needsCarriedFrom ? { allowedPriorSittings: d.earlier.map((e) => ({ month: e.month as 'june', year: e.year })) } : {}),
-        teachers: r.teachers ? r.teachers.map(teacherInput) : null,
+        ...(r.needsCarriedFrom && anyCell(r.cells) && (!prev || changed('earlier') || !anyCell(prev.cells))
+          ? { allowedPriorSittings: d.earlier.filter((e) => monthIndex(e.month, e.year) < own).map((e) => ({ month: e.month as 'june', year: e.year })) }
+          : {}),
+        ...(!prev || JSON.stringify(prev.teachers) !== JSON.stringify(r.teachers) ? { teachers: r.teachers ? r.teachers.map(teacherInput) : null } : {}),
       };
     }),
-    questions: d.questions,
-    defaultsReviewed: true as const,
+    ...(changed('questions') ? { questions: d.questions } : {}),
+    ...(o.rows.some((r) => r.cellsByDefault.length) ? { defaultsReviewed: true as const } : {}),
   };
 }
 
 export default function SubjectEditor({ sessionId, offeringId, viewerRole }: { sessionId: string; offeringId: string; viewerRole: string }): React.JSX.Element {
-  const off = useQuery({ queryKey: offeringKey(sessionId, offeringId), queryFn: () => fetchOffering(sessionId, offeringId) });
-  const ses = useQuery({ queryKey: setupKey(sessionId), queryFn: () => fetchSetupSession(sessionId) });
+  // Read once and again only after a save (its invalidation): a refetch under her would remount the editor
+  // and lose what she has not saved.
+  const off = useQuery({ queryKey: offeringKey(sessionId, offeringId), queryFn: () => fetchOffering(sessionId, offeringId), staleTime: Infinity, refetchOnWindowFocus: false });
+  const ses = useQuery({ queryKey: setupKey(sessionId), queryFn: () => fetchSetupSession(sessionId), staleTime: Infinity, refetchOnWindowFocus: false });
+  const saved = useSavedAnnouncer();
   if (off.isLoading || ses.isLoading) return <LoadingState />;
   if (off.isError || ses.isError || !off.data || !ses.data) {
     return <div className="mx-auto max-w-6xl px-6 py-8"><ErrorState message={off.error ? refusalText(off.error) : undefined} onRetry={() => { void off.refetch(); void ses.refetch(); }} /></div>;
   }
   const canEdit = (viewerRole === ROLES.ADMIN || viewerRole === ROLES.COORDINATOR) && ses.data.status !== 'closed';
-  return <Editor key={off.dataUpdatedAt} o={off.data} s={ses.data} canEdit={canEdit} />;
+  return <><Editor key={off.dataUpdatedAt} o={off.data} s={ses.data} canEdit={canEdit} saved={saved} />{saved.region}</>;
 }
 
-function Editor({ o, s, canEdit }: { o: OfferingData; s: SetupSession; canEdit: boolean }) {
+/**
+ * A save remounts the editor (its key is the read's time), which would drop focus to the page and replace
+ * the status line before a screen reader hears it. This outlives the remount: it says "Saved." and tells
+ * the new editor to take focus back to its save bar.
+ */
+function useSavedAnnouncer() {
+  const [said, setSaid] = useState('');
+  const refocus = useRef(false);
+  const announce = () => {
+    refocus.current = true;
+    setSaid('');
+    requestAnimationFrame(() => setSaid('Saved.'));
+  };
+  const region = <p role="status" className="sr-only">{said}</p>;
+  return { announce, refocus, region };
+}
+type SavedAnnouncer = ReturnType<typeof useSavedAnnouncer>;
+
+function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; canEdit: boolean; saved: SavedAnnouncer }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const initial = useMemo(() => draftOf(o), [o]);
@@ -160,8 +206,15 @@ function Editor({ o, s, canEdit }: { o: OfferingData; s: SetupSession; canEdit: 
   const save = useImpactSave(
     (body: ReturnType<typeof bodyOf>, expected) =>
       apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId: o.id }, json: { ...body, ...(expected ? { expected } : {}) } })),
-    async () => { await queryClient.invalidateQueries({ queryKey: ['sessions', s.id] }); },
+    async () => { saved.announce(); await queryClient.invalidateQueries({ queryKey: ['sessions', s.id] }); },
   );
+  const statusRef = useRef<HTMLSpanElement>(null);
+  const { refocus } = saved;
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    statusRef.current?.focus({ preventScroll: true });
+  }, [refocus]);
   const remove = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$delete({ param: { id: s.id, offeringId: o.id } })),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: setupKey(s.id) }); router.push(back as never); },
@@ -209,9 +262,9 @@ function Editor({ o, s, canEdit }: { o: OfferingData; s: SetupSession; canEdit: 
           <ForFamilies d={d} setD={setD} canEdit={canEdit} />
           {canEdit && (
             <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-md">
-              <Button disabled={!dirty || save.isPending} onClick={() => save.save(bodyOf(d, o))}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+              <Button disabled={!dirty || save.isPending} onClick={() => save.save(bodyOf(d, o, s))}>{save.isPending ? 'Saving…' : 'Save'}</Button>
               <Button variant="outline" disabled={!dirty || save.isPending} onClick={() => { setD(initial); save.reset(); }}>Undo the changes</Button>
-              <span className="flex-1 text-xs text-muted-foreground">{dirty ? 'Changes not saved yet.' : 'Saved.'}</span>
+              <span ref={statusRef} tabIndex={-1} className="flex-1 text-xs text-muted-foreground outline-none">{dirty ? 'Changes not saved yet.' : 'Saved.'}</span>
               <Button variant="ghost" className="text-destructive" onClick={() => setRemoving(true)}>Remove this subject</Button>
               <div className="basis-full"><ErrorLine message={save.error} /></div>
             </div>
@@ -264,7 +317,7 @@ function Grid({ o, s, d, setD, setRow, more, setMore, canEdit }: GridProps) {
     setD({ ...d, rows: [...d.rows, {
       key, kind: 'custom', label: custom.name.trim(), labelAr: custom.name.trim(), name: custom.name.trim(), referenceKey: null, referenceCodes: custom.code.trim() ? [custom.code.trim()] : [],
       sitting: s.sessionType === 'june' ? 'june' : 'november', closesAt: '', payBy: '', examFee: custom.fee, courseFee: '', selfStudyOwn: false, selfStudyFee: '',
-      cells: { ...NO_CELLS, retakeSelfStudy: true }, teachers: null, needsCarriedFrom: false, fromReference: false, examFeeSource: null, lines: 0,
+      cells: { ...NO_CELLS, retakeSelfStudy: true }, teachers: null, needsCarriedFrom: false, fromReference: false, examFeeSource: null, lines: 0, linesAll: 0, byDefault: [],
     }] });
     setCustom(null);
   };
@@ -299,7 +352,7 @@ function Grid({ o, s, d, setD, setRow, more, setMore, canEdit }: GridProps) {
                 );
               })}
               <th className={th}>Exam fee (EGP)</th>
-              <th className={th}>Course fee (EGP)</th>
+              <th className={th}>Its own course fee (EGP)</th>
             </tr>
           </thead>
           <tbody>
@@ -336,6 +389,12 @@ function Grid({ o, s, d, setD, setRow, more, setMore, canEdit }: GridProps) {
       ) : (
         <Button variant="ghost" size="sm" className="mt-2" onClick={() => setCustom({ name: '', code: '', fee: '' })}>+ Add a row not on the list</Button>
       ))}
+      {d.rows.some((r) => r.byDefault.some((c) => r.cells[c])) && (
+        <p className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+          <span aria-hidden="true" className="inline-block size-3 rounded-sm ring-2 ring-amber-500" />
+          <span>Ringed ticks were made by a default, not by your form. Saving says they look right.</span>
+        </p>
+      )}
       <p className="mt-2 text-xs text-muted-foreground">Retake in school starts ticked wherever first entry in school is: on your forms a retaker may pick a teacher. Untick it where the school does not offer it.</p>
     </section>
   );
@@ -360,7 +419,7 @@ function RowLines({ r, o, s, cols, on, open, canEdit, setRow, setMore, feeNote }
     <>
       <tr className={cn('border-b border-border', !on && 'text-muted-foreground')}>
         <td className="px-2 py-2 align-top">
-          <input type="checkbox" className="size-4 accent-primary" checked={on} disabled={!canEdit} aria-label={`Offer ${r.label}`}
+          <input type="checkbox" className="size-4 accent-primary" checked={on} disabled={!canEdit} aria-label={`Offer ${r.label} to families`}
             onChange={() => setRow(r.key, { cells: on ? { ...NO_CELLS } : usualCells(r.kind) })} />
         </td>
         <td className="px-2 py-2 align-top">
@@ -376,7 +435,8 @@ function RowLines({ r, o, s, cols, on, open, canEdit, setRow, setMore, feeNote }
         {cols.map((c) => (
           <td key={c} className="px-2 py-2 text-center align-top">
             {cellAllowed(r.kind, c)
-              ? <input type="checkbox" className="size-4 accent-primary" checked={r.cells[c]} disabled={!canEdit} aria-label={`${r.label}: ${CELL_WORDS[c]}`}
+              ? <input type="checkbox" className={cn('size-4 accent-primary', r.byDefault.includes(c) && r.cells[c] && 'rounded-sm ring-2 ring-amber-500 ring-offset-1')} checked={r.cells[c]} disabled={!canEdit}
+                  aria-label={`${r.label}: ${CELL_WORDS[c]}${r.byDefault.includes(c) && r.cells[c] ? ' (ticked by a default)' : ''}`}
                   onChange={() => setRow(r.key, { cells: { ...r.cells, [c]: !r.cells[c] } })} />
               : <span className="text-muted-foreground" title="A one-paper row is a retake">—</span>}
           </td>
@@ -446,14 +506,14 @@ function MoreOptions({ r, s, o, canEdit, setRow }: { r: DraftRow; s: SetupSessio
                   onOnline={() => setRow(r.key, { teachers: r.teachers!.map((x) => (x === t ? { ...x, online: !x.online } : x)) })}
                   onRemove={() => setRow(r.key, { teachers: r.teachers!.filter((x) => x !== t) })} />
               ))}
-              <select className={cn(INPUT_CLASS, 'h-9 w-auto')} value="" disabled={!canEdit} aria-label={`Add a teacher to ${r.label}`}
-                onChange={(e) => {
-                  const t = avail.find((x) => x.id === e.target.value);
+              <CommitSelect className={cn(INPUT_CLASS, 'h-9 w-auto')} value="" reset disabled={!canEdit} aria-label={`Add a teacher to ${r.label}`}
+                onCommit={(v) => {
+                  const t = avail.find((x) => x.id === v);
                   if (t) setRow(r.key, { teachers: [...(r.teachers ?? []), { teacherId: t.id, name: t.name, online: false, external: false }] });
                 }}>
                 <option value="">Add…</option>
                 {avail.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
-              </select>
+              </CommitSelect>
             </>
           )}
         </div>
@@ -462,7 +522,7 @@ function MoreOptions({ r, s, o, canEdit, setRow }: { r: DraftRow; s: SetupSessio
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2">
             <span>Exam in</span>
-            <select className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.sitting} disabled={!canEdit || r.lines > 0} onChange={(e) => setRow(r.key, { sitting: e.target.value as DraftRow['sitting'] })}>
+            <select className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.sitting ?? 'november'} disabled={!canEdit || r.linesAll > 0} onChange={(e) => setRow(r.key, { sitting: e.target.value as DraftRow['sitting'] })}>
               <option value="november">November</option>
               <option value="january">January</option>
             </select>
@@ -483,13 +543,13 @@ function TeacherChip({ t, canEdit, onOnline, onExternal, onRemove }: { t: Teache
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-xs">
       <bdi data-i18n-skip="true" className="font-medium">{t.name}</bdi>
       {t.newName && <Badge tone="info">new</Badge>}
-      <button type="button" disabled={!canEdit} aria-pressed={t.online} onClick={onOnline}
+      <button type="button" disabled={!canEdit} aria-pressed={t.online} aria-label={`${t.name}: online`} onClick={onOnline}
         className={cn('rounded-full px-1.5 py-0.5', t.online ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>online</button>
       {onExternal
-        ? <button type="button" disabled={!canEdit} aria-pressed={t.external} onClick={onExternal}
+        ? <button type="button" disabled={!canEdit} aria-pressed={t.external} aria-label={`${t.name}: external team`} onClick={onExternal}
             className={cn('rounded-full px-1.5 py-0.5', t.external ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>external team</button>
         : t.external && <span className="text-muted-foreground">(external team)</span>}
-      {canEdit && <button type="button" aria-label={`Remove ${t.name}`} onClick={onRemove} className="rounded-full px-1 text-muted-foreground hover:bg-muted hover:text-foreground">×</button>}
+      {canEdit && <button type="button" aria-label={`Remove the teacher ${t.name}`} onClick={onRemove} className="rounded-full px-1 text-muted-foreground hover:bg-muted hover:text-foreground">×</button>}
     </span>
   );
 }
@@ -522,10 +582,10 @@ function Teachers({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void; ca
       </div>
       {canEdit && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select className={cn(INPUT_CLASS, 'w-auto max-w-xs')} value="" aria-label="Add a teacher"
-            onChange={(e) => {
-              if (e.target.value === '__new') { setAdding(true); return; }
-              const t = avail.find((x) => x.id === e.target.value);
+          <CommitSelect className={cn(INPUT_CLASS, 'w-auto max-w-xs')} value="" reset aria-label="Add a teacher"
+            onCommit={(v) => {
+              if (v === '__new') { setAdding(true); return; }
+              const t = avail.find((x) => x.id === v);
               if (t) setD({ ...d, teachers: [...d.teachers, { teacherId: t.id, name: t.name, online: false, external: t.kind === 'provider' }] });
             }}>
             <option value="">Add a teacher…</option>
@@ -533,7 +593,7 @@ function Teachers({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void; ca
               {avail.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
             </optgroup>
             <option value="__new">A new teacher…</option>
-          </select>
+          </CommitSelect>
           {adding && (
             <>
               <input className={cn(INPUT_CLASS, 'w-60')} value={name} onChange={(e) => { setName(e.target.value); check.reset(); }} placeholder="Name as families will read it" aria-label="The new teacher's name" />
@@ -635,16 +695,16 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
         })}
       </ul>
       {canEdit && cand.length > 0 && (
-        <select className={cn(INPUT_CLASS, 'mt-3 w-auto')} value="" aria-label="Add an older earlier exam"
-          onChange={(e) => {
-            const [m, y] = e.target.value.split('-');
+        <CommitSelect className={cn(INPUT_CLASS, 'mt-3 w-auto')} value="" reset aria-label="Add an older earlier exam"
+          onCommit={(v) => {
+            const [m, y] = v.split('-');
             const pick = { month: m!, year: Number(y) };
             setShown([...shown, pick].sort((a, b) => monthIndex(b.month, b.year) - monthIndex(a.month, a.year)));
             setD({ ...d, earlier: [...d.earlier, pick] });
           }}>
           <option value="">Add an older one…</option>
           {cand.map((e) => <option key={`${e.month}-${e.year}`} value={`${e.month}-${e.year}`}>{examMonth(e.month, e.year)}</option>)}
-        </select>
+        </CommitSelect>
       )}
     </section>
   );
@@ -669,7 +729,7 @@ function ForFamilies({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void;
           {d.questions.map((q, i) => (
             <li key={q.id ?? `new-${i}`} className="flex items-center justify-between gap-2 py-1.5 text-sm">
               <span><bdi data-i18n-skip="true">{q.prompt}</bdi> <span className="text-xs text-muted-foreground">{KIND_WORDS[q.kind]}{q.choices.length > 0 && <>: <bdi data-i18n-skip="true">{q.choices.join(' / ')}</bdi></>}</span></span>
-              {canEdit && <Button variant="ghost" size="sm" onClick={() => setD({ ...d, questions: d.questions.filter((_, j) => j !== i) })}>Remove</Button>}
+              {canEdit && <Button variant="ghost" size="sm" aria-label={`Remove the question: ${q.prompt}`} onClick={() => setD({ ...d, questions: d.questions.filter((_, j) => j !== i) })}>Remove</Button>}
             </li>
           ))}
         </ul>

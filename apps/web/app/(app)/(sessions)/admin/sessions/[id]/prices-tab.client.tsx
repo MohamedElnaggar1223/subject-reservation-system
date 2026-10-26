@@ -18,14 +18,14 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, type ParsePriceListType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
 import { Money, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../sessions-shared';
 import {
-  fetchPrices, fetchReferenceBoards, pricesKey, REFERENCE_BOARDS_KEY, subjectTitle, useImpactSave, ImpactDialog, refusalText,
+  fetchPrices, fetchReferenceBoards, pricesKey, REFERENCE_BOARDS_KEY, subjectTitle, useImpactSave, ImpactDialog, CommitSelect, refusalText,
   type SetupSession, type PricesData,
 } from '../setup-shared';
 
@@ -95,7 +95,7 @@ function ListsInUse({ data }: { data: PricesData }) {
 function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
   const queryClient = useQueryClient();
   const boards = useQuery({ queryKey: REFERENCE_BOARDS_KEY, queryFn: fetchReferenceBoards });
-  const [board, setBoard] = useState('cambridge');
+  const [board, setBoard] = useState<ParsePriceListType['board']>('cambridge');
   const months = listMonths(s);
   const boardName = boards.data?.find((b) => b.code === board)?.name ?? board;
   const nameOf = (k: { y: number; m: number }) => `${boardName} ${MONTHS[k.m]} ${k.y}`;
@@ -108,14 +108,14 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
   const [doubt, setDoubt] = useState<Record<number, 'use' | ''>>({});
   const [done, setDone] = useState<{ rows: number; name: string } | null>(null);
   const parse = useMutation({
-    mutationFn: async () => apiResponse(api.v1.sessions[':id']['price-lists'].parse.$post({ param: { id: s.id }, json: { board: board as 'cambridge', text } })),
+    mutationFn: async () => apiResponse(api.v1.sessions[':id']['price-lists'].parse.$post({ param: { id: s.id }, json: { board, text } })),
     onSuccess: () => { setDoubt({}); setDone(null); },
   });
   const byRow = useMemo(() => new Map(data.rows.map((r) => [r.rowId, r])), [data.rows]);
   const parsed = parse.data;
   const apply = useImpactSave(
     (v: { name: string; rows: { lineNo: number; code: string; name: string; amount: number; confirmed?: boolean }[] }, expected) =>
-      apiResponse(api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: { board: board as 'cambridge', name: v.name, rows: v.rows, ...(expected ? { expected } : {}) } })),
+      apiResponse(api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: { board, name: v.name, rows: v.rows, ...(expected ? { expected } : {}) } })),
     async (res, v) => {
       setDone({ rows: res.rowsPriced, name: v.name });
       setText('');
@@ -133,7 +133,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="pl-board" className="block text-sm font-medium text-foreground">Board</label>
-          <select id="pl-board" className={cn(INPUT_CLASS, 'mt-1 w-56')} value={board} onChange={(e) => { setBoard(e.target.value); setForKey(''); parse.reset(); }}>
+          <select id="pl-board" className={cn(INPUT_CLASS, 'mt-1 w-56')} value={board} onChange={(e) => { setBoard(e.target.value as ParsePriceListType['board']); setForKey(''); parse.reset(); }}>
             {(boards.data ?? []).map((b) => <option key={b.code} value={b.code} data-i18n-skip="true">{b.name}</option>)}
           </select>
         </div>
@@ -251,6 +251,7 @@ function MissingRow({ s, r, edit }: { s: SetupSession; r: PriceRow; edit: boolea
     (json: { amount: number } | { source: 'units_sum' | 'board_rule' }, expected) =>
       apiResponse(api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: s.id, rowId: r.rowId }, json: { ...json, ...(expected ? { expected } : {}) } })),
     () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+    () => setAmount(''),
   );
   const fills = [
     ...(r.fill.unitsSum !== null ? [{ v: 'units_sum', text: `Sum of its units: ${r.fill.unitsSum}` }] : []),
@@ -263,15 +264,14 @@ function MissingRow({ s, r, edit }: { s: SetupSession; r: PriceRow; edit: boolea
       <td className={td}><bdi data-i18n-skip="true">{titleOf(s, r)}</bdi> · <span data-i18n-skip="true">{rowName(r)}</span><ErrorLine message={set.error} /></td>
       <td className={td}>
         {fills.length ? (
-          <select className={cn(INPUT_CLASS, 'h-9 w-auto max-w-xs')} aria-label={`${label}: fill it by`} disabled={!edit || set.isPending} value=""
-            onChange={(e) => {
-              const v = e.target.value;
+          <CommitSelect className={cn(INPUT_CLASS, 'h-9 w-auto max-w-xs')} aria-label={`${label}: fill it by`} disabled={!edit || set.isPending} value="" reset
+            onCommit={(v) => {
               if (v === 'units_sum' || v === 'board_rule') set.save({ source: v });
               else if (v.startsWith('list:')) set.save({ amount: Number(v.slice(5)) });
             }}>
             <option value="">typing it, or…</option>
             {fills.map((f) => <option key={f.v} value={f.v}>{f.text}</option>)}
-          </select>
+          </CommitSelect>
         ) : <span className="text-xs text-muted-foreground">typing it (no list we hold prints it)</span>}
       </td>
       <td className={td}>
@@ -293,7 +293,7 @@ function CourseFees({ s, edit }: { s: SetupSession; edit: boolean }) {
       <p className="mt-1 text-sm text-muted-foreground"><span>The school&apos;s own fee, one per subject; a row may have its own in the subject&apos;s editor. Self study pays</span> <span>{s.selfStudyPercent}%</span> <span>of it. 0 is a fee; empty is not set.</span></p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-border"><th className={th}>Subject</th><th className={th}>Course fee (EGP)</th><th className={th}>Rows with their own</th></tr></thead>
+          <thead><tr className="border-b border-border"><th className={th}>Subject</th><th className={th}>The subject&apos;s course fee (EGP)</th><th className={th}>Rows with their own</th></tr></thead>
           <tbody>{s.offerings.map((o) => <CourseRow key={o.id} s={s} o={o} edit={edit} />)}</tbody>
         </table>
       </div>
@@ -307,6 +307,7 @@ function CourseRow({ s, o, edit }: { s: SetupSession; o: SetupSession['offerings
   const save = useImpactSave(
     (courseFee: number | null, expected) => apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId: o.id }, json: { courseFee, ...(expected ? { expected } : {}) } })),
     () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+    () => setValue(o.courseFee === null ? '' : String(o.courseFee)),
   );
   const own = o.rows.filter((r) => r.courseFee !== null);
   return (

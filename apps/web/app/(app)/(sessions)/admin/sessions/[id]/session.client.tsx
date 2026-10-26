@@ -189,6 +189,7 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
     (json: { closesAt?: string | null; paymentDueAt?: string; courseStartsOn?: string }, expected) =>
       apiResponse(api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { ...json, ...(expected ? { expected } : {}) } })),
     () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+    () => { setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn); },
   );
   const [close, setClose] = useState(pickerValue(s.closesAt));
   const [due, setDue] = useState(pickerValue(s.paymentDueAt));

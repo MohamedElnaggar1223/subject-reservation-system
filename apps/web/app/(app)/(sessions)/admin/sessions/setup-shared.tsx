@@ -10,7 +10,7 @@
  * refusal that carries one is put in her words by `herWords` (lib/i18n-setup.ts) before it is shown.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
@@ -110,6 +110,45 @@ export const pickerValue = (iso: string | null | undefined) => (iso ? schoolDate
  */
 export const endOfSchoolDay = (day: string) => `${day}T20:59:00.000Z`;
 
+// ─── A select that acts ──────────────────────────────────────────────────────
+
+const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+
+/**
+ * A select whose choice does something at once (adds a teacher, an earlier exam; saves the share). Picked
+ * with the mouse it acts on the pick; walked with the arrow keys (a closed select changes its value on each
+ * key in some browsers) it waits for Enter or for her to leave the field, so a key press is never a save.
+ * `value` '' with `reset` makes it a pick-to-add list that goes back to its prompt.
+ */
+export function CommitSelect({ value, onCommit, reset, children, ...props }: Omit<React.ComponentProps<'select'>, 'onChange' | 'value' | 'onKeyDown' | 'onBlur'> & {
+  value: string;
+  onCommit: (value: string) => void;
+  reset?: boolean;
+}) {
+  const walking = useRef(false);
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  const commit = (v: string) => {
+    walking.current = false;
+    if (v !== value && v !== '') onCommit(v);
+    setLocal(reset ? '' : v);
+  };
+  return (
+    <select
+      {...props}
+      value={local}
+      onKeyDown={(e) => {
+        if (ARROWS.has(e.key)) walking.current = true;
+        if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget.value); }
+      }}
+      onChange={(e) => { if (walking.current) setLocal(e.target.value); else commit(e.target.value); }}
+      onBlur={(e) => { if (walking.current) commit(e.currentTarget.value); }}
+    >
+      {children}
+    </select>
+  );
+}
+
 // ─── The impact pattern (A3, §6) ─────────────────────────────────────────────
 
 /**
@@ -120,6 +159,8 @@ export const endOfSchoolDay = (day: string) => `${day}T20:59:00.000Z`;
 export function useImpactSave<V, R extends { saved: boolean; impact: ImpactType }>(
   send: (vars: V, expected?: ImpactType) => Promise<R>,
   onSaved: (res: R, vars: V) => unknown,
+  // Not saved after all (she cancelled what it would do): a field showing the new value puts the saved one back.
+  onCancel?: () => void,
 ) {
   const [asking, setAsking] = useState<{ vars: V; impact: ImpactType; changed: boolean } | null>(null);
   const m = useMutation({
@@ -144,7 +185,7 @@ export function useImpactSave<V, R extends { saved: boolean; impact: ImpactType 
   return {
     save: (vars: V) => m.mutate({ vars }),
     confirm: () => { if (asking) m.mutate({ vars: asking.vars, expected: asking.impact }); },
-    cancel: () => { setAsking(null); m.reset(); },
+    cancel: () => { setAsking(null); m.reset(); onCancel?.(); },
     asking,
     isPending: m.isPending,
     error: m.error ? refusalText(m.error) : null,

@@ -145,6 +145,17 @@ export const STAGE_OVERRIDE: Readonly<Partial<Record<Role, Readonly<Record<strin
 const pathOf = (href: string) => href.split(/[?#]/)[0] ?? href;
 const under = (path: string, screen: string) => path === screen || path.startsWith(`${screen}/`);
 
+/**
+ * The coordinator rework's hiding (§9.3), whatever the switch above says: the parked set-up screens leave the
+ * coordinator's and the admin's sidebars (with the switch off too), and the coordinator's Settings and import.
+ */
+export function parkedForSetUp(role: string | null | undefined, href: string): boolean {
+  const path = pathOf(href);
+  if (role === 'admin') return SET_UP_PARKED.some((screen) => under(path, screen));
+  if (role === 'coordinator') return [...SET_UP_PARKED, '/settings', '/imports'].some((screen) => under(path, screen));
+  return false;
+}
+
 /** Whether a screen is outside the cycle for this role (always false with the switch off). */
 export function isOutsideTheCycle(role: string | null | undefined, href: string): boolean {
   if (!RESERVATION_CYCLE_ONLY || !role || !isRole(role)) return false;

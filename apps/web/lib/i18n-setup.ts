@@ -372,6 +372,10 @@ export const setupArabic: Record<string, string> = {
   'Offered': 'معروض',
   'Row': 'الصف',
   'Exam fee (EGP)': 'رسوم الامتحان (جنيه)',
+  'Its own course fee (EGP)': 'رسوم المقرر الخاصة به (جنيه)',
+  'The subject\'s course fee (EGP)': 'رسوم المقرر للمادة (جنيه)',
+  'Ringed ticks were made by a default, not by your form. Saving says they look right.': 'التحديدات المحاطة بإطار جاءت افتراضيًا لا من نموذجك. الحفظ يعني أنها تبدو صحيحة.',
+  'Open the subject to see it and save it there.': 'افتح المادة لتراه واحفظه هناك.',
   'e.g. Paper 3 only': 'مثال: الورقة 3 فقط',
   'Its exam fee (EGP)': 'رسوم امتحانه (جنيه)',
   'Add the row': 'أضف الصف',
@@ -486,11 +490,15 @@ export function translateSetupText(text: string): string | null {
   if ((m = /^(.+): self-study course amount$/.exec(text))) return `${m[1]}: مبلغ الدراسة الذاتية`;
   if ((m = new RegExp(`^${cell}: tick or untick every offered row$`).exec(text))) return `${CELL_AR[m[1]!]}: حدد أو ألغِ التحديد لكل الصفوف المعروضة`;
   if ((m = new RegExp(`^(.+): ${cell}$`).exec(text))) return `${m[1]}: ${CELL_AR[m[2]!]}`;
-  if ((m = /^Offer (.+)$/.exec(text))) return `اعرض ${m[1]}`;
+  if ((m = new RegExp(`^(.+): ${cell} \\(ticked by a default\\)$`).exec(text))) return `${m[1]}: ${CELL_AR[m[2]!]} (محدد افتراضيًا)`;
+  if ((m = /^Offer (.+) to families$/.exec(text))) return `اعرض ${m[1]} على العائلات`;
+  if ((m = /^(.+): online$/.exec(text))) return `${m[1]}: عبر الإنترنت`;
+  if ((m = /^(.+): external team$/.exec(text))) return `${m[1]}: فريق خارجي`;
+  if ((m = /^Remove the teacher (.+)$/.exec(text))) return `إزالة المعلم ${m[1]}`;
+  if ((m = /^Remove the question: (.+)$/.exec(text))) return `إزالة السؤال: ${m[1]}`;
   if ((m = /^Add a teacher to (.+)$/.exec(text))) return `أضف معلمًا إلى ${m[1]}`;
   if ((m = /^with (.+ (?:O\.L\.|A\.S\.\/A\.L\.))$/.exec(text))) return `مع ${m[1]}`;
   if ((m = /^Remove (.+ (?:O\.L\.|A\.S\.\/A\.L\.))$/.exec(text))) return `إزالة ${m[1]}`;
-  if ((m = /^Remove (T-[\w-]+|.+ [\w-]+)$/.exec(text)) && !/^Remove step \d+$/.test(text)) return `إزالة ${m[1]}`;
   // The refund policy's rows.
   if ((m = /^week (\d+)$/.exec(text))) return `الأسبوع ${m[1]}`;
   if ((m = /^Step (\d+): up to week$/.exec(text))) return `الخطوة ${m[1]}: حتى الأسبوع`;

@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, ROLES } from '@repo/validations';
+import { apiResponse, impactSentence, ROLES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
@@ -88,8 +88,13 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
   const subjectHref = (offeringId: string) => `/admin/sessions/${s.id}/subjects/${offeringId}`;
   const byId = new Map(s.offerings.map((o) => [o.id, o]));
-  const putOffering = (offeringId: string, json: { notesReviewed?: true; defaultsReviewed?: true; accepting?: boolean }) =>
-    apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId }, json }));
+  // A check-list button saves nothing families would feel; if the save answers that it would (a fee that follows
+  // another re-derived, closing with reservations), nothing is saved and she is sent to the subject to see it.
+  const putOffering = async (offeringId: string, json: { notesReviewed?: true; defaultsReviewed?: true; accepting?: boolean }) => {
+    const r = await apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId }, json }));
+    if (!r.saved) throw new Error(`${impactSentence(r.impact)} Open the subject to see it and save it there.`);
+    return r;
+  };
 
   const items = s.checkList;
   const of = (code: CheckItem['code']) => items.filter((c) => c.code === code);

@@ -15,13 +15,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, refundPolicySentence, DECLARATION_TEXT, ALLOWED_GRADES, type RefundPolicy, type AllowedGrade } from '@repo/validations';
+import { apiResponse, refundPolicySentence, DECLARATION_TEXT, ALLOWED_GRADES, type RefundPolicy, type AllowedGrade, type UpdateSessionType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
 import { cn } from '~/lib/utils';
 import { ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../sessions-shared';
-import { subjectTitle, useImpactSave, ImpactDialog, refusalText, type SetupSession } from '../setup-shared';
+import { subjectTitle, useImpactSave, ImpactDialog, CommitSelect, refusalText, type SetupSession } from '../setup-shared';
 
 const card = 'rounded-xl border border-border bg-card p-5 shadow-sm';
 const PERCENTS = [100, 75, 50, 25, 0];
@@ -29,10 +29,8 @@ const GRADE_WORDS: Record<AllowedGrade, string> = { '10': 'Grade 10', '11': 'Gra
 const QUESTION_KINDS = { yes_no: 'Yes / no', text: 'Short text', choice: 'A choice' } as const;
 type QuestionKind = keyof typeof QUESTION_KINDS;
 
-type SessionPut = {
-  selfStudyPercent?: number; allowedGrades?: AllowedGrade[]; unpaidCancelDays?: number; refundPolicy?: RefundPolicy;
-  questions?: { id?: string; kind: QuestionKind; prompt: string; choices: string[]; required: boolean }[];
-};
+/** The fields of PUT /sessions/:id this tab sends (the API's input type). */
+type SessionPut = Pick<UpdateSessionType, 'selfStudyPercent' | 'allowedGrades' | 'unpaidCancelDays' | 'refundPolicy' | 'questions'>;
 
 export default function AgreeTab({ s }: { s: SetupSession }) {
   const queryClient = useQueryClient();
@@ -53,10 +51,10 @@ export default function AgreeTab({ s }: { s: SetupSession }) {
         <div className="grid gap-5 sm:grid-cols-3">
           <div>
             <label htmlFor="ag-share" className="block text-sm font-medium text-foreground">Self study pays</label>
-            <select id="ag-share" className={cn(INPUT_CLASS, 'mt-1')} value={s.selfStudyPercent} disabled={closed || save.isPending}
-              onChange={(e) => save.save({ selfStudyPercent: Number(e.target.value) })}>
+            <CommitSelect id="ag-share" className={cn(INPUT_CLASS, 'mt-1')} value={String(s.selfStudyPercent)} disabled={closed || save.isPending}
+              onCommit={(v) => save.save({ selfStudyPercent: Number(v) })}>
               {Array.from({ length: 21 }, (_, i) => i * 5).map((p) => <option key={p} value={p}>{`${p}% of the course fee`}</option>)}
-            </select>
+            </CommitSelect>
             <p className="mt-1 text-xs text-muted-foreground">and the whole exam fee. Shown on every subject; a row may have its own amount.</p>
           </div>
           <fieldset>
@@ -76,10 +74,10 @@ export default function AgreeTab({ s }: { s: SetupSession }) {
           </fieldset>
           <div>
             <label htmlFor="ag-cancel" className="block text-sm font-medium text-foreground">Unpaid reservations are cancelled</label>
-            <select id="ag-cancel" className={cn(INPUT_CLASS, 'mt-1')} value={s.unpaidCancelDays} disabled={closed || save.isPending}
-              onChange={(e) => save.save({ unpaidCancelDays: Number(e.target.value) })}>
+            <CommitSelect id="ag-cancel" className={cn(INPUT_CLASS, 'mt-1')} value={String(s.unpaidCancelDays)} disabled={closed || save.isPending}
+              onCommit={(v) => save.save({ unpaidCancelDays: Number(v) })}>
               {Array.from({ length: 15 }, (_, d) => d).map((d) => <option key={d} value={d}>{d === 0 ? 'on the payment due date' : `${d} ${d === 1 ? 'day' : 'days'} after the payment due date`}</option>)}
-            </select>
+            </CommitSelect>
             <p className="mt-1 text-xs text-muted-foreground">or at the board&apos;s deadline, if that is earlier. Reminders go before.</p>
           </div>
         </div>
@@ -196,7 +194,7 @@ function QuestionsCard({ s, onSave, pending }: { s: SetupSession; onSave: (q: Se
                   <span>{QUESTION_KINDS[q.kind as QuestionKind] ?? q.kind}</span>{q.choices.length > 0 && <>: <bdi data-i18n-skip="true">{q.choices.join(' / ')}</bdi></>} · {where ? <><span>asked with</span> <bdi data-i18n-skip="true">{subjectTitle(where)}</bdi></> : <span>asked with every reservation</span>}
                 </p>
               </div>
-              {!closed && <Button type="button" variant="ghost" size="sm" disabled={pending || subject.isPending} onClick={() => remove(q.id, where)}>Remove</Button>}
+              {!closed && <Button type="button" variant="ghost" size="sm" aria-label={`Remove the question: ${q.prompt}`} disabled={pending || subject.isPending} onClick={() => remove(q.id, where)}>Remove</Button>}
             </li>
           ))}
         </ul>

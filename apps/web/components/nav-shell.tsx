@@ -9,7 +9,7 @@ import { api } from '~/lib/hono';
 import { apiResponse, ROLE_LABELS, isRole } from '@repo/validations';
 import { cn } from '~/lib/utils';
 import { useI18n, type TranslationKey } from '~/lib/i18n';
-import { RESERVATION_CYCLE_ONLY, cycleLandingFor, cycleStageOf, isOutsideTheCycle, CYCLE_STAGES } from '~/lib/reservation-focus';
+import { RESERVATION_CYCLE_ONLY, cycleLandingFor, cycleStageOf, isOutsideTheCycle, parkedForSetUp, CYCLE_STAGES } from '~/lib/reservation-focus';
 
 /* ─── Icons (inline SVGs to avoid deps) ─────────────────────────────────────── */
 
@@ -352,7 +352,10 @@ const CYCLE_HOME_ITEM: NavItem = { labelKey: 'nav.home', href: '/', icon: 'dashb
  * the cycle. Labels and icons are the items' own. With the switch off, the sidebar is as above.
  */
 function getCycleNavSections(role: string | null | undefined, teaches = false): NavSection[] {
-  const sections = getNavSections(role, teaches);
+  // The coordinator rework (§9.3): set-up is the session's — the parked screens leave her and the admin's sidebar either way.
+  const sections = getNavSections(role, teaches)
+    .map((s) => ({ ...s, items: s.items.filter((i) => !parkedForSetUp(role, i.href)) }))
+    .filter((s) => s.items.length > 0);
   if (!RESERVATION_CYCLE_ONLY) return sections;
   const keep = (item: NavItem) => !isOutsideTheCycle(role, item.href);
 

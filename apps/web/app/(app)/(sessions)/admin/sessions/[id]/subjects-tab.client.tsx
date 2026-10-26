@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, SUBJECT_GROUPS } from '@repo/validations';
+import { apiResponse, SUBJECT_GROUPS, type ParsePriceListType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
@@ -73,7 +73,7 @@ function AddSubject({ s, onDialog }: { s: SetupSession; onDialog: (d: 'copy' | '
   const add = useMutation({
     mutationFn: async (key: string) => {
       const [board, code] = key.split('|') as [string, string];
-      return apiResponse(api.v1.sessions[':id'].offerings.$post({ param: { id: s.id }, json: { referenceCode: code, board: board as 'cambridge' } }));
+      return apiResponse(api.v1.sessions[':id'].offerings.$post({ param: { id: s.id }, json: { referenceCode: code, board: board as ParsePriceListType['board'] } }));
     },
     onSuccess: (o) => openNew(o.id),
   });
@@ -214,7 +214,7 @@ function CopySubject({ s, onClose }: { s: SetupSession; onClose: () => void }) {
 /** D1's "not on the list": board, name, level; the code optional. Flagged for us to add to the reference. */
 function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) {
   const boards = useQuery({ queryKey: REFERENCE_BOARDS_KEY, queryFn: fetchReferenceBoards });
-  const [board, setBoard] = useState('cambridge');
+  const [board, setBoard] = useState<ParsePriceListType['board']>('cambridge');
   const [name, setName] = useState('');
   const [group, setGroup] = useState<'O.L.' | 'A.S./A.L.'>('O.L.');
   const [code, setCode] = useState('');
@@ -222,7 +222,7 @@ function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) 
   const add = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offerings.$post({
       param: { id: s.id },
-      json: { custom: { board: board as 'cambridge', name: name.trim(), level: group === 'O.L.' ? 'igcse' : 'as_al', group, ...(code.trim() ? { code: code.trim() } : {}) } },
+      json: { custom: { board, name: name.trim(), level: group === 'O.L.' ? 'igcse' : 'as_al', group, ...(code.trim() ? { code: code.trim() } : {}) } },
     })),
     onSuccess: (o) => openNew(o.id),
   });
@@ -232,7 +232,7 @@ function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) 
         <p className="text-sm text-muted-foreground">Families read its name as you type it. We are told, and add it to the list.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Board" htmlFor="nl-board">
-            <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(e.target.value)}>
+            <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(e.target.value as ParsePriceListType['board'])}>
               {(boards.data ?? []).map((b) => <option key={b.code} value={b.code} data-i18n-skip="true">{b.name}</option>)}
             </select>
           </Field>

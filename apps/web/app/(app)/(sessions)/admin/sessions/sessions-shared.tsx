@@ -7,7 +7,7 @@
  * translator (lib/i18n.tsx, lib/i18n-sessions.ts) finds the words.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { api } from '~/lib/hono';
 import { apiResponse, type SessionMoneyQueryType, formatEgp } from '@repo/validations';
 import { Badge, Notice, type Tone } from '~/components/ui/tone';
@@ -75,15 +75,35 @@ export function Field({ label, htmlFor, hint, children }: { label: string; htmlF
   );
 }
 
-/** A dialog over the page; Escape closes it. */
+/**
+ * A dialog over the page; Escape closes it. Focus moves into it when it opens, Tab stays inside it, and
+ * focus goes back to what had it when it closes (the page behind is aria-modal: a keyboard must not reach it).
+ */
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean | 'xl' }) {
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    const focusable = () => [...(box.current?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])];
+    // The first field; with none, the dialog itself (Enter then confirms nothing by accident).
+    (focusable().find((el) => el.tagName !== 'BUTTON') ?? box.current)?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const els = focusable();
+      if (!els.length) return;
+      const [a, z] = [els[0]!, els[els.length - 1]!];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    };
+    window.addEventListener('keydown', trap);
+    return () => { window.removeEventListener('keydown', trap); before?.focus?.(); };
+  }, []);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={title}>
+    <div ref={box} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 outline-none" role="dialog" aria-modal="true" aria-label={title}>
       <div className={cn('max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-card shadow-xl', wide === 'xl' ? 'max-w-5xl' : wide ? 'max-w-3xl' : 'max-w-lg')}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="font-display text-lg font-semibold text-foreground">{title}</h2>
