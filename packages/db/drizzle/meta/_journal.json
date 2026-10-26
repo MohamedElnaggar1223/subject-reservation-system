@@ -484,6 +484,13 @@
       "when": 1793024205511,
       "tag": "0068_p1b_cut_off",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793049132485,
+      "tag": "0069_p1b_cut_off_cairo_days",
+      "breakpoints": true
     }
   ]
 }
