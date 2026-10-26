@@ -167,6 +167,12 @@ function main(): number {
   if (JSON.stringify(seed.session.refundPolicy) !== JSON.stringify(DEFAULT_REFUND_POLICIES.june)) err("the pre-load's refund policy is not C7's June default");
   if (seed.session.selfStudyPercent !== 50) err(`the pre-load's self-study share is ${seed.session.selfStudyPercent}, not 50`);
   if (seed.offerings.length !== 25) err(`the pre-load has ${seed.offerings.length} offerings; §8 has 25`);
+  for (const k of ["closesAt", "paymentDueAt", "courseStartsOn"] as const) {
+    if (seed.session[k] !== null) err(`the pre-load sets ${k}; §8 pre-loads no date`);
+  }
+  for (const o of seed.offerings) {
+    if (o.courseFee !== null || o.rows.some((r) => r.courseFee !== null)) err(`pre-load #${o.order}: a course fee is set; §8 pre-loads none (Q1)`);
+  }
 
   const usedKeys = new Set<string>();
   const boardsUsed = new Set<ReferenceBoardCode>();

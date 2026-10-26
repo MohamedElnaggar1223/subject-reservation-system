@@ -282,8 +282,8 @@ export const SeedRowSchema = z.object({
   examFeeSource: ExamFeeSourceSchema.nullable(),
   /** The school's fee list the figure was read on ("Cambridge June 2026"), with the board rule or the sum applied. */
   examFeeList: nonEmpty.nullable(),
-  /** The course fee: not set in the pre-load (Q1). */
-  courseFee: z.null(),
+  /** The row's own course fee (E3), EGP; null: the offering's. Not set in the June 2027 pre-load (Q1). */
+  courseFee: z.number().int().nonnegative().nullable(),
   /** The earlier exams a retake carries from (D6), when the row asks; null when it does not. */
   allowedPriorSittings: z.array(SittingRefSchema).nullable(),
   /** A row's own teachers (IAL Mathematics units, Arabic A.L. qualifications); absent: the offering's. */
@@ -307,7 +307,8 @@ export const SeedOfferingSchema = z.object({
   teacherChoice: z.enum(['families', 'school']),
   /** The optional family note per subject (D9); no form carries one. */
   note: nonEmpty.nullable(),
-  courseFee: z.null(),
+  /** The subject's course fee (E3), EGP; null: not set (distinct from 0). Not set in the June 2027 pre-load (Q1). */
+  courseFee: z.number().int().nonnegative().nullable(),
   rows: z.array(SeedRowSchema).min(1),
   /** §8's flags for the check list; names appear only as {T-…} placeholders. */
   flags: z.array(nonEmpty),
@@ -332,10 +333,10 @@ export const SeedSessionSchema = z.object({
   refundPolicy: RefundPolicySchema,
   /** The session's self-study share of the course fee (E4), in percent. */
   selfStudyPercent: z.number().int().min(0).max(100),
-  /** Not on any form (§8): set by the coordinator. */
-  closesAt: z.null(),
-  paymentDueAt: z.null(),
-  courseStartsOn: z.null(),
+  /** C5's dates; none is on a form, so the June 2027 pre-load leaves all three to the coordinator (§8). */
+  closesAt: DateOnlySchema.nullable(),
+  paymentDueAt: DateOnlySchema.nullable(),
+  courseStartsOn: DateOnlySchema.nullable(),
 });
 export type SeedSession = z.infer<typeof SeedSessionSchema>;
 
