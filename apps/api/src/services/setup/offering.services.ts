@@ -316,7 +316,10 @@ async function writeRow(tx: Tx, c: RowContext, input: OfferingRowInputType, exis
   const label = kind === 'custom'
     ? (input.name ?? existing!.label)
     : kind === 'all_papers' ? WHOLE_ITEM_LABEL
-      : rowLabel(labelRowOf({ kind, label: '', short: ref?.short ?? null, referenceCodes: codes }), 'en');
+      : ref ? rowLabel(labelRowOf({ kind, label: '', short: ref.short, referenceCodes: codes }), 'en')
+        // A row from no reference row: her name for it with its code ("GCE A Level (9AA0)"), else the generated words.
+        : input.name ? (codes[0] && !input.name.includes(codes[0]) ? `${input.name} (${codes[0]})` : input.name)
+          : existing && !input.referenceCodes ? existing.label : rowLabel(labelRowOf({ kind, label: '', short: null, referenceCodes: codes }), 'en');
   const currentSitting = existing?.boardSeriesId
     ? sittingOfSeries(c.session.sessionType, (await tx.select({ month: boardSeries.month }).from(boardSeries).where(eq(boardSeries.id, existing.boardSeriesId)))[0]?.month ?? null)
     : null;
@@ -739,8 +742,9 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
         }));
       return {
         // As screens show it (D9): "All papers", "Paper 41/42 only"; in Arabic too.
-        id: r.id, kind: r.kind, label: rowLabel(labelRowOf({ ...r, short: ref?.short ?? null }), 'en'), labelAr: rowLabel(labelRowOf({ ...r, short: ref?.short ?? null }), 'ar'),
-        short: ref?.short ?? null, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
+        id: r.id, kind: r.kind, label: rowLabel(labelRowOf({ ...r, short: ref?.short ?? null, fromReference: !!ref }), 'en'),
+        labelAr: rowLabel(labelRowOf({ ...r, short: ref?.short ?? null, fromReference: !!ref }), 'ar'),
+        short: ref?.short ?? null, fromReference: !!ref, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
         sitting: sittingOfSeries(session.sessionType, here?.month ?? null),
         series: here ? { id: here.id, month: here.month, year: here.year, label: here.label, entryDeadline: here.entryDeadline, examsStart: here.examsStart, hasBoardDate: !!(here.entryDeadline || here.examsStart) } : null,
         closesAt: r.closesAt, payBy: r.payBy,

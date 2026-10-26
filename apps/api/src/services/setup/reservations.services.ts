@@ -47,7 +47,7 @@ export async function sessionReservations(sessionId: string) {
     session: { id: s.id, name: s.name, status: s.status },
     lines: lines.map((l) => ({
       ...l,
-      option: optionLabel(labelRowOf({ kind: l.kind, label: l.row, short: l.short, referenceCodes: l.codes }), { attempt: l.attempt, mode: l.mode }, { selfStudyShare: s.selfStudyPercent, lang: 'en' }),
+      option: optionLabel(labelRowOf({ kind: l.kind, label: l.row, short: l.short, referenceCodes: l.codes, fromReference: l.short !== null }), { attempt: l.attempt, mode: l.mode }, { selfStudyShare: s.selfStudyPercent, lang: 'en' }),
       paid: l.status === 'confirmed',
     })),
     questions: questions.map(({ id, offeringId, kind, prompt, choices }) => ({ id, offeringId, kind, prompt, choices })),

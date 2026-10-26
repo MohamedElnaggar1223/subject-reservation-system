@@ -37,7 +37,8 @@ export async function referenceBoards(executor: Executor = db) {
 export async function referenceSubjects(board?: string, executor: Executor = db) {
   const subjects = await executor.select().from(referenceSubject)
     .where(board ? eq(referenceSubject.boardCode, board) : undefined)
-    .orderBy(asc(referenceSubject.boardCode), asc(referenceSubject.group), asc(referenceSubject.sortOrder), asc(referenceSubject.name));
+    // D10: O.L. subjects, then A.S. / A.L.
+    .orderBy(asc(referenceSubject.boardCode), sql`${referenceSubject.group} = 'O.L.' desc`, asc(referenceSubject.sortOrder), asc(referenceSubject.name));
   const rows = subjects.length
     ? await executor.select().from(referenceRow).where(inArray(referenceRow.referenceSubjectId, subjects.map((s) => s.id))).orderBy(asc(referenceRow.sortOrder))
     : [];

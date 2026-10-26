@@ -335,7 +335,7 @@ export async function familyOfferings(
         }
         options.push({
           attempt, mode,
-          label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes }), { attempt, mode }, { selfStudyShare: s.selfStudyPercent, lang })),
+          label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), { attempt, mode }, { selfStudyShare: s.selfStudyPercent, lang })),
           price,
           // D6: an A.2. and a one-paper retake (where the board asks) name the sitting they carry from.
           needsCarriedFrom: r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2'),
@@ -345,7 +345,7 @@ export async function familyOfferings(
       }
       if (!options.length) continue;
       rows.push({
-        id: r.id, label: both((lang) => rowLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes }), lang)), kind: r.kind, sitting: r.sitting,
+        id: r.id, label: both((lang) => rowLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), lang)), kind: r.kind, sitting: r.sitting,
         closed: closedOffering || !!(r.closesAt && r.closesAt <= now), payBy: r.payBy, exclusiveGroup: r.exclusiveGroup,
         knownSitting: known ? { id: known.id, label: sittingLabel(known.month, known.year) } : null,
         options,

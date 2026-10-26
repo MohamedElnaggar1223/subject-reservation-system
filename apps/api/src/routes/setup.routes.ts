@@ -178,9 +178,8 @@ export const setupRoutes = new Hono<HonoEnv>()
       try {
         const r = await sessionReservations(id);
         if (c.req.valid('query').format === 'csv') {
-          return new Response(sessionReservationsCsv(r), {
-            headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="reservations-${id}.csv"` },
-          });
+          // A text body (typed as such), so the JSON answer below keeps its RPC type.
+          return c.text(sessionReservationsCsv(r), 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="reservations-${id}.csv"` });
         }
         return success(c, r);
       } catch (err) {
