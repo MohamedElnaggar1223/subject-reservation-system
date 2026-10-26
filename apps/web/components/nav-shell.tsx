@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authClient } from '~/lib/auth-client';
 import { api } from '~/lib/hono';
@@ -10,6 +10,7 @@ import { apiResponse, ROLE_LABELS, isRole } from '@repo/validations';
 import { cn } from '~/lib/utils';
 import { useI18n, type TranslationKey } from '~/lib/i18n';
 import { RESERVATION_CYCLE_ONLY, cycleLandingFor, cycleStageOf, isOutsideTheCycle, parkedForSetUp, CYCLE_STAGES } from '~/lib/reservation-focus';
+import { ViewerRoleProvider } from '~/lib/viewer-role';
 
 /* ─── Icons (inline SVGs to avoid deps) ─────────────────────────────────────── */
 
@@ -474,6 +475,17 @@ export default function NavShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const { language, toggleLanguage, t } = useI18n();
   const sections = getCycleNavSections(userRole, teaches);
+  // The coordinator rework (§9.3): a set-up screen parked for the coordinator, opened by its URL, sends her to
+  // Sessions (the sidebar hides it; this is the page's guard). The page is taken away once mounted, not in the
+  // first render, which must match the server's (the server does not always see the same path).
+  const pathname = usePathname();
+  const router = useRouter();
+  const parked = userRole === 'coordinator' && parkedForSetUp(userRole, pathname);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    setLeaving(parked);
+    if (parked) router.replace('/admin/sessions');
+  }, [parked, router]);
 
   // L-5: Unread notification badge. Refetches every 30s so the number
   // reflects mark-as-read actions and new notifications without a
@@ -640,7 +652,7 @@ export default function NavShell({
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <ViewerRoleProvider value={userRole ?? null}>{leaving ? null : children}</ViewerRoleProvider>
         </main>
       </div>
     </div>

@@ -357,7 +357,7 @@ export function StudentAcademicPanel({
           <p className="mt-1">
             {/* F6b: sections are outside the reservation cycle for now (lib/reservation-focus.ts). */}
             {isAcademic ? (
-              !leadsOutsideTheCycle('/academic/sections') && (
+              !leadsOutsideTheCycle('/academic/sections', viewerRole) && (
                 <Link href={`/academic/sections?section=${r.section.sectionId}`} className="underline hover:no-underline">
                   Move them to a section of their grade
                 </Link>
@@ -418,7 +418,7 @@ export function StudentAcademicPanel({
           {r.section ? (
             <>
               <p className="font-display text-2xl font-bold text-foreground">
-                {isAcademic && !leadsOutsideTheCycle('/academic/sections') ? (
+                {isAcademic && !leadsOutsideTheCycle('/academic/sections', viewerRole) ? (
                   <Link href={`/academic/sections?section=${r.section.sectionId}`} className="hover:underline">
                     {r.section.name}
                   </Link>

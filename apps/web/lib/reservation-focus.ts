@@ -11,7 +11,7 @@
  * - the sidebar (`components/nav-shell.tsx`): a role's items less its list below, in the cycle's
  *   order (`CYCLE_STAGES`), its landing first;
  * - the landing after sign-in and on "/" (`CYCLE_LANDING`);
- * - every link on a kept screen that opens a screen outside the cycle (`leadsOutsideTheCycle`).
+ * - every link on a kept screen that opens a screen outside the cycle for the viewer (`leadsOutsideTheCycle`).
  *
  * The cycle, as the school lives it: the admin sets it up (the session's sheet, the teachers it
  * names, the subjects' papers on the Catalogue, the fees, the boards' dates, the settings behind
@@ -165,16 +165,22 @@ export function isOutsideTheCycle(role: string | null | undefined, href: string)
 
 const ON_ANY_LIST = [...new Set(Object.values(OUTSIDE_THE_CYCLE).flat())];
 
-/**
- * Whether a link on a kept screen opens a screen outside the cycle (always false with the switch
- * off). A screen is outside the cycle or not whoever looks at it — the lists above differ only in
- * which screens each role reaches — so a link reads every role's list, and the component that
- * draws it need not know the viewer.
- */
-export function leadsOutsideTheCycle(href: string): boolean {
+/** Whether a screen is on any role's list (always false with the switch off): a part of the cycle hidden for all. */
+function onAnyList(href: string): boolean {
   if (!RESERVATION_CYCLE_ONLY) return false;
   const path = pathOf(href);
   return ON_ANY_LIST.some((screen) => under(path, screen));
+}
+
+/**
+ * Whether a link on a kept screen opens a screen hidden for the signed-in role: outside the cycle for it (with the
+ * switch on), or a set-up screen the coordinator rework parked for it. Each role's list is its own — Exam Deadlines'
+ * "Open candidates" stays for finance, whose list does not hold Candidates. Without a role (a component that cannot
+ * know the viewer) a link is hidden when any role's list holds it, as before.
+ */
+export function leadsOutsideTheCycle(href: string, role: string | null | undefined): boolean {
+  if (role && isRole(role)) return isOutsideTheCycle(role, href) || parkedForSetUp(role, href);
+  return onAnyList(href);
 }
 
 /**
@@ -183,7 +189,7 @@ export function leadsOutsideTheCycle(href: string): boolean {
  * so the block comes back with the screens when the switch is off or the timetable leaves the lists.
  */
 export function timetableHidden(): boolean {
-  return leadsOutsideTheCycle('/my-timetable');
+  return onAnyList('/my-timetable');
 }
 
 /**
@@ -193,7 +199,7 @@ export function timetableHidden(): boolean {
  * true (the lead's decision of 16 Oct 2026, 7). The API is untouched; the switch off shows them again.
  */
 export function remarksHidden(): boolean {
-  return leadsOutsideTheCycle('/remarks-desk');
+  return onAnyList('/remarks-desk');
 }
 
 /**
@@ -203,7 +209,7 @@ export function remarksHidden(): boolean {
  * outside the cycle, their screens on the lists above.
  */
 export function entryDatesOnly(): boolean {
-  return leadsOutsideTheCycle('/exams/results');
+  return onAnyList('/exams/results');
 }
 
 /** Where a role lands after sign-in while the switch is on. */

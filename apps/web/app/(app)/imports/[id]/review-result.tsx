@@ -11,6 +11,7 @@ import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import type { ImportView } from '../import-shared';
 import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
+import { useViewerRole } from '~/lib/viewer-role';
 
 type Result = {
   families?: { committed: number; failed: number };
@@ -28,6 +29,7 @@ const CREATED: [string, string][] = [
 
 export function ResultTab({ v, onOpenRows }: { v: ImportView; onOpenRows: (show: string) => void }) {
   const r = (v.batch.result ?? {}) as Result;
+  const role = useViewerRole();
   const created = r.created ?? {};
   const made = CREATED.filter(([k]) => (created[k] ?? 0) > 0);
   return (
@@ -68,7 +70,7 @@ export function ResultTab({ v, onOpenRows }: { v: ImportView; onOpenRows: (show:
       {/* F6b: Sections and Course enrolment are outside the reservation cycle for now: named, not linked. */}
       <p className="text-sm text-muted-foreground">
         <span>Every record made points back to its line of the file. See them on</span>{' '}
-        <a className="underline" href="/students">Students</a>, {leadsOutsideTheCycle('/academic/sections') ? <span>Sections</span> : <a className="underline" href="/academic/sections">Sections</a>} <span>and</span> {leadsOutsideTheCycle('/academic/enrolment') ? <span>Course enrolment</span> : <a className="underline" href="/academic/enrolment">Course enrolment</a>}.
+        <a className="underline" href="/students">Students</a>, {leadsOutsideTheCycle('/academic/sections', role) ? <span>Sections</span> : <a className="underline" href="/academic/sections">Sections</a>} <span>and</span> {leadsOutsideTheCycle('/academic/enrolment', role) ? <span>Course enrolment</span> : <a className="underline" href="/academic/enrolment">Course enrolment</a>}.
         {' '}<span>Accounts made here have no password yet: each family sets one with “Forgot password” on the sign-in page, using the email on the account.</span>
       </p>
       <Button variant="ghost" onClick={() => onOpenRows('committed')}>Show the committed rows</Button>

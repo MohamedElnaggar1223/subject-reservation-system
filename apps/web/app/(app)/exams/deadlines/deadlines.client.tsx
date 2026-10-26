@@ -35,6 +35,7 @@ import { DateText, MONTHS } from '../../academic/calendar/academic-shared';
 import { EXAMS_KEY, fetchDeadlines, BoardText, PrintButton, type DeadlinesData } from '../exam-f4-shared';
 import { SeriesWords } from '../candidates/series-words';
 import { leadsOutsideTheCycle, entryDatesOnly } from '~/lib/reservation-focus';
+import { useViewerRole } from '~/lib/viewer-role';
 
 type Item = DeadlinesData['items'][number];
 type Field = Item['field'];
@@ -270,6 +271,7 @@ function TodayMarker({ today }: { today: string }) {
 
 function DeadlineRow({ item }: { item: Item }) {
   const fix = FIX[item.field];
+  const role = useViewerRole();
   const isToday = item.daysLeft === 0;
   return (
     <tr id={itemKey(item)} className={cn('align-top', item.passed && 'opacity-60', !item.passed && isToday && 'bg-primary/5')}>
@@ -304,7 +306,7 @@ function DeadlineRow({ item }: { item: Item }) {
         )}
         {/* F6b: a date whose work is outside the reservation cycle (forecasts, candidates, the timetable,
             results, certificates) keeps its row, not its link (lib/reservation-focus.ts). */}
-        {fix && !leadsOutsideTheCycle(fix.path) && (item.outstanding.length > 0 || !item.passed) && (
+        {fix && !leadsOutsideTheCycle(fix.path, role) && (item.outstanding.length > 0 || !item.passed) && (
           <Link
             href={`${fix.path}?series=${encodeURIComponent(item.boardSeriesId)}` as Route}
             className="mt-1 block w-fit text-xs font-semibold text-primary underline-offset-4 hover:underline print:hidden"
