@@ -302,6 +302,18 @@ describe('08p: pricing policies on pricing v2', () => {
     const [legacy] = await reserve(h, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
     await sql(`update registration set price_provisional = false, pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
       '[{"id": "a-confirmed-grid-row", "keyKind": "subject", "keyId": "x", "amount": 9200, "provisional": false}]'::jsonb) where id = $1`, [legacy!.id]);
+    // And a legacy line priced from a provisional grid row that the old Confirm later confirmed at the amount it recorded
+    // (P1b fix 1): the Confirm cleared its mark weeks ago, its basis still saying provisional; 0066 then stamped the
+    // session prices-final. Its price stopped being provisional at the confirmation, not at the stamp.
+    const k = await onboard(officer, `p08-prov-v1c-${RUN}`, 11);
+    const [cleared] = await reserve(k, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
+    const feeRowId = `p08-confirmed-grid-row-${RUN}`;
+    await sql(`insert into board_fee (id, board_series_id, key_kind, subject_id, amount, provisional, confirmed_at)
+      select $1, i.board_series_id, 'subject', o.subject_id, 9200, false, now() - interval '30 days'
+      from session_offer_item i join session_offer o on o.id = i.offer_id where i.id = $2`, [feeRowId, taughtAll]);
+    await sql(`update registration set price_provisional = false, created_at = now() - interval '40 days', pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
+      jsonb_build_array(jsonb_build_object('id', $1::text, 'keyKind', 'subject', 'keyId', 'x', 'amount', 9200, 'provisional', true))) where id = $2`, [feeRowId, cleared!.id]);
+    expect(await priceOf(cleared!.id)).toMatchObject({ provisional: false, basis: { v: 1, feeRows: [{ id: feeRowId, provisional: true }] } });
     const waiting = Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and status = 'pending_payment' and price_provisional`, [session])).n);
     const dueBefore = new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line!.id])).d).getTime();
     const switchedAt = Date.now();
@@ -328,6 +340,9 @@ describe('08p: pricing policies on pricing v2', () => {
     // grace: the moment prices became final says nothing about a price that was never provisional (0066 stamps it).
     const newPaymentDue = new Date((await one<{ d: string }>(`select payment_due_at as d from registration_session where id = $1`, [session])).d).getTime();
     expect(await dueOf(legacy!.id)).toBe(newPaymentDue);
+    // The line the old Confirm cleared keeps the Confirm's date (its grace long over): due at the payment date, not at
+    // the stamp plus the grace.
+    expect(await dueOf(cleared!.id)).toBe(newPaymentDue);
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [pay!.id!])).amount)).toBe(23200);
   });

@@ -193,24 +193,30 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
   if (!line) throw new Error('Registration not found');
   // When the price stopped being provisional: a v2 line (the coordinator rework) when its session's
   // prices were switched final (§6: switching them final re-dates every waiting line from prices_final_at);
-  // a v1 line when the last fee row its basis read was confirmed — or, for a v1 line priced from a fee its
-  // basis recorded as provisional, on a row now priced by its own exam fee (a converted line the switch made
-  // payable), the later of that and prices_final_at, so every later re-date keeps the grace the switch gave
-  // it. A line that was never provisional keeps its own rule (0066 stamped legacy sessions prices-final at
-  // the migration: that moment says nothing about its price).
+  // a v1 line when the last fee row its basis read was confirmed. A v1 line priced from a fee its basis
+  // recorded as provisional, on a row now priced by its own exam fee, was made payable by one of two acts,
+  // told apart by the old Confirm's own condition (board-fee.services settleLinesOfConfirmed): every row its
+  // basis recorded confirmed at the amount it recorded — the Confirm cleared it, at its confirmation time;
+  // otherwise the prices-final switch did (a converted line, M3b), at prices_final_at, so every later re-date
+  // keeps the grace the switch gave it. A line that was never provisional keeps its own rule, and so does one
+  // the Confirm cleared (0066 stamped legacy sessions prices-final at the migration: that moment says nothing
+  // about their price — P1b fix 1).
   let feeConfirmedAt: Date | null = null;
   if ((line.pricingBasis as { v?: number } | null)?.v === 2) {
     feeConfirmedAt = !line.priceProvisional ? line.pricesFinalAt : null;
   } else {
-    const basisRows = (line.pricingBasis as { feeRows?: { id: string; provisional?: boolean }[] } | null)?.feeRows ?? [];
+    const basisRows = (line.pricingBasis as { feeRows?: { id: string; amount?: number; provisional?: boolean }[] } | null)?.feeRows ?? [];
     const feeIds = basisRows.map((f) => f.id);
     const rows = feeIds.length
-      ? await executor.select({ confirmedAt: boardFee.confirmedAt }).from(boardFee).where(inArray(boardFee.id, feeIds))
+      ? await executor.select({ id: boardFee.id, amount: boardFee.amount, provisional: boardFee.provisional, confirmedAt: boardFee.confirmedAt })
+        .from(boardFee).where(inArray(boardFee.id, feeIds))
       : [];
     const confirmed = rows.map((r) => r.confirmedAt).filter((d): d is Date => !!d);
     feeConfirmedAt = !line.priceProvisional && confirmed.length ? new Date(Math.max(...confirmed.map((d) => d.getTime()))) : null;
     const pricedProvisional = basisRows.some((f) => f.provisional);
-    if (!line.priceProvisional && pricedProvisional && line.rowExamFee !== null && line.pricesFinalAt && (!feeConfirmedAt || line.pricesFinalAt > feeConfirmedAt)) {
+    const confirmedAsRecorded = basisRows.length > 0
+      && basisRows.every((f) => rows.some((r) => r.id === f.id && !r.provisional && r.amount === f.amount));
+    if (!line.priceProvisional && pricedProvisional && line.rowExamFee !== null && line.pricesFinalAt && !confirmedAsRecorded) {
       feeConfirmedAt = line.pricesFinalAt;
     }
   }
