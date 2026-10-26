@@ -80,7 +80,6 @@
           "4MA1/1H"
         ],
         "priceCodes": [
-          "4MA1H",
           "4MA1/1H",
           "4MA1 1H"
         ],
@@ -97,7 +96,6 @@
           "4MA1/2H"
         ],
         "priceCodes": [
-          "4MA2H",
           "4MA1/2H",
           "4MA1 2H"
         ],
@@ -160,7 +158,7 @@
         "short": "International A Level",
         "label": {
           "en": "International A Level (YAA01)",
-          "ar": "International A Level (YAA01)"
+          "ar": "المستوى A الدولي (YAA01)"
         },
         "sumOfUnits": [
           "waa01",
@@ -179,7 +177,7 @@
         "short": "GCE A Level",
         "label": {
           "en": "GCE A Level (9AA0)",
-          "ar": "GCE A Level (9AA0)"
+          "ar": "المستوى A البريطاني (9AA0)"
         },
         "winterSitting": null,
         "note": "Pearson Edexcel GCE A Level Arabic (9AA0, papers 9AA0/01–03 on Pearson's GCE June 2027 timetable); sat in June only. The form prints '9AA01', the links sheet '9AA1': board aliases."

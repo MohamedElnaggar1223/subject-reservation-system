@@ -8,6 +8,20 @@
     "note": "Prices per syllabus and option code: a one-paper retake costs the syllabus's fee. An AS result may be carried forward within 13 months (Cambridge Handbook 2026, carry-forward rules). June has no separate retake deadline (Cambridge's retake entries page); November's retakes of the June syllabus have one.",
     "sittings": [
       {
+        "month": 6,
+        "year": 2025,
+        "levels": [
+          "igcse",
+          "as_al"
+        ],
+        "entryDeadline": "2025-02-21",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://www.cambridgeinternational.org/Images/723185-cambridge-handbook-2025.pdf",
+        "confirmed": true,
+        "note": "Handbook 2025, section 2.3: final entries 21 February 2025; June has no separate retake deadline. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
         "month": 11,
         "year": 2025,
         "levels": [
@@ -122,6 +136,59 @@
     "carryForwardMonths": null,
     "note": "Prices per unit or paper and per sitting. A one-paper retake (International GCSE Mathematics 1H, 2H) is priced by its own row and does not ask an earlier exam; IAL unit results stay banked, so units carry nothing forward. International A Levels sit October, January and June; International GCSEs November and June; the GCE A Level June. Deadlines are those for international centres.",
     "sittings": [
+      {
+        "month": 1,
+        "year": 2025,
+        "levels": [
+          "as_al"
+        ],
+        "entryDeadline": "2024-10-18",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://qualifications.pearson.com/content/dam/pdf/Support/Information-manual/1-key-dates-2024-25.pdf",
+        "confirmed": true,
+        "note": "IAL January 2025. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
+        "month": 6,
+        "year": 2025,
+        "levels": [
+          "igcse",
+          "as_al"
+        ],
+        "entryDeadline": "2025-03-21",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://qualifications.pearson.com/content/dam/pdf/Support/Information-manual/1-key-dates-2024-25.pdf",
+        "confirmed": true,
+        "note": "International centres: International GCSE, IAL and GCE AS/A level alike. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
+        "month": 10,
+        "year": 2025,
+        "levels": [
+          "as_al"
+        ],
+        "entryDeadline": "2025-08-29",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://qualifications.pearson.com/content/dam/pdf/Support/Information-manual/1-key-dates-2025-2026.pdf",
+        "confirmed": true,
+        "note": "IAL October 2025. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
+        "month": 11,
+        "year": 2025,
+        "levels": [
+          "igcse"
+        ],
+        "entryDeadline": "2025-09-12",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://qualifications.pearson.com/content/dam/pdf/Support/Information-manual/1-key-dates-2025-2026.pdf",
+        "confirmed": true,
+        "note": "International GCSE November 2025. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
       {
         "month": 1,
         "year": 2026,
@@ -296,6 +363,20 @@
         "note": "The June 2026 fee list prints Mathematics Paper 2H as '4WM2H'."
       },
       {
+        "printed": "4MA1H",
+        "subject": "4MA1",
+        "row": "paper-1h",
+        "toCheck": true,
+        "note": "The November 2026 list prints 4MA1H and 4MA2H at 9,840 each. Read per paper (as June's 4WM1H and 4WM2H at 4,600 each), that is more than double June's fee; read as the whole qualification, it equals Human Biology 4HB1's 9,840 on the same list and June's 9,200 total plus about 7%, the rise the IAL units show from June to November 2026. The second reading is the likelier: confirm with the school before using either figure."
+      },
+      {
+        "printed": "4MA2H",
+        "subject": "4MA1",
+        "row": "paper-2h",
+        "toCheck": true,
+        "note": "The November 2026 list prints 4MA1H and 4MA2H at 9,840 each. Read per paper (as June's 4WM1H and 4WM2H at 4,600 each), that is more than double June's fee; read as the whole qualification, it equals Human Biology 4HB1's 9,840 on the same list and June's 9,200 total plus about 7%, the rise the IAL units show from June to November 2026. The second reading is the likelier: confirm with the school before using either figure."
+      },
+      {
         "printed": "9AA01",
         "subject": "YAA01",
         "row": "9aa0",
@@ -318,18 +399,71 @@
     "note": "No one-paper rows and no fee list from the school for OxfordAQA; the one-paper rule is a default. International GCSEs sit November and May/June; International AS/A levels January and May/June.",
     "sittings": [
       {
+        "month": 1,
+        "year": 2025,
+        "levels": [
+          "as_al"
+        ],
+        "entryDeadline": "2024-11-07",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://www.oxfordaqa.com/wp-content/uploads/2024/07/OxfordAQA-Key-Dates-Calendar-2024-25-v1.3.pdf",
+        "confirmed": true,
+        "note": "International AS/A level January 2025: closing date 7 November 2024. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
+        "month": 6,
+        "year": 2025,
+        "levels": [
+          "igcse",
+          "as_al"
+        ],
+        "entryDeadline": "2025-02-21",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://www.oxfordaqa.com/wp-content/uploads/2024/07/OxfordAQA-Key-Dates-Calendar-2024-25-v1.3.pdf",
+        "confirmed": true,
+        "note": "May/June 2025, every qualification: closing date 21 February 2025. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
+        "month": 11,
+        "year": 2025,
+        "levels": [
+          "igcse"
+        ],
+        "entryDeadline": "2025-09-18",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://www.oxfordaqa.com/wp-content/uploads/2025/07/oxfordaqa-exams-administration-2025-26-key-dates-calendar.pdf",
+        "confirmed": true,
+        "note": "International GCSE November 2025: closing date 18 September 2025. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
+        "month": 1,
+        "year": 2026,
+        "levels": [
+          "as_al"
+        ],
+        "entryDeadline": "2025-11-07",
+        "retakeDeadline": null,
+        "examsStart": null,
+        "source": "https://www.oxfordaqa.com/wp-content/uploads/2025/07/oxfordaqa-exams-administration-2025-26-key-dates-calendar.pdf",
+        "confirmed": true,
+        "note": "International AS/A level January 2026: closing date 7 November 2025. Exams start not looked up (a past sitting, listed so an older exam a retake carries from resolves, D6)."
+      },
+      {
         "month": 6,
         "year": 2026,
         "levels": [
           "igcse",
           "as_al"
         ],
-        "entryDeadline": null,
+        "entryDeadline": "2026-02-21",
         "retakeDeadline": null,
         "examsStart": "2026-04-27",
-        "source": "https://www.oxfordaqa.com/wp-content/uploads/2026/06/oxfordaqa-exams-administration-6Y26-6X26-exam-timetable.pdf",
-        "confirmed": false,
-        "note": "May/June 2026: the timetable starts 27 April 2026; the 2025/26 key dates calendar (its closing date) was not read. A past sitting."
+        "source": "https://www.oxfordaqa.com/wp-content/uploads/2025/07/oxfordaqa-exams-administration-2025-26-key-dates-calendar.pdf ; https://www.oxfordaqa.com/wp-content/uploads/2026/06/oxfordaqa-exams-administration-6Y26-6X26-exam-timetable.pdf",
+        "confirmed": true,
+        "note": "May/June 2026, every qualification: closing date 21 February 2026; the timetable starts 27 April 2026."
       },
       {
         "month": 11,
