@@ -106,7 +106,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
   const name = nameOf(picked);
   const [text, setText] = useState('');
   const [doubt, setDoubt] = useState<Record<number, 'use' | ''>>({});
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ rows: number; name: string } | null>(null);
   const parse = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id']['price-lists'].parse.$post({ param: { id: s.id }, json: { board: board as 'cambridge', text } })),
     onSuccess: () => { setDoubt({}); setDone(null); },
@@ -114,10 +114,10 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
   const byRow = useMemo(() => new Map(data.rows.map((r) => [r.rowId, r])), [data.rows]);
   const parsed = parse.data;
   const apply = useImpactSave(
-    (rows: { lineNo: number; code: string; name: string; amount: number; confirmed?: boolean }[], expected) =>
-      apiResponse(api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: { board: board as 'cambridge', name, rows, ...(expected ? { expected } : {}) } })),
-    async (res) => {
-      setDone(`${res.rowsPriced}`);
+    (v: { name: string; rows: { lineNo: number; code: string; name: string; amount: number; confirmed?: boolean }[] }, expected) =>
+      apiResponse(api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: { board: board as 'cambridge', name: v.name, rows: v.rows, ...(expected ? { expected } : {}) } })),
+    async (res, v) => {
+      setDone({ rows: res.rowsPriced, name: v.name });
       setText('');
       parse.reset();
       await queryClient.invalidateQueries({ queryKey: ['sessions'] });
@@ -134,7 +134,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
         <div>
           <label htmlFor="pl-board" className="block text-sm font-medium text-foreground">Board</label>
           <select id="pl-board" className={cn(INPUT_CLASS, 'mt-1 w-56')} value={board} onChange={(e) => { setBoard(e.target.value); setForKey(''); parse.reset(); }}>
-            {(boards.data ?? []).map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
+            {(boards.data ?? []).map((b) => <option key={b.code} value={b.code} data-i18n-skip="true">{b.name}</option>)}
           </select>
         </div>
         <div>
@@ -153,7 +153,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
         {parsed && <Button variant="outline" onClick={() => parse.reset()}>Discard</Button>}
       </div>
       <ErrorLine message={parse.error ? refusalText(parse.error) : apply.error} />
-      {done && <Notice tone="success" className="mt-3"><span>Used:</span> <span>{done}</span> <span>rows priced from</span> <bdi data-i18n-skip="true">{name}</bdi>.</Notice>}
+      {done && <Notice tone="success" className="mt-3"><span>Used:</span> <span>{done.rows}</span> <span>rows priced from</span> <bdi data-i18n-skip="true">{done.name}</bdi>.</Notice>}
       {parsed && (
         <div className="mt-4 space-y-4">
           <div>
@@ -167,7 +167,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
                       const targets = r.matches.filter((m) => !m.toCheck && m.rowIds.length).flatMap((m) => m.rowIds.map((id) => byRow.get(id))).filter((x): x is PriceRow => !!x);
                       return (
                         <tr key={`${r.lineNo}-${r.code}`} className="border-b border-border last:border-0">
-                          <td className={cn(td, 'font-mono text-xs')} dir="ltr">{r.code}</td>
+                          <td className={cn(td, 'font-mono text-xs')} dir="ltr" data-i18n-skip="true">{r.code}</td>
                           <td className={td}><bdi data-i18n-skip="true">{r.name}</bdi></td>
                           <td className={td}><Money amount={r.amount} /></td>
                           <td className={td}>{targets.map((t) => <div key={t.rowId}><bdi data-i18n-skip="true">{titleOf(s, t)}</bdi> · <span data-i18n-skip="true">{rowName(t)}</span></div>)}</td>
@@ -187,7 +187,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
                 const m = r.matches.find((x) => x.toCheck)!;
                 return (
                   <Notice key={`${r.lineNo}-${r.code}`} tone="warning">
-                    <p><span className="font-mono" dir="ltr">{r.code}</span> <Money amount={r.amount} /> — <bdi data-i18n-skip="true">{m.label}</bdi></p>
+                    <p><span className="font-mono" dir="ltr" data-i18n-skip="true">{r.code}</span> <Money amount={r.amount} /> — <bdi data-i18n-skip="true">{m.label}</bdi></p>
                     {m.note && <p className="mt-1" lang="en" data-i18n-skip="true">{m.note}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <label htmlFor={`tc-${r.lineNo}`} className="font-medium">This line</label>
@@ -206,7 +206,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
               <h3 className="text-sm font-semibold text-foreground"><span>Not used</span> <span className="text-muted-foreground">(<span>{notUsed.length + parsed.skipped.length}</span>)</span></h3>
               <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
                 {notUsed.map((r) => (
-                  <li key={`${r.lineNo}-${r.code}`}><span className="font-mono" dir="ltr">{r.code}</span> <bdi data-i18n-skip="true">{r.name}</bdi> — <span>{r.matches.length ? 'its subject or row is not offered in this session' : 'not recognised: no subject on our lists has this code'}</span></li>
+                  <li key={`${r.lineNo}-${r.code}`}><span className="font-mono" dir="ltr" data-i18n-skip="true">{r.code}</span> <bdi data-i18n-skip="true">{r.name}</bdi> — <span>{r.matches.length ? 'its subject or row is not offered in this session' : 'not recognised: no subject on our lists has this code'}</span></li>
                 ))}
                 {parsed.skipped.map((x) => <li key={`skip-${x.lineNo}`}><bdi data-i18n-skip="true">{x.text}</bdi> — <span>no amount read on this line</span></li>)}
               </ul>
@@ -214,7 +214,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
           )}
           <div className="flex flex-wrap items-center gap-3">
             <Button disabled={!(used.length || Object.values(doubt).includes('use')) || apply.isPending}
-              onClick={() => apply.save(parsed.rows.map((r) => ({ lineNo: r.lineNo, code: r.code, name: r.name, amount: r.amount, ...(doubt[r.lineNo] === 'use' ? { confirmed: true } : {}) })))}>
+              onClick={() => apply.save({ name, rows: parsed.rows.map((r) => ({ lineNo: r.lineNo, code: r.code, name: r.name, amount: r.amount, ...(doubt[r.lineNo] === 'use' ? { confirmed: true } : {}) })) })}>
               {apply.isPending ? 'Using…' : 'Use these prices'}
             </Button>
             <span className="text-xs text-muted-foreground">One-paper rows that follow their subject, and sums of units, follow by themselves.</span>

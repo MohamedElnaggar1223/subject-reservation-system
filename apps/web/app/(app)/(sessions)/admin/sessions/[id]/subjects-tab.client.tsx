@@ -21,6 +21,7 @@ import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
 import { cn } from '~/lib/utils';
+import { useI18n } from '~/lib/i18n';
 import { Money, Modal, Field, INPUT_CLASS, ErrorLine, fetchSessions, SESSIONS_KEY } from '../sessions-shared';
 import {
   fetchReferenceSubjects, fetchReferenceBoards, fetchSetupSession, REFERENCE_SUBJECTS_KEY, REFERENCE_BOARDS_KEY, setupKey,
@@ -99,7 +100,7 @@ function AddSubject({ s, onDialog }: { s: SetupSession; onDialog: (d: 'copy' | '
           <option value="">Pick from the board&apos;s list…</option>
           {groups.map((g) => (
             <optgroup key={g.label} label={g.label}>
-              {g.items.map((i) => <option key={i.key} value={i.key}>{i.text}</option>)}
+              {g.items.map((i) => <option key={i.key} value={i.key} data-i18n-skip="true">{i.text}</option>)}
             </optgroup>
           ))}
         </select>
@@ -116,6 +117,7 @@ function AddSubject({ s, onDialog }: { s: SetupSession; onDialog: (d: 'copy' | '
 /** A subject's tile: board, teachers, what it offers, its fees, its switch. */
 function Tile({ s, o }: { s: SetupSession; o: Offering }) {
   const queryClient = useQueryClient();
+  const { language } = useI18n();
   const toggle = useImpactSave(
     (accepting: boolean, expected) => apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId: o.id }, json: { accepting, ...(expected ? { expected } : {}) } })),
     () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
@@ -135,7 +137,7 @@ function Tile({ s, o }: { s: SetupSession; o: Offering }) {
         </span>
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr">{code}</span></>}{o.notOnTheList && <> · <span>not on the list (flagged to us)</span></>}
+        <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr" data-i18n-skip="true">{code}</span></>}{o.notOnTheList && <> · <span>not on the list (flagged to us)</span></>}
       </p>
       <p className="mt-2 text-sm text-foreground">
         {o.teacherTbc
@@ -147,7 +149,7 @@ function Tile({ s, o }: { s: SetupSession; o: Offering }) {
       <ul className="mt-2 space-y-1 text-xs">
         {ticked.length ? ticked.map((r) => (
           <li key={r.id}>
-            <span className="font-medium text-foreground" data-i18n-skip="true">{r.label}</span>{' '}
+            <span className="font-medium text-foreground" data-i18n-skip="true">{language === 'ar' ? r.labelAr : r.label}</span>{' '}
             <span className="text-muted-foreground">{CELLS.filter((c) => r.cells[c]).map((c, i) => <span key={c}>{i > 0 && ' · '}<span>{CELL_SHORT[c]}</span></span>)}</span>
             {r.teachers.length > 0 && <span className="text-muted-foreground"> — <bdi data-i18n-skip="true">{r.teachers.map((t) => t.name).join(' / ')}</bdi></span>}
           </li>
@@ -190,13 +192,13 @@ function CopySubject({ s, onClose }: { s: SetupSession; onClose: () => void }) {
         <Field label="From" htmlFor="cp-session">
           <select id="cp-session" className={INPUT_CLASS} value={source} onChange={(e) => { setFrom(e.target.value); setPick(''); }}>
             {others.length === 0 && <option value="">No other session yet</option>}
-            {others.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            {others.map((x) => <option key={x.id} value={x.id} data-i18n-skip="true">{x.name}</option>)}
           </select>
         </Field>
         <Field label="Subject" htmlFor="cp-subject">
           <select id="cp-subject" className={INPUT_CLASS} value={pick} onChange={(e) => setPick(e.target.value)} disabled={!candidates.length}>
             <option value="">{candidates.length ? 'Pick a subject…' : 'Every subject there is already here'}</option>
-            {candidates.map((o) => <option key={o.id} value={o.id}>{subjectTitle(o)}</option>)}
+            {candidates.map((o) => <option key={o.id} value={o.id} data-i18n-skip="true">{subjectTitle(o)}</option>)}
           </select>
         </Field>
         <ErrorLine message={copy.error ? refusalText(copy.error) : null} />
@@ -231,7 +233,7 @@ function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Board" htmlFor="nl-board">
             <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(e.target.value)}>
-              {(boards.data ?? []).map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
+              {(boards.data ?? []).map((b) => <option key={b.code} value={b.code} data-i18n-skip="true">{b.name}</option>)}
             </select>
           </Field>
           <Field label="Group" htmlFor="nl-group">

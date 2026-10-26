@@ -46,7 +46,7 @@ type RowData = OfferingData['rows'][number];
 type Cells = Record<CellKey, boolean>;
 type TeacherPick = { teacherId?: string; newName?: string; name: string; online: boolean; external: boolean; confirmNew?: boolean };
 type DraftRow = {
-  key: string; id?: string; kind: string; label: string; referenceKey: string | null; referenceCodes: string[]; name?: string;
+  key: string; id?: string; kind: string; label: string; labelAr: string; referenceKey: string | null; referenceCodes: string[]; name?: string;
   sitting: 'june' | 'november' | 'january'; closesAt: string; payBy: string;
   examFee: string; courseFee: string; selfStudyOwn: boolean; selfStudyFee: string;
   cells: Cells; teachers: TeacherPick[] | null; needsCarriedFrom: boolean; fromReference: boolean;
@@ -88,7 +88,7 @@ function draftOf(o: OfferingData): Draft {
 
 function rowDraft(r: RowData): DraftRow {
   return {
-    key: r.id, id: r.id, kind: r.kind, label: rowName(r), referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
+    key: r.id, id: r.id, kind: r.kind, label: rowName(r), labelAr: r.labelAr, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
     ...(r.kind === 'custom' ? { name: r.label } : {}),
     sitting: (r.sitting ?? 'june') as DraftRow['sitting'], closesAt: pickerValue(r.closesAt), payBy: pickerValue(r.payBy),
     examFee: money(r.examFee), courseFee: money(r.courseFee), selfStudyOwn: r.selfStudyFee !== null, selfStudyFee: money(r.selfStudyFee),
@@ -182,7 +182,7 @@ function Editor({ o, s, canEdit }: { o: OfferingData; s: SetupSession; canEdit: 
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-bold text-foreground"><bdi data-i18n-skip="true">{subjectTitle(o)}</bdi></h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr">{code}</span></>} · <span>{o.group}</span> · <bdi>{s.name}</bdi>
+            <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr" data-i18n-skip="true">{code}</span></>} · <span data-i18n-skip="true">{o.group}</span> · <bdi>{s.name}</bdi>
             {o.notOnTheList && <> · <span>not on the list (flagged to us)</span></>}
           </p>
         </div>
@@ -198,7 +198,7 @@ function Editor({ o, s, canEdit }: { o: OfferingData; s: SetupSession; canEdit: 
       </div>
       {o.checkNotes.length > 0 && (
         <Notice tone="warning" className="mt-4" title="To look at (from the check list)">
-          {o.checkNotes.map((n, i) => <p key={i} lang="en" data-i18n-skip="true">{n}</p>)}
+          {o.checkNotes.map((n, i) => <p key={i} lang="en" dir="ltr" data-i18n-skip="true">{n}</p>)}
         </Notice>
       )}
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -262,7 +262,7 @@ function Grid({ o, s, d, setD, setRow, more, setMore, canEdit }: GridProps) {
     if (!custom || custom.name.trim().length < 1) return;
     const key = `new-${Date.now()}`;
     setD({ ...d, rows: [...d.rows, {
-      key, kind: 'custom', label: custom.name.trim(), name: custom.name.trim(), referenceKey: null, referenceCodes: custom.code.trim() ? [custom.code.trim()] : [],
+      key, kind: 'custom', label: custom.name.trim(), labelAr: custom.name.trim(), name: custom.name.trim(), referenceKey: null, referenceCodes: custom.code.trim() ? [custom.code.trim()] : [],
       sitting: s.sessionType === 'june' ? 'june' : 'november', closesAt: '', payBy: '', examFee: custom.fee, courseFee: '', selfStudyOwn: false, selfStudyFee: '',
       cells: { ...NO_CELLS, retakeSelfStudy: true }, teachers: null, needsCarriedFrom: false, fromReference: false, examFeeSource: null, lines: 0,
     }] });
@@ -353,6 +353,7 @@ function RowLines({ r, o, s, cols, on, open, canEdit, setRow, setMore, feeNote }
   r: DraftRow; o: OfferingData; s: SetupSession; cols: CellKey[]; on: boolean; open: boolean; canEdit: boolean;
   setRow: (key: string, patch: Partial<DraftRow>) => void; setMore: (k: string | null) => void; feeNote: string;
 }) {
+  const { language } = useI18n();
   const hint = r.kind === 'paper' ? (r.needsCarriedFrom ? 'a retake of one paper; the others carried from an earlier exam' : 'a retake of one paper')
     : r.kind === 'a2' ? 'carries the A.S. from an earlier exam' : r.kind === 'custom' ? 'not on the list' : '';
   return (
@@ -363,7 +364,7 @@ function RowLines({ r, o, s, cols, on, open, canEdit, setRow, setMore, feeNote }
             onChange={() => setRow(r.key, { cells: on ? { ...NO_CELLS } : usualCells(r.kind) })} />
         </td>
         <td className="px-2 py-2 align-top">
-          <span className="font-medium text-foreground" data-i18n-skip="true">{r.label}</span>
+          <span className="font-medium text-foreground" data-i18n-skip="true">{language === 'ar' ? r.labelAr : r.label}</span>
           {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
           {r.teachers && <span className="block text-xs"><bdi data-i18n-skip="true">{r.teachers.map((t) => t.name + (t.online ? ' (online)' : '')).join(' / ')}</bdi></span>}
           {s.sessionType === 'winter' && <span className="mt-1 block"><Badge tone="info">{r.sitting === 'january' ? 'exam in January' : 'exam in November'}</Badge></span>}
@@ -451,7 +452,7 @@ function MoreOptions({ r, s, o, canEdit, setRow }: { r: DraftRow; s: SetupSessio
                   if (t) setRow(r.key, { teachers: [...(r.teachers ?? []), { teacherId: t.id, name: t.name, online: false, external: false }] });
                 }}>
                 <option value="">Add…</option>
-                {avail.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {avail.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
               </select>
             </>
           )}
@@ -529,7 +530,7 @@ function Teachers({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void; ca
             }}>
             <option value="">Add a teacher…</option>
             <optgroup label="The school's teachers">
-              {avail.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {avail.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}</option>)}
             </optgroup>
             <option value="__new">A new teacher…</option>
           </select>
@@ -625,7 +626,8 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
               </label>
               {old && (
                 <p role="status" className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  <span>{examMonth(e.month, e.year)}</span> <span>is</span> <span>{age}</span> <span>months before this exam: older than</span> <bdi data-i18n-skip="true">{o.board.name}</bdi> <span>carries a result forward</span> (<span>{carry}</span> <span>months</span>). <span>It stays, since your list wins; the board may refuse the entry.</span>
+                  <span>{`${examMonth(e.month, e.year)} is ${age} months before this exam: older than ${o.board.name} carries a result forward (${carry} months).`}</span>{' '}
+                  <span>It stays, since your list wins; the board may refuse the entry.</span>
                 </p>
               )}
             </li>

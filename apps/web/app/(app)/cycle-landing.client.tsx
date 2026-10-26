@@ -78,7 +78,7 @@ function SessionCard({ row, viewerRole }: { row: SessionRow; viewerRole: string 
             <span><span>First lesson</span> <Day iso={`${row.courseStartsOn}T12:00:00.000Z`} /></span>
           </p>
         </div>
-        <Button asChild><Link href={href as never}><span><span>Open</span> <bdi>{row.name}</bdi></span></Link></Button>
+        <Button asChild><Link href={href as never}>{`Open ${row.name}`}</Link></Button>
       </div>
       {(row.status === 'active' || row.summary.lines > 0) && (
         <p className="mt-3 text-sm text-foreground">

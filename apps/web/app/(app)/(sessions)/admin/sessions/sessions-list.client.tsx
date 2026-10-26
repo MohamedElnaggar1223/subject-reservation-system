@@ -71,7 +71,7 @@ function SessionCard({ s, viewerRole, sessions }: { s: SessionRow; viewerRole: s
           </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link href={href as never}>Open</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link href={href as never}>Open the session</Link></Button>
           {money && s.summary.lines > 0 && <Button asChild variant="outline" size="sm"><Link href={`${href}#money` as never}>Money</Link></Button>}
         </div>
       </div>

@@ -26,6 +26,7 @@ import { apiResponse, ROLES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
+import { useI18n } from '~/lib/i18n';
 import { Day, INPUT_CLASS } from './sessions-shared';
 import {
   CELL_SHORT, examMonth, refusalText, subjectTitle,
@@ -51,6 +52,8 @@ type Entry = {
 };
 
 const DAY = 24 * 60 * 60 * 1000;
+/** A deadline as the school reads it, in one piece for a sentence ("21 March 2027", Cairo). */
+const longDay = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' }).format(new Date(iso));
 
 const Name = ({ children }: { children: React.ReactNode }) => <bdi data-i18n-skip="true" className="font-medium">{children}</bdi>;
 
@@ -79,6 +82,8 @@ function lateReasons(s: SetupSession, row: Offering['rows'][number], deadline: D
 
 export function useCheckEntries(s: SetupSession, viewerRole: string) {
   const queryClient = useQueryClient();
+  const { language } = useI18n();
+  const label = (r: { label: string; labelAr: string }) => (language === 'ar' ? r.labelAr : r.label);
   const isAdmin = viewerRole === ROLES.ADMIN;
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
   const subjectHref = (offeringId: string) => `/admin/sessions/${s.id}/subjects/${offeringId}`;
@@ -126,12 +131,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     const course = unpriced.filter((o) => o.rows.some((r) => ticked(r) && (r.courseFee ?? o.courseFee) === null)).length;
     entries.push({
       key: 'prices', severity: 'look', forHome: true,
-      body: (
-        <>
-          <span>{unpriced.length}</span> <span>of</span> <span>{s.offerings.length}</span> <span>subjects are not offered to families: a price is not set</span>{' '}
-          (<span>{course}</span> <span>{course === 1 ? 'course fee' : 'course fees'}</span><span>,</span> <span>{exam}</span> <span>{exam === 1 ? 'exam fee' : 'exam fees'}</span>).
-        </>
-      ),
+      body: <span>{`${unpriced.length} of ${s.offerings.length} subjects are not offered to families: a price is not set (${course} ${course === 1 ? 'course fee' : 'course fees'}, ${exam} ${exam === 1 ? 'exam fee' : 'exam fees'}).`}</span>,
       actions: [{ kind: 'link', label: 'Go to Prices', href: `/admin/sessions/${s.id}#prices` }],
     });
   }
@@ -159,7 +159,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       key: 'defaults', severity: 'look', forHome: true,
       body: (
         <>
-          <span>Ticked by a default, not by your forms:</span> <span>{cells}</span> <span>{cells === 1 ? 'tick' : 'ticks'}</span> <span>on</span> <span>{subjects.length}</span> <span>{subjects.length === 1 ? 'subject' : 'subjects'}</span>.{' '}
+          <span>{`Ticked by a default, not by your forms: ${cells} ${cells === 1 ? 'tick' : 'ticks'} on ${subjects.length} ${subjects.length === 1 ? 'subject' : 'subjects'}.`}</span>{' '}
           <span>On your forms a retaker who picks a teacher retakes in school, so retake in school starts ticked wherever first entry in school is. Untick any the school does not offer.</span>
         </>
       ),
@@ -169,7 +169,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
         return {
           key: id, href: subjectHref(id),
           body: <><Name>{subjectTitle(o)}</Name><span>:</span> {rows.map((r, i) => (
-            <span key={r.id}>{i > 0 && <span>; </span>}<span data-i18n-skip="true">{r.label}</span> — {(r.cellsByDefault as CellKey[]).map((k, j) => <span key={k}>{j > 0 && ', '}<span>{CELL_SHORT[k] ?? k}</span></span>)}</span>
+            <span key={r.id}>{i > 0 && <span>; </span>}<span data-i18n-skip="true">{label(r)}</span> — {(r.cellsByDefault as CellKey[]).map((k, j) => <span key={k}>{j > 0 && ', '}<span>{CELL_SHORT[k] ?? k}</span></span>)}</span>
           ))}</>,
         };
       }),
@@ -184,7 +184,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     if (!o) continue;
     entries.push({
       key: `notes-${id}`, severity: 'look', forHome: true,
-      body: <><Name>{subjectTitle(o)}</Name><span>:</span> {o.checkNotes.map((n, i) => <span key={i} className="block" lang="en" data-i18n-skip="true">{n}</span>)}</>,
+      body: <><Name>{subjectTitle(o)}</Name><span>:</span> {o.checkNotes.map((n, i) => <span key={i} className="block" lang="en" dir="ltr" data-i18n-skip="true">{n}</span>)}</>,
       actions: [
         { kind: 'run', label: 'Looks right', primary: true, run: () => putOffering(id, { notesReviewed: true }) },
         { kind: 'link', label: 'Open the subject', href: subjectHref(id) },
@@ -225,7 +225,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
         key: `old-${r.id}-${p.id}`, severity: 'look', forHome: true,
         body: (
           <>
-            <Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{r.label}</span><span>:</span> <span>{examMonth(p.month, p.year)}</span>{' '}
+            <Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{label(r)}</span><span>:</span> <span>{examMonth(p.month, p.year)}</span>{' '}
             <span>is older than</span> <Name>{o.board.name}</Name> <span>carries a result forward. It stays, since your list wins; the board may refuse the entry.</span>
           </>
         ),
@@ -244,7 +244,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     if (!reasons.length) continue;
     const key = `${o.board.name}|${r.series.entryDeadline}|${reasons.join(',')}`;
     const g = late.get(key) ?? { board: o.board.name, deadline: r.series.entryDeadline, reasons, rows: [] };
-    g.rows.push({ id: r.id, offeringId: o.id, text: <><Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{r.label}</span></> });
+    g.rows.push({ id: r.id, offeringId: o.id, text: <><Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{label(r)}</span></> });
     late.set(key, g);
   }
   for (const [key, g] of late) {
@@ -252,8 +252,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       key: `late-${key}`, severity: 'look', forHome: true,
       body: (
         <>
-          {g.reasons.map((x, i) => <span key={x}>{i > 0 && <span>{i === g.reasons.length - 1 ? ' and ' : ', '}</span>}<span>{x}</span></span>)}{' '}
-          <span>after</span> <Name>{g.board}</Name><span>&apos;s entry deadline</span> (<Day iso={g.deadline} />)<span>:</span> <span>{g.rows.length}</span> <span>{g.rows.length === 1 ? 'row' : 'rows'}</span>.{' '}
+          <span>{`${g.reasons.join(', ').replace(/, ([^,]*)$/, ' and $1')} after ${g.board}'s entry deadline (${longDay(g.deadline)}): ${g.rows.length} ${g.rows.length === 1 ? 'row' : 'rows'}.`}</span>{' '}
           <span>The board&apos;s deadline cancels unpaid reservations first. Move your dates earlier?</span>
         </>
       ),
@@ -299,9 +298,9 @@ export function CheckList({ s, viewerRole, place, headingLevel = 'h2' }: { s: Se
 
 function CheckLine({ e, refresh }: { e: Entry; refresh: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
+  // The line stays busy until the list is read again, so a second click never lands on the line below it.
   const run = useMutation({
-    mutationFn: async (a: Extract<Action, { kind: 'run' }>) => a.run(),
-    onSuccess: () => refresh(),
+    mutationFn: async (a: Extract<Action, { kind: 'run' }>) => { await a.run(); await refresh(); },
   });
   return (
     <li className="flex flex-wrap items-start gap-3 py-3">
