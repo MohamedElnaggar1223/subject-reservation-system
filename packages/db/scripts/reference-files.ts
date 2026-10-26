@@ -3,7 +3,7 @@
  * schemas of @repo/validations. Used by `reference:check` and `reference:labels`.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -85,6 +85,48 @@ export function loadReferenceFiles(): ReferenceFiles {
   const teachers = existsSync(localPath) ? parseFile<LocalTeachersFile>(localPath, LocalTeachersFileSchema).data : null;
 
   return { boards: boards.data, subjects, seed: seed.data, teachers, committed };
+}
+
+/**
+ * The committed files that must never carry a teacher's name or a mobile number: the reference
+ * data, the committed seeds, these scripts, and the coordinator trails (.audit/coordinator-*.tsv).
+ */
+export function personalDataScanFiles(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, keep: (f: string) => boolean, skip: (d: string) => boolean = () => false) => {
+    if (!existsSync(dir)) return;
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) {
+        if (!skip(p)) walk(p, keep, skip);
+      } else if (keep(name)) out.push(p);
+    }
+  };
+  walk(REFERENCE_DIR, (f) => f.endsWith(".json"));
+  walk(SEEDS_DIR, (f) => f.endsWith(".json"), (d) => d === join(SEEDS_DIR, "local"));
+  walk(join(DB_DIR, "scripts"), (f) => f.endsWith(".ts"));
+  walk(join(REPO_DIR, ".audit"), (f) => /^coordinator-.*\.tsv$/.test(f), () => true);
+  return out;
+}
+
+/**
+ * Personal data in the committed files: an 11-digit mobile number always; a teacher's name only
+ * when the git-ignored local names file exists (the names to look for are the local file's, so
+ * the scan skips where it is absent, as in CI).
+ */
+export function personalDataIssues(teachers: LocalTeachersFile | null): string[] {
+  const issues: string[] = [];
+  const names = teachers ? (Object.values(teachers) as string[]) : [];
+  for (const path of personalDataScanFiles()) {
+    const rel = relative(REPO_DIR, path);
+    readFileSync(path, "utf8").split("\n").forEach((line, i) => {
+      if (/(^|[^0-9])01[0-9]{9}([^0-9]|$)/.test(line)) issues.push(`${rel}:${i + 1} contains an 11-digit mobile number`);
+      for (const n of names) {
+        if (line.includes(n)) issues.push(`${rel}:${i + 1} contains a teacher's name (${n.slice(0, 3)}…): names live only in the local file`);
+      }
+    });
+  }
+  return issues;
 }
 
 /** "{T-ESL-2}" placeholders in a flag, replaced by names when the local file has them. */

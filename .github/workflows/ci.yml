@@ -64,6 +64,12 @@ jobs:
       - name: Build shared packages
         run: pnpm build --filter=@repo/db --filter=@repo/validations --filter=@repo/storage
 
+      # COORDINATOR_REWORK.md §7.1: the reference data and the June 2027 pre-load against their
+      # schemas, the school's fee lists, the family wording and the trails' personal data (the
+      # teacher-name scan skips here: the local names file is git-ignored).
+      - name: Reference data check
+        run: pnpm --filter @repo/db reference:check
+
       # CLAUDE.md, Git: evidence is its proof, not a request log; nothing over 300 KB under .audit.
       - name: Gate 0 - evidence size
         run: |

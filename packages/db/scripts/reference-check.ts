@@ -12,13 +12,17 @@
  * - the pre-load: subjects and row keys exist, rows in D10's order, O.L. before A.S./A.L., the
  *   carried-from lists exactly where the board asks (and in the boards' sittings), every exam fee
  *   equal to its list (a sum or the board rule applied), the June refund policy of C7, teacher
- *   placeholders only (no name and no phone number in a committed file).
+ *   placeholders only;
+ * - the wording: a null self-study share reads plain "self study"; the jargon finder catches
+ *   plurals and Arabic attached forms;
+ * - personal data (reference-files.ts personalDataIssues): no mobile number in the reference, the
+ *   seeds, these scripts or the coordinator trails, and no teacher's name there when the local
+ *   names file exists (the name scan skips without it, as in CI, which runs this check).
  *
  * Usage: pnpm --filter @repo/db reference:check   (build @repo/validations first)
  * Exit code 1 on any error; warnings are printed and do not fail.
  */
 
-import { relative } from "node:path";
 import {
   CELL_NAMES,
   DEFAULT_REFUND_POLICIES,
@@ -38,7 +42,7 @@ import {
   type SittingRef,
 } from "@repo/validations";
 import { SCHOOL_FEE_LISTS, WINTER_2026_LINKS_SHEET, type FeeList } from "./fee-lists";
-import { REPO_DIR, ReferenceFileError, loadReferenceFiles, teacherPlaceholdersIn } from "./reference-files";
+import { ReferenceFileError, loadReferenceFiles, personalDataIssues, teacherPlaceholdersIn } from "./reference-files";
 
 const errors: string[] = [];
 const warnings: string[] = [];
@@ -60,7 +64,7 @@ function main(): number {
     }
     throw e;
   }
-  const { boards, subjects, seed, teachers, committed } = files;
+  const { boards, subjects, seed, teachers } = files;
   const boardOf = new Map<ReferenceBoardCode, ReferenceBoard>(boards.map((b) => [b.code, b]));
   const subjectOf = (board: ReferenceBoardCode, code: string): ReferenceSubject | undefined => subjects[board]?.find((s) => s.code === code);
   const rowOf = (board: ReferenceBoardCode, code: string, key: string): ReferenceRow | undefined => subjectOf(board, code)?.rows.find((r) => r.key === key);
@@ -131,12 +135,29 @@ function main(): number {
     }
   }
   if (modeLabel("self_study", 40, "en") !== "self study 40%") err("labels.ts: the self-study share is not taken from its parameter");
+  // A row with its own self-study amount (E4, self_study_fee) passes a null share: no percentage shown.
+  const p4142 = { kind: "paper" as const, short: "Paper 41/42", codes: ["0970/41"] };
+  const nullShare = {
+    en: optionLabel(p4142, CELL_OPTIONS.retakeSelfStudy, { selfStudyShare: null, lang: "en" }),
+    ar: optionLabel(p4142, CELL_OPTIONS.retakeSelfStudy, { selfStudyShare: null, lang: "ar" }),
+  };
+  if (nullShare.en !== "Retake · self study · Paper 41/42 only") err(`labels.ts: a null share reads '${nullShare.en}', not plain "self study"`);
+  if (nullShare.ar !== "إعادة · دراسة ذاتية · الورقة 41/42 فقط") err(`labels.ts: a null share reads '${nullShare.ar}' in Arabic, not plain "دراسة ذاتية"`);
+  // The jargon finder catches plurals and Arabic attached forms (F3), and nothing in plain wording.
+  for (const text of ["Sittings", "two components", "the Awards", "syllabi", "syllabuses", "the June series", "option codes", "cash-ins",
+    "الدورة", "للدورة", "بالدورة", "والدورة", "دورات", "دورتها", "دوراتها", "السلسلة", "المكونات", "مكوّنات", "مكوناتها"]) {
+    if (familyJargonIn(text).length === 0) err(`labels.ts: familyJargonIn misses '${text}'`);
+  }
+  for (const text of ["First entry · in school · all papers", "Retake · self study 50% · A.2. (carry forward)", "International A Level (YAA01)",
+    "إعادة · دراسة ذاتية 50% · A.2. (نقل نتيجة)", "قيد أول · في المدرسة · المستوى A الدولي (YAA01)", "الدوري", "دور"]) {
+    if (familyJargonIn(text).length) err(`labels.ts: familyJargonIn flags plain wording '${text}' (${familyJargonIn(text).join(", ")})`);
+  }
   for (const l of WINTER_2026_LINKS_SHEET) {
     if (!subjectOf(l.board, l.subject)) err(`the November 2026 / January 2027 links sheet's '${l.row}' (${l.board} ${l.subject}) is not in the reference`);
   }
 
   // ── The school's fee lists ──
-  const feeRowMatch = new Map<string, { list: FeeList; printed: string; amount: number }[]>();
+  const feeRowMatch = new Map<string, { list: FeeList; printed: string; amount: number; toCheck: boolean }[]>();
   let feeRows = 0;
   for (const list of SCHOOL_FEE_LISTS) {
     const board = boardOf.get(list.board);
@@ -154,8 +175,9 @@ function main(): number {
       const k = `${list.board}|${hits[0]!.subject}|${hits[0]!.row}`;
       const seen = feeRowMatch.get(k) ?? [];
       if (seen.some((x) => x.list.name === list.name)) err(`fee list ${list.name}: two printed rows reach ${hits[0]!.subject}/${hits[0]!.row}`);
-      seen.push({ list, printed: fr.printed, amount: fr.amount });
+      seen.push({ list, printed: fr.printed, amount: fr.amount, toCheck: !!hits[0]!.toCheck });
       feeRowMatch.set(k, seen);
+      if (hits[0]!.toCheck) warn(`fee list ${list.name}: '${fr.printed}' ${fr.amount} reaches ${hits[0]!.subject}/${hits[0]!.row} only through an alias to check — ${hits[0]!.note}`);
     }
   }
   const listFee = (board: ReferenceBoardCode, subject: string, row: string, listName: string) =>
@@ -230,6 +252,7 @@ function main(): number {
       if (r.examFeeSource === "list") {
         const hit = listFee(o.board, subject.code, r.key, r.examFeeList!);
         if (!hit) err(`${rw}: '${r.examFeeList}' has no row for ${subject.code}/${r.key}`);
+        else if (hit.toCheck) err(`${rw}: the fee comes from '${hit.printed}', a match still to check`);
         else if (hit.amount !== r.examFee) err(`${rw}: exam fee ${r.examFee}, the list's '${hit.printed}' says ${hit.amount}`);
       } else if (r.examFeeSource === "units_sum") {
         if (!ref.sumOfUnits) err(`${rw}: a sum, but the reference row sums nothing`);
@@ -238,6 +261,7 @@ function main(): number {
           for (const k of ref.sumOfUnits) {
             const hit = listFee(o.board, subject.code, k, r.examFeeList!);
             if (!hit) err(`${rw}: '${r.examFeeList}' has no row for ${subject.code}/${k}`);
+            else if (hit.toCheck) err(`${rw}: the sum takes '${hit.printed}', a match still to check`);
             else sum += hit.amount;
           }
           if (sum !== r.examFee) err(`${rw}: exam fee ${r.examFee}, the sum of ${ref.sumOfUnits.join(" + ")} is ${sum}`);
@@ -263,17 +287,10 @@ function main(): number {
   if (teachers) {
     for (const k of usedKeys) if (!teachers[k]) err(`the local teachers file has no name for ${k}`);
     for (const k of Object.keys(teachers)) if (!usedKeys.has(k)) warn(`the local teachers file names ${k}, which the pre-load does not use`);
-    for (const f of committed) {
-      for (const name of Object.values(teachers) as string[]) {
-        if (f.text.includes(name)) err(`${relative(REPO_DIR, f.path)} contains a teacher's name (${name.slice(0, 3)}…): names live only in the local file`);
-      }
-    }
   } else {
-    warn("packages/db/seeds/local/june-2027.teachers.json is absent: teachers stay placeholders");
+    warn("packages/db/seeds/local/june-2027.teachers.json is absent: teachers stay placeholders and the name scan is skipped");
   }
-  for (const f of committed) {
-    if (/(^|[^0-9])01[0-9]{9}([^0-9]|$)/.test(f.text)) err(`${relative(REPO_DIR, f.path)} contains an 11-digit mobile number`);
-  }
+  for (const issue of personalDataIssues(teachers)) err(issue);
 
   const unconfirmed = boards.flatMap((b) => subjects[b.code].filter((s) => !s.confirmed).map((s) => `${b.code} ${s.code} ${s.name} (${s.group})`));
   const openSittings = boards.flatMap((b) => b.sittings.filter((s) => !s.confirmed).map((s) => `${b.code} ${sittingName(s)}`));
