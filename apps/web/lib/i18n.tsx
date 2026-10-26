@@ -1947,7 +1947,8 @@ function localizeDom(language: Language): boolean {
     if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
   }
 
-  const attrNames = ['placeholder', 'title', 'aria-label', 'alt'];
+  // `label`: an <optgroup>'s heading in a select ("The school's teachers"), read like the rest.
+  const attrNames = ['placeholder', 'title', 'aria-label', 'alt', 'label'];
   for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
     if (!ownedByReact(element)) {
       if (attrNames.some((a) => element.hasAttribute(a))) waiting = true;
@@ -2044,7 +2045,7 @@ export function I18nProvider({ children, initialLanguage = 'en' }: { children: R
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['placeholder', 'title', 'aria-label', 'alt'],
+      attributeFilter: ['placeholder', 'title', 'aria-label', 'alt', 'label'],
     });
 
     return () => {
