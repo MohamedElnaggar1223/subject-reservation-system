@@ -82,6 +82,9 @@ const MONTHS: Record<number, string> = { 1: 'january', 6: 'june', 10: 'october',
 const MONTH_ORDER = ['january', 'june', 'october', 'november'];
 
 type Db = NodePgDatabase<typeof schema>;
+
+/** A text[] value: drizzle expands a JS array in a template into a list of parameters, not one array. */
+const textArray = (xs: readonly string[]) => (xs.length ? sql`ARRAY[${sql.join(xs.map((x) => sql`${x}`), sql`, `)}]::text[]` : sql`'{}'::text[]`);
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /**
@@ -141,7 +144,7 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
         values (${b.code}, ${b.name}, ${b.name}, ${JSON.stringify(months)}::jsonb, ${b.carryForwardMonths},
           ${b.onePaperFee === 'syllabus' ? 'qualification' : 'unit'}, ${b.onePaperAsksSitting}, ${JSON.stringify(b.aliases ?? [])}::jsonb)
         on conflict (code) do update set
-          series_months = (select coalesce(jsonb_agg(m order by array_position(${MONTH_ORDER}::text[], m)), '[]'::jsonb)
+          series_months = (select coalesce(jsonb_agg(m order by array_position(${textArray(MONTH_ORDER)}, m)), '[]'::jsonb)
                            from (select distinct jsonb_array_elements_text(exam_board.series_months || excluded.series_months) as m) x),
           carry_forward_months = excluded.carry_forward_months,
           one_paper_fee_key = excluded.one_paper_fee_key,
@@ -159,7 +162,7 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
         const retake = referenceDeadline(s.retakeDeadline);
         await tx.execute(sql`
           insert into board_series (id, board_code, month, year, label, entry_deadline, retake_deadline, exams_start, dates_source, dates_confirmed, levels)
-          values (${randomUUID()}, ${b.code}, ${month}, ${s.year}, '', ${entry}, ${retake}, ${s.examsStart}, ${s.source}, ${s.confirmed}, ${s.levels}::text[])
+          values (${randomUUID()}, ${b.code}, ${month}, ${s.year}, '', ${entry}, ${retake}, ${s.examsStart}, ${s.source}, ${s.confirmed}, ${textArray(s.levels)})
           on conflict (board_code, month, year, label) do update set
             levels = excluded.levels,
             entry_deadline = coalesce(excluded.entry_deadline, board_series.entry_deadline),
@@ -194,8 +197,8 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
           rowIds.push(rowId);
           await tx.execute(sql`
             insert into reference_row (id, reference_subject_id, key, kind, codes, price_codes, short, label_en, label_ar, sum_of_units, winter_sitting, sort_order)
-            values (${rowId}, ${id}, ${r.key}, ${r.kind}, ${r.codes}::text[], ${r.priceCodes}::text[], ${r.short ?? null}, ${r.label.en}, ${r.label.ar},
-              ${r.sumOfUnits ?? []}::text[], ${r.winterSitting === null ? 'none' : r.winterSitting ?? null}, ${j})
+            values (${rowId}, ${id}, ${r.key}, ${r.kind}, ${textArray(r.codes)}, ${textArray(r.priceCodes)}, ${r.short ?? null}, ${r.label.en}, ${r.label.ar},
+              ${textArray(r.sumOfUnits ?? [])}, ${r.winterSitting === null ? 'none' : r.winterSitting ?? null}, ${j})
             on conflict (id) do update set kind = excluded.kind, codes = excluded.codes, price_codes = excluded.price_codes, short = excluded.short,
               label_en = excluded.label_en, label_ar = excluded.label_ar, sum_of_units = excluded.sum_of_units, winter_sitting = excluded.winter_sitting,
               sort_order = excluded.sort_order`);

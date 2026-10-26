@@ -58,7 +58,7 @@ describe('08u: the session in the school\'s words — one form per subject, the 
   const asIs = (o: Awaited<ReturnType<typeof offerRow>>): FormJson => ({
     teachers: o.teachers.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' })),
     availability: o.availability as FormJson['availability'],
-    courseFee: o.courseFee,
+    courseFee: o.courseFee ?? 0,
     grade10Core: o.grade10Core,
     courseStartsOn: o.courseStartsOn,
     notes: o.notes,
