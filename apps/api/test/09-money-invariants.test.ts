@@ -19,6 +19,8 @@ import { sql } from './helpers';
 const cents = (expr: string) => `round((${expr}) * 100)::bigint`;
 
 describe('money invariants over the whole database', () => {
+  // P1b (§12: reworded): no preregistration counts (a draft takes none, C4); a checkout given time for its reference
+  // at its cut-off, and lines expired there, are counted instead — checkouts after the close are legitimate.
   it('there is money to check: every kind of movement happened in the suites above', async () => {
     const [counts] = await sql<Record<string, string>>(`
       select
@@ -30,20 +32,17 @@ describe('money invariants over the whole database', () => {
         (select count(*) from withdrawal_disbursement)                                    as hand_overs,
         (select count(*) from withdrawal_request where status = 'rejected')              as rejected_withdrawals,
         (select count(*) from withdrawal_request where approved_by is not null)          as approved_withdrawals,
-        (select count(*) from registration r where r.status = 'preregistered' and exists (
-           select 1 from payment_registration pr join payment p on p.id = pr.payment_id
-           where pr.registration_id = r.id and p.status = 'completed'))                  as paid_waiting_preregistrations,
         (select count(*) from receipt where receipt_number like '%-R%')                  as reissued_receipts,
         (select count(*) from payment where reversal_money_returned = true)              as reversals_money_returned,
         (select count(*) from payment where reversal_money_returned = false)             as reversals_never_received,
-        (select count(*) from payment where reference_due_at is not null)                as checkouts_held_after_close,
+        (select count(*) from payment where reference_due_at is not null)                as checkouts_given_reference_time,
+        (select count(*) from audit_log where action = 'REGISTRATION_EXPIRED' and new_data->>'reason' = 'cut_off') as expired_at_cut_off,
         (select count(*) from payment where late_transfer_at is not null)                as late_transfers_recorded,
         (select count(*) from payment where purpose = 'remark' and status = 'completed')  as remark_fees_confirmed,
         (select count(*) from escrow_transaction where reason = 'late_transfer_undone')   as late_transfers_undone,
-        (select count(*) from audit_log where action = 'PREREG_REFUNDED_AT_DEADLINE')     as prereg_refunded_at_deadline,
         (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops,
         (select count(*) from registration where status = 'expired')                     as expired_registrations,
-        (select count(*) from escrow_transaction where reason = 'prereg_capture')        as held_captures,
+        (select count(*) from escrow_transaction where reason = 'plan_capture')          as held_captures,
         (select count(*) from escrow_transaction where reason = 'transfer_out')          as escrow_transfers,
         (select count(*) from receipt where status = 'lost')                             as receipts_lost
     `);
@@ -221,7 +220,9 @@ describe('money invariants over the whole database', () => {
     expect(stray).toEqual([]);
   });
 
-  it('an open payment never covers a request awaiting approval, nor only registrations that have expired (ST-03, ST-04, ST-06)', async () => {
+  // P1b (§12: reworded): nor an expired line, whatever expired it — a checkout fails before its lines expire at the
+  // cut-off, a transfer under verification protects its lines until it is decided (or failed at the board deadline).
+  it('an open payment never covers a request awaiting approval, nor an expired line, any reason (ST-03, ST-04, ST-06)', async () => {
     // Awaiting approval: a revert raced a checkout (ST-03). Only expired: the
     // payment can never be confirmed and only holds its escrow (ST-04; the
     // recovery sweep closes any such payment, ST-06).
@@ -231,15 +232,12 @@ describe('money invariants over the whole database', () => {
       where p.status in ('pending', 'pending_verification') and r.status = 'pending_approval'
     `);
     expect(onApproval).toEqual([]);
-    const onlyExpired = await sql(`
-      select p.id from payment p
-      where p.status in ('pending', 'pending_verification')
-        and exists (select 1 from payment_registration pr where pr.payment_id = p.id)
-        and not exists (
-          select 1 from payment_registration pr join registration r on r.id = pr.registration_id
-          where pr.payment_id = p.id and r.status <> 'expired')
+    const onExpired = await sql(`
+      select p.id, r.id as registration_id from payment p
+      join payment_registration pr on pr.payment_id = p.id join registration r on r.id = pr.registration_id
+      where p.status in ('pending', 'pending_verification') and r.status = 'expired'
     `);
-    expect(onlyExpired).toEqual([]);
+    expect(onExpired).toEqual([]);
   });
 
   it('a confirmed remark fee has moved its request on: never left awaiting payment, and never on a cancelled request (ST-01)', async () => {
@@ -320,7 +318,9 @@ describe('money invariants over the whole database', () => {
         and (coalesce(previous_data->>'status', '') not in ('pending_approval', 'pending_payment', 'preregistered')
           or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline', 'ineligible',
             -- The reservations rework (§3.1, §3.10 item 8): the six new reasons.
-            'overdue', 'declaration_rejected', 'hold_unverified', 'plan_revoked', 'plan_lapsed', 'plan_ended')
+            'overdue', 'declaration_rejected', 'hold_unverified', 'plan_revoked', 'plan_lapsed', 'plan_ended',
+            -- P1b (§12: reworded): the cut-off's reason, and a request whose subject closed before a parent approved it.
+            'cut_off', 'subject_closed')
           -- F0a: a student no longer eligible for the series says what changed.
           or (new_data->>'reason' = 'ineligible' and coalesce(new_data->>'detail', '') not in
             ('withdrawn', 'transferred', 'cohort_corrected', 'graduate_retakes_off', 'series_corrected', 'exception_revoked', 'exception_lapsed')))
@@ -395,9 +395,12 @@ describe('money invariants over the whole database', () => {
 
   // ─── F0b: the entry deadline is a board series' (MO-10 per series) ────────
 
-  it('there are board series to check: windows feeding several, entries in them, entries closed at a deadline', async () => {
+  // P1b (§12: reworded): the sittings exist for the rows that exist (each row sits in one; a session's sittings are
+  // its rows'), and lines are entered in them and closed at their board deadline.
+  it('there are sittings to check: rows in them, sessions with several, lines entered and closed at a board deadline', async () => {
     const [counts] = await sql<Record<string, string>>(`
       select
+        (select count(*) from session_offer_item where board_series_id is not null)                                as rows_in_a_sitting,
         (select count(*) from (select session_id from session_board_series group by session_id having count(*) > 1) w) as windows_feeding_several_series,
         (select count(*) from registration where board_series_id is not null)                                     as entries_in_a_series,
         (select count(*) from audit_log a join registration r on r.id = a.entity_id
@@ -451,14 +454,20 @@ describe('money invariants over the whole database', () => {
     expect(Number((await sql<{ n: string }>(`select count(*) as n from registration where pricing_basis is not null`))[0]?.n)).toBeGreaterThan(0);
   });
 
-  it('no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows)', async () => {
-    // Confirm clears a line whose basis rows are all confirmed at the amounts it recorded; a row
-    // confirmed at another amount leaves the line to the Re-price, so it is not counted here. A
-    // move racing a Confirm left the moved line provisional on a confirmed row until a second
-    // Confirm (the review of 40c1447): the move now holds the new series' rows before its lines.
+  // P1b (§12: reworded): a line priced by its row (version 2) is provisional exactly while its session's prices are not
+  // final; a line priced from the old grid (version 1) keeps the old rule — no longer provisional once every fee row
+  // it read is confirmed at the amount it recorded.
+  it('no provisional line once prices are final (v2); no v1 line provisional on confirmed rows', async () => {
+    const v2 = await sql(`
+      select r.id, r.status, r.price_provisional, s.prices_final from registration r join registration_session s on s.id = r.session_id
+      where r.status in ('pending_approval', 'pending_payment') and (r.pricing_basis->>'v')::int = 2
+        and r.price_provisional = s.prices_final
+    `);
+    expect(v2).toEqual([]);
     const stuck = await sql(`
       select r.id, r.status, r.pricing_basis->'feeRows' as rows from registration r
       where r.price_provisional and r.status in ('pending_approval', 'pending_payment', 'preregistered')
+        and coalesce((r.pricing_basis->>'v')::int, 1) = 1
         and jsonb_array_length(coalesce(r.pricing_basis->'feeRows', '[]'::jsonb)) > 0
         and not exists (
           select 1 from jsonb_array_elements(r.pricing_basis->'feeRows') fr
@@ -466,15 +475,16 @@ describe('money invariants over the whole database', () => {
           where f.id is null or f.provisional or ${cents('f.amount')} <> ${cents("(fr->>'amount')::numeric")})
     `);
     expect(stuck).toEqual([]);
-    // There is something to check: Confirms that made waiting lines payable, and lines still waiting on a provisional row.
+    // There is something to check: prices switched final with lines waiting, and a line reserved before it.
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'SESSION_PRICES_FINAL' and (new_data->>'linesMadePayable')::int > 0`))[0]?.n)).toBeGreaterThan(0);
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'BOARD_FEES_CONFIRMED' and (new_data->>'linesNoLongerProvisional')::int > 0`))[0]?.n)).toBeGreaterThan(0);
-    expect(Number((await sql<{ n: string }>(`select count(*) as n from registration where price_provisional and status in ('pending_approval', 'pending_payment', 'preregistered')`))[0]?.n)).toBeGreaterThan(0);
   });
 
-  it('one live line per student, unit or award and series, across sessions (§3.5 gate.sameEntryOnce)', async () => {
-    // A line's entry keys: its award (an award or option item), each of its units, or its subject
-    // row (an item entering the subject as a whole). Two live lines of a student in one series
-    // never share one.
+  // P1b (§12: reworded): the same row code once per sitting (line rules v2's gate.sameEntryOnce): a row entering the
+  // subject is keyed by its codes where it names them.
+  it('one live line per student, row code (unit or award) and sitting, across sessions (gate.sameEntryOnce)', async () => {
+    // A line's entry keys: its award (an award or option item), each of its units, each of its row's codes, or
+    // its subject (a row entering the subject with no code). Two live lines of a student in one sitting never share one.
     const broken = await sql(`
       with keys as (
         select r.id, r.student_id, r.board_series_id, 'q:' || i.qualification_id as k
@@ -484,9 +494,13 @@ describe('money invariants over the whole database', () => {
         select r.id, r.student_id, r.board_series_id, 'u:' || u.unit_id
           from registration r join session_offer_item_unit u on u.item_id = r.offer_item_id
         union all
+        select r.id, r.student_id, r.board_series_id, 'c:' || r.subject_id || ':' || c.code
+          from registration r join session_offer_item i on i.id = r.offer_item_id cross join lateral unnest(i.reference_codes) as c(code)
+          where i.enters_kind = 'subject'
+        union all
         select r.id, r.student_id, r.board_series_id, 's:' || r.subject_id
           from registration r join session_offer_item i on i.id = r.offer_item_id
-          where i.enters_kind = 'subject'
+          where i.enters_kind = 'subject' and cardinality(coalesce(i.reference_codes, '{}')) = 0
       )
       select k.student_id, k.board_series_id, k.k, count(distinct k.id) as lines
       from keys k join registration r on r.id = k.id
@@ -514,21 +528,9 @@ describe('money invariants over the whole database', () => {
   // rule above — the line's effective deadline (a retake's retake deadline, a series with no entry
   // deadline its exams' start) — which it contradicted for a series with no entry deadline.
 
-  it("every open payment's registrations share one entry deadline (F0b: the sweep closes a payment at its series' deadline)", async () => {
-    // Changed by the reservations rework (pre-authorised; trail row "assertion"): the deadline is
-    // each line's effective one (a retake's retake deadline, a series with no entry deadline its
-    // exams' start), which is what the sweep closes a payment at (§3.3).
-    const deadline = `coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)::text, 'none')`;
-    const broken = await sql(`
-      select p.id, count(distinct ${deadline}) as deadlines
-      from payment p
-      join payment_registration pr on pr.payment_id = p.id
-      join registration r on r.id = pr.registration_id
-      where p.status in ('pending', 'pending_verification')
-      group by p.id having count(distinct ${deadline}) > 1
-    `);
-    expect(broken).toEqual([]);
-  });
+  // Removed by P1b (§12): "every open payment's registrations share one entry deadline" — payments are no longer split
+  // by deadline (§4); a checkout fails at its earliest cut-off, a transfer under verification at its earliest board
+  // deadline (08z-reserve-pay).
 
   it('every series a session is entered in is in its academic year and kind, of its board (F0b)', async () => {
     // Changed by the reservations rework (pre-authorised; trail row "assertion"): the clause "a
@@ -567,12 +569,14 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
+  // P1b (§9.2): "may sit" is eligibility without the session's grade list — the list is asked of new reservations
+  // only, and changing it (or a grade-10 exception ending) never strands a line already reserved (08e).
   it('F0a: nothing waits for, and nothing was captured into, a series its student may not sit', async () => {
     const { mayRegisterFor } = await import('../src/services/eligibility.services');
     const verdicts = new Map<string, boolean>();
     const allowed = async (studentId: string, sessionId: string) => {
       const key = `${studentId}|${sessionId}`;
-      if (!verdicts.has(key)) verdicts.set(key, (await mayRegisterFor(studentId, sessionId)).allowed);
+      if (!verdicts.has(key)) verdicts.set(key, (await mayRegisterFor(studentId, sessionId, undefined, { forNewReservation: false })).allowed);
       return verdicts.get(key)!;
     };
 
@@ -745,7 +749,9 @@ describe('money invariants over the whole database', () => {
     expect(moved).toEqual([]);
   });
 
-  it('F7: every line the import made is a line like any other — priced from the grid with its basis, its two consents on the imported channel, traced to its committed import line, and paid only through a payment', async () => {
+  // P1b (§12: reworded): priced by its row (version 2: the exam fee in full and the course fee in school or at the
+  // share) or, made before the row had its fee, from the grid with its rows (version 1).
+  it('F7: every line the import made is a line like any other — priced by its row or the grid with its basis, its two consents on the imported channel, traced to its committed import line, and paid only through a payment', async () => {
     // The lines the import made, as its IMPORT_REGISTRATION rows list them (08n makes several).
     const made = await sql<{ id: string }>(`
       select distinct jsonb_array_elements_text(a.new_data->'registrationIds') as id from audit_log a where a.action = 'IMPORT_REGISTRATION'`);
@@ -833,16 +839,16 @@ describe('money invariants over the whole database', () => {
     expect(mixed).toEqual([]);
   });
 
-  it("an open charge payment's charges share one deadline; an instalment payment covers one plan's line (§3.10 item 1)", async () => {
-    const deadline = `coalesce(charge_effective_deadline(c.kind, c.registration_id, c.board_series_id, c.board_service_id)::text, 'none')`;
+  // P1b (§12): the one-deadline clause goes (payments are not split by deadline); an instalment payment still covers one
+  // plan's line, and no other charge.
+  it("an instalment payment covers one plan's line (§3.10 item 1)", async () => {
     const broken = await sql(`
-      select p.id, count(distinct ${deadline}) as deadlines,
-             count(distinct case when c.kind = 'instalment' then c.registration_id end) as plan_lines,
+      select p.id, count(distinct case when c.kind = 'instalment' then c.registration_id end) as plan_lines,
              bool_or(c.kind = 'instalment') and bool_or(c.kind <> 'instalment') as mixed
       from payment p join payment_charge pc on pc.payment_id = p.id join charge c on c.id = pc.charge_id
       where p.status in ('pending', 'pending_verification')
       group by p.id
-      having count(distinct ${deadline}) > 1 or count(distinct case when c.kind = 'instalment' then c.registration_id end) > 1
+      having count(distinct case when c.kind = 'instalment' then c.registration_id end) > 1
          or (bool_or(c.kind = 'instalment') and bool_or(c.kind <> 'instalment'))
     `);
     expect(broken).toEqual([]);
@@ -1060,7 +1066,8 @@ describe('money invariants over the whole database', () => {
     expect(problems).toEqual([]);
   });
 
-  it('every charge has one creation row; every desk drop was past its line\'s deadline (§3.3, §3.6)', async () => {
+  // P1b (§12: reworded): a desk drop is after "sent" — the line's entry marked sent (F4), else its board deadline.
+  it('every charge has one creation row; every desk drop was after its line\'s entry was sent (§3.3, §3.6)', async () => {
     const broken = await sql(`
       select c.id, count(a.id) as rows from charge c
       left join audit_log a on a.entity_id = c.id and a.action in ('CHARGE_CREATED', 'CHARGE_REQUESTED')
@@ -1071,6 +1078,7 @@ describe('money invariants over the whole database', () => {
       select a.entity_id from audit_log a join registration r on r.id = a.entity_id
       where a.action = 'DESK_DROP_EXECUTED'
         and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > a.created_at, true)
+        and not exists (select 1 from exam_entry e where e.registration_id = r.id and e.submitted_at is not null and e.submitted_at <= a.created_at)
     `);
     expect(early).toEqual([]);
   });
@@ -1234,5 +1242,72 @@ describe('money invariants over the whole database', () => {
       and m.source <> 'legacy_announcement' and not exists (select 1 from audit_log a where a.entity_id = m.id and a.action = 'MESSAGE_CANCELLED')`)).toEqual([]);
     expect(await sql(`select m.id from message m where m.status = 'sent' and m.source <> 'legacy_announcement'
       and m.recipient_count <> (select count(distinct d.recipient_id) from message_delivery d where d.message_id = m.id)`)).toEqual([]);
+  });
+
+  // ─── P1b: reserving and paying (COORDINATOR_REWORK.md §12, the four rules it adds) ─────────────
+
+  it("every line's option was ticked on its row when it was reserved, or an exception says why (D3)", async () => {
+    // A line priced by its row (version 2): its (attempt, mode) cell is ticked — a cell lines use cannot be unticked —
+    // or the first entry in self study was let through by the student's one-shot exception, used by that line.
+    const broken = await sql(`
+      select r.id, r.attempt, r.mode, i.id as row from registration r join session_offer_item i on i.id = r.offer_item_id
+      where (r.pricing_basis->>'v')::int = 2
+        and not (case when r.attempt = 'first' and r.mode = 'in_school' then i.first_in_school
+                      when r.attempt = 'first' then i.first_self_study
+                      when r.mode = 'in_school' then i.retake_in_school
+                      else i.retake_self_study end)
+        and not exists (select 1 from exception e where e.policy_key = 'gate.selfStudyFirstEntry' and e.used_for->'registrationIds' ? r.id)
+    `);
+    expect(broken).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from registration where (pricing_basis->>'v')::int = 2`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('every cut_off expiry was past its cut-off, and nothing protected the line then: a transfer under verification, an InstaPay checkout in its grace, an instalment payment in progress (C10)', async () => {
+    const ended = `select 1 from audit_log e where e.entity_id = p.id and e.action in ('PAYMENT_FAILED', 'PAYMENT_REJECTED', 'PAYMENT_CANCELLED', 'PAYMENT_CONFIRMED') and e.created_at <= x.at`;
+    const broken = await sql(`
+      with x as (select a.entity_id as id, a.created_at as at from audit_log a where a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' = 'cut_off')
+      select x.id, x.at, line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as cut_off
+      from x join registration r on r.id = x.id
+      where line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > x.at
+        or exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+          where pr.registration_id = r.id and p.created_at < x.at and not exists (${ended})
+            and (exists (select 1 from audit_log s where s.entity_id = p.id and s.action = 'PAYMENT_REFERENCE_SUBMITTED' and s.created_at < x.at)
+              or (p.payment_method = 'instapay' and p.reference_due_at > x.at)))
+        or exists (select 1 from charge c join payment_charge pc on pc.charge_id = c.id join payment p on p.id = pc.payment_id
+          where c.registration_id = r.id and c.kind = 'instalment' and p.created_at < x.at and not exists (${ended}))
+    `);
+    expect(broken).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'REGISTRATION_EXPIRED' and new_data->>'reason' = 'cut_off'`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it("no line was confirmed after its board deadline, as it stood when it was confirmed (C6: a transfer found later goes to the balance)", async () => {
+    // Each confirmation records the line's board deadline at that moment (P1b): a test moving a deadline later on
+    // does not rewrite what the confirmation saw.
+    const late = await sql(`
+      select a.entity_id, a.created_at, a.new_data->>'boardDeadline' as deadline from audit_log a
+      where a.action = 'REGISTRATION_CONFIRMED' and a.new_data ? 'boardDeadline' and a.new_data->>'boardDeadline' is not null
+        and (a.new_data->>'boardDeadline')::timestamptz < a.created_at
+    `);
+    expect(late).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'REGISTRATION_CONFIRMED' and new_data->>'boardDeadline' is not null`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it("every line's basis matches its row's fees: the exam fee and the course fee it was priced from, unless a later change left it to finance (§6, E7)", async () => {
+    // A row's fee changed after a line was reserved re-prices the line (its basis follows) or, with a payment
+    // history, lists it for finance and leaves it as it was; a line no longer live keeps what it had.
+    const broken = await sql(`
+      select r.id, r.status, (r.pricing_basis->>'examFee')::numeric as basis_exam, i.exam_fee,
+        (r.pricing_basis->>'courseFeeBase')::numeric as basis_course,
+        case when r.mode = 'self_study' and i.self_study_fee is not null then i.self_study_fee else coalesce(i.course_fee, o.course_fee) end as row_course
+      from registration r join session_offer_item i on i.id = r.offer_item_id join session_offer o on o.id = i.offer_id
+      where (r.pricing_basis->>'v')::int = 2 and r.status in ('pending_approval', 'pending_payment', 'confirmed')
+        and not coalesce((r.pricing_basis->>'customPrice')::boolean, false)
+        and (${cents("(r.pricing_basis->>'examFee')::numeric")} is distinct from ${cents('i.exam_fee')}
+          or ${cents("(r.pricing_basis->>'courseFeeBase')::numeric")} is distinct from
+             ${cents("case when r.mode = 'self_study' and i.self_study_fee is not null then i.self_study_fee else coalesce(i.course_fee, o.course_fee) end")})
+        and not exists (select 1 from audit_log a where a.action = 'ROWS_REPRICED'
+          and exists (select 1 from jsonb_array_elements(a.new_data->'listedForFinance') l where l->>'id' = r.id))
+    `);
+    expect(broken).toEqual([]);
   });
 });
