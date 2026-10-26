@@ -26,18 +26,21 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, ROLES } from '@repo/validations';
+import {
+  apiResponse, ROLES, RowKindSchema, TeacherChoiceSchema, QuestionKindSchema, SeriesMonthSchema, SittingSchema, QUESTION_KINDS,
+  type RowKind, type TeacherChoice, type Sitting, type SeriesMonth, type QuestionInputType,
+} from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
 import { useI18n } from '~/lib/i18n';
-import { Day, Money, Modal, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../../../sessions-shared';
+import { Day, Money, Modal, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS, fetchSession, sessionKey } from '../../../sessions-shared';
 import {
-  fetchOffering, fetchSetupSession, fetchTeachers, fetchReferenceBoards, fetchFamilyPreview, offeringKey, setupKey, previewKey,
+  fetchOffering, fetchTeachers, fetchReferenceBoards, fetchFamilyPreview, offeringKey, previewKey,
   TEACHERS_KEY, REFERENCE_BOARDS_KEY, CELLS, CELL_WORDS, subjectTitle, ownName, examMonth, monthIndex, pickerValue, endOfSchoolDay,
-  useImpactSave, ImpactDialog, CommitSelect, refusalText, type CellKey, type SetupSession,
+  useImpactSave, ImpactDialog, CommitSelect, refusalText, isCell, rowName, CARD, TH, QUESTION_KIND_WORDS, type CellKey, type SetupSession,
 } from '../../../setup-shared';
 import { shownCode } from '../../subjects-tab.client';
 
@@ -46,16 +49,16 @@ type RowData = OfferingData['rows'][number];
 type Cells = Record<CellKey, boolean>;
 type TeacherPick = { teacherId?: string; newName?: string; name: string; online: boolean; external: boolean; confirmNew?: boolean };
 type DraftRow = {
-  key: string; id?: string; kind: string; label: string; labelAr: string; referenceKey: string | null; referenceCodes: string[]; name?: string;
-  sitting: 'june' | 'november' | 'january' | null; closesAt: string; payBy: string;
+  key: string; id?: string; kind: RowKind; label: string; labelAr: string; referenceKey: string | null; referenceCodes: string[]; name?: string;
+  sitting: Sitting | null; closesAt: string; payBy: string;
   examFee: string; courseFee: string; selfStudyOwn: boolean; selfStudyFee: string;
   cells: Cells; teachers: TeacherPick[] | null; needsCarriedFrom: boolean; fromReference: boolean;
   examFeeSource: string | null; lines: number; linesAll: number; byDefault: CellKey[];
 };
-type Earlier = { month: string; year: number };
-type Question = { id?: string; kind: 'yes_no' | 'text' | 'choice'; prompt: string; choices: string[]; required: boolean };
+type Earlier = { month: SeriesMonth; year: number };
+type Question = QuestionInputType;
 type Draft = {
-  accepting: boolean; closesAt: string; courseFee: string; note: string; teacherChoice: 'families' | 'school'; teacherTbc: boolean;
+  accepting: boolean; closesAt: string; courseFee: string; note: string; teacherChoice: TeacherChoice; teacherTbc: boolean;
   teachers: TeacherPick[]; rows: DraftRow[]; earlier: Earlier[]; questions: Question[];
 };
 
@@ -69,7 +72,6 @@ const usualCells = (kind: string): Cells => (kind === 'paper'
   : { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false });
 const money = (v: number | null) => (v === null ? '' : String(v));
 const num = (v: string) => (v.trim() === '' ? null : Number(v));
-const rowName = (r: { kind: string; label: string }) => (r.kind === 'all_papers' ? 'All papers' : r.label);
 
 function draftOf(o: OfferingData): Draft {
   // The subject's earlier exams: the lists of the rows that ask and are offered (all that ask, when none is).
@@ -77,26 +79,26 @@ function draftOf(o: OfferingData): Draft {
   const offeredAsks = asks.filter((r) => anyCell(r.cells));
   const asking = offeredAsks.length ? offeredAsks : asks;
   const earlier: Earlier[] = [];
-  for (const r of asking) for (const p of r.allowedPriorSittings) if (!earlier.some((e) => e.month === p.month && e.year === p.year)) earlier.push({ month: p.month, year: p.year });
+  for (const r of asking) for (const p of r.allowedPriorSittings) if (!earlier.some((e) => e.month === p.month && e.year === p.year)) earlier.push({ month: SeriesMonthSchema.parse(p.month), year: p.year });
   earlier.sort((a, b) => monthIndex(b.month, b.year) - monthIndex(a.month, a.year));
   return {
     accepting: o.accepting, closesAt: pickerValue(o.closesAt), courseFee: money(o.courseFee), note: o.note ?? '',
-    teacherChoice: o.teacherChoice as 'families' | 'school', teacherTbc: o.teacherTbc,
+    teacherChoice: TeacherChoiceSchema.parse(o.teacherChoice), teacherTbc: o.teacherTbc,
     teachers: o.teachers.map((t) => ({ teacherId: t.teacherId, name: t.name, online: t.online, external: t.external })),
     rows: o.rows.map((r) => rowDraft(r)),
     earlier,
-    questions: o.questions.map((q) => ({ id: q.id, kind: q.kind as Question['kind'], prompt: q.prompt, choices: q.choices, required: q.required })),
+    questions: o.questions.map((q) => ({ id: q.id, kind: QuestionKindSchema.parse(q.kind), prompt: q.prompt, choices: q.choices, required: q.required })),
   };
 }
 
 function rowDraft(r: RowData): DraftRow {
   return {
-    key: r.id, id: r.id, kind: r.kind, label: rowName(r), labelAr: r.labelAr, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
-    sitting: r.sitting as DraftRow['sitting'], closesAt: pickerValue(r.closesAt), payBy: pickerValue(r.payBy),
+    key: r.id, id: r.id, kind: RowKindSchema.parse(r.kind), label: rowName(r), labelAr: r.labelAr, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
+    sitting: r.sitting, closesAt: pickerValue(r.closesAt), payBy: pickerValue(r.payBy),
     examFee: money(r.examFee), courseFee: money(r.courseFee), selfStudyOwn: r.selfStudyFee !== null, selfStudyFee: money(r.selfStudyFee),
     cells: { ...r.cells }, teachers: r.teachers.length ? r.teachers.map((t) => ({ teacherId: t.teacherId, name: t.name, online: t.online, external: t.external })) : null,
     needsCarriedFrom: r.needsCarriedFrom, fromReference: r.fromReference, examFeeSource: r.examFeeSource, lines: r.lines.live, linesAll: r.lines.all,
-    byDefault: r.cellsByDefault as CellKey[],
+    byDefault: r.cellsByDefault.filter(isCell),
   };
 }
 
@@ -137,7 +139,7 @@ function bodyOf(d: Draft, o: OfferingData, s: SetupSession) {
       const own = ownExam(s, r, before);
       return {
         ...(r.id ? { id: r.id } : {}),
-        kind: r.kind as 'custom',
+        kind: r.kind,
         ...(r.referenceKey ? { referenceKey: r.referenceKey } : {}),
         ...(!r.id ? { referenceCodes: r.referenceCodes } : {}),
         // A row of her own keeps the name she gave it unless she gives another.
@@ -152,7 +154,7 @@ function bodyOf(d: Draft, o: OfferingData, s: SetupSession) {
         ...(!prev || prev.selfStudyOwn !== r.selfStudyOwn || prev.selfStudyFee !== r.selfStudyFee ? { selfStudyFee: r.selfStudyOwn ? num(r.selfStudyFee) : null } : {}),
         cells: r.cells,
         ...(r.needsCarriedFrom && anyCell(r.cells) && (!prev || changed('earlier') || !anyCell(prev.cells))
-          ? { allowedPriorSittings: d.earlier.filter((e) => monthIndex(e.month, e.year) < own).map((e) => ({ month: e.month as 'june', year: e.year })) }
+          ? { allowedPriorSittings: d.earlier.filter((e) => monthIndex(e.month, e.year) < own).map((e) => ({ month: e.month, year: e.year })) }
           : {}),
         ...(!prev || JSON.stringify(prev.teachers) !== JSON.stringify(r.teachers) ? { teachers: r.teachers ? r.teachers.map(teacherInput) : null } : {}),
       };
@@ -166,7 +168,7 @@ export default function SubjectEditor({ sessionId, offeringId, viewerRole }: { s
   // Read once and again only after a save (its invalidation): a refetch under her would remount the editor
   // and lose what she has not saved.
   const off = useQuery({ queryKey: offeringKey(sessionId, offeringId), queryFn: () => fetchOffering(sessionId, offeringId), staleTime: Infinity, refetchOnWindowFocus: false });
-  const ses = useQuery({ queryKey: setupKey(sessionId), queryFn: () => fetchSetupSession(sessionId), staleTime: Infinity, refetchOnWindowFocus: false });
+  const ses = useQuery({ queryKey: sessionKey(sessionId), queryFn: () => fetchSession(sessionId), staleTime: Infinity, refetchOnWindowFocus: false });
   const saved = useSavedAnnouncer();
   if (off.isLoading || ses.isLoading) return <LoadingState />;
   if (off.isError || ses.isError || !off.data || !ses.data) {
@@ -217,7 +219,7 @@ function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; ca
   }, [refocus]);
   const remove = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$delete({ param: { id: s.id, offeringId: o.id } })),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: setupKey(s.id) }); router.push(back as never); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: sessionKey(s.id) }); router.push(back as never); },
   });
   // Leaving with changes not saved asks first (the browser's own question).
   useEffect(() => {
@@ -289,8 +291,8 @@ function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; ca
   );
 }
 
-const card = 'rounded-xl border border-border bg-card p-5 shadow-sm';
-const th = 'px-2 py-2 text-start text-xs font-semibold text-muted-foreground';
+// The grid's header cells carry checkboxes: plain case, a tighter gutter.
+const th = cn(TH, 'px-2 normal-case tracking-normal');
 
 type GridProps = {
   o: OfferingData; s: SetupSession; d: Draft; setD: (d: Draft) => void; setRow: (key: string, patch: Partial<DraftRow>) => void;
@@ -322,7 +324,7 @@ function Grid({ o, s, d, setD, setRow, more, setMore, canEdit }: GridProps) {
     setCustom(null);
   };
   return (
-    <section className={card} aria-labelledby="grid-title">
+    <section className={CARD} aria-labelledby="grid-title">
       <h2 id="grid-title" className="font-display text-base font-semibold text-foreground">What can be entered, and how it is studied</h2>
       <p className="mt-1 text-sm text-muted-foreground"><span>Tick the rows the school offers, and how each is studied. The rows come from</span> <bdi data-i18n-skip="true">{o.board.name}</bdi><span>&apos;s list for this subject.</span></p>
       <div className="mt-3 flex flex-wrap items-end gap-4">
@@ -525,7 +527,7 @@ function MoreOptions({ r, s, o, canEdit, setRow }: { r: DraftRow; s: SetupSessio
         {s.sessionType === 'winter' && (
           <label className="flex items-center gap-2">
             <span>Exam in</span>
-            <select className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.sitting ?? 'november'} disabled={!canEdit || r.linesAll > 0} onChange={(e) => setRow(r.key, { sitting: e.target.value as DraftRow['sitting'] })}>
+            <select className={cn(INPUT_CLASS, 'h-9 w-auto')} value={r.sitting ?? 'november'} disabled={!canEdit || r.linesAll > 0} onChange={(e) => setRow(r.key, { sitting: SittingSchema.parse(e.target.value) })}>
               <option value="november">November</option>
               <option value="january">January</option>
             </select>
@@ -576,7 +578,7 @@ function Teachers({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void; ca
   };
   const dups = check.data?.duplicates ?? [];
   return (
-    <section className={card} aria-labelledby="teachers-title">
+    <section className={CARD} aria-labelledby="teachers-title">
       <h2 id="teachers-title" className="font-display text-base font-semibold text-foreground">Teachers</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {d.teachers.length ? d.teachers.map((t) => (
@@ -633,7 +635,7 @@ function Teachers({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void; ca
         </div>
         <div>
           <label htmlFor="ed-choice" className="block text-sm font-medium text-foreground">Who picks the teacher</label>
-          <select id="ed-choice" className={cn(INPUT_CLASS, 'mt-1')} value={d.teacherChoice} disabled={!canEdit} onChange={(e) => setD({ ...d, teacherChoice: e.target.value as Draft['teacherChoice'] })}>
+          <select id="ed-choice" className={cn(INPUT_CLASS, 'mt-1')} value={d.teacherChoice} disabled={!canEdit} onChange={(e) => setD({ ...d, teacherChoice: TeacherChoiceSchema.parse(e.target.value) })}>
             <option value="families">Families choose (one is preselected)</option>
             <option value="school">The school assigns</option>
           </select>
@@ -655,7 +657,7 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
   const [shown, setShown] = useState<Earlier[]>(() => d.earlier);
   if (!asking.length) {
     return notAsked
-      ? <section className={card}><h2 className="font-display text-base font-semibold text-foreground">Earlier exams</h2><p className="mt-1 text-sm text-muted-foreground"><bdi data-i18n-skip="true">{o.board.name}</bdi> <span>does not ask which earlier exam a one-paper retake follows, so families are not asked.</span></p></section>
+      ? <section className={CARD}><h2 className="font-display text-base font-semibold text-foreground">Earlier exams</h2><p className="mt-1 text-sm text-muted-foreground"><bdi data-i18n-skip="true">{o.board.name}</bdi> <span>does not ask which earlier exam a one-paper retake follows, so families are not asked.</span></p></section>
       : null;
   }
   const board = boards.data?.find((b) => b.code === o.board.code);
@@ -665,7 +667,7 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
   const months = [...new Set((board?.sittings ?? []).filter((x) => x.levels.includes(level)).map((x) => x.month))];
   const cand: Earlier[] = [];
   for (let y = here.year; y >= here.year - 4; y--) {
-    for (const m of ['november', 'october', 'june', 'january']) {
+    for (const m of ['november', 'october', 'june', 'january'] as const) {
       if (!months.includes(m) || monthIndex(m, y) >= hereIdx) continue;
       if ([...shown].some((e) => e.month === m && e.year === y)) continue;
       cand.push({ month: m, year: y });
@@ -675,7 +677,7 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
   const toggle = (e: Earlier) => setD({ ...d, earlier: ticked(e) ? d.earlier.filter((x) => !(x.month === e.month && x.year === e.year)) : [...d.earlier, e] });
   const carry = board?.carryForwardMonths ?? null;
   return (
-    <section className={card} aria-labelledby="earlier-title">
+    <section className={CARD} aria-labelledby="earlier-title">
       <h2 id="earlier-title" className="font-display text-base font-semibold text-foreground">Earlier exams a retake carries from</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         <span>Asked of a family taking</span> {asking.map((r, i) => <span key={r.key}>{i > 0 && ', '}<span data-i18n-skip="true">{r.label}</span></span>)}<span>: they pick the exam they sat from this list. A student the school knows sat it has it filled in.</span>
@@ -703,8 +705,8 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
       {canEdit && cand.length > 0 && (
         <CommitSelect className={cn(INPUT_CLASS, 'mt-3 w-auto')} value="" reset aria-label="Add an older earlier exam"
           onCommit={(v) => {
-            const [m, y] = v.split('-');
-            const pick = { month: m!, year: Number(y) };
+            const [m = '', y] = v.split('-');
+            const pick = { month: SeriesMonthSchema.parse(m), year: Number(y) };
             setShown([...shown, pick].sort((a, b) => monthIndex(b.month, b.year) - monthIndex(a.month, a.year)));
             setD({ ...d, earlier: [...d.earlier, pick] });
           }}>
@@ -723,9 +725,8 @@ function ForFamilies({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void;
   const [choices, setChoices] = useState('');
   const list = choices.split('\n').map((c) => c.trim()).filter(Boolean);
   const ready = prompt.trim().length >= 2 && (kind !== 'choice' || list.length > 0);
-  const KIND_WORDS = { yes_no: 'Yes / no', text: 'Short text', choice: 'A choice' } as const;
   return (
-    <section className={card} aria-labelledby="families-title">
+    <section className={CARD} aria-labelledby="families-title">
       <h2 id="families-title" className="font-display text-base font-semibold text-foreground">For families</h2>
       <label htmlFor="ed-note" className="mt-3 block text-sm font-medium text-foreground"><span>Note on the subject</span> <span className="font-normal text-muted-foreground">(optional)</span></label>
       <textarea id="ed-note" rows={2} className={cn(TEXTAREA_CLASS, 'mt-1')} value={d.note} disabled={!canEdit} placeholder="e.g. Taught on Saturdays." onChange={(e) => setD({ ...d, note: e.target.value })} />
@@ -734,7 +735,7 @@ function ForFamilies({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void;
         <ul className="mt-1 divide-y divide-border">
           {d.questions.map((q, i) => (
             <li key={q.id ?? `new-${i}`} className="flex items-center justify-between gap-2 py-1.5 text-sm">
-              <span><bdi data-i18n-skip="true">{q.prompt}</bdi> <span className="text-xs text-muted-foreground">{KIND_WORDS[q.kind]}{q.choices.length > 0 && <>: <bdi data-i18n-skip="true">{q.choices.join(' / ')}</bdi></>}</span></span>
+              <span><bdi data-i18n-skip="true">{q.prompt}</bdi> <span className="text-xs text-muted-foreground">{QUESTION_KIND_WORDS[q.kind]}{q.choices.length > 0 && <>: <bdi data-i18n-skip="true">{q.choices.join(' / ')}</bdi></>}</span></span>
               {canEdit && <Button variant="ghost" size="sm" aria-label={`Remove the question: ${q.prompt}`} onClick={() => setD({ ...d, questions: d.questions.filter((_, j) => j !== i) })}>Remove</Button>}
             </li>
           ))}
@@ -744,8 +745,8 @@ function ForFamilies({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void;
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <div>
             <label htmlFor="eq-kind" className="block text-xs font-medium text-foreground">Answer</label>
-            <select id="eq-kind" className={cn(INPUT_CLASS, 'mt-1 h-9 w-auto')} value={kind} onChange={(e) => setKind(e.target.value as Question['kind'])}>
-              {(Object.keys(KIND_WORDS) as Question['kind'][]).map((k) => <option key={k} value={k}>{KIND_WORDS[k]}</option>)}
+            <select id="eq-kind" className={cn(INPUT_CLASS, 'mt-1 h-9 w-auto')} value={kind} onChange={(e) => setKind(QuestionKindSchema.parse(e.target.value))}>
+              {QUESTION_KINDS.map((k) => <option key={k} value={k}>{QUESTION_KIND_WORDS[k]}</option>)}
             </select>
           </div>
           <div className="min-w-56 flex-1">
@@ -787,10 +788,10 @@ function Preview({ o, s, dirty }: { o: OfferingData; s: SetupSession; dirty: boo
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
   return (
-    <section className={cn(card, 'lg:sticky lg:top-4')} aria-labelledby="preview-title">
+    <section className={cn(CARD, 'lg:sticky lg:top-4')} aria-labelledby="preview-title">
       <h2 id="preview-title" className="font-display text-base font-semibold text-foreground">What families see</h2>
       <label htmlFor="pv-as" className="mt-2 block text-xs font-medium text-foreground">Preview as</label>
-      <select id="pv-as" className={cn(INPUT_CLASS, 'mt-1 h-9')} value={as} onChange={(e) => { setAs(e.target.value as typeof as); setSatBefore(false); }}>
+      <select id="pv-as" className={cn(INPUT_CLASS, 'mt-1 h-9')} value={as} onChange={(e) => { setAs(e.target.value === 'retaker' ? 'retaker' : 'first_timer'); setSatBefore(false); }}>
         <option value="first_timer">A first-time student</option>
         <option value="retaker">A retaker</option>
       </select>

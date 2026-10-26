@@ -20,8 +20,8 @@ import { apiResponse, ROLES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
-import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
-import { fetchSetupSession, setupKey, STATUS_WORDS, STATUS_TONE } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
+import { Day, fetchSession, sessionKey, STATUS_TONE } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { STATUS_WORDS } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 import { CheckList } from '~/app/(app)/(sessions)/admin/sessions/check-list.client';
 
 const fetchSessions = () => apiResponse(api.v1.sessions.$get({ query: {} }));
@@ -75,7 +75,7 @@ export default function CycleLanding({ viewerRole, userName }: { viewerRole: str
 }
 
 function SessionCard({ row, viewerRole }: { row: SessionRow; viewerRole: string }) {
-  const { data: s, isLoading, isError, refetch } = useQuery({ queryKey: setupKey(row.id), queryFn: () => fetchSetupSession(row.id) });
+  const { data: s, isLoading, isError, refetch } = useQuery({ queryKey: sessionKey(row.id), queryFn: () => fetchSession(row.id) });
   const href = `/admin/sessions/${row.id}`;
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby={`home-${row.id}`}>

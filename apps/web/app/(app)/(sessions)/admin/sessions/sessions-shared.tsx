@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react';
 import { api } from '~/lib/hono';
 import { apiResponse, type SessionMoneyQueryType, formatEgp } from '@repo/validations';
-import { Badge, Notice, type Tone } from '~/components/ui/tone';
+import { Badge, type Tone } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 
@@ -19,9 +19,8 @@ import { InstantText } from '~/app/(app)/exams/exams-shared';
 export const fetchSessions = () => apiResponse(api.v1.sessions.$get({ query: {} }));
 export type SessionRow = Awaited<ReturnType<typeof fetchSessions>>[number];
 
+/** A session with its set-up (GET /sessions/:id); its type is SetupSession (setup-shared.tsx). */
 export const fetchSession = (id: string) => apiResponse(api.v1.sessions[':id'].$get({ param: { id } }));
-export type SessionDetail = Awaited<ReturnType<typeof fetchSession>>;
-export type SessionSeries = SessionDetail['series'][number];
 
 export const fetchMoney = (id: string, query: Partial<SessionMoneyQueryType>) =>
   apiResponse(api.v1.sessions[':id'].money.$get({ param: { id }, query: { filter: query.filter ?? 'all', ...(query.offerId ? { offerId: query.offerId } : {}), ...(query.sectionId ? { sectionId: query.sectionId } : {}) } }));

@@ -28,9 +28,9 @@ import { Switch } from '~/components/ui/switch';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
-import { Day, Modal, ErrorLine, INPUT_CLASS } from '../sessions-shared';
+import { Day, Modal, ErrorLine, INPUT_CLASS, fetchSession, sessionKey, STATUS_TONE } from '../sessions-shared';
 import {
-  fetchSetupSession, setupKey, STATUS_WORDS, STATUS_TONE, pickerValue, endOfSchoolDay, useImpactSave, ImpactDialog, refusalText,
+  STATUS_WORDS, pickerValue, endOfSchoolDay, useImpactSave, ImpactDialog, refusalText,
   type SetupSession,
 } from '../setup-shared';
 import { CheckList, openWaitsFor } from '../check-list.client';
@@ -52,7 +52,7 @@ function tabsFor(role: string): Tab[] {
 }
 
 export default function SessionClient({ id, viewerRole }: { id: string; viewerRole: string }): React.JSX.Element {
-  const { data: s, isLoading, isError, refetch } = useQuery({ queryKey: setupKey(id), queryFn: () => fetchSetupSession(id) });
+  const { data: s, isLoading, isError, refetch } = useQuery({ queryKey: sessionKey(id), queryFn: () => fetchSession(id) });
   const [tab, setTab] = useState<Tab | null>(null);
   useEffect(() => {
     const read = () => {

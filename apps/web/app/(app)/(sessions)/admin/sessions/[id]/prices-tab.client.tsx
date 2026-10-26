@@ -18,20 +18,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, type ParsePriceListType } from '@repo/validations';
+import { apiResponse, BoardCodeInputSchema, type ParsePriceListType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
 import { Money, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../sessions-shared';
 import {
-  fetchPrices, fetchReferenceBoards, pricesKey, REFERENCE_BOARDS_KEY, subjectTitle, useImpactSave, ImpactDialog, CommitSelect, refusalText,
-  type SetupSession, type PricesData,
+  fetchPrices, fetchReferenceBoards, pricesKey, REFERENCE_BOARDS_KEY, subjectTitle, rowName, useImpactSave, ImpactDialog, CommitSelect, refusalText,
+  CARD, TH, TD, type SetupSession, type PricesData,
 } from '../setup-shared';
 
 type PriceRow = PricesData['rows'][number];
 
-const rowName = (r: { kind: string; label: string }) => (r.kind === 'all_papers' ? 'All papers' : r.label);
 /** A price row's subject as she names it ("Arabic O.L."): the prices read gives the name alone. */
 const titleOf = (s: SetupSession, r: { offeringId: string; subject: string }) => {
   const o = s.offerings.find((x) => x.id === r.offeringId);
@@ -63,24 +62,21 @@ export default function PricesTab({ s, canEdit }: { s: SetupSession; canEdit: bo
   );
 }
 
-const card = 'rounded-xl border border-border bg-card p-5 shadow-sm';
-const th = 'px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground';
-const td = 'px-3 py-2 align-top';
 
 function ListsInUse({ data }: { data: PricesData }) {
   return (
-    <section className={card} aria-labelledby="lists-title">
+    <section className={CARD} aria-labelledby="lists-title">
       <h2 id="lists-title" className="font-display text-base font-semibold text-foreground">Price lists in use</h2>
       {data.lists.length ? (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-border"><th className={th}>List</th><th className={th}>Lines as printed</th><th className={th}>Not matched</th></tr></thead>
+            <thead><tr className="border-b border-border"><th className={TH}>List</th><th className={TH}>Lines as printed</th><th className={TH}>Not matched</th></tr></thead>
             <tbody>
               {data.lists.map((l) => (
                 <tr key={l.id} className="border-b border-border last:border-0">
-                  <td className={cn(td, 'font-medium')}><bdi data-i18n-skip="true">{l.name}</bdi></td>
-                  <td className={cn(td, 'tabular-nums')}>{l.lines}</td>
-                  <td className={cn(td, 'tabular-nums')}>{l.unmatched.length}</td>
+                  <td className={cn(TD, 'font-medium')}><bdi data-i18n-skip="true">{l.name}</bdi></td>
+                  <td className={cn(TD, 'tabular-nums')}>{l.lines}</td>
+                  <td className={cn(TD, 'tabular-nums')}>{l.unmatched.length}</td>
                 </tr>
               ))}
             </tbody>
@@ -127,13 +123,13 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
   const toCheck = parsed?.rows.filter((r) => r.matches.some((m) => m.toCheck)) ?? [];
   const notUsed = parsed?.rows.filter((r) => !r.matches.length || r.matches.every((m) => !m.toCheck && !m.rowIds.length)) ?? [];
   return (
-    <section className={card} aria-labelledby="paste-title">
+    <section className={CARD} aria-labelledby="paste-title">
       <h2 id="paste-title" className="font-display text-base font-semibold text-foreground">Paste a list as printed</h2>
       <p className="mt-1 text-sm text-muted-foreground">Copy the board&apos;s fee list from the PDF or sheet and paste it as it is: one line per code, name and amount. Lines match your rows by code; old codes and two codes on one line are understood.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="pl-board" className="block text-sm font-medium text-foreground">Board</label>
-          <select id="pl-board" className={cn(INPUT_CLASS, 'mt-1 w-56')} value={board} onChange={(e) => { setBoard(e.target.value as ParsePriceListType['board']); setForKey(''); parse.reset(); }}>
+          <select id="pl-board" className={cn(INPUT_CLASS, 'mt-1 w-56')} value={board} onChange={(e) => { setBoard(BoardCodeInputSchema.parse(e.target.value)); setForKey(''); parse.reset(); }}>
             {(boards.data ?? []).map((b) => <option key={b.code} value={b.code} data-i18n-skip="true">{b.name}</option>)}
           </select>
         </div>
@@ -161,17 +157,17 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
             {used.length ? (
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b border-border"><th className={th}>Code as printed</th><th className={th}>Name as printed</th><th className={th}>Amount</th><th className={th}>Goes to</th><th className={th}>Now</th></tr></thead>
+                  <thead><tr className="border-b border-border"><th className={TH}>Code as printed</th><th className={TH}>Name as printed</th><th className={TH}>Amount</th><th className={TH}>Goes to</th><th className={TH}>Now</th></tr></thead>
                   <tbody>
                     {used.map((r) => {
                       const targets = r.matches.filter((m) => !m.toCheck && m.rowIds.length).flatMap((m) => m.rowIds.map((id) => byRow.get(id))).filter((x): x is PriceRow => !!x);
                       return (
                         <tr key={`${r.lineNo}-${r.code}`} className="border-b border-border last:border-0">
-                          <td className={cn(td, 'font-mono text-xs')} dir="ltr" data-i18n-skip="true">{r.code}</td>
-                          <td className={td}><bdi data-i18n-skip="true">{r.name}</bdi></td>
-                          <td className={td}><Money amount={r.amount} /></td>
-                          <td className={td}>{targets.map((t) => <div key={t.rowId}><bdi data-i18n-skip="true">{titleOf(s, t)}</bdi> · <span data-i18n-skip="true">{rowName(t)}</span></div>)}</td>
-                          <td className={td}>{targets.map((t) => <div key={t.rowId}>{t.examFee === null ? <span className="text-amber-700 dark:text-amber-400">not set</span> : t.examFee === r.amount ? <span className="text-muted-foreground">same</span> : <Money amount={t.examFee} />}</div>)}</td>
+                          <td className={cn(TD, 'font-mono text-xs')} dir="ltr" data-i18n-skip="true">{r.code}</td>
+                          <td className={TD}><bdi data-i18n-skip="true">{r.name}</bdi></td>
+                          <td className={TD}><Money amount={r.amount} /></td>
+                          <td className={TD}>{targets.map((t) => <div key={t.rowId}><bdi data-i18n-skip="true">{titleOf(s, t)}</bdi> · <span data-i18n-skip="true">{rowName(t)}</span></div>)}</td>
+                          <td className={TD}>{targets.map((t) => <div key={t.rowId}>{t.examFee === null ? <span className="text-amber-700 dark:text-amber-400">not set</span> : t.examFee === r.amount ? <span className="text-muted-foreground">same</span> : <Money amount={t.examFee} />}</div>)}</td>
                         </tr>
                       );
                     })}
@@ -191,7 +187,7 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
                     {m.note && <p className="mt-1" lang="en" data-i18n-skip="true">{m.note}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <label htmlFor={`tc-${r.lineNo}`} className="font-medium">This line</label>
-                      <select id={`tc-${r.lineNo}`} className={cn(INPUT_CLASS, 'h-9 w-auto')} value={doubt[r.lineNo] ?? ''} onChange={(e) => setDoubt({ ...doubt, [r.lineNo]: e.target.value as 'use' | '' })}>
+                      <select id={`tc-${r.lineNo}`} className={cn(INPUT_CLASS, 'h-9 w-auto')} value={doubt[r.lineNo] ?? ''} onChange={(e) => setDoubt({ ...doubt, [r.lineNo]: e.target.value === 'use' ? 'use' : '' })}>
                         <option value="">Leave it out until the school confirms</option>
                         <option value="use">{`Use it: ${m.label}`}</option>
                       </select>
@@ -229,13 +225,13 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
 /** Amendment 4: every ticked row without an exam fee, each filled by typing it, its units' sum, the board's rule or another list. */
 function MissingFees({ s, data, edit }: { s: SetupSession; data: PricesData; edit: boolean }) {
   return (
-    <section className={card} aria-labelledby="missing-title">
+    <section className={CARD} aria-labelledby="missing-title">
       <h2 id="missing-title" className="font-display text-base font-semibold text-foreground"><span>Missing exam fees</span> <span className="text-muted-foreground">(<span>{data.missing.length}</span>)</span></h2>
       <p className="mt-1 text-sm text-muted-foreground">Every ticked row without an exam fee. A subject with a fee not set is not offered to families. Not set is not 0.</p>
       {data.missing.length ? (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-border"><th className={th}>Subject · row</th><th className={th}>Fill it by</th><th className={th}>Amount (EGP)</th></tr></thead>
+            <thead><tr className="border-b border-border"><th className={TH}>Subject · row</th><th className={TH}>Fill it by</th><th className={TH}>Amount (EGP)</th></tr></thead>
             <tbody>{data.missing.map((r) => <MissingRow key={r.rowId} s={s} r={r} edit={edit} />)}</tbody>
           </table>
         </div>
@@ -261,8 +257,8 @@ function MissingRow({ s, r, edit }: { s: SetupSession; r: PriceRow; edit: boolea
   const label = `${titleOf(s, r)} ${rowName(r)}`;
   return (
     <tr className="border-b border-border last:border-0">
-      <td className={td}><bdi data-i18n-skip="true">{titleOf(s, r)}</bdi> · <span data-i18n-skip="true">{rowName(r)}</span><ErrorLine message={set.error} /></td>
-      <td className={td}>
+      <td className={TD}><bdi data-i18n-skip="true">{titleOf(s, r)}</bdi> · <span data-i18n-skip="true">{rowName(r)}</span><ErrorLine message={set.error} /></td>
+      <td className={TD}>
         {fills.length ? (
           <CommitSelect className={cn(INPUT_CLASS, 'h-9 w-auto max-w-xs')} aria-label={`${label}: fill it by`} disabled={!edit || set.isPending} value="" reset
             onCommit={(v) => {
@@ -274,7 +270,7 @@ function MissingRow({ s, r, edit }: { s: SetupSession; r: PriceRow; edit: boolea
           </CommitSelect>
         ) : <span className="text-xs text-muted-foreground">typing it (no list we hold prints it)</span>}
       </td>
-      <td className={td}>
+      <td className={TD}>
         <input type="number" min={0} step={50} inputMode="decimal" className={cn(INPUT_CLASS, 'h-9 w-32')} placeholder="not set" aria-label={`${label}: exam fee`}
           disabled={!edit || set.isPending} value={amount} onChange={(e) => setAmount(e.target.value)}
           onBlur={() => { if (amount !== '' && Number(amount) >= 0) set.save({ amount: Number(amount) }); }}
@@ -288,12 +284,12 @@ function MissingRow({ s, r, edit }: { s: SetupSession; r: PriceRow; edit: boolea
 /** E3: the school's course fee, one per subject (a row may have its own, in the subject editor). Empty is not set; 0 is a fee. */
 function CourseFees({ s, edit }: { s: SetupSession; edit: boolean }) {
   return (
-    <section className={card} aria-labelledby="course-title">
+    <section className={CARD} aria-labelledby="course-title">
       <h2 id="course-title" className="font-display text-base font-semibold text-foreground">Course fees</h2>
       <p className="mt-1 text-sm text-muted-foreground"><span>The school&apos;s own fee, one per subject; a row may have its own in the subject&apos;s editor. Self study pays</span> <span>{s.selfStudyPercent}%</span> <span>of it. 0 is a fee; empty is not set.</span></p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-border"><th className={th}>Subject</th><th className={th}>The subject&apos;s course fee (EGP)</th><th className={th}>Rows with their own</th></tr></thead>
+          <thead><tr className="border-b border-border"><th className={TH}>Subject</th><th className={TH}>The subject&apos;s course fee (EGP)</th><th className={TH}>Rows with their own</th></tr></thead>
           <tbody>{s.offerings.map((o) => <CourseRow key={o.id} s={s} o={o} edit={edit} />)}</tbody>
         </table>
       </div>
@@ -317,8 +313,8 @@ function CourseRow({ s, o, edit }: { s: SetupSession; o: SetupSession['offerings
   const own = o.rows.filter((r) => r.courseFee !== null);
   return (
     <tr className="border-b border-border last:border-0">
-      <td className={td}><bdi data-i18n-skip="true">{subjectTitle(o)}</bdi><ErrorLine message={save.error} /></td>
-      <td className={td}>
+      <td className={TD}><bdi data-i18n-skip="true">{subjectTitle(o)}</bdi><ErrorLine message={save.error} /></td>
+      <td className={TD}>
         <input type="number" min={0} step={50} inputMode="decimal" className={cn(INPUT_CLASS, 'h-9 w-32')} placeholder="not set" aria-label={`${subjectTitle(o)}: course fee`}
           disabled={!edit || save.isPending} value={value} onChange={(e) => setValue(e.target.value)}
           onFocus={() => { entered.current = value; }}
@@ -331,7 +327,7 @@ function CourseRow({ s, o, edit }: { s: SetupSession; o: SetupSession['offerings
           }}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
       </td>
-      <td className={cn(td, 'text-xs text-muted-foreground')}>
+      <td className={cn(TD, 'text-xs text-muted-foreground')}>
         {own.length ? own.map((r, i) => <span key={r.id}>{i > 0 && ' · '}<span data-i18n-skip="true">{r.label}</span> <Money amount={r.courseFee} /></span>) : '—'}
         <ImpactDialog save={save} />
       </td>
@@ -352,7 +348,7 @@ function EveryFee({ s, data }: { s: SetupSession; data: PricesData }) {
     return <span>typed</span>;
   };
   return (
-    <section className={card} aria-labelledby="every-title">
+    <section className={CARD} aria-labelledby="every-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="every-title" className="font-display text-base font-semibold text-foreground"><span>Every exam fee</span> <span className="text-muted-foreground">(<span>{rows.length}</span>)</span></h2>
         <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show'}</Button>
@@ -360,13 +356,13 @@ function EveryFee({ s, data }: { s: SetupSession; data: PricesData }) {
       {open && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-border"><th className={th}>Subject · row</th><th className={th}>Exam fee</th><th className={th}>From</th></tr></thead>
+            <thead><tr className="border-b border-border"><th className={TH}>Subject · row</th><th className={TH}>Exam fee</th><th className={TH}>From</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.rowId} className="border-b border-border last:border-0">
-                  <td className={td}><bdi data-i18n-skip="true">{titleOf(s, r)}</bdi> · <span data-i18n-skip="true">{rowName(r)}</span></td>
-                  <td className={td}>{r.examFee === null ? <Badge tone="warning">not set</Badge> : <Money amount={r.examFee} />}</td>
-                  <td className={cn(td, 'text-xs text-muted-foreground')}>{from(r)}</td>
+                  <td className={TD}><bdi data-i18n-skip="true">{titleOf(s, r)}</bdi> · <span data-i18n-skip="true">{rowName(r)}</span></td>
+                  <td className={TD}>{r.examFee === null ? <Badge tone="warning">not set</Badge> : <Money amount={r.examFee} />}</td>
+                  <td className={cn(TD, 'text-xs text-muted-foreground')}>{from(r)}</td>
                 </tr>
               ))}
             </tbody>

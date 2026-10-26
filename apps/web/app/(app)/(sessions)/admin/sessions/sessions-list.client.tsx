@@ -17,13 +17,13 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, deriveSessionName, ROLES, type SessionType } from '@repo/validations';
+import { apiResponse, deriveSessionName, ROLES, SessionTypeSchema, type SessionType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { EmptyState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
-import { fetchSessions, SESSIONS_KEY, Money, Day, Modal, Field, INPUT_CLASS, ErrorLine, type SessionRow } from './sessions-shared';
-import { STATUS_WORDS, STATUS_TONE, refusalText } from './setup-shared';
+import { fetchSessions, SESSIONS_KEY, STATUS_TONE, Money, Day, Modal, Field, INPUT_CLASS, ErrorLine, type SessionRow } from './sessions-shared';
+import { STATUS_WORDS, refusalText } from './setup-shared';
 
 const TYPE_WORDS: Record<SessionType, string> = { june: 'June', winter: 'November / January' };
 
@@ -118,8 +118,8 @@ function NewSession({ sessions, onClose }: { sessions: SessionRow[]; onClose: ()
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!exists) create.mutate(); }}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Type" htmlFor="ns-type">
-            <select id="ns-type" className={INPUT_CLASS} value={type} onChange={(e) => { const t = e.target.value as SessionType; setType(t); setYear(suggest(t)); }}>
-              {(Object.keys(TYPE_WORDS) as SessionType[]).map((t) => <option key={t} value={t}>{TYPE_WORDS[t]}</option>)}
+            <select id="ns-type" className={INPUT_CLASS} value={type} onChange={(e) => { const t = SessionTypeSchema.parse(e.target.value); setType(t); setYear(suggest(t)); }}>
+              {SessionTypeSchema.options.map((t) => <option key={t} value={t}>{TYPE_WORDS[t]}</option>)}
             </select>
           </Field>
           <Field label="Year" htmlFor="ns-year">
@@ -132,7 +132,7 @@ function NewSession({ sessions, onClose }: { sessions: SessionRow[]; onClose: ()
           hint={start === 'copy'
             ? "Every subject, row, teacher, note, question, policy and share comes across. Earlier exams and dates move on a year; prices come across as last year's, not final."
             : 'No subjects: add them from the boards’ lists.'}>
-          <select id="ns-from" className={INPUT_CLASS} value={start} onChange={(e) => setFrom(e.target.value as 'copy' | 'empty')}>
+          <select id="ns-from" className={INPUT_CLASS} value={start} onChange={(e) => setFrom(e.target.value === 'copy' ? 'copy' : 'empty')}>
             <option value="copy" disabled={!last}>{last ? `Copy the last ${TYPE_WORDS[type]} session (${last.name})` : 'Copy the last session of this type (there is none yet)'}</option>
             <option value="empty">Empty</option>
           </select>

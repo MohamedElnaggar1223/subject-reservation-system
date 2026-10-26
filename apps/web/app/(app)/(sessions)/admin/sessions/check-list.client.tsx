@@ -35,8 +35,8 @@ import { useI18n } from '~/lib/i18n';
 import { herWords } from '~/lib/i18n-setup';
 import { Day, INPUT_CLASS } from './sessions-shared';
 import {
-  CELL_SHORT, examMonth, refusalText, subjectTitle,
-  type CellKey, type CheckItem, type Offering, type SetupSession,
+  CELL_SHORT, examMonth, refusalText, subjectTitle, isCell,
+  type CheckItem, type Offering, type SetupSession,
 } from './setup-shared';
 
 type Action =
@@ -217,7 +217,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
         return {
           key: id, href: subjectHref(id),
           body: <><Name>{subjectTitle(o)}</Name><span>:</span> {rows.map((r, i) => (
-            <span key={r.id}>{i > 0 && <span>; </span>}<span data-i18n-skip="true">{label(r)}</span> — {(r.cellsByDefault as CellKey[]).map((k, j) => <span key={k}>{j > 0 && ', '}<span>{CELL_SHORT[k] ?? k}</span></span>)}</span>
+            <span key={r.id}>{i > 0 && <span>; </span>}<span data-i18n-skip="true">{label(r)}</span> — {r.cellsByDefault.filter(isCell).map((k, j) => <span key={k}>{j > 0 && ', '}<span>{CELL_SHORT[k]}</span></span>)}</span>
           ))}</>,
         };
       }),

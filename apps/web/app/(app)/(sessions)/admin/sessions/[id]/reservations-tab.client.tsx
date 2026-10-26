@@ -18,10 +18,7 @@ import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { downloadCsv } from '~/lib/csv';
 import { cn } from '~/lib/utils';
 import { Money, ErrorLine } from '../sessions-shared';
-import { fetchReservations, reservationsKey, refusalText, subjectTitle, examMonth, type SetupSession } from '../setup-shared';
-
-const th = 'px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground';
-const td = 'px-3 py-2 align-top';
+import { fetchReservations, reservationsKey, refusalText, subjectTitle, examMonth, TH as th, TD as td, type SetupSession } from '../setup-shared';
 
 type Line = Awaited<ReturnType<typeof fetchReservations>>['lines'][number];
 

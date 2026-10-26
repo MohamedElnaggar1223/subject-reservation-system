@@ -17,14 +17,13 @@ import {
   apiResponse, schoolDateString, impactSentence, IMPACT_CHANGED_REFUSAL, type ImpactType, type QuestionInputType,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
-import type { Tone } from '~/components/ui/tone';
 import { herWords } from '~/lib/i18n-setup';
-import { Modal, errorText } from './sessions-shared';
+import { Modal, errorText, type fetchSession } from './sessions-shared';
 
 // ─── Fetchers (Appendix A) ───────────────────────────────────────────────────
 
-export const fetchSetupSession = (id: string) => apiResponse(api.v1.sessions[':id'].$get({ param: { id } }));
-export type SetupSession = Awaited<ReturnType<typeof fetchSetupSession>>;
+/** A session as GET /sessions/:id reads it (fetchSession, sessionKey: sessions-shared.tsx). */
+export type SetupSession = Awaited<ReturnType<typeof fetchSession>>;
 export type Offering = SetupSession['offerings'][number];
 export type OfferingRow = Offering['rows'][number];
 export type CheckItem = SetupSession['checkList'][number];
@@ -49,7 +48,6 @@ export type ReferenceBoard = Awaited<ReturnType<typeof fetchReferenceBoards>>[nu
 export const fetchTeachers = () => apiResponse(api.v1.teachers.$get({ query: { isActive: 'true' } }));
 export type SchoolTeacher = Awaited<ReturnType<typeof fetchTeachers>>[number];
 
-export const setupKey = (id: string) => ['sessions', id] as const;
 export const offeringKey = (id: string, offeringId: string) => ['sessions', id, 'offering', offeringId] as const;
 export const pricesKey = (id: string) => ['sessions', id, 'prices'] as const;
 export const previewKey = (id: string, offeringId: string, as: string) => ['sessions', id, 'preview', offeringId, as] as const;
@@ -82,6 +80,10 @@ export const ownName = (name: string, group: string) => {
 /** The four columns of D3, in the grid's order. */
 export const CELLS = ['firstInSchool', 'retakeInSchool', 'retakeSelfStudy', 'firstSelfStudy'] as const;
 export type CellKey = (typeof CELLS)[number];
+/** One of the four cells (the API reads them as text). */
+export const isCell = (c: string): c is CellKey => (CELLS as readonly string[]).includes(c);
+/** A row as her screens name it: an all-papers row is "All papers" (its stored label is the API's). */
+export const rowName = (r: { kind: string; label: string }) => (r.kind === 'all_papers' ? 'All papers' : r.label);
 export const CELL_WORDS: Record<CellKey, string> = {
   firstInSchool: 'First entry in school',
   retakeInSchool: 'Retake in school',
@@ -98,8 +100,7 @@ export const CELL_SHORT: Record<CellKey, string> = {
 /** An extra question's answer kind (D13), as her screens name it. */
 export const QUESTION_KIND_WORDS: Record<QuestionInputType['kind'], string> = { yes_no: 'Yes / no', text: 'Short text', choice: 'A choice' };
 
-/** A session's status as families meet it (C4), and its badge's tone. */
-export const STATUS_TONE: Record<string, Tone> = { active: 'success', draft: 'neutral', closed: 'danger' };
+/** A session's status as families meet it (C4); its badge's tone is sessions-shared's STATUS_TONE. */
 export const STATUS_WORDS: Record<string, string> = {
   active: 'Accepting reservations',
   draft: 'Draft — families cannot see it',
@@ -114,6 +115,11 @@ const MONTH_WORDS: Record<string, string> = { january: 'January', june: 'June', 
 export const examMonth = (month: string, year: number) => `${MONTH_WORDS[month] ?? month} ${year}`;
 const MONTH_INDEX: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 export const monthIndex = (month: string, year: number) => year * 12 + (MONTH_INDEX[month] ?? 0);
+
+/** A card on her screens, and a table's header and data cells. */
+export const CARD = 'rounded-xl border border-border bg-card p-5 shadow-sm';
+export const TH = 'px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+export const TD = 'px-3 py-2 align-top';
 
 /** An error's sentence in her words. */
 export const refusalText = (err: unknown) => herWords(errorText(err));

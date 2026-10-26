@@ -16,15 +16,15 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, SUBJECT_GROUPS, type ParsePriceListType } from '@repo/validations';
+import { apiResponse, SUBJECT_GROUPS, BoardCodeInputSchema, SubjectGroupSchema, type ParsePriceListType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
 import { cn } from '~/lib/utils';
 import { useI18n } from '~/lib/i18n';
-import { Money, Modal, Field, INPUT_CLASS, ErrorLine, fetchSessions, SESSIONS_KEY } from '../sessions-shared';
+import { Money, Modal, Field, INPUT_CLASS, ErrorLine, fetchSessions, fetchSession, sessionKey, SESSIONS_KEY } from '../sessions-shared';
 import {
-  fetchReferenceSubjects, fetchReferenceBoards, fetchSetupSession, REFERENCE_SUBJECTS_KEY, REFERENCE_BOARDS_KEY, setupKey,
+  fetchReferenceSubjects, fetchReferenceBoards, REFERENCE_SUBJECTS_KEY, REFERENCE_BOARDS_KEY,
   CELLS, CELL_SHORT, subjectTitle, useImpactSave, ImpactDialog, refusalText,
   type SetupSession, type Offering,
 } from '../setup-shared';
@@ -59,7 +59,7 @@ function useOpenNew(s: SetupSession) {
   const router = useRouter();
   const queryClient = useQueryClient();
   return async (offeringId: string) => {
-    await queryClient.invalidateQueries({ queryKey: setupKey(s.id) });
+    await queryClient.invalidateQueries({ queryKey: sessionKey(s.id) });
     router.push(`/admin/sessions/${s.id}/subjects/${offeringId}`);
   };
 }
@@ -72,8 +72,8 @@ function AddSubject({ s, onDialog }: { s: SetupSession; onDialog: (d: 'copy' | '
   const openNew = useOpenNew(s);
   const add = useMutation({
     mutationFn: async (key: string) => {
-      const [board, code] = key.split('|') as [string, string];
-      return apiResponse(api.v1.sessions[':id'].offerings.$post({ param: { id: s.id }, json: { referenceCode: code, board: board as ParsePriceListType['board'] } }));
+      const [board = '', code = ''] = key.split('|');
+      return apiResponse(api.v1.sessions[':id'].offerings.$post({ param: { id: s.id }, json: { referenceCode: code, board: BoardCodeInputSchema.parse(board) } }));
     },
     onSuccess: (o) => openNew(o.id),
   });
@@ -176,7 +176,7 @@ function CopySubject({ s, onClose }: { s: SetupSession; onClose: () => void }) {
   const others = (sessions.data ?? []).filter((x) => x.id !== s.id).sort((a, b) => b.seriesYear - a.seriesYear);
   const [from, setFrom] = useState('');
   const source = from || others[0]?.id || '';
-  const src = useQuery({ queryKey: setupKey(source), queryFn: () => fetchSetupSession(source), enabled: !!source });
+  const src = useQuery({ queryKey: sessionKey(source), queryFn: () => fetchSession(source), enabled: !!source });
   const have = new Set(s.offerings.map((o) => o.subject.id));
   const candidates = (src.data?.offerings ?? []).filter((o) => !have.has(o.subject.id));
   const [pick, setPick] = useState('');
@@ -232,12 +232,12 @@ function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) 
         <p className="text-sm text-muted-foreground">Families see its name as you type it, and the admin is told to add it to the board&apos;s list we hold.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Board" htmlFor="nl-board">
-            <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(e.target.value as ParsePriceListType['board'])}>
+            <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(BoardCodeInputSchema.parse(e.target.value))}>
               {(boards.data ?? []).map((b) => <option key={b.code} value={b.code} data-i18n-skip="true">{b.name}</option>)}
             </select>
           </Field>
           <Field label="Group" htmlFor="nl-group">
-            <select id="nl-group" className={INPUT_CLASS} value={group} onChange={(e) => setGroup(e.target.value as 'O.L.' | 'A.S./A.L.')}>
+            <select id="nl-group" className={INPUT_CLASS} value={group} onChange={(e) => setGroup(SubjectGroupSchema.parse(e.target.value))}>
               {SUBJECT_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           </Field>

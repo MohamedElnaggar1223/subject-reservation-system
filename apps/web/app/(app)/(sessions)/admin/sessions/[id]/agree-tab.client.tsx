@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
-  apiResponse, refundPolicySentence, DECLARATION_TEXT, ALLOWED_GRADES, QUESTION_KINDS, QuestionKindSchema,
+  apiResponse, refundPolicySentence, DECLARATION_TEXT, ALLOWED_GRADES, QUESTION_KINDS, QuestionKindSchema, RefundPolicySchema, AllowedGradeSchema,
   type RefundPolicy, type AllowedGrade, type UpdateSessionType, type QuestionInputType, type ImpactType,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
@@ -24,9 +24,8 @@ import { Badge } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
 import { cn } from '~/lib/utils';
 import { ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../sessions-shared';
-import { subjectTitle, useImpactSave, ImpactDialog, CommitSelect, QUESTION_KIND_WORDS, type SetupSession } from '../setup-shared';
+import { subjectTitle, useImpactSave, ImpactDialog, CommitSelect, QUESTION_KIND_WORDS, CARD as card, type SetupSession } from '../setup-shared';
 
-const card = 'rounded-xl border border-border bg-card p-5 shadow-sm';
 const PERCENTS = [100, 75, 50, 25, 0];
 const GRADE_WORDS: Record<AllowedGrade, string> = { '10': 'Grade 10', '11': 'Grade 11', '12': 'Grade 12', graduates: 'Graduates retaking' };
 type QuestionKind = QuestionInputType['kind'];
@@ -70,7 +69,7 @@ export default function AgreeTab({ s }: { s: SetupSession }) {
                   <div key={g} className="flex max-w-60 items-center justify-between gap-3">
                     <span className="text-sm text-foreground">{GRADE_WORDS[g]}</span>
                     <Switch checked={on} label={GRADE_WORDS[g]} disabled={closed || save.isPending || (on && s.allowedGrades.length === 1)}
-                      onChange={(next) => save.save({ allowedGrades: (next ? [...s.allowedGrades, g] : s.allowedGrades.filter((x) => x !== g)) as AllowedGrade[] })} />
+                      onChange={(next) => save.save({ allowedGrades: AllowedGradeSchema.array().parse(next ? [...s.allowedGrades, g] : s.allowedGrades.filter((x) => x !== g)) })} />
                   </div>
                 );
               })}
@@ -95,7 +94,8 @@ export default function AgreeTab({ s }: { s: SetupSession }) {
 
 /** C7: "until week N → P%" rows; the sentence families read made from them; fixed once a family agrees. */
 function RefundPolicyCard({ s, onSave, pending }: { s: SetupSession; onSave: (p: RefundPolicy) => void; pending: boolean }) {
-  const saved = (s.refundPolicy as RefundPolicy | null) ?? { steps: [{ throughWeek: null, percent: 0 }] };
+  const stored = RefundPolicySchema.safeParse(s.refundPolicy);
+  const saved: RefundPolicy = stored.success ? stored.data : { steps: [{ throughWeek: null, percent: 0 }] };
   const [steps, setSteps] = useState(saved.steps);
   const locked = s.refundPolicyLocked || s.status === 'closed';
   const changed = JSON.stringify(steps) !== JSON.stringify(saved.steps);

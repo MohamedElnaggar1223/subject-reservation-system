@@ -18,14 +18,15 @@ import { downloadCsv, toCsv } from '~/lib/csv';
 import { SessionCharges } from './session-charges.client';
 import { Remind } from './remind.client';
 import {
-  fetchMoney, moneyKey, Money, Day, INPUT_CLASS, LINE_STATUS_LABEL, LINE_STATUS_TONE, type SessionDetail,
+  fetchMoney, moneyKey, Money, Day, INPUT_CLASS, LINE_STATUS_LABEL, LINE_STATUS_TONE,
 } from '../sessions-shared';
+import type { SetupSession } from '../setup-shared';
 
 const FILTERS = ['all', 'unpaid', 'overdue', 'provisional', 'paid'] as const;
 type Filter = (typeof FILTERS)[number];
 const FILTER_LABEL: Record<Filter, string> = { all: 'All', unpaid: 'Unpaid', overdue: 'Overdue', provisional: 'Provisional', paid: 'Paid' };
 
-export default function MoneyTab({ session }: { session: SessionDetail }): React.JSX.Element {
+export default function MoneyTab({ session }: { session: SetupSession }): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
   const [offerId, setOfferId] = useState('');
   const [sectionId, setSectionId] = useState('');
