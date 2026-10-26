@@ -1,0 +1,1401 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coordinator set-up — clickable mock (COORDINATOR_REWORK.md, decision H2)</title>
+<!--
+  The clickable mock of decision H2 (COORDINATOR_REWORK.md): the coordinator's Home, Sessions, the Session page,
+  the Subject editor, the family's Reserve page and the desk, on the June 2027 pre-load of §8. One file, no external
+  requests, nothing saved. Teacher and student names are invented placeholders (the data rule: no real staff names in
+  a committed file); the structure of §8 is kept (how many teachers each subject has, online, external team, to be
+  confirmed, the same person across subjects).
+  Colours are the product's tokens (apps/web/app/globals.css, light theme) and the status tones of
+  components/ui/tone.tsx; no other palette.
+-->
+<style>
+:root{
+  --radius:.625rem;
+  --background:oklch(0.982 0.004 80); --foreground:oklch(0.17 0.02 265);
+  --card:oklch(1 0 0); --primary:oklch(0.44 0.11 178); --primary-foreground:oklch(0.99 0 0);
+  --secondary:oklch(0.955 0.005 80); --muted:oklch(0.955 0.005 80); --muted-foreground:oklch(0.50 0.01 265);
+  --accent:oklch(0.95 0.02 178); --accent-foreground:oklch(0.30 0.08 178);
+  --destructive:oklch(0.55 0.22 25); --border:oklch(0.91 0.005 80); --input:oklch(0.91 0.005 80); --ring:oklch(0.44 0.11 178);
+  --sidebar:oklch(0.20 0.04 220); --sidebar-foreground:oklch(0.90 0.01 220); --sidebar-primary:oklch(0.65 0.13 178);
+  --sidebar-primary-foreground:oklch(0.20 0.04 220); --sidebar-accent:oklch(0.26 0.04 220); --sidebar-accent-foreground:oklch(0.95 0.01 220);
+  --sidebar-border:oklch(0.30 0.04 220); --brand-100:oklch(0.92 0.06 178);
+  /* components/ui/tone.tsx: emerald (done), amber (attention), red (refused), violet (information) — 50 / 200 / 700 */
+  --ok-bg:oklch(0.979 0.021 166.113); --ok-bd:oklch(0.905 0.093 164.15); --ok-fg:oklch(0.508 0.118 165.612);
+  --warn-bg:oklch(0.987 0.022 95.277); --warn-bd:oklch(0.924 0.12 95.746); --warn-fg:oklch(0.555 0.163 48.998);
+  --bad-bg:oklch(0.971 0.013 17.38); --bad-bd:oklch(0.885 0.062 18.334); --bad-fg:oklch(0.505 0.213 27.518);
+  --info-bg:oklch(0.969 0.016 293.756); --info-bd:oklch(0.894 0.057 293.283); --info-fg:oklch(0.491 0.27 292.581);
+  --shadow-sm:0 1px 3px 0 oklch(0 0 0 / .1),0 1px 2px -1px oklch(0 0 0 / .1);
+  --shadow-xl:0 20px 25px -5px oklch(0 0 0 / .1),0 8px 10px -6px oklch(0 0 0 / .1);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--background);color:var(--foreground);font:14px/1.5 "Plus Jakarta Sans","DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+html[dir=rtl] body{font-family:Tahoma,Arial,system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+ul{margin:0;padding:0;list-style:none}
+.h1{font-size:24px;font-weight:700;line-height:1.25}
+.h2{font-size:18px;font-weight:600;line-height:1.35}
+.h3{font-size:15px;font-weight:600}
+.muted{color:var(--muted-foreground)}
+.xs{font-size:12px}.sm{font-size:13px}.b{font-weight:600}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.between{justify-content:space-between}
+.top{align-items:flex-start}
+.nowrap{flex-wrap:nowrap}
+.stack>*+*{margin-top:16px}
+.stack-sm>*+*{margin-top:6px}
+.mt4{margin-top:4px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+.grow{flex:1;min-width:0}
+.warnText{color:var(--warn-fg)}.badText{color:var(--bad-fg)}.okText{color:var(--ok-fg)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+/* the mock's own chrome */
+#mockbar{position:sticky;top:0;z-index:40;background:var(--foreground);color:var(--background);font-size:12px}
+#mockbar .mb{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:6px 14px}
+#mockbar .mb+.mb{border-top:1px solid oklch(1 0 0 / .12)}
+#mockbar .tag{background:var(--sidebar-primary);color:var(--sidebar-primary-foreground);font-weight:700;border-radius:4px;padding:1px 6px;letter-spacing:.06em}
+#mockbar button,#mockbar select{background:transparent;border:1px solid oklch(1 0 0 / .28);color:inherit;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px}
+#mockbar select option,#mockbar select optgroup{color:var(--foreground);background:var(--card)}
+#mockbar [aria-pressed=true],#mockbar select.on{background:var(--sidebar-primary);color:var(--sidebar-primary-foreground);border-color:var(--sidebar-primary)}
+#mockbar .where{font-weight:700}
+#mockbar .dim{opacity:.6}
+
+/* the product's shell (components/nav-shell.tsx) */
+.shell{display:flex;min-height:calc(100vh - 64px)}
+.side{width:256px;flex:none;background:var(--sidebar);color:var(--sidebar-foreground);display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:20px 16px}
+.logo{display:flex;width:36px;height:36px;flex:none;align-items:center;justify-content:center;border-radius:var(--radius);background:var(--sidebar-primary);color:var(--sidebar-primary-foreground);font-weight:700;font-size:13px}
+.nav{padding:0 12px 16px}
+.nav .sec{margin:20px 0 6px;padding:0 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:oklch(0.90 0.01 220 / .6)}
+.nav button{display:flex;width:100%;align-items:center;gap:12px;border:0;background:transparent;color:oklch(0.90 0.01 220 / .72);padding:8px 12px;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;text-align:start;margin-top:2px}
+.nav button:hover{background:var(--sidebar-accent);color:var(--sidebar-accent-foreground)}
+.nav button[aria-current=page]{background:var(--sidebar-primary);color:var(--sidebar-primary-foreground);box-shadow:var(--shadow-sm)}
+.nav button:disabled{opacity:.45;cursor:default;background:transparent}
+.nav svg{width:20px;height:20px;flex:none}
+.sidefoot{margin-top:auto;border-top:1px solid var(--sidebar-border);padding:12px;display:flex;align-items:center;gap:12px}
+.avatar{display:flex;width:32px;height:32px;flex:none;align-items:center;justify-content:center;border-radius:50%;background:var(--sidebar-accent);color:var(--sidebar-accent-foreground);font-size:12px;font-weight:600}
+.main{flex:1;min-width:0}
+.mhead{display:none;height:56px;align-items:center;gap:8px;border-bottom:1px solid var(--border);background:var(--card);padding:0 16px;font-weight:700}
+.mhead .logo{width:28px;height:28px;font-size:12px;background:var(--primary);color:var(--primary-foreground)}
+.page{max-width:1280px;margin:0 auto;padding:32px 24px 64px}
+@media (max-width:1023px){.side{display:none}.mhead{display:flex}.page{padding:20px 14px 48px}}
+
+/* components (components/ui/*) */
+.card{background:var(--card);border:1px solid var(--border);border-radius:calc(var(--radius) + 4px);box-shadow:var(--shadow-sm);padding:20px}
+.card.tight{padding:14px 16px}
+.card.flat{background:var(--muted);box-shadow:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 16px;border-radius:var(--radius);font-size:14px;font-weight:600;border:1px solid transparent;cursor:pointer;white-space:nowrap;background:var(--primary);color:var(--primary-foreground)}
+.btn:hover{background:oklch(0.44 0.11 178 / .9)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.outline{background:var(--background);border-color:var(--border);color:var(--foreground);box-shadow:0 1px 2px oklch(0 0 0 / .05)}
+.btn.outline:hover{background:var(--accent);color:var(--accent-foreground)}
+.btn.ghost{background:transparent;color:var(--foreground)}
+.btn.ghost:hover{background:var(--accent);color:var(--accent-foreground)}
+.btn.danger{background:var(--destructive);color:var(--primary-foreground)}
+.btn.sm{height:32px;padding:0 12px;font-size:13px;border-radius:calc(var(--radius) - 2px)}
+.btn.xs{height:26px;padding:0 9px;font-size:12px;border-radius:calc(var(--radius) - 4px)}
+.link{background:none;border:0;padding:0;color:var(--primary);cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:3px;text-align:start}
+.link.plain{color:var(--foreground);text-decoration:none}
+.link.plain:hover{text-decoration:underline}
+:focus-visible{outline:3px solid oklch(0.44 0.11 178 / .5);outline-offset:1px}
+.input{height:40px;width:100%;border:1px solid var(--input);border-radius:var(--radius);background:var(--background);padding:0 12px;font-size:14px;box-shadow:0 1px 2px oklch(0 0 0 / .05)}
+.input.s{height:34px;font-size:13px;padding:0 8px}
+textarea.input{height:auto;padding:8px 12px;min-height:64px;resize:vertical;line-height:1.45}
+.input:disabled{opacity:.55}
+.fee{width:104px}
+.field label,.lbl{display:block;font-size:13px;font-weight:500;margin-bottom:4px}
+.hint{font-size:12px;color:var(--muted-foreground);margin-top:4px}
+input[type=checkbox],input[type=radio]{accent-color:var(--primary);width:16px;height:16px;margin:0;vertical-align:middle;cursor:pointer;flex:none}
+input:disabled{cursor:default}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:var(--muted);color:var(--muted-foreground)}
+.badge.ok{background:var(--ok-bg);color:var(--ok-fg)}.badge.warn{background:var(--warn-bg);color:var(--warn-fg)}.badge.bad{background:var(--bad-bg);color:var(--bad-fg)}.badge.info{background:var(--info-bg);color:var(--info-fg)}
+.notice{border:1px solid var(--border);border-radius:calc(var(--radius) + 4px);padding:12px 14px;font-size:13px;background:var(--muted)}
+.notice.ok{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-bd)}.notice.warn{background:var(--warn-bg);color:var(--warn-fg);border-color:var(--warn-bd)}
+.notice.bad{background:var(--bad-bg);color:var(--bad-fg);border-color:var(--bad-bd)}.notice.info{background:var(--info-bg);color:var(--info-fg);border-color:var(--info-bd)}
+.mocknote{border:1px dashed var(--muted-foreground);border-radius:var(--radius);padding:8px 12px;font-size:12px;color:var(--muted-foreground);background:var(--card)}
+.mocknote b{color:var(--foreground)}
+.switch{position:relative;display:inline-flex;width:40px;height:22px;flex:none;border-radius:999px;border:0;background:var(--input);cursor:pointer;padding:0;transition:background .15s}
+.switch .thumb{position:absolute;top:2px;inset-inline-start:2px;width:18px;height:18px;border-radius:50%;background:var(--card);box-shadow:var(--shadow-sm);transition:inset-inline-start .15s}
+.switch.on{background:var(--primary)}
+.switch.on .thumb{inset-inline-start:20px}
+.switch:disabled{opacity:.5;cursor:default}
+.swrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.swlabel{font-size:14px;font-weight:500}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--border)}
+.tabs button{margin-bottom:-1px;border:0;border-bottom:2px solid transparent;background:none;padding:8px 16px;font-size:14px;font-weight:500;color:var(--muted-foreground);cursor:pointer}
+.tabs button[aria-selected=true]{border-color:var(--primary);color:var(--foreground)}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{background:oklch(0.955 0.005 80 / .45);color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:500;text-align:start;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:bottom}
+table.t td{padding:8px 10px;border-top:1px solid var(--border);vertical-align:top;text-align:start}
+html[dir=rtl] table.t th,html[dir=rtl] table.t td{text-align:right}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:calc(var(--radius) + 4px);background:var(--card)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--border);border-radius:calc(var(--radius) + 4px);box-shadow:var(--shadow-sm);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.tile.off{background:var(--muted);box-shadow:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:3px 6px 3px 10px;background:var(--card);font-size:13px}
+.tog{border:1px solid var(--border);background:var(--background);border-radius:999px;font-size:11px;padding:1px 8px;cursor:pointer;color:var(--muted-foreground)}
+.tog[aria-pressed=true]{background:var(--accent);color:var(--accent-foreground);border-color:var(--brand-100);font-weight:600}
+.x{border:0;background:none;cursor:pointer;color:var(--muted-foreground);font-size:16px;line-height:1;padding:0 4px}
+.x:hover{color:var(--foreground)}
+.check{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)}
+.check:first-child{border-top:0}
+.dot{width:8px;height:8px;border-radius:50%;margin-top:7px;flex:none}
+.dot.block{background:var(--bad-fg)}.dot.look{background:var(--warn-fg)}.dot.info{background:var(--muted-foreground)}
+.modal-bg{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:oklch(0 0 0 / .5);padding:16px}
+.modal{width:100%;max-width:540px;max-height:90vh;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:calc(var(--radius) + 4px);box-shadow:var(--shadow-xl)}
+.modal .mh{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);padding:16px 24px}
+.modal .mbody{padding:20px 24px}
+.modal .mf{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;background:var(--foreground);color:var(--background);padding:10px 16px;border-radius:var(--radius);font-size:13px;box-shadow:var(--shadow-xl);max-width:90vw}
+/* subject editor */
+.ed{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+.pv{position:sticky;top:80px}
+@media (max-width:1240px){.ed{grid-template-columns:1fr}.pv{position:static}}
+table.grid td.c,table.grid th.c{text-align:center}
+table.grid th.c label{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px}
+table.grid th.c{width:66px;padding:8px 4px}
+table.grid td.rowc{min-width:170px}
+table.grid .fee{width:92px}
+.tile .swl{white-space:nowrap}
+table.grid tr.offrow td{color:var(--muted-foreground)}
+table.grid tr.more td{background:oklch(0.955 0.005 80 / .55);border-top:0}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);padding:2px;background:var(--card)}
+.seg button{border:0;background:none;border-radius:calc(var(--radius) - 2px);padding:5px 12px;font-size:13px;cursor:pointer;color:var(--muted-foreground)}
+.seg button[aria-pressed=true]{background:var(--primary);color:var(--primary-foreground)}
+/* the family's page */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:12px}
+@media (max-width:640px){.fgrid{grid-template-columns:1fr}}
+.fcard{background:var(--card);border:1px solid var(--border);border-radius:calc(var(--radius) + 4px);box-shadow:var(--shadow-sm);padding:16px}
+.fcard.chosen{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.price{font-weight:600}
+.optset{border:0;padding:0;margin-inline:0}
+.optset legend{padding:0}
+.opt{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);margin-top:4px;font-size:13px;cursor:pointer;background:var(--card)}
+.opt.on{border-color:var(--primary);background:var(--accent)}
+.optdetail{padding:4px 10px 0}
+.consent{display:flex;align-items:flex-start;gap:8px;font-size:13px}
+.consent input{margin-top:2px}
+</style>
+</head>
+<body>
+<div id="mockbar"></div>
+<div id="app"></div>
+<div id="layer"></div>
+<noscript>This mock needs JavaScript.</noscript>
+<script>
+(function () {
+'use strict';
+
+/* ───────────────────────── Helpers ───────────────────────── */
+const TODAY = '2026-10-26';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const n2 = (n) => Number(n).toLocaleString('en-US');
+const MON = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MON_S = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MON_AR = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const day = (iso, lang) => { if (!iso) return ''; const [y, m, d] = iso.split('-').map(Number); return lang === 'ar' ? `${d} ${MON_AR[m]} ${y}` : `${d} ${MON_S[m]} ${y}`; };
+const ym = (k, lang) => { const [y, m] = k.split('-').map(Number); return `${lang === 'ar' ? MON_AR[m] : MON[m]} ${y}`; };
+const ymShift = (k, years) => `${Number(k.slice(0, 4)) + years}${k.slice(4)}`;
+const dShift = (iso, years) => (iso ? `${Number(iso.slice(0, 4)) + years}${iso.slice(4)}` : iso);
+const monthsBetween = (a, b) => { const [ya, ma] = a.split('-').map(Number); const [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const clone = (o) => JSON.parse(JSON.stringify(o));
+let seq = 100;
+const nid = (p) => `${p}${++seq}`;
+const money = (n, lang) => (n == null ? '' : lang === 'ar' ? `<span class="num" dir="ltr">${n2(n)}</span> جنيه` : `<span class="num" dir="ltr">EGP ${n2(n)}</span>`);
+const moneyTxt = (n, lang) => (lang === 'ar' ? `${n2(n)} جنيه` : `EGP ${n2(n)}`);
+const normCode = (s) => String(s).toUpperCase().replace(/\s+/g, ' ').trim();
+const sumParts = (p) => Object.values(p).reduce((a, b) => a + b, 0);
+const numOrNull = (v) => (v === '' || v == null ? null : Math.max(0, Number(v)));
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
+
+/* ───────────────────────── Reference data (ours: §7) ───────────────────────── */
+const BOARDS = {
+  cambridge: { name: 'Cambridge', onePaperFee: 'syllabus', onePaperAsks: true, carryMonths: 13, deadlines: { '2027-06': '2027-02-21', '2028-06': '2028-02-21', '2027-11': '2027-09-15' } },
+  edexcel: { name: 'Edexcel', onePaperFee: 'paper', onePaperAsks: false, carryMonths: null, deadlines: { '2027-06': '2027-02-21', '2028-06': '2028-02-21', '2027-11': '2027-09-21' } },
+  oxford: { name: 'OxfordAQA', onePaperFee: 'syllabus', onePaperAsks: false, carryMonths: null, deadlines: {} },
+};
+const ALIASES = { cambridge: { '9608 SY': ['cam-9618', 'as'] }, edexcel: {}, oxford: {} };
+
+function R(key, kind, en, ar, codes, extra) { return Object.assign({ key, kind, label: { en, ar }, codes: codes || [] }, extra || {}); }
+const ALL = (code, extra) => R('all', 'all', 'All papers', 'كل الأوراق', code ? [code] : [], extra);
+const P41 = () => R('p4', 'paper', 'Paper 41/42 only', 'الورقة 41/42 فقط', []);
+const ROUTES = (c) => [R('as', 'as', 'A.S.', 'A.S.', c ? [c + ' AS'] : []), R('a2', 'a2', 'A.2.', 'A.2.', c ? [c + ' A2'] : []), R('al', 'al', 'A.L.', 'A.L.', c ? [c + ' AL'] : [])];
+const UNITS = (list) => list.map(([key, short, code, req, winter]) => R(key, 'unit', `${short} (${code})`, `${short.replace('Unit', 'الوحدة')} (${code})`, [code], { required: !!req, winter }));
+
+const REF = [
+  { ref: 'cam-3180', board: 'cambridge', code: '3180', title: 'Arabic O.L.', group: 'OL', rows: [ALL('3180 A'), R('p1', 'paper', 'Paper 1 only', 'الورقة 1 فقط', []), R('p2', 'paper', 'Paper 2 only', 'الورقة 2 فقط', [])] },
+  { ref: 'cam-0970', board: 'cambridge', code: '0970', title: 'Biology O.L.', group: 'OL', rows: [ALL('0970 CX'), P41()] },
+  { ref: 'cam-0986', board: 'cambridge', code: '0986', title: 'Business O.L.', group: 'OL', rows: [ALL('0986 AX')] },
+  { ref: 'cam-0971', board: 'cambridge', code: '0971', title: 'Chemistry O.L.', group: 'OL', rows: [ALL('0971 CX'), P41()] },
+  { ref: 'cam-0653', board: 'cambridge', code: '0653', title: 'Combined Science O.L.', group: 'OL', rows: [ALL('0653 CX'), P41()] },
+  { ref: 'cam-0984', board: 'cambridge', code: '0984', title: 'Computer Science O.L.', group: 'OL', rows: [ALL('0984 AX')] },
+  { ref: 'oxf-esl', board: 'oxford', code: '', title: 'English as a Second Language', group: 'OL', toCheck: true, rows: [ALL(null)] },
+  { ref: 'cam-0680', board: 'cambridge', code: '0680', title: 'Environmental Management O.L.', group: 'OL', rows: [ALL('0680 AX')] },
+  { ref: 'cam-7156', board: 'cambridge', code: '7156', title: 'French O.L.', group: 'OL', rows: [ALL('7156 X')] },
+  { ref: 'cam-7159', board: 'cambridge', code: '7159', title: 'German O.L.', group: 'OL', rows: [ALL('7159 Y')] },
+  { ref: 'cam-0457', board: 'cambridge', code: '0457', title: 'Global Perspectives O.L.', group: 'OL', rows: [ALL('0457 AX')] },
+  { ref: 'cam-gc', board: 'cambridge', code: '', title: 'Global Citizenship O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
+  { ref: 'edx-4hb1', board: 'edexcel', code: '4HB1', title: 'Human Biology O.L.', group: 'OL', rows: [ALL('4HB1')] },
+  { ref: 'cam-0983', board: 'cambridge', code: '0983', title: 'ICT O.L.', group: 'OL', rows: [ALL('0983 DY'), R('th', 'paper', 'Theory paper only', 'الورقة النظرية فقط', [])] },
+  { ref: 'edx-4ma1', board: 'edexcel', code: '4MA1', title: 'Mathematics O.L.', group: 'OL', rows: [ALL(null, { sumOf: ['4MA1 1H', '4MA1 2H'] }), R('p1h', 'paper', 'Paper 1H only', 'الورقة 1H فقط', ['4MA1 1H']), R('p2h', 'paper', 'Paper 2H only', 'الورقة 2H فقط', ['4MA1 2H'])] },
+  { ref: 'cam-0972', board: 'cambridge', code: '0972', title: 'Physics O.L.', group: 'OL', rows: [ALL('0972 CX'), P41()] },
+  { ref: 'oxf-psy', board: 'oxford', code: '', title: 'Psychology O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
+  { ref: 'edx-ara-al', board: 'edexcel', code: 'YAA01 · 9AA0', title: 'Arabic A.L.', group: 'AS', rows: [R('ial', 'qual', 'International A Level (YAA01)', 'المستوى المتقدم الدولي (YAA01)', ['YAA01'], { sumOf: ['WAA01', 'WAA02'] }), R('gce', 'qual', 'GCE A Level (9AA0)', 'المستوى المتقدم GCE (9AA0)', ['9AA0'])] },
+  { ref: 'edx-bio-ial', board: 'edexcel', code: 'YBI11', title: 'Biology A.S./A.L.', group: 'AS', rows: UNITS([['u1', 'Unit 1', 'WBI11', 1, 'november'], ['u2', 'Unit 2', 'WBI12', 1, 'november'], ['u3', 'Unit 3', 'WBI13', 1, 'january'], ['u4', 'Unit 4', 'WBI14', 1, 'january'], ['u5', 'Unit 5', 'WBI15', 1, 'january'], ['u6', 'Unit 6', 'WBI16', 1, 'january']]) },
+  { ref: 'cam-9701', board: 'cambridge', code: '9701', title: 'Chemistry A.S.', group: 'AS', rows: ROUTES('9701') },
+  { ref: 'cam-9618', board: 'cambridge', code: '9618', title: 'Computer Science A.S./A.L.', group: 'AS', rows: ROUTES('9618') },
+  { ref: 'cam-fr-al', board: 'cambridge', code: '', title: 'French A.S./A.L.', group: 'AS', toCheck: true, rows: [R('as', 'as', 'A.S.', 'A.S.', []), R('al', 'al', 'A.L.', 'A.L.', [])] },
+  { ref: 'edx-math-ial', board: 'edexcel', code: 'YMA01', title: 'Mathematics A.S./A.L.', group: 'AS', rows: UNITS([['p1', 'P1', 'WMA11', 1, 'january'], ['p2', 'P2', 'WMA12', 1, 'january'], ['p3', 'P3', 'WMA13', 1, 'january'], ['p4', 'P4', 'WMA14', 1, 'january'], ['m1', 'M1', 'WME01', 0, 'january'], ['s1', 'S1', 'WST01', 0, 'january'], ['m2', 'M2', 'WME02', 0, 'january'], ['s2', 'S2', 'WST02', 0, 'january'], ['d1', 'D1', 'WDM11', 0, 'january'], ['fp1', 'FP1', 'WFM01', 0, 'january']]) },
+  { ref: 'cam-9702', board: 'cambridge', code: '9702', title: 'Physics A.S./A.L.', group: 'AS', rows: ROUTES('9702') },
+  { ref: 'cam-9990', board: 'cambridge', code: '9990', title: 'Psychology A.L.', group: 'AS', toCheck: true, rows: ROUTES('9990') },
+  // On the boards' lists, not offered in June 2027
+  { ref: 'cam-0455', board: 'cambridge', code: '0455', title: 'Economics O.L.', group: 'OL', rows: [ALL('0455 AX'), P41()] },
+  { ref: 'cam-0985', board: 'cambridge', code: '0985', title: 'Accounting O.L.', group: 'OL', rows: [ALL('0985 AX')] },
+  { ref: 'cam-0980', board: 'cambridge', code: '0980', title: 'Mathematics O.L. (Cambridge)', group: 'OL', rows: [ALL('0980 CX'), P41()] },
+  { ref: 'cam-0610', board: 'cambridge', code: '0610', title: 'Biology O.L. (0610)', group: 'OL', rows: [ALL('0610 CX'), P41()] },
+  { ref: 'cam-9709', board: 'cambridge', code: '9709', title: 'Mathematics A.S./A.L. (Cambridge)', group: 'AS', rows: ROUTES('9709') },
+  { ref: 'cam-9700', board: 'cambridge', code: '9700', title: 'Biology A.S./A.L. (Cambridge)', group: 'AS', rows: ROUTES('9700') },
+  { ref: 'cam-9708', board: 'cambridge', code: '9708', title: 'Economics A.S./A.L.', group: 'AS', rows: ROUTES('9708') },
+  { ref: 'edx-4ph1', board: 'edexcel', code: '4PH1', title: 'Physics O.L. (Edexcel)', group: 'OL', rows: [ALL('4PH1')] },
+  { ref: 'edx-4ch1', board: 'edexcel', code: '4CH1', title: 'Chemistry O.L. (Edexcel)', group: 'OL', rows: [ALL('4CH1')] },
+  { ref: 'edx-eco-ial', board: 'edexcel', code: 'YEC11', title: 'Economics A.S./A.L. (Edexcel)', group: 'AS', rows: UNITS([['u1', 'Unit 1', 'WEC11', 1], ['u2', 'Unit 2', 'WEC12', 1], ['u3', 'Unit 3', 'WEC13', 1], ['u4', 'Unit 4', 'WEC14', 1]]) },
+];
+const REFMAP = Object.fromEntries(REF.map((r) => [r.ref, r]));
+
+/* Invented placeholder teachers: one record per person, as many per subject as §8 has. */
+const TEACHER_SEED = [
+  ['t01', 'Tarek Sobhy'], ['t02', 'Sameh Lotfy'], ['t03', 'Ehab Zaki'], ['t04', 'Nermine Fouad'], ['t05', 'Ghada Selim'], ['t06', 'Bishoy Adly'],
+  ['t07', 'Amr Shawky'], ['t08', "Mo'taz Helal"], ['t09', 'Riham Saad'], ['t10', 'Basma Soliman'], ['t11', 'Hazem Ragab', 'Orbit team'], ['t12', 'Nihal Wahba'],
+  ['t13', 'Lina Atef'], ['t14', 'Yasmine Ghali'], ['t15', 'Hoda Sharaf'], ['t16', 'Nayra Elbaroudy'], ['t17', 'Leena Kamal'], ['t18', 'Fady Gerges', 'Orbit team'],
+  ['t19', 'Shereen Okasha'], ['t20', 'Ramy Wagdy'], ['t21', 'Marwa Elkady'], ['t22', 'Peter Wassef'], ['t23', 'Mirna Ayad'], ['t24', 'Hala Mokhtar'],
+];
+
+/* The fee lists as printed (§1), the latest she held for June 2027. */
+const LISTS = [
+  { id: 'cam-jun26', board: 'cambridge', name: 'Cambridge June 2026', rows: [['3180 A', 'Arabic', 9850], ['0970 CX', 'Biology', 10850], ['0986 AX', 'Business', 9850], ['0971 CX', 'Chemistry', 10850], ['0653 CX', 'Combined Science', 10850], ['0984 AX', 'Computer Science', 9850], ['7156 X', 'French', 12550], ['7159 Y', 'German', 12550], ['0983 DY', 'Information and Communication Technology', 12950], ['0972 CX', 'Physics', 10850], ['9701 AS', 'Chemistry AS Level', 14100], ['9701 AL', 'Chemistry A Level', 18600], ['9608 SY', 'Computer Science AS Level', 11400], ['9618 A2', 'Computer Science A2', 12450], ['9618 AL', 'Computer Science A Level', 16950], ['9702 AS', 'Physics AS Level', 14100], ['9702 A2', 'Physics A2', 11400]] },
+  { id: 'edx-jun26', board: 'edexcel', name: 'Edexcel June 2026', rows: [['4MA1 1H', 'Mathematics A Paper 1H', 4600], ['4MA1 2H', 'Mathematics A Paper 2H', 4600], ['WAA01', 'Arabic Unit 1', 8950], ['WAA02', 'Arabic Unit 2', 9350], ['WBI15', 'Biology Unit 5', 4450], ['WBI16', 'Biology Unit 6', 4450], ['WMA11', 'Pure Mathematics P1', 4800], ['WMA12', 'Pure Mathematics P2', 4800], ['WMA13', 'Pure Mathematics P3', 4800], ['WMA14', 'Pure Mathematics P4', 4800], ['WME01', 'Mechanics M1', 4450], ['WST01', 'Statistics S1', 4450]] },
+  { id: 'edx-nov26', board: 'edexcel', name: 'Edexcel November 2026', rows: [['4HB1', 'Human Biology', 9840], ['4MA1 1H', 'Mathematics A Paper 1H', 9840], ['4MA1 2H', 'Mathematics A Paper 2H', 9840], ['WBI11', 'Biology Unit 1', 4790], ['WBI12', 'Biology Unit 2', 4790], ['WBI13', 'Biology Unit 3', 4790], ['WBI14', 'Biology Unit 4', 4790]] },
+];
+const EXAMPLE_TEXT = {
+  cambridge: ['3180 A     Arabic                         10,350', '0970 CX    Biology                        11,400', '0986 AX    Business                       10,350', '0971 CX    Chemistry                      11,400', '0653 CX    Combined Science               11,400', '0984 AX    Computer Science               10,350', '0680 AX    Environmental Management       10,350', '7156 X     French                         13,200', '7159 Y     German                         13,200', '0457 AX    Global Perspectives            10,900', '0983 DY    Information and Communication Technology  13,600', '0972 CX    Physics                        11,400', '9701 AS    Chemistry AS Level             14,800', '9701 AL    Chemistry A Level              19,500', '9618 AS    Computer Science AS Level      12,000', '9618 A2    Computer Science A2            13,100', '9618 AL    Computer Science A Level       17,800', '9702 AS    Physics AS Level               14,800', '9702 A2    Physics A2                     12,000', '9990 AL    Psychology A Level             19,500', '0610 CX    Biology                        11,400'].join('\n'),
+  edexcel: ['4HB1           Human Biology                10,300', '4MA1 1H        Mathematics A Paper 1H        4,850', '4MA1 2H        Mathematics A Paper 2H        4,850', 'WAA01          Arabic Unit 1                 9,400', 'WAA02          Arabic Unit 2                 9,800', 'WBI15          Biology Unit 5                4,650', 'WBI16          Biology Unit 6                4,650', 'WMA11          Pure Mathematics P1           5,050', 'WMA12          Pure Mathematics P2           5,050', 'WMA13          Pure Mathematics P3           5,050', 'WMA14          Pure Mathematics P4           5,050', 'WME01 / WST01  Mechanics M1 / Statistics S1  4,650', '9AA0           Arabic (GCE A Level)         21,000', 'XFR21          French (not ours)             9,000'].join('\n'),
+  oxford: ['9271   English as a Second Language   8,900', '9273   Psychology                     9,300'].join('\n'),
+};
+
+/* §8, row for row (cells: fi first entry in school · ri retake in school · rs retake self study · fs first entry self study). */
+const L26C = 'cam-jun26', L26E = 'edx-jun26', N26E = 'edx-nov26';
+const PRE = [
+  { ref: 'cam-3180', T: ['t01', 't02', 't03'], rows: { all: 'fi ri rs', p1: 'ri rs', p2: 'ri rs' }, earlier: ['2026-06'], fees: { all: [9850, 'list', L26C], p1: [9850, 'board_rule'], p2: [9850, 'board_rule'] } },
+  { ref: 'cam-0970', T: ['t04', 't05', 't06'], rows: { all: 'fi ri rs', p4: 'rs' }, fees: { all: [10850, 'list', L26C], p4: [10850, 'board_rule'] } },
+  { ref: 'cam-0986', T: ['t07'], rows: { all: 'fi ri rs' }, fees: { all: [9850, 'list', L26C] } },
+  { ref: 'cam-0971', T: ['t08', 't09', 't10'], rows: { all: 'fi ri rs', p4: 'rs' }, fees: { all: [10850, 'list', L26C], p4: [10850, 'board_rule'] } },
+  { ref: 'cam-0653', T: ['t10'], rows: { all: 'fi ri rs', p4: 'rs' }, fees: { all: [10850, 'list', L26C], p4: [10850, 'board_rule'] } },
+  { ref: 'cam-0984', T: ['t11:external'], rows: { all: 'fi ri rs' }, fees: { all: [9850, 'list', L26C] } },
+  { ref: 'oxf-esl', T: ['t12', 't13'], rows: { all: 'fi ri rs' } },
+  { ref: 'cam-0680', T: ['t05'], rows: { all: 'fi ri rs' } },
+  { ref: 'cam-7156', T: ['t14'], rows: { all: 'fi ri rs' }, fees: { all: [12550, 'list', L26C] } },
+  { ref: 'cam-7159', T: ['t15'], rows: { all: 'fi ri rs' }, fees: { all: [12550, 'list', L26C] } },
+  { ref: 'cam-0457', T: ['t16:online'], rows: { all: 'fi ri rs' } },
+  { ref: 'cam-gc', T: ['t17'], rows: { all: 'fi ri rs' } },
+  { ref: 'edx-4hb1', T: ['t05'], rows: { all: 'fi ri rs' }, fees: { all: [9840, 'list', N26E] } },
+  { ref: 'cam-0983', T: ['t18:external'], rows: { all: 'fi ri rs', th: 'rs' }, fees: { all: [12950, 'list', L26C], th: [12950, 'board_rule'] } },
+  { ref: 'edx-4ma1', T: ['t19', 't20', 't21'], rows: { all: 'fi ri rs', p1h: 'rs', p2h: 'rs' }, fees: { all: [9200, 'units_sum'], p1h: [4600, 'list', L26E], p2h: [4600, 'list', L26E] }, parts: { all: { '4MA1 1H': 4600, '4MA1 2H': 4600 } } },
+  { ref: 'cam-0972', T: ['t22'], rows: { all: 'fi ri rs', p4: 'rs' }, fees: { all: [10850, 'list', L26C], p4: [10850, 'board_rule'] } },
+  { ref: 'oxf-psy', T: ['t23'], rows: { all: 'fi ri rs' } },
+  { ref: 'edx-ara-al', T: ['t01', 't03'], rows: { ial: 'fi ri rs', gce: 'fi ri rs' }, rowT: { ial: ['t01'], gce: ['t03'] }, fees: { ial: [18300, 'units_sum'] }, parts: { ial: { WAA01: 8950, WAA02: 9350 } } },
+  { ref: 'edx-bio-ial', T: ['t24'], rows: { u1: 'rs', u2: 'rs', u3: 'rs', u4: 'rs', u5: 'fi rs', u6: 'fi rs' }, fees: { u1: [4790, 'list', N26E], u2: [4790, 'list', N26E], u3: [4790, 'list', N26E], u4: [4790, 'list', N26E], u5: [4450, 'list', L26E], u6: [4450, 'list', L26E] } },
+  { ref: 'cam-9701', T: ['t08'], rows: { as: 'fi ri rs', al: 'fi ri rs' }, fees: { as: [14100, 'list', L26C], al: [18600, 'list', L26C] } },
+  { ref: 'cam-9618', T: [], tbc: true, rows: { as: 'fi ri rs', a2: 'fi ri rs', al: 'fi ri rs' }, fees: { as: [11400, 'list', L26C], a2: [12450, 'list', L26C], al: [16950, 'list', L26C] } },
+  { ref: 'cam-fr-al', T: ['t14'], rows: { as: 'fi ri rs', al: 'fi ri rs' } },
+  { ref: 'edx-math-ial', T: ['t19', 't20'], rows: { p1: 'fi ri rs', p2: 'fi ri rs', p3: 'fi ri rs', p4: 'fi ri rs', m1: 'fi ri rs', s1: 'fi ri rs' }, rowT: { p1: ['t20:online'], p2: ['t20:online'], p3: ['t20'], p4: ['t20'], m1: ['t19', 't20'], s1: ['t19', 't20'] }, fees: { p1: [4800, 'list', L26E], p2: [4800, 'list', L26E], p3: [4800, 'list', L26E], p4: [4800, 'list', L26E], m1: [4450, 'list', L26E], s1: [4450, 'list', L26E] } },
+  { ref: 'cam-9702', T: ['t22'], rows: { as: 'fi ri rs', a2: 'fs rs' }, earlier: ['2026-06', '2025-11'], fees: { as: [14100, 'list', L26C], a2: [11400, 'list', L26C] } },
+  { ref: 'cam-9990', T: ['t23'], rows: { al: 'fi ri rs' } },
+];
+/* Q15's six name doubts, in invented names that keep the pattern (two different people twice, one informal name, three spellings). */
+const DOUBTS = [
+  { id: 'd1', where: 'English as a Second Language', refs: ['oxf-esl'], a: 'Lina Atef', aFrom: 'the form', b: 'Dalia Mansy', bFrom: 'the links sheet', tid: 't13', same: false },
+  { id: 'd2', where: 'Mathematics O.L.', refs: ['edx-4ma1'], a: 'Ramy Wagdy', aFrom: 'the form', b: 'Safaa Barakat', bFrom: 'the links sheet', tid: 't20', same: false },
+  { id: 'd3', where: 'Global Citizenship O.L.', refs: ['cam-gc'], a: 'Leena Kamal', aFrom: 'the links sheet', b: 'Ms. Lina', bFrom: 'the form', tid: 't17', same: true },
+  { id: 'd4', where: 'Chemistry O.L. · Combined Science O.L.', refs: [], a: 'Basma Soliman', aFrom: 'one', b: 'Basma Seliman', bFrom: 'the other', tid: 't10', same: true },
+  { id: 'd5', where: 'Chemistry O.L. · Chemistry A.S.', refs: [], a: "Mo'taz Helal", aFrom: 'one', b: "Mo'tez Helal", bFrom: 'the other', tid: 't08', same: true },
+  { id: 'd6', where: 'Global Perspectives O.L.', refs: [], a: 'Nayra Elbaroudy', aFrom: 'one', b: 'Nyra El Baroudy', bFrom: 'the other', tid: 't16', same: true },
+];
+const FLAGS = [
+  { id: 'f-ar', ref: 'cam-3180', text: 'Arabic O.L.: “Paper 1 only” and “Paper 2 only” follow your November form; the June form did not ask which paper.' },
+  { id: 'f-cs', ref: 'cam-0984', text: 'Computer Science O.L.: your form asked about Paper 41/42 (with 2025 dates); 0984 has no such paper, so no one-paper row is offered. Add a row if it should be.' },
+  { id: 'f-hb', tab: 'prices', text: "Human Biology O.L.: its exam fee (EGP 9,840) is from Edexcel's November 2026 list; the June 2026 list does not print it." },
+  { id: 'f-bio', tab: 'prices', text: "Biology A.S./A.L.: units 1–4 (EGP 4,790 each) are from Edexcel's November 2026 list." },
+  { id: 'f-ma', tab: 'prices', text: 'Mathematics O.L.: EGP 4,600 a paper (Edexcel June 2026); the November 2026 list prints EGP 9,840 a paper. Check which is right.' },
+];
+const STUDENTS = {
+  y11b: { id: 'y11b', name: 'Youssef Adel', nameAr: 'يوسف عادل', cls: '11B', grade: 11, known: {}, family: 'Adel family', what: 'a first-time student' },
+  n12a: { id: 'n12a', name: 'Nour Hassan', nameAr: 'نور حسن', cls: '12A', grade: 12, known: { 'cam-3180': '2026-06' }, family: 'Hassan family', what: 'sat Arabic O.L. in June 2026' },
+};
+/* Example reservations for the "open" stage (invented students). */
+const EXAMPLE_LINES = [
+  ['Malak Samir', '11A', 'cam-0970', 'all', 'fi', 't04', null, 'paid'], ['Malak Samir', '11A', 'cam-0971', 'all', 'fi', 't09', null, 'waiting'],
+  ['Omar Tarek', '11C', 'cam-3180', 'all', 'fi', 't01', null, 'paid'], ['Omar Tarek', '11C', 'cam-0972', 'all', 'fi', 't22', null, 'waiting'],
+  ['Farida Khaled', '12B', 'edx-math-ial', 'p1', 'fi', 't20', null, 'waiting'], ['Farida Khaled', '12B', 'edx-math-ial', 'p2', 'fi', 't20', null, 'waiting'],
+  ['Farida Khaled', '12B', 'cam-9702', 'as', 'fi', 't22', null, 'paid'], ['Ali Mostafa', '11D', 'cam-0970', 'p4', 'rs', null, '2026-06', 'waiting'],
+  ['Salma Ibrahim', '12C', 'edx-bio-ial', 'u5', 'fi', 't24', null, 'waiting'], ['Salma Ibrahim', '12C', 'edx-bio-ial', 'u1', 'rs', null, null, 'waiting'],
+  ['Hana Fathy', '11E', 'cam-0986', 'all', 'fi', 't07', null, 'waiting'], ['Hana Fathy', '11E', 'cam-7156', 'all', 'fi', 't14', null, 'paid'],
+  ['Ziad Ramy', '12D', 'cam-9618', 'a2', 'fi', null, '2026-06', 'waiting'], ['Ziad Ramy', '12D', 'cam-9701', 'as', 'fi', 't08', null, 'waiting'],
+  ['Mariam Ehab', '11B', 'edx-4ma1', 'all', 'fi', 't19', null, 'waiting'], ['Mariam Ehab', '11B', 'cam-3180', 'all', 'rs', null, null, 'waiting'],
+  ['Youssef Hany', '12A', 'cam-0970', 'all', 'ri', 't05', null, 'paid'],
+];
+
+/* ───────────────────────── Words ───────────────────────── */
+const OPT = {
+  fi: { en: 'First entry · in school', ar: 'قيد أول · في المدرسة', attempt: 'first', mode: 'school', col: 'First entry in school' },
+  ri: { en: 'Retake · in school', ar: 'إعادة · في المدرسة', attempt: 'retake', mode: 'school', col: 'Retake in school' },
+  rs: { en: 'Retake · self study', ar: 'إعادة · دراسة ذاتية', attempt: 'retake', mode: 'ss', col: 'Retake self study' },
+  fs: { en: 'First entry · self study (not taught this cycle)', ar: 'قيد أول · دراسة ذاتية (لا تُدرَّس هذه الدورة)', attempt: 'first', mode: 'ss', col: 'First entry self study' },
+};
+const CELL_SHORT = { fi: 'first entry in school', ri: 'retake in school', rs: 'retake self study', fs: 'first entry self study' };
+const DECL = { en: 'I confirm that the information given is true, complete and accurate.', ar: 'أؤكد أن المعلومات المقدمة صحيحة وكاملة ودقيقة.' };
+const DESK_CONSENT = 'Refund policy and declaration read and signed by the parent';
+const QTYPE = { yesno: 'Yes / no', text: 'Short text', choice: 'A choice' };
+const TABS = { subjects: 'Subjects', prices: 'Prices', agree: 'What families agree to', reservations: 'Reservations' };
+const FAM = {
+  en: {
+    reserveFor: (n) => `Reserve for ${n}`, gradeLine: (c, sn) => `Grade ${c} · ${sn}`,
+    dates: (s) => `Reservations close ${s.closesAt ? day(s.closesAt, 'en') : 'when the school closes them'} · Pay by ${s.paymentDueAt ? day(s.paymentDueAt, 'en') : 'to be announced'} · First lesson ${s.firstLesson ? day(s.firstLesson, 'en') : 'to be announced'}`,
+    intro: 'Every subject you may take this session, with only the choices open to you and their prices. Pick what you will sit; the total is at the bottom.',
+    what: 'What will you take?', notTaking: 'Not taking it', teacher: 'Teacher', whenSat: 'When did you sit it?', whenSatAS: 'When did you sit the A.S.?', choose: 'Choose…',
+    tba: 'Teacher to be announced', schoolAssigns: 'The school assigns the teacher', online: 'online', taughtOnline: 'Taught online', with: 'with',
+    examFee: 'exam fee', courseFee: 'course fee', known: (m) => `You sat it in ${m}: only the retake choices are shown.`, satIn: (m) => `You sat it in ${m}`,
+    total: 'Total', nSubjects: (n) => (n === 1 ? '1 subject' : `${n} subjects`), payBy: 'Pay by', tbaShort: 'to be announced', nothingYet: 'Nothing picked yet.',
+    questions: 'A few questions from the school', yes: 'Yes', no: 'No', answer: 'Your answer',
+    reservePay: (m) => `Reserve and pay ${m}`, reserveOnly: 'Reserve',
+    notFinal: 'Prices are not final yet: you can reserve now and pay once the school confirms them.',
+    errNone: 'Pick at least one subject.', errWhen: 'Answer “When did you sit it?” for each retake that asks it.', errConsent: 'Tick the refund policy and the declaration.',
+    reserved: (n) => `Reserved for ${n}`, payNow: (m) => `Pay ${m}`, payHow: 'Card, InstaPay or at the school: the checkout as today.', payLater: (d) => `You will be told when the prices are final. Pay by ${d}.`,
+    change: 'Change the choices', paid: 'The checkout opens here: card, InstaPay or pay at the school, as today (not part of this mock).',
+    notOpen: (g) => `Not open to this student: grade ${g} may not reserve in this session.`, ex: '‡ includes an example course fee', oneOf: 'one choice',
+  },
+  ar: {
+    reserveFor: (n) => `الحجز للطالب ${n}`, gradeLine: (c, sn) => `الصف ${c} · ${sn}`,
+    dates: (s) => `يُغلق الحجز ${s.closesAt ? day(s.closesAt, 'ar') : 'حين تغلقه المدرسة'} · ادفع قبل ${s.paymentDueAt ? day(s.paymentDueAt, 'ar') : 'يُعلن لاحقًا'} · أول حصة ${s.firstLesson ? day(s.firstLesson, 'ar') : 'تُعلن لاحقًا'}`,
+    intro: 'كل مادة يمكنك أخذها في هذه الجلسة، بالخيارات المتاحة لك فقط وأسعارها. اختر ما ستمتحن فيه؛ والإجمالي في الأسفل.',
+    what: 'ماذا ستأخذ؟', notTaking: 'لن آخذها', teacher: 'المعلم', whenSat: 'متى امتحنتَ فيها؟', whenSatAS: 'متى امتحنتَ A.S.؟', choose: 'اختر…',
+    tba: 'سيُعلَن المعلم لاحقًا', schoolAssigns: 'تحدد المدرسة المعلم', online: 'عبر الإنترنت', taughtOnline: 'تُدرَّس عبر الإنترنت', with: 'مع',
+    examFee: 'رسوم الامتحان', courseFee: 'رسوم التدريس', known: (m) => `امتحنتَ فيها في ${m}: تظهر خيارات الإعادة فقط.`, satIn: (m) => `امتحنتَ فيها في ${m}`,
+    total: 'الإجمالي', nSubjects: (n) => (n === 1 ? 'مادة واحدة' : n === 2 ? 'مادتان' : n <= 10 ? `${n} مواد` : `${n} مادة`), payBy: 'ادفع قبل', tbaShort: 'يُعلن لاحقًا', nothingYet: 'لم تختر شيئًا بعد.',
+    questions: 'أسئلة من المدرسة', yes: 'نعم', no: 'لا', answer: 'إجابتك',
+    reservePay: (m) => `احجز وادفع ${m}`, reserveOnly: 'احجز',
+    notFinal: 'الأسعار ليست نهائية بعد: يمكنك الحجز الآن والدفع حين تؤكدها المدرسة.',
+    errNone: 'اختر مادة واحدة على الأقل.', errWhen: 'أجب عن «متى امتحنتَ فيها؟» لكل إعادة تطلبه.', errConsent: 'حدد سياسة الاسترداد والإقرار.',
+    reserved: (n) => `تم الحجز للطالب ${n}`, payNow: (m) => `ادفع ${m}`, payHow: 'بالبطاقة أو إنستاباي أو في المدرسة: الدفع كما هو اليوم.', payLater: (d) => `سنبلغك حين تصبح الأسعار نهائية. ادفع قبل ${d}.`,
+    change: 'تعديل الاختيارات', paid: 'تُفتح صفحة الدفع هنا: بالبطاقة أو إنستاباي أو في المدرسة كما هو اليوم (ليست جزءًا من هذا النموذج).',
+    notOpen: (g) => `غير متاح لهذا الطالب: لا يحجز الصف ${g} في هذه الجلسة.`, ex: '‡ يشمل رسوم تدريس للتوضيح', oneOf: 'اختيار واحد',
+  },
+};
+const sessName = (s, lang) => (lang === 'ar' ? (s.type === 'june' ? `يونيو ${s.year}` : `نوفمبر ${s.year} / يناير ${s.year + 1}`) : s.type === 'june' ? `June ${s.year}` : `November ${s.year} / January ${s.year + 1}`);
+const sessKey = (s) => (s.type === 'june' ? `${s.year}-06` : `${s.year}-11`);
+const defaultEarlier = (s) => (s.type === 'june' ? [`${s.year - 1}-06`, `${s.year - 1}-11`] : [`${s.year}-06`, `${s.year - 1}-11`]);
+const refundDefault = (type) => (type === 'june' ? [{ week: 2, pct: 100 }, { week: 3, pct: 50 }, { week: null, pct: 0 }] : [{ week: 2, pct: 100 }, { week: 6, pct: 50 }, { week: null, pct: 0 }]);
+function refundSentence(steps, lang) {
+  let from = 1; const parts = [];
+  for (const st of steps) {
+    let p;
+    if (st.week == null) p = lang === 'ar' ? `${st.pct}% من الأسبوع ${from}` : `${st.pct}% from week ${from}`;
+    else if (st.week === from) p = lang === 'ar' ? `${st.pct}% في الأسبوع ${from}` : `${st.pct}% in week ${from}`;
+    else if (from === 1) p = lang === 'ar' ? `${st.pct}% حتى الأسبوع ${st.week}` : `${st.pct}% to week ${st.week}`;
+    else p = lang === 'ar' ? `${st.pct}% في الأسابيع ${from}–${st.week}` : `${st.pct}% in weeks ${from}–${st.week}`;
+    if (st.week != null) from = st.week + 1;
+    parts.push(p);
+  }
+  return parts.join(' · ');
+}
+const refundConsent = (s, lang) => (lang === 'ar' ? `أؤكد أنني قرأت سياسة الاسترداد: من رسوم التدريس، ${refundSentence(s.refund, 'ar')}، محسوبة من أول حصة.` : `I confirm that I have read the refund policy: of the course fee, ${refundSentence(s.refund, 'en')}, counted from the first lesson.`);
+
+/* ───────────────────────── Model ───────────────────────── */
+const S = {};
+const byId = (id) => S.sessions.find((s) => s.id === id);
+const cur = () => byId(S.sessionId) || S.sessions[0];
+const famSession = () => byId('jun2027');
+const teacher = (id) => S.teachers.find((t) => t.id === id);
+const tName = (id) => (teacher(id) ? teacher(id).name : '?');
+const offByRef = (s, ref) => s.offerings.find((o) => o.ref === ref);
+const cellsFrom = (txt) => ({ fi: /\bfi\b/.test(txt), ri: /\bri\b/.test(txt), rs: /\brs\b/.test(txt), fs: /\bfs\b/.test(txt) });
+const cellAllowed = (r, c) => !(r.kind === 'paper' && (c === 'fi' || c === 'fs'));
+const rowAsks = (o, r) => (r.kind === 'paper' && BOARDS[o.board].onePaperAsks) || (r.kind === 'a2' && o.board === 'cambridge');
+const rowTeachers = (o, r) => r.teachers || o.teachers;
+const rowCourse = (o, r) => (r.courseFee != null ? r.courseFee : o.courseFee);
+const rowCourseSrc = (o, r) => (r.courseFee != null ? r.courseFeeSrc : o.courseFeeSrc);
+const tSpec = (x) => { const [tid, flag] = x.split(':'); return { tid, online: flag === 'online', external: flag === 'external' }; };
+function addTeacher(name) { const t = { id: nid('t'), name }; S.teachers.push(t); return t; }
+
+function baseSession(type, year) {
+  return { id: nid('s'), type, year, status: 'draft', closesAt: null, paymentDueAt: null, firstLesson: null, pricesFinal: false, share: 50, refund: refundDefault(type), refundLocked: false, grades: { g10: false, g11: true, g12: true, grad: true }, cancelDays: 3, questions: [], offerings: [], lists: [], reservations: [], done: {}, doubts: null, flags: [], copiedFrom: null, datesMoved: false, example: false };
+}
+function newRow(sess, r) {
+  const on = r.kind === 'paper' || r.kind === 'a2' ? false : r.kind === 'unit' ? !!r.required : true;
+  const cells = r.kind === 'paper' ? { fi: false, ri: true, rs: true, fs: false } : { fi: true, ri: true, rs: true, fs: false };
+  return { key: r.key, kind: r.kind, label: clone(r.label), codes: r.codes.slice(), sumOf: r.sumOf ? r.sumOf.slice() : null, parts: null, on, cells, examFee: null, feeSrc: null, feeList: null, lastYear: false, kept: false, courseFee: null, courseFeeSrc: null, ssFee: null, teachers: null, sitting: sess.type === 'june' ? 'june' : (r.winter || 'november'), closesAt: null, payBy: null, closed: false, required: !!r.required };
+}
+function newOffering(sess, ref, skipFees) {
+  const R0 = REFMAP[ref];
+  const o = { id: nid('o'), ref, title: R0.title, board: R0.board, code: R0.code, group: R0.group, toCheck: !!R0.toCheck, custom: false, teachers: [], tbc: false, choice: 'families', note: '', accepting: true, closesAt: null, courseFee: null, courseFeeSrc: null, questions: [], earlier: defaultEarlier(sess), rows: R0.rows.map((r) => newRow(sess, r)) };
+  if (!skipFees) autoFees(sess, o);
+  return o;
+}
+function listsOf(sess, board) { return sess.lists.filter((l) => l.board === board); }
+function findIn(lists, code) { const c = normCode(code); for (let i = lists.length - 1; i >= 0; i--) { const hit = lists[i].rows.find((x) => normCode(x[0]) === c); if (hit) return { list: lists[i], amount: hit[2] }; } return null; }
+function allLists(board) { return S.sessions.flatMap((s) => s.lists.filter((l) => l.board === board)); }
+function codesOf(o, r) { return [...r.codes, ...Object.entries(ALIASES[o.board] || {}).filter(([, v]) => v[0] === o.ref && v[1] === r.key).map(([p]) => p)]; }
+function autoFees(sess, o) {
+  const lists = listsOf(sess, o.board);
+  for (const r of o.rows) {
+    if (r.examFee != null) continue;
+    for (const c of codesOf(o, r)) { const f = findIn(lists, c); if (f) { r.examFee = f.amount; r.feeSrc = 'list'; r.feeList = f.list.id; break; } }
+    if (r.examFee == null && r.sumOf) { const parts = {}; let ok = true; for (const c of r.sumOf) { const f = findIn(lists, c); if (f) parts[c] = f.amount; else ok = false; } if (ok) { r.parts = parts; r.examFee = sumParts(parts); r.feeSrc = 'units_sum'; } }
+  }
+  recalc(o);
+}
+function recalc(o) {
+  const all = o.rows.find((r) => r.kind === 'all');
+  for (const r of o.rows) {
+    if (r.feeSrc === 'units_sum' && r.parts && r.sumOf && r.sumOf.every((c) => r.parts[c] != null)) r.examFee = sumParts(r.parts);
+    if (r.kind === 'paper' && BOARDS[o.board].onePaperFee === 'syllabus' && all && all.examFee != null && (r.examFee == null || r.feeSrc === 'board_rule')) { r.examFee = all.examFee; r.feeSrc = 'board_rule'; r.lastYear = all.lastYear; r.kept = all.kept; }
+  }
+}
+function buildPre(sess, p) {
+  const o = newOffering(sess, p.ref, true);
+  o.teachers = p.T.map(tSpec); o.tbc = !!p.tbc; if (p.earlier) o.earlier = p.earlier.slice();
+  for (const r of o.rows) {
+    const cells = p.rows[r.key]; r.on = !!cells; if (cells) r.cells = cellsFrom(cells);
+    const f = p.fees && p.fees[r.key]; if (f) { r.examFee = f[0]; r.feeSrc = f[1]; r.feeList = f[2] || null; }
+    if (p.parts && p.parts[r.key]) r.parts = clone(p.parts[r.key]);
+    if (p.rowT && p.rowT[r.key]) r.teachers = p.rowT[r.key].map(tSpec);
+  }
+  return o;
+}
+function makeJune2027() {
+  const s = baseSession('june', 2027);
+  s.id = 'jun2027'; s.lists = clone(LISTS); s.doubts = clone(DOUBTS).map((d) => ({ ...d, pick: d.a })); s.flags = clone(FLAGS);
+  s.questions = [{ id: 'q1', scope: 'session', type: 'yesno', text: 'Example question: does the student have exam access arrangements (extra time, a reader)?', choices: [], example: true }];
+  s.offerings = PRE.map((p) => buildPre(s, p));
+  return s;
+}
+const exampleCourse = (r) => ({ paper: 3000, unit: 2500, qual: 12000, al: 12000, as: 7500, a2: 7500, all: 6000, custom: 3000 })[r.kind] || 6000;
+function priceOf(sess, o, r, k, example) {
+  if (r.examFee == null) return null;
+  let course = rowCourse(o, r); let ex = false;
+  if (course == null) { if (!example) return null; course = exampleCourse(r); ex = true; } else if (rowCourseSrc(o, r) === 'example') ex = true;
+  const coursePart = OPT[k].mode === 'ss' ? (r.ssFee != null ? r.ssFee : Math.round(course * sess.share / 100)) : course;
+  return { total: r.examFee + coursePart, exam: r.examFee, course: coursePart, example: ex };
+}
+function missingOf(o) { const on = o.rows.filter((r) => r.on && !r.closed); return { exam: on.filter((r) => r.examFee == null), course: on.filter((r) => rowCourse(o, r) == null), get any() { return this.exam.length > 0 || this.course.length > 0; } }; }
+const linesOf = (s, oid) => s.reservations.filter((l) => l.oid === oid);
+const resCounts = (s) => ({ total: s.reservations.length, paid: s.reservations.filter((l) => l.status === 'paid').length, waiting: s.reservations.filter((l) => l.status === 'waiting').length });
+function linePrice(ss, l) { const o = ss.offerings.find((x) => x.id === l.oid); const r = o && o.rows.find((x) => x.key === l.rkey); const p = o && r ? priceOf(ss, o, r, l.opt, false) : null; return p ? p.total : null; }
+function repriceLines(s) { for (const l of s.reservations) if (l.status === 'waiting') { const p = linePrice(s, l); if (p != null) l.price = p; } }
+function impactOf(s, mutate) {
+  const c = clone(s); mutate(c); let repriced = 0, finance = 0;
+  for (const l of s.reservations) { const now = linePrice(c, l); if (now !== l.price) { if (l.status === 'paid') finance++; else repriced++; } }
+  return { repriced, finance };
+}
+/* A3, E7: a change that moves a price shows its counts before it is saved. */
+function withImpact(s, mutate, title, what, after, doneMsg) {
+  const imp = impactOf(s, mutate);
+  const run = () => { mutate(s); repriceLines(s); if (after) after(); };
+  if (!imp.repriced && !imp.finance) { run(); if (doneMsg) toast(doneMsg); return; }
+  S.dialog = { type: 'impact', title, what, imp, run, doneMsg };
+}
+function applyOpenStage(s) {
+  s.status = 'open'; s.closesAt = '2026-11-30'; s.paymentDueAt = '2026-12-10'; s.firstLesson = '2026-11-01'; s.pricesFinal = true; s.refundLocked = true;
+  for (const o of s.offerings) {
+    const hasUnits = o.rows.some((r) => r.kind === 'unit'), hasQual = o.rows.some((r) => r.kind === 'qual'), onlyAL = o.rows.filter((r) => r.on).every((r) => r.kind === 'al');
+    o.courseFee = o.group === 'OL' ? 6000 : hasUnits ? 2500 : hasQual || onlyAL ? 12000 : 7500; o.courseFeeSrc = 'example';
+    for (const r of o.rows) { if (r.kind === 'paper') { r.courseFee = 3000; r.courseFeeSrc = 'example'; } if (r.kind === 'al' && !onlyAL) { r.courseFee = 12000; r.courseFeeSrc = 'example'; } }
+    for (const e of o.earlier) s.done[`old-${o.id}-${e}`] = true;
+  }
+  Object.assign(s.done, { doubts: true, 'f-ar': true, 'f-cs': true, 'f-hb': true, 'f-bio': true, 'f-ma': true });
+  s.reservations = EXAMPLE_LINES.map(([student, cls, ref, rkey, opt, tid, when, status], i) => { const o = offByRef(s, ref); const r = o.rows.find((x) => x.key === rkey); const p = priceOf(s, o, r, opt, false); return { id: 'l' + i, student, cls, oid: o.id, rkey, opt, tid, when, status, price: p ? p.total : null, answers: { q1: i % 6 === 0 ? 'Yes' : 'No' } }; });
+}
+function copySession(src, year) {
+  const yrs = year - src.year; const s = baseSession(src.type, year);
+  s.copiedFrom = src.id; s.share = src.share; s.refund = clone(src.refund); s.grades = clone(src.grades); s.cancelDays = src.cancelDays;
+  s.closesAt = dShift(src.closesAt, yrs); s.paymentDueAt = dShift(src.paymentDueAt, yrs); s.firstLesson = dShift(src.firstLesson, yrs);
+  s.datesMoved = !!(src.closesAt || src.paymentDueAt || src.firstLesson);
+  s.questions = clone(src.questions).map((q) => ({ ...q, id: nid('q') }));
+  s.offerings = src.offerings.map((o) => {
+    const c = clone(o); c.id = nid('o'); c.earlier = c.earlier.map((e) => ymShift(e, yrs)); c.closesAt = dShift(c.closesAt, yrs); c.questions = c.questions.map((q) => ({ ...q, id: nid('q') }));
+    if (c.courseFee != null) c.courseFeeSrc = 'last_year';
+    for (const r of c.rows) { r.closed = false; r.kept = false; if (r.examFee != null && r.feeSrc !== 'board_rule') r.lastYear = true; if (r.courseFee != null) r.courseFeeSrc = 'last_year'; r.closesAt = dShift(r.closesAt, yrs); r.payBy = dShift(r.payBy, yrs); }
+    recalc(c); return c;
+  });
+  return s;
+}
+function ensureWinterExample() {
+  let s = byId('win2027'); if (s) return s;
+  s = baseSession('winter', 2027); s.id = 'win2027'; s.example = true;
+  s.lists = [{ id: 'edx-nov26w', board: 'edexcel', name: 'Edexcel November 2026', rows: [['WBI11', 'Biology Unit 1', 4790], ['WBI12', 'Biology Unit 2', 4790], ['WBI13', 'Biology Unit 3', 4790], ['WBI14', 'Biology Unit 4', 4790]] }, { id: 'edx-jan26', board: 'edexcel', name: 'Edexcel January 2026', rows: [['WBI15', 'Biology Unit 5', 4450], ['WBI16', 'Biology Unit 6', 4450]] }];
+  const o = newOffering(s, 'edx-bio-ial'); o.teachers = [tSpec('t24')];
+  for (const r of o.rows) { r.on = true; r.cells = cellsFrom(['u5', 'u6'].includes(r.key) ? 'rs' : 'fi rs'); }
+  o.note = 'Units 1–2 are sat in November, units 3–4 in January; units 5–6 again in January for a retake.';
+  s.offerings = [o]; S.sessions.push(s); return s;
+}
+function lastYearRows(s) { return s.offerings.flatMap((o) => o.rows.filter((r) => r.on && r.lastYear && !r.kept && r.feeSrc !== 'board_rule').map((r) => ({ o, r }))); }
+
+/* The check list (§5.3): everything that blocks or deserves a look; `mine` = the coordinator can act on it. */
+function checks(s) {
+  const out = []; const key = sessKey(s); const name = sessName(s);
+  if (!s.paymentDueAt) out.push({ id: 'due', level: 'block', mine: true, text: 'Payment due date not set: families need it, and unpaid reservations are cancelled a few days after it.', field: 'paymentDueAt' });
+  if (!s.firstLesson) out.push({ id: 'first', level: 'block', mine: true, text: 'First lesson not set: the refund weeks count from it.', field: 'firstLesson' });
+  const accepting = s.offerings.filter((o) => o.accepting);
+  const notOff = accepting.filter((o) => missingOf(o).any);
+  if (notOff.length) {
+    const course = accepting.filter((o) => missingOf(o).course.length).length; const exam = accepting.reduce((a, o) => a + missingOf(o).exam.length, 0);
+    out.push({ id: 'prices', level: 'look', mine: true, text: `${notOff.length} of ${s.offerings.length} subjects are not offered to families: a price is not set (${plural(course, 'course fee')}, ${plural(exam, 'exam fee')}).`, tab: 'prices' });
+  }
+  const ly = lastYearRows(s);
+  if (ly.length) out.push({ id: 'ly', level: 'look', mine: true, text: `${plural(ly.length, "exam fee is last year's", "exam fees are last year's")} (not final): paste this year's lists, then keep or type what is left.`, tab: 'prices' });
+  const lyc = s.offerings.filter((o) => o.courseFeeSrc === 'last_year');
+  if (lyc.length) out.push({ id: 'lyc', level: 'look', mine: true, text: `${plural(lyc.length, "course fee is last year's", "course fees are last year's")}.`, act: 'keepCourse', actLabel: 'Keep them', tab: 'prices' });
+  for (const o of s.offerings) if (o.tbc && !o.teachers.length) out.push({ id: 'tbc-' + o.id, level: 'look', mine: true, text: `${o.title}: teacher to be confirmed. Families read “teacher to be announced”.`, off: o.id });
+  for (const o of s.offerings) if (!o.tbc && !o.teachers.length && o.choice === 'families' && o.rows.some((r) => r.on && (r.cells.fi || r.cells.ri))) out.push({ id: 'not-' + o.id, level: 'look', mine: true, text: `${o.title}: taught in school, but no teacher is named.`, off: o.id });
+  if (s.doubts && !s.done.doubts) out.push({ id: 'doubts', kind: 'doubts', level: 'look', mine: true, text: `${s.doubts.length} teacher names differ between the links sheet and the forms.` });
+  for (const f of s.flags) if (!s.done[f.id]) { const o = f.ref ? offByRef(s, f.ref) : null; out.push({ id: f.id, level: 'look', mine: true, text: f.text, ok: 'Looks right', off: o ? o.id : null, tab: f.tab }); }
+  for (const o of s.offerings) {
+    const B = BOARDS[o.board]; if (!B.carryMonths || !o.rows.some((r) => r.on && rowAsks(o, r))) continue;
+    for (const e of o.earlier) { const age = monthsBetween(e, key); const id = `old-${o.id}-${e}`; if (age > B.carryMonths && !s.done[id]) out.push({ id, level: 'look', mine: true, text: `${o.title}: ${ym(e)} is on its earlier exams, ${age} months before ${ym(key)} — older than ${B.name} carries a result forward (${B.carryMonths} months).`, ok: 'Keep it', off: o.id }); }
+  }
+  for (const b of [...new Set(accepting.map((o) => o.board))]) {
+    const B = BOARDS[b]; const dl = s.type === 'june' ? B.deadlines[key] : B.deadlines[key] || null; const subs = accepting.filter((o) => o.board === b);
+    if (!dl) {
+      const priced = subs.filter((o) => !missingOf(o).exam.length);
+      out.push({ id: 'bd-' + b, level: priced.length ? 'block' : 'look', mine: false, adminDate: true, board: b, text: `${B.name} has no ${name} entry deadline in our reference yet. ${priced.length ? `It blocks opening: ${priced.map((o) => o.title).join(' and ')} would be offered without it.` : `It is needed before ${subs.map((o) => o.title).join(' and ')} can be offered (their exam fees are not set yet).`} The admin enters it once.` });
+      continue;
+    }
+    if (s.paymentDueAt) { const cut = addDays(s.paymentDueAt, s.cancelDays); if (cut > dl) out.push({ id: 'cut-' + b, level: 'look', mine: true, text: `Unpaid reservations would be cancelled on ${day(cut)}, after ${B.name}'s entry deadline (${day(dl)}): the deadline cancels them first. Move the payment due date earlier?`, field: 'paymentDueAt' }); }
+    if (s.closesAt && s.closesAt > dl) out.push({ id: 'close-' + b, level: 'look', mine: true, text: `Reservations close on ${day(s.closesAt)}, after ${B.name}'s entry deadline (${day(dl)}).`, field: 'closesAt' });
+  }
+  if (s.paymentDueAt && s.paymentDueAt < TODAY && !s.pricesFinal) out.push({ id: 'passed', level: 'look', mine: true, text: 'The payment due date has passed and prices are not final: families cannot pay yet.', field: 'paymentDueAt' });
+  if (s.copiedFrom && s.datesMoved && !s.done.dates) out.push({ id: 'dates', level: 'look', mine: true, text: `The copy moved the dates one year: reservations close ${day(s.closesAt) || '—'}, payment due ${day(s.paymentDueAt) || '—'}, first lesson ${day(s.firstLesson) || '—'}.`, ok: 'They are right' });
+  const codes = s.offerings.filter((o) => o.toCheck || o.custom);
+  if (codes.length) out.push({ id: 'codes', level: 'info', mine: false, text: `We are confirming the board codes of ${codes.map((o) => o.title).join(', ')} — nothing to do.` });
+  return out;
+}
+
+/* ───────────────────────── Family view of one subject (F1, F2, D5–D9) ───────────────────────── */
+const groupKey = (r) => (r.kind === 'all' || r.kind === 'paper' ? 'papers' : ['as', 'a2', 'al'].includes(r.kind) ? 'routes' : r.kind === 'qual' ? 'quals' : 'u:' + r.key);
+function groupsOf(o) { const out = []; const by = {}; for (const r of o.rows) { if (!r.on || r.closed) continue; const k = groupKey(r); if (!by[k]) { by[k] = { key: k, rows: [] }; out.push(by[k]); } by[k].rows.push(r); } return out; }
+function famOptions(sess, o, r, st, example) { const known = st.known[o.ref]; return ['fi', 'fs', 'ri', 'rs'].filter((k) => r.cells[k] && cellAllowed(r, k) && !(known && OPT[k].attempt === 'first')).map((k) => ({ k, price: priceOf(sess, o, r, k, example) })).filter((x) => x.price); }
+function optLabel(sess, r, k, lang) { const base = OPT[k][lang]; if (OPT[k].mode === 'ss' && r.ssFee == null) return lang === 'ar' ? base.replace('دراسة ذاتية', `دراسة ذاتية ${sess.share}%`) : base.replace('self study', `self study ${sess.share}%`); return base; }
+const rowOptText = (sess, r, k, lang) => `${r.label[lang]} · ${optLabel(sess, r, k, lang)}`;
+const pickBag = (scope) => (S.picks[scope] = S.picks[scope] || {});
+function famOffered(s, o, st) { if (!o.accepting || missingOf(o).exam.length) return false; return groupsOf(o).some((g) => g.rows.some((r) => famOptions(s, o, r, st, true).length)); }
+function famSubject(sess, o, ctx) {
+  const lang = ctx.lang; const L = FAM[lang]; const st = ctx.st; const picks = pickBag(ctx.scope)[o.id] || {}; const known = st.known[o.ref];
+  let body = ''; let chosen = false;
+  for (const g of groupsOf(o)) {
+    const many = g.rows.length > 1; const opts = [];
+    for (const r of g.rows) for (const x of famOptions(sess, o, r, st, ctx.example)) opts.push({ r, k: x.k, price: x.price });
+    if (!opts.length) continue;
+    const p = picks[g.key]; if (p) chosen = true;
+    const single = g.key.startsWith('u:');
+    const label = single ? g.rows[0].label[lang] : many ? L.what : `${L.what} · ${g.rows[0].label[lang]}`;
+    const nm = `pk-${ctx.scope}-${o.id}-${g.key}`;
+    const optRow = (val, text, priceHtml, checked) => `<label class="opt${checked ? ' on' : ''}"><input type="radio" name="${esc(nm)}" value="${esc(val)}" data-chg="pick" data-scope="${esc(ctx.scope)}" data-o="${o.id}" data-g="${esc(g.key)}" ${checked ? 'checked' : ''}><span class="grow">${text}</span>${priceHtml}</label>`;
+    body += `<fieldset class="optset mt12"><legend class="lbl">${esc(label)}</legend>${optRow('', `<span class="muted">${esc(L.notTaking)}</span>`, '', !p)}${opts.map((x) => {
+      const ts = rowTeachers(o, x.r); const withT = x.r.teachers && ts.length === 1 && OPT[x.k].mode === 'school' ? ` · ${L.with} ${esc(tName(ts[0].tid))}` : '';
+      return optRow(`${x.r.key}|${x.k}`, `${many ? `<b><bdi>${esc(x.r.label[lang])}</bdi></b> · ` : ''}${esc(optLabel(sess, x.r, x.k, lang))}${withT}`, `<span class="price nowrap">${money(x.price.total, lang)}${x.price.example ? ' ‡' : ''}</span>`, p && p.row === x.r.key && p.opt === x.k);
+    }).join('')}`;
+    if (p) body += `<div class="optdetail">${pickDetails(sess, o, p, g, ctx, known)}</div>`;
+    body += '</fieldset>';
+  }
+  if (!body) return '';
+  const ts = o.teachers; const allOnline = ts.length && ts.every((t) => t.online);
+  const qs = chosen && o.questions.length ? `<div class="mt12">${o.questions.map((q) => questionField(q, ctx.scope, lang)).join('')}</div>` : '';
+  return `<article class="fcard${chosen ? ' chosen' : ''}"><div class="row between top"><div><span class="h3"><bdi>${esc(o.title)}</bdi></span> <span class="xs muted">${esc(BOARDS[o.board].name)}</span></div>${allOnline ? `<span class="badge info">${esc(L.taughtOnline)}</span>` : ''}</div>${o.note ? `<p class="sm muted mt4">${esc(o.note)}</p>` : ''}${known ? `<p class="notice info mt8">${esc(L.known(ym(known, lang)))}</p>` : ''}${body}${qs}</article>`;
+}
+function pickDetails(sess, o, p, g, ctx, known) {
+  const lang = ctx.lang; const L = FAM[lang]; const r = o.rows.find((x) => x.key === p.row); if (!r) return '';
+  const price = priceOf(sess, o, r, p.opt, ctx.example); let h = '';
+  if (OPT[p.opt].mode === 'school') {
+    const ts = rowTeachers(o, r);
+    if (o.choice === 'school') h += `<p class="xs muted mt4">${esc(L.schoolAssigns)}</p>`;
+    else if (!ts.length) h += `<p class="xs muted mt4">${esc(L.tba)}</p>`;
+    else if (ts.length === 1) h += `<p class="sm mt4">${esc(L.teacher)}: <bdi>${esc(tName(ts[0].tid))}</bdi>${ts[0].online ? ` (${esc(L.online)})` : ''}</p>`;
+    else h += `<div class="mt8"><label class="lbl xs">${esc(L.teacher)}</label><select class="input s" data-chg="pickTeacher" data-scope="${esc(ctx.scope)}" data-o="${o.id}" data-g="${esc(g.key)}" aria-label="${esc(L.teacher)}">${ts.map((t) => `<option value="${t.tid}" ${p.teacher === t.tid ? 'selected' : ''}>${esc(tName(t.tid))}${t.online ? ` (${L.online})` : ''}</option>`).join('')}</select></div>`;
+  }
+  if (rowAsks(o, r)) {
+    const q = r.kind === 'a2' ? L.whenSatAS : L.whenSat;
+    if (known) h += `<p class="sm mt4">${esc(L.satIn(ym(known, lang)))}</p>`;
+    else h += `<div class="mt8"><label class="lbl xs">${esc(q)}</label><select class="input s" data-chg="pickWhen" data-scope="${esc(ctx.scope)}" data-o="${o.id}" data-g="${esc(g.key)}" aria-label="${esc(q)}"><option value="">${esc(L.choose)}</option>${o.earlier.slice().sort().reverse().map((e) => `<option value="${e}" ${p.when === e ? 'selected' : ''}>${esc(ym(e, lang))}</option>`).join('')}</select></div>`;
+  }
+  if (price) h += `<p class="mt8"><span class="price">${money(price.total, lang)}</span>${price.example ? ' ‡' : ''} <span class="xs muted">(${esc(L.examFee)} ${money(price.exam, lang)} + ${esc(L.courseFee)} ${money(price.course, lang)})</span></p>`;
+  return h;
+}
+function questionField(q, scope, lang) {
+  const L = FAM[lang]; const ans = (S.answers[scope] || {})[q.id] || ''; const id = `qa-${scope}-${q.id}`.replace(/[^a-zA-Z0-9-]/g, '-');
+  const tag = q.example ? ' <span class="badge info">example</span>' : '';
+  let input;
+  if (q.type === 'yesno') input = `<select id="${id}" class="input s" data-chg="answer" data-scope="${esc(scope)}" data-q="${q.id}"><option value="">${esc(L.choose)}</option><option ${ans === 'Yes' ? 'selected' : ''} value="Yes">${L.yes}</option><option ${ans === 'No' ? 'selected' : ''} value="No">${L.no}</option></select>`;
+  else if (q.type === 'choice') input = `<select id="${id}" class="input s" data-chg="answer" data-scope="${esc(scope)}" data-q="${q.id}"><option value="">${esc(L.choose)}</option>${q.choices.map((c) => `<option ${ans === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`;
+  else input = `<input id="${id}" class="input s" data-chg="answer" data-scope="${esc(scope)}" data-q="${q.id}" value="${esc(ans)}" placeholder="${esc(L.answer)}">`;
+  return `<div class="field mt8"><label for="${id}">${esc(q.text)}${tag}</label>${input}</div>`;
+}
+function chosenLines(sess, scope, st) {
+  const bag = pickBag(scope); const out = [];
+  for (const o of sess.offerings) { const ps = bag[o.id]; if (!ps) continue; for (const g of Object.keys(ps)) { const p = ps[g]; const r = o.rows.find((x) => x.key === p.row); if (!r || !r.on) continue; const price = priceOf(sess, o, r, p.opt, true); if (!price) continue; out.push({ o, r, p, price, needsWhen: rowAsks(o, r) && !st.known[o.ref] && !p.when }); } }
+  return out;
+}
+
+/* ───────────────────────── Render: chrome ───────────────────────── */
+const ICON = {
+  home: 'M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25',
+  sessions: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5',
+  register: 'M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z',
+  doc: 'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M8.25 8.25H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z',
+  bell: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0',
+  profile: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
+  pay: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z',
+};
+const icon = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${d}"/></svg>`;
+const ar = () => S.screen === 'family' && S.fam.lang === 'ar';
+const sw = (on, act, data, label, disabled, title) => `<button type="button" role="switch" aria-checked="${!!on}" class="switch${on ? ' on' : ''}" data-act="${act}" ${data || ''} ${disabled ? 'disabled' : ''} aria-label="${esc(label)}" ${title ? `title="${esc(title)}"` : ''}><span class="thumb"></span></button>`;
+function roleName() { if (S.screen === 'family') return 'Parent'; if (S.screen === 'desk') return 'Finance officer at the desk'; return S.role === 'admin' ? 'Admin' : 'Coordinator'; }
+function mockbar() {
+  const scr = S.screen; const btn = (k, label) => `<button type="button" data-act="go" data-screen="${k}" aria-pressed="${scr === k}">${label}</button>`;
+  const s = cur(); const j = famSession();
+  const names = { home: 'Home', sessions: 'Sessions and New session', session: `Session — ${sessName(s)}`, subject: `Subject — ${S.edit ? S.edit.off.title : ''}${S.edit ? ` (${sessName(byId(S.edit.sid))})` : ''}`, family: 'Reserve — the family page', desk: 'Desk — reserve and collect' };
+  const others = j.offerings.filter((o) => !['cam-3180', 'edx-bio-ial', 'cam-9702', 'edx-math-ial', 'edx-ara-al'].includes(o.ref));
+  const subj = `<select data-chg="subjectScreen" aria-label="4 Subject" class="${scr === 'subject' ? 'on' : ''}"><option value="">4 Subject…</option><optgroup label="Fully worked (June 2027)">${['cam-3180', 'edx-bio-ial', 'cam-9702', 'edx-math-ial', 'edx-ara-al'].map((r) => `<option value="${r}">${esc(REFMAP[r].title)}</option>`).join('')}</optgroup><optgroup label="The other June 2027 subjects">${others.map((o) => `<option value="${o.ref}">${esc(o.title)}</option>`).join('')}</optgroup><optgroup label="A November / January subject"><option value="winter">Biology A.S./A.L. — Nov / Jan (example)</option></optgroup></select>`;
+  let extra = '';
+  if (['home', 'sessions', 'session', 'subject'].includes(scr)) extra = `<label>as <select data-chg="role" aria-label="Role"><option value="coordinator" ${S.role === 'coordinator' ? 'selected' : ''}>Coordinator</option><option value="admin" ${S.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>`;
+  if (scr === 'family') extra = `<span class="dim">|</span><span>Child</span>${Object.values(STUDENTS).map((st) => `<button type="button" data-act="setChild" data-v="${st.id}" aria-pressed="${S.fam.student === st.id}">${st.cls} · ${esc(st.what)}</button>`).join('')}<span class="dim">|</span><span>Language</span><button type="button" data-act="setLang" data-v="en" aria-pressed="${S.fam.lang === 'en'}">English</button><button type="button" data-act="setLang" data-v="ar" aria-pressed="${S.fam.lang === 'ar'}" lang="ar">العربية</button>`;
+  return `<div class="mb" dir="ltr"><span class="tag">MOCK</span><span>Coordinator rework — clickable mock (H2). Nothing is saved; names are invented.</span><span class="dim">|</span>${btn('home', '1 Home')}${btn('sessions', '2 Sessions')}${btn('session', '3 Session')}${subj}${btn('family', '5 Family')}${btn('desk', '6 Desk')}<span class="grow"></span><label>Stage <select data-chg="stage" aria-label="Stage"><option value="pre" ${S.stage === 'pre' ? 'selected' : ''}>June 2027 as pre-loaded (draft)</option><option value="open" ${S.stage === 'open' ? 'selected' : ''}>June 2027 open, example reservations</option></select></label><button type="button" data-act="reset">Reset</button></div>
+  <div class="mb" dir="ltr"><span>Screen</span> <span class="where" id="where">${esc(names[scr])}</span><span class="dim">·</span><span>Role</span> <span class="where">${roleName()}</span> ${extra}</div>`;
+}
+function sidebar() {
+  const scr = S.screen; let items; let user;
+  const A = ar();
+  if (scr === 'family') { items = [[A ? 'الحجز' : 'Reserve', 'register', 'family'], [A ? 'كشف الحساب' : 'Statement', 'doc', null], [A ? 'الإشعارات' : 'Notifications', 'bell', null]]; user = [A ? 'ولي الأمر (تجريبي)' : 'Parent (demo)', A ? 'ولي أمر' : 'Parent']; }
+  else if (scr === 'desk') { items = [['Desk', 'home', 'desk'], ['Payments', 'pay', null]]; user = ['Desk officer (demo)', 'Finance officer']; }
+  else { items = [['Home', 'home', 'home'], ['Sessions', 'sessions', 'sessions']]; if (S.role === 'admin') items.push(['Desk', 'pay', 'desk'], ['Team', 'profile', null]); items.push(['Profile', 'profile', null]); user = [S.role === 'admin' ? 'Admin (demo)' : 'Coordinator (demo)', S.role === 'admin' ? 'Admin' : 'Coordinator']; }
+  const active = scr === 'session' || scr === 'subject' ? 'sessions' : scr;
+  return `<div class="brand"><div class="logo">IG</div><div><p class="b sm">IGCSE</p><p class="xs" style="opacity:.7">${A ? 'حجز المواد' : 'Subject reservation'}</p></div></div>
+  <nav class="nav" aria-label="Main">${items.map(([l, ic, to]) => `<button type="button" ${to ? `data-act="go" data-screen="${to}"` : 'disabled title="Not in this mock"'} ${to === active ? 'aria-current="page"' : ''}>${icon(ICON[ic])}<span>${l}</span></button>`).join('')}</nav>
+  <div class="sidefoot"><div class="avatar">${esc(user[0][0])}</div><div><p class="sm b">${esc(user[0])}</p><p class="xs" style="opacity:.7">${esc(user[1])}</p></div></div>`;
+}
+function app() {
+  const fn = { home: homeScreen, sessions: sessionsScreen, session: sessionScreen, subject: subjectScreen, family: familyScreen, desk: deskScreen }[S.screen];
+  return `<div class="shell"><aside class="side">${sidebar()}</aside><div class="main"><header class="mhead"><span class="logo">IG</span><span>IGCSE ${ar() ? 'حجز المواد' : 'Subject reservation'}</span></header><main class="page" id="main">${fn()}</main></div></div>`;
+}
+const statusBadge = (s) => (s.status === 'open' ? '<span class="badge ok">Accepting reservations</span>' : s.status === 'closed' ? '<span class="badge">Closed</span>' : '<span class="badge">Draft — families cannot see it</span>') + (s.example ? ' <span class="badge info">example</span>' : '');
+const datesLine = (s) => `Reservations close ${s.closesAt ? day(s.closesAt) : '— (optional)'} · Payment due ${s.paymentDueAt ? day(s.paymentDueAt) : '<span class="warnText">not set</span>'} · First lesson ${s.firstLesson ? day(s.firstLesson) : '<span class="warnText">not set</span>'}`;
+
+/* ───────────────────────── 1. Home ───────────────────────── */
+function homeScreen() {
+  const list = S.sessions.filter((s) => s.status !== 'closed');
+  return `<div class="row between"><div><h1 class="h1">Home</h1><p class="muted mt4">Your sessions, and what to do in each before it opens.</p></div><button class="btn outline" data-act="go" data-screen="sessions">All sessions</button></div>
+  <div class="stack mt24">${list.map(homeCard).join('')}</div>`;
+}
+function homeCard(s) {
+  const items = checks(s).filter((c) => c.mine && c.level !== 'info'); const c = resCounts(s);
+  return `<section class="card"><div class="row between"><div class="row"><h2 class="h2"><bdi>${sessName(s)}</bdi></h2>${statusBadge(s)}</div><button class="btn" data-act="openSession" data-id="${s.id}">Open ${sessName(s)}</button></div>
+  <p class="sm muted mt4">${datesLine(s)}</p>
+  ${s.status === 'open' ? `<p class="sm mt8">What families are doing: <b>${c.total}</b> reservations · <b>${c.paid}</b> paid · <b>${c.waiting}</b> waiting for payment</p>` : ''}
+  <h3 class="h3 mt16">${s.status === 'draft' ? 'Check before you open' : 'Needs a look'} <span class="muted">(${items.length})</span></h3>
+  ${items.length ? `<ul class="mt4">${items.map((x) => `<li class="check"><span class="dot ${x.level}"></span><p class="grow sm">${esc(x.text)}</p><button class="btn xs outline" data-act="checkGo" data-s="${s.id}" data-id="${x.id}">${x.field ? 'Set it' : x.off ? 'Open the subject' : x.tab ? `Go to ${TABS[x.tab]}` : 'Look'}</button></li>`).join('')}</ul>` : '<p class="sm muted mt8">Nothing to do.</p>'}</section>`;
+}
+
+/* ───────────────────────── 2. Sessions ───────────────────────── */
+function sessionsScreen() {
+  const list = S.sessions.slice().sort((a, b) => sessKey(b).localeCompare(sessKey(a)));
+  return `<div class="row between"><div><h1 class="h1">Sessions</h1><p class="muted mt4">A session is one cycle — June, or November / January. Families see it once it accepts reservations.</p></div><button class="btn" data-act="newSession">New session</button></div>
+  <ul class="stack mt24">${list.map((s) => { const c = resCounts(s); const offered = s.offerings.filter((o) => o.accepting && !missingOf(o).any).length; const ol = s.offerings.filter((o) => o.group === 'OL').length;
+    return `<li class="card"><div class="row between"><div><div class="row"><button class="link plain h2" data-act="openSession" data-id="${s.id}"><bdi>${sessName(s)}</bdi></button>${statusBadge(s)}${s.copiedFrom ? `<span class="badge">copied from ${sessName(byId(s.copiedFrom))}</span>` : ''}</div><p class="sm muted mt4">${datesLine(s)}</p></div><button class="btn outline" data-act="openSession" data-id="${s.id}">Open</button></div>
+    <p class="sm mt8">${plural(s.offerings.length, 'subject')} (${ol} O.L., ${s.offerings.length - ol} A.S./A.L.) · ${offered} offered to families · ${plural(c.total, 'reservation')}${c.total ? `, ${c.paid} paid` : ''} · prices ${s.pricesFinal ? 'final' : 'not final'}</p></li>`; }).join('')}</ul>`;
+}
+const lastOfType = (type) => S.sessions.filter((s) => s.type === type && !s.example).sort((a, b) => b.year - a.year)[0] || null;
+const suggestYear = (type) => { const last = lastOfType(type); return last ? Math.min(last.year + 1, 2028) : 2026; };
+function dlgNew(d) {
+  const last = lastOfType(d.t); const y = Number(d.y); const exists = S.sessions.some((s) => s.type === d.t && s.year === y && !s.example);
+  const name = sessName({ type: d.t, year: y }); const from = last ? d.from : 'empty';
+  return modal('New session', `<div class="grid-2"><div class="field"><label for="ns-type">Type</label><select id="ns-type" class="input" data-chg="nsType"><option value="june" ${d.t === 'june' ? 'selected' : ''}>June</option><option value="winter" ${d.t === 'winter' ? 'selected' : ''}>November / January</option></select></div>
+   <div class="field"><label for="ns-year">Year</label><select id="ns-year" class="input" data-chg="nsYear">${[2026, 2027, 2028].map((x) => `<option value="${x}" ${x === y ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div>
+   <div class="field mt12"><label for="ns-from">Start from</label><select id="ns-from" class="input" data-chg="nsFrom"><option value="copy" ${from === 'copy' ? 'selected' : ''} ${last ? '' : 'disabled'}>${last ? `Copy the last ${d.t === 'june' ? 'June' : 'November / January'} session (${sessName(last)})` : 'Copy the last session of this type (there is none yet)'}</option><option value="empty" ${from === 'empty' ? 'selected' : ''}>Empty</option></select>
+   <p class="hint">${from === 'copy' ? "Every subject, row, teacher, note, question, policy and share comes across. Earlier exams and dates move one year; prices come across as last year's, not final." : "No subjects: add them from the boards' lists."}</p></div>
+   <div class="card flat tight mt16"><p class="xs muted">The session's name — made from the type and the year</p><p class="h2" id="ns-name">${name}</p></div>
+   ${exists ? `<p class="notice bad mt12" role="alert">${name} already exists.</p>` : ''}`,
+   `<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="createSession" ${exists ? 'disabled' : ''}>Create ${name}</button>`);
+}
+
+/* ───────────────────────── 3. Session ───────────────────────── */
+function sessionScreen() {
+  const s = cur(); const c = resCounts(s);
+  const label = { subjects: `Subjects (${s.offerings.length})`, prices: 'Prices', agree: TABS.agree, reservations: `Reservations (${c.total})` };
+  const body = { subjects: subjectsTab, prices: pricesTab, agree: agreeTab, reservations: reservationsTab }[S.tab](s);
+  return `<button class="link plain sm muted" data-act="go" data-screen="sessions">← Sessions</button>${sessionHeader(s)}${checkCard(s)}
+  <div class="tabs mt24" role="tablist" aria-label="Session">${Object.keys(TABS).map((t) => `<button type="button" role="tab" data-act="tab" data-tab="${t}" aria-selected="${S.tab === t}">${label[t]}</button>`).join('')}</div>
+  <div class="mt16" role="tabpanel">${body}</div>`;
+}
+function sessionHeader(s) {
+  const lines = s.reservations.length > 0;
+  const dateField = (f, label, hint) => `<div class="field"><label for="d-${f}">${label}</label><input type="date" id="d-${f}" class="input" value="${s[f] || ''}" data-chg="sessDate" data-f="${f}"><p class="hint">${hint}</p></div>`;
+  return `<section class="card mt12"><div class="row between top"><div><div class="row"><h1 class="h1"><bdi>${sessName(s)}</bdi></h1>${statusBadge(s)}</div>
+    <p class="sm muted mt4">${plural(s.offerings.length, 'subject')} · self study pays ${s.share}% of the course fee${s.copiedFrom ? ` · copied from ${sessName(byId(s.copiedFrom))}` : ''}</p></div>
+    <div class="stack-sm" style="min-width:320px"><div class="swrow"><span class="swlabel">Accepting reservations</span>${sw(s.status === 'open', 'toggleAccepting', '', 'Accepting reservations')}</div>
+    <div class="swrow"><span class="swlabel">Prices final <span class="xs muted">— families can pay</span></span>${sw(s.pricesFinal, 'togglePricesFinal', '', 'Prices final', false, s.pricesFinal && lines ? 'One-way once reservations exist' : '')}</div></div></div>
+    <div class="grid-3 mt16">${dateField('closesAt', 'Reservations close <span class="muted">(optional)</span>', 'Switches Accepting off that day.')}${dateField('paymentDueAt', 'Payment due', `Unpaid reservations are cancelled ${plural(s.cancelDays, 'day')} after it.`)}${dateField('firstLesson', 'First lesson', 'The refund weeks count from it.')}</div></section>`;
+}
+function checkCard(s) {
+  const items = checks(s); const n = items.filter((c) => c.level !== 'info').length;
+  return `<section class="card mt16" id="checks"><div class="row between"><h2 class="h2">${s.status === 'draft' ? 'Check before you open' : 'Needs a look'} <span class="muted">(${n})</span></h2><button class="link sm" data-act="toggleChecks">${S.openChecks ? 'Hide' : 'Show'}</button></div>
+  ${S.openChecks ? (items.length ? `<ul class="mt8">${items.map((c) => checkItem(s, c)).join('')}</ul>` : '<p class="sm muted mt8">Nothing left: the session can open.</p>') : ''}</section>`;
+}
+function checkItem(s, c) {
+  if (c.kind === 'doubts') {
+    return `<li class="check" id="chk-doubts"><span class="dot look"></span><div class="grow"><p class="sm">${esc(c.text)} Families read the name you keep.</p>
+    <div class="tablewrap mt8"><table class="t"><thead><tr><th>Where</th><th>Names seen</th><th>Families will read</th></tr></thead><tbody>${s.doubts.map((d) => `<tr><td>${esc(d.where)}</td><td>${d.same ? `${esc(d.a)} · ${esc(d.b)} <span class="xs muted">(${d.aFrom === 'one' ? 'two spellings of one person' : `${d.aFrom} · ${d.bFrom}`})</span>` : `${esc(d.a)} <span class="xs muted">(${d.aFrom})</span> · ${esc(d.b)} <span class="xs muted">(${d.bFrom}) — two different people</span>`}</td><td><select class="input s" data-chg="doubtPick" data-id="${d.id}" aria-label="${esc(d.where)}: the name families read"><option ${d.pick === d.a ? 'selected' : ''}>${esc(d.a)}</option><option ${d.pick === d.b ? 'selected' : ''}>${esc(d.b)}</option></select></td></tr>`).join('')}</tbody></table></div></div>
+    <div style="flex:none"><button class="btn xs outline" data-act="confirmDoubts">Confirm these names</button></div></li>`;
+  }
+  let a = '';
+  if (c.ok) a += `<button class="btn xs outline" data-act="checkOk" data-id="${c.id}">${c.ok}</button>`;
+  if (c.act) a += `<button class="btn xs outline" data-act="${c.act}">${c.actLabel}</button>`;
+  if (c.field) a += `<button class="btn xs ghost" data-act="focusField" data-f="${c.field}">Set it</button>`;
+  if (c.off) a += `<button class="btn xs ghost" data-act="checkGo" data-s="${s.id}" data-id="${c.id}">Open the subject</button>`;
+  if (c.tab) a += `<button class="btn xs ghost" data-act="tab" data-tab="${c.tab}">Go to ${TABS[c.tab]}</button>`;
+  if (c.adminDate) a += S.role === 'admin' ? `<input type="date" class="input s" style="width:160px" data-chg="adminDate" data-b="${c.board}" aria-label="${esc(BOARDS[c.board].name)} entry deadline"><button class="btn xs" data-act="saveAdminDate" data-b="${c.board}">Save the date</button>` : '<span class="badge">waiting for the admin</span>';
+  return `<li class="check"><span class="dot ${c.level}"></span><p class="grow sm">${esc(c.text)}</p><div class="row" style="flex:none;max-width:50%;justify-content:flex-end">${a}</div></li>`;
+}
+
+/* Subjects tab */
+function subjectsTab(s) {
+  const avail = REF.filter((r) => !s.offerings.some((o) => o.ref === r.ref));
+  const groups = [['cambridge', 'OL', 'Cambridge · O.L.'], ['cambridge', 'AS', 'Cambridge · A.S./A.L.'], ['edexcel', 'OL', 'Edexcel · O.L.'], ['edexcel', 'AS', 'Edexcel · A.S./A.L.'], ['oxford', 'OL', 'OxfordAQA · O.L.']];
+  const sel = `<select id="add-ref" class="input" style="max-width:380px" data-chg="addPick" aria-label="Add a subject: pick from the board's list"><option value="">Pick from the board's list…</option>${groups.map(([b, g, l]) => { const xs = avail.filter((r) => r.board === b && r.group === g); return xs.length ? `<optgroup label="${l}">${xs.map((r) => `<option value="${r.ref}" ${S.addRef === r.ref ? 'selected' : ''}>${esc(r.title)}${r.code ? ' · ' + esc(r.code) : ''}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>`;
+  return `<div class="card tight"><div class="row"><span class="b sm">Add a subject</span>${sel}<button class="btn" data-act="addSubject">Add</button><span class="muted sm">or</span><button class="btn outline sm" data-act="dlgCopySubject">Copy a similar subject</button><button class="btn ghost sm" data-act="dlgNotOnList">Not on the list</button></div></div>
+  ${['OL', 'AS'].map((g) => { const xs = s.offerings.filter((o) => o.group === g); return `<h2 class="h3 mt24">${g === 'OL' ? 'O.L.' : 'A.S./A.L.'} <span class="muted">(${xs.length})</span></h2>${xs.length ? `<div class="tiles mt8">${xs.map((o) => tile(s, o)).join('')}</div>` : '<p class="sm muted mt8">None yet.</p>'}`; }).join('')}`;
+}
+function feeSummary(o) {
+  const on = o.rows.filter((r) => r.on); const fees = on.map((r) => r.examFee).filter((f) => f != null);
+  const exam = !fees.length ? '<span class="warnText">exam fee not set</span>' : `exam fee${on.length > 1 ? 's' : ''} ${Math.min(...fees) === Math.max(...fees) ? money(fees[0]) : `${money(Math.min(...fees))}–${n2(Math.max(...fees))}`}${fees.length < on.length ? ' <span class="warnText">(one not set)</span>' : ''}${on.some((r) => r.lastYear && !r.kept) ? ' <span class="badge warn">last year\'s</span>' : ''}`;
+  const course = o.courseFee == null ? '<span class="warnText">course fee not set</span>' : `course fee ${money(o.courseFee)}${o.courseFeeSrc === 'example' ? ' <span class="badge info">example</span>' : o.courseFeeSrc === 'last_year' ? ' <span class="badge warn">last year\'s</span>' : ''}`;
+  return `${exam} · ${course}`;
+}
+function tile(s, o) {
+  const m = missingOf(o); const n = linesOf(s, o.id).length;
+  const ts = o.tbc && !o.teachers.length ? '<span class="badge warn">teacher to be confirmed</span>' : o.teachers.map((t) => `<bdi>${esc(tName(t.tid))}</bdi>${t.online ? ' <span class="xs muted">(online)</span>' : ''}${t.external ? ' <span class="xs muted">(external team)</span>' : ''}`).join(', ');
+  const rows = o.rows.filter((r) => r.on).map((r) => `<li><span class="b">${esc(r.label.en)}</span> <span class="muted">${['fi', 'ri', 'rs', 'fs'].filter((k) => r.cells[k]).map((k) => CELL_SHORT[k]).join(' · ')}</span>${r.teachers ? ` <span class="muted">— ${r.teachers.map((t) => esc(tName(t.tid)) + (t.online ? ' (online)' : '')).join(' or ')}</span>` : ''}${r.closed ? ' <span class="badge">closed</span>' : ''}</li>`).join('');
+  return `<article class="tile${o.accepting ? '' : ' off'}"><div class="row between nowrap top"><button class="link plain h3" data-act="openSubject" data-id="${o.id}">${esc(o.title)}</button><span class="row nowrap xs muted swl">${o.accepting ? (s.status === 'open' ? 'Accepting' : 'Opens with the session') : 'Closed'} ${sw(o.accepting, 'toggleSubjectAccepting', `data-id="${o.id}"`, `${o.title}: accepting reservations`)}</span></div>
+   <p class="xs muted">${BOARDS[o.board].name}${o.code ? ' · ' + esc(o.code) : ''}${o.toCheck ? ' · code being confirmed by us' : ''}${o.custom ? ' · not on the list (flagged to us)' : ''}</p>
+   <p class="sm">${ts || '<span class="muted">no teacher</span>'}</p><ul class="xs stack-sm">${rows || '<li class="muted">No row ticked.</li>'}</ul><p class="xs">${feeSummary(o)}</p>
+   ${m.any && o.accepting ? '<p><span class="badge warn">Not offered to families: a price is not set</span></p>' : ''}${n ? `<p class="xs muted">${plural(n, 'reservation')}</p>` : ''}</article>`;
+}
+
+/* Prices tab */
+const plFor = (s) => { if (S.pl.forKey) return S.pl.forKey; const opts = s.type === 'june' ? [`${s.year - 1}-06`, `${s.year}-06`] : [`${s.year - 1}-11`, `${s.year}-11`]; return opts.find((k) => !s.lists.some((l) => l.name === `${BOARDS[S.pl.board].name} ${ym(k)}`)) || opts[1]; };
+const listForOptions = (s) => (s.type === 'june' ? [`${s.year}-06`, `${s.year - 1}-11`, `${s.year - 1}-06`, `${s.year - 1}-01`] : [`${s.year}-11`, `${s.year}-06`, `${s.year - 1}-11`, `${s.year}-01`]);
+function feeSrcText(s, o, r) {
+  if (r.examFee == null) return 'not set';
+  if (r.lastYear && !r.kept) return "last year's — not final";
+  if (r.kept) return "last year's, kept";
+  if (r.feeSrc === 'list') { const l = S.sessions.flatMap((x) => x.lists).find((x) => x.id === r.feeList); return `from ${l ? l.name : 'a list'}`; }
+  if (r.feeSrc === 'board_rule') return `the subject's fee (${BOARDS[o.board].name}'s rule)`;
+  if (r.feeSrc === 'units_sum') return `sum of its ${r.kind === 'qual' ? 'units' : 'papers'}: ${Object.entries(r.parts || {}).map(([k, v]) => `${k} ${n2(v)}`).join(' + ')}`;
+  return 'typed';
+}
+function pricesTab(s) {
+  const used = (l) => s.offerings.reduce((a, o) => a + o.rows.filter((r) => r.on && r.feeList === l.id).length + o.rows.filter((r) => r.on && r.sumOf && r.feeSrc === 'units_sum' && l.rows.some((x) => r.sumOf.map(normCode).includes(normCode(x[0])))).length, 0);
+  const lists = `<section class="card"><h2 class="h3">Price lists in use</h2>${s.lists.length ? `<div class="tablewrap mt12"><table class="t"><thead><tr><th>List</th><th>Lines as printed</th><th>Rows priced from it</th></tr></thead><tbody>${s.lists.map((l) => `<tr><td class="b">${esc(l.name)}</td><td>${l.rows.length}</td><td>${used(l)}</td></tr>`).join('')}</tbody></table></div>` : `<p class="sm muted mt8">None yet in ${sessName(s)}.${s.copiedFrom ? ` Last year's lists stay with ${sessName(byId(s.copiedFrom))}; its prices came across as last year's.` : ''}</p>`}</section>`;
+  return lists + pasteCard(s) + missingCard(s) + lastYearCard(s) + courseCard(s);
+}
+function pasteCard(s) {
+  const pl = S.pl; const f = plFor(s);
+  return `<section class="card mt16" id="paste"><h2 class="h3">Paste a list as printed</h2><p class="sm muted mt4">Copy the board's fee list from the PDF or sheet and paste it here as it is: one line per code, name and amount. Lines match your rows by code; old codes and two codes printed on one line are understood.</p>
+  <div class="row mt12" style="align-items:flex-end;gap:12px"><div class="field"><label for="pl-board">Board</label><select id="pl-board" class="input" data-chg="plBoard">${Object.entries(BOARDS).map(([k, b]) => `<option value="${k}" ${pl.board === k ? 'selected' : ''}>${b.name}</option>`).join('')}</select></div>
+  <div class="field"><label for="pl-for">The list is the board's fees for</label><select id="pl-for" class="input" data-chg="plFor">${listForOptions(s).map((k) => `<option value="${k}" ${f === k ? 'selected' : ''}>${ym(k)}</option>`).join('')}</select></div><p class="sm" style="padding-bottom:10px">Its name: <b>${BOARDS[pl.board].name} ${ym(f)}</b></p></div>
+  <div class="field mt12"><label for="pl-text">The list, pasted</label><textarea id="pl-text" class="input" rows="7" data-chg="plText" placeholder="3180 A    Arabic    9,850" style="font-family:ui-monospace,Menlo,monospace;font-size:12px">${esc(pl.text)}</textarea><p class="hint"><button class="link" data-act="plExample">Fill with an example ${BOARDS[pl.board].name} list</button> — mock only: example figures, not the board's.</p></div>
+  <div class="row mt12"><button class="btn" data-act="plRead">Read the list</button>${pl.parsed ? '<button class="btn outline" data-act="plDiscard">Discard</button>' : ''}</div>${pl.parsed ? parsedView(s) : ''}</section>`;
+}
+function parsedView(s) {
+  const res = S.pl.parsed;
+  return `<div class="mt16"><h3 class="h3">Matched <span class="muted">(${res.matched.length})</span></h3>${res.matched.length ? `<div class="tablewrap mt8"><table class="t"><thead><tr><th>Code as printed</th><th>Name as printed</th><th>Amount</th><th>Goes to</th><th>Now</th></tr></thead><tbody>${res.matched.map((m) => `<tr><td class="num">${esc(m.code)}</td><td>${esc(m.name)}</td><td>${money(m.amount)}</td><td>${m.targets.map((t) => `${esc(t.title)} · ${esc(t.label)}${t.part ? ' <span class="xs muted">(one of its units, summed)</span>' : ''}`).join('<br>')}</td><td>${m.targets.map((t) => (t.old == null ? '<span class="warnText">not set</span>' : t.old === m.amount && !t.ly ? 'same' : `${money(t.old)}${t.ly ? ' <span class="xs muted">last year\'s</span>' : ''}`)).join('<br>')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted mt4">No line matched a row of this session.</p>'}
+  ${res.unused.length ? `<h3 class="h3 mt16">Not used <span class="muted">(${res.unused.length})</span></h3><div class="tablewrap mt8"><table class="t"><thead><tr><th>Line as printed</th><th>Why</th></tr></thead><tbody>${res.unused.map((u) => `<tr><td class="num">${esc(u.raw)}</td><td>${esc(u.why)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+  <div class="row mt12"><button class="btn" data-act="plUse" ${res.matched.length ? '' : 'disabled'}>Use these prices</button><span class="sm muted">One-paper rows that follow their subject, and sums of units, follow by themselves.</span></div></div>`;
+}
+function parseList(text) {
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\t/g, '  ').trim(); if (!line) continue;
+    const m = line.match(/^(.*?)\s+(?:EGP\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:EGP)?$/i);
+    if (!m) { out.push({ raw: line, bad: true, codes: [] }); continue; }
+    const amount = Number(m[2].replace(/,/g, '')); const rest = m[1].trim(); let codes = []; let name = rest;
+    const pair = rest.match(/^([A-Z0-9]{3,6}(?:\s[0-9A-Z]{1,2})?)\s*\/\s*([A-Z0-9]{3,6}(?:\s[0-9A-Z]{1,2})?)\s+(.*)$/);
+    if (pair) { codes = [pair[1], pair[2]]; name = pair[3]; }
+    else { const one = rest.match(/^([0-9]{4}\s[A-Z0-9]{1,2}(?=\s)|[0-9][A-Z]{2}[0-9]\s[0-9][A-Z](?=\s)|[A-Z0-9]{4,6})\s+(.*)$/); if (one) { codes = [one[1]]; name = one[2]; } }
+    out.push({ raw: line, codes, name, amount });
+  }
+  return out;
+}
+function targetsFor(s, board, code) {
+  const c = normCode(code); const alias = ALIASES[board][c]; const out = [];
+  for (const o of s.offerings) { if (o.board !== board) continue; for (const r of o.rows) { if (!r.on) continue;
+    if (r.codes.map(normCode).includes(c) || (alias && alias[0] === o.ref && alias[1] === r.key)) out.push({ oid: o.id, rkey: r.key, title: o.title, label: r.label.en, old: r.examFee, ly: r.lastYear && !r.kept });
+    else if (r.sumOf && r.sumOf.map(normCode).includes(c)) out.push({ oid: o.id, rkey: r.key, title: o.title, label: r.label.en, old: r.parts ? (r.parts[r.sumOf.find((x) => normCode(x) === c)] ?? null) : null, part: r.sumOf.find((x) => normCode(x) === c), ly: r.lastYear && !r.kept });
+  } }
+  return out;
+}
+function whyUnused(s, board, code) {
+  const c = normCode(code);
+  for (const R0 of REF) { if (R0.board !== board) continue; for (const r of R0.rows) if (r.codes.map(normCode).includes(c) || (r.sumOf || []).map(normCode).includes(c)) { const inS = offByRef(s, R0.ref); return inS ? `${R0.title}: its ${r.label.en} row is not ticked` : `${R0.title} is not offered in this session`; } }
+  return 'not recognised: no subject on our lists has this code';
+}
+function matchList(s, board, text) {
+  const matched = [], unused = [];
+  for (const p of parseList(text)) {
+    if (p.bad || !p.codes.length) { unused.push({ raw: p.raw, why: p.bad ? 'no amount read on this line' : 'no code read on this line' }); continue; }
+    for (const code of p.codes) { const targets = targetsFor(s, board, code); if (targets.length) matched.push({ code, name: p.name, amount: p.amount, targets }); else unused.push({ raw: p.codes.length > 1 ? `${code} (on the line “${p.raw}”)` : p.raw, why: whyUnused(s, board, code) }); }
+  }
+  return { matched, unused };
+}
+function applyList(ss, board, name, matched) {
+  const id = nid('L'); ss.lists.push({ id, board, name, rows: matched.map((m) => [m.code, m.name, m.amount]) });
+  for (const m of matched) for (const t of m.targets) {
+    const o = ss.offerings.find((x) => x.id === t.oid); const r = o && o.rows.find((x) => x.key === t.rkey); if (!r) continue;
+    if (t.part) { r.parts = r.parts || {}; r.parts[t.part] = m.amount; r.lastYear = false; r.kept = false; if (r.sumOf.every((x) => r.parts[x] != null)) { r.examFee = sumParts(r.parts); r.feeSrc = 'units_sum'; } }
+    else { r.examFee = m.amount; r.feeSrc = 'list'; r.feeList = id; r.lastYear = false; r.kept = false; }
+  }
+  for (const o of ss.offerings) recalc(o);
+}
+function fillOptions(o, r) {
+  const out = [];
+  if (r.sumOf) { const parts = {}; let ok = true; for (const c of r.sumOf) { const f = findIn(allLists(o.board), c); if (f) parts[c] = f.amount; else ok = false; } if (ok) out.push({ v: 'sum', label: `Sum of its ${r.kind === 'qual' ? 'units' : 'papers'}: ${moneyTxt(sumParts(parts))}` }); }
+  for (const c of codesOf(o, r)) for (const l of allLists(o.board)) { const hit = l.rows.find((x) => normCode(x[0]) === normCode(c)); if (hit) out.push({ v: `copy:${l.id}:${hit[0]}`, label: `Copy from ${l.name}: ${moneyTxt(hit[2])}` }); }
+  return out;
+}
+function missingCard(s) {
+  const rows = []; for (const o of s.offerings) for (const r of o.rows) if (r.on && r.examFee == null) rows.push({ o, r });
+  return `<section class="card mt16" id="missing"><h2 class="h3">Missing exam fees <span class="muted">(${rows.length})</span></h2><p class="sm muted mt4">Every ticked row without an exam fee. A subject with a fee not set is not offered to families. Not set is not 0.</p>
+  ${rows.length ? `<div class="tablewrap mt12"><table class="t"><thead><tr><th>Subject · row</th><th>Fill it by</th><th>Amount (EGP)</th></tr></thead><tbody>${rows.map(({ o, r }) => { const opts = fillOptions(o, r); return `<tr><td>${esc(o.title)} · ${esc(r.label.en)}</td><td>${opts.length ? `<select class="input s" data-chg="missHow" data-o="${o.id}" data-r="${r.key}" aria-label="${esc(o.title)} ${esc(r.label.en)}: fill it by"><option value="">typing it, or…</option>${opts.map((x) => `<option value="${esc(x.v)}">${esc(x.label)}</option>`).join('')}</select>` : '<span class="xs muted">typing it (no list we hold prints it)</span>'}</td><td><input type="number" min="0" step="50" class="input s fee" data-chg="missAmt" data-o="${o.id}" data-r="${r.key}" placeholder="not set" aria-label="${esc(o.title)} ${esc(r.label.en)}: exam fee"></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="sm okText mt8">Every ticked row has its exam fee.</p>'}</section>`;
+}
+function lastYearCard(s) {
+  const rows = lastYearRows(s); if (!rows.length) return '';
+  return `<section class="card mt16" id="lastyear"><h2 class="h3">Last year's exam fees <span class="muted">(${rows.length})</span></h2><p class="sm muted mt4">Copied from ${sessName(byId(s.copiedFrom))}, not final. Paste this year's lists above; keep or type what is left.</p>
+  <div class="row mt8"><button class="btn outline sm" data-act="keepLastYear">Keep last year's fee for these ${rows.length} rows</button></div>
+  <div class="tablewrap mt12"><table class="t"><thead><tr><th>Subject · row</th><th>Last year's</th><th>This year's (EGP)</th></tr></thead><tbody>${rows.map(({ o, r }) => `<tr><td>${esc(o.title)} · ${esc(r.label.en)}</td><td>${money(r.examFee)}</td><td><input type="number" min="0" step="50" class="input s fee" data-chg="lyAmt" data-o="${o.id}" data-r="${r.key}" placeholder="type it" aria-label="${esc(o.title)} ${esc(r.label.en)}: this year's exam fee"></td></tr>`).join('')}</tbody></table></div></section>`;
+}
+function courseCard(s) {
+  return `<section class="card mt16" id="course"><h2 class="h2 h3">Course fees</h2><p class="sm muted mt4">The school's own fee, one per subject; a row may have its own (a unit, a one-paper retake, an A.L.) in the subject's editor. Self study pays ${s.share}% of it. 0 is a fee; empty is not set.</p>
+  <div class="tablewrap mt12"><table class="t"><thead><tr><th>Subject</th><th>Course fee (EGP)</th><th>Rows with their own</th></tr></thead><tbody>${s.offerings.map((o) => `<tr><td>${esc(o.title)}</td><td><div class="row nowrap"><input type="number" min="0" step="50" class="input s fee" value="${o.courseFee ?? ''}" placeholder="not set" data-chg="courseFee" data-o="${o.id}" aria-label="${esc(o.title)}: course fee">${o.courseFeeSrc === 'example' ? '<span class="badge info">example</span>' : o.courseFeeSrc === 'last_year' ? '<span class="badge warn">last year\'s</span>' : ''}</div></td><td class="xs muted">${o.rows.filter((r) => r.on && r.courseFee != null).map((r) => `${esc(r.label.en)} ${n2(r.courseFee)}`).join(' · ') || '—'}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+
+/* What families agree to */
+function agreeTab(s) {
+  const locked = s.refundLocked; const PCT = [100, 75, 50, 25, 0];
+  const steps = s.refund.map((st, i) => {
+    const from = i === 0 ? 1 : s.refund[i - 1].week + 1; const last = i === s.refund.length - 1;
+    const pct = `<select class="input s" style="width:110px" data-chg="refPct" data-i="${i}" ${locked ? 'disabled' : ''} aria-label="Refund ${last ? `from week ${from}` : `step ${i + 1}`}">${PCT.map((p) => `<option value="${p}" ${st.pct === p ? 'selected' : ''}>${p}%</option>`).join('')}</select>`;
+    if (last) return `<div class="row"><span class="sm" style="width:170px">From week ${from}</span>${pct}<span class="sm muted">of the course fee back</span></div>`;
+    const weeks = []; for (let w = from; w <= 20; w++) weeks.push(w);
+    return `<div class="row"><span class="sm" style="width:58px">${i === 0 ? 'Up to' : 'Then to'}</span><select class="input s" style="width:104px" data-chg="refWeek" data-i="${i}" ${locked ? 'disabled' : ''} aria-label="Step ${i + 1}: up to week">${weeks.map((w) => `<option value="${w}" ${st.week === w ? 'selected' : ''}>week ${w}</option>`).join('')}</select>${pct}<span class="sm muted">of the course fee back</span>${!locked && s.refund.length > 2 ? `<button class="x" data-act="refDel" data-i="${i}" aria-label="Remove step ${i + 1}">×</button>` : ''}</div>`;
+  }).join('');
+  const shares = []; for (let p = 10; p <= 100; p += 5) shares.push(p);
+  const days = []; for (let d = 1; d <= 14; d++) days.push(d);
+  return `<section class="card"><h2 class="h3">Refund policy</h2><p class="sm muted mt4">Of the course fee, counted from the first lesson. Families read the sentence below, made from these rows, so the words and the money cannot disagree.</p>
+  ${locked ? '<p class="mt8"><span class="badge info">Fixed: a family has agreed to it</span></p>' : ''}<div class="stack-sm mt12">${steps}</div>${locked ? '' : '<div class="row mt8"><button class="btn outline sm" data-act="refAdd">Add a step</button></div>'}
+  <div class="notice mt12"><p class="sm"><b>Families read:</b> ${esc(refundConsent(s, 'en'))}</p><p class="sm mt4" dir="rtl" lang="ar">${esc(refundConsent(s, 'ar'))}</p></div></section>
+  <section class="card mt16"><h2 class="h3">Declaration</h2><p class="sm mt8">“${DECL.en}”</p><p class="xs muted mt4">One text for the whole school, set by the admin; each family's agreement keeps a copy of it.</p></section>
+  <section class="card mt16"><div class="grid-3">
+   <div class="field"><label for="ag-share">Self study pays</label><select id="ag-share" class="input" data-chg="share">${shares.map((p) => `<option value="${p}" ${s.share === p ? 'selected' : ''}>${p}% of the course fee</option>`).join('')}</select><p class="hint">and the whole exam fee. Shown on every subject.</p></div>
+   <div class="field"><span class="lbl">Grades that may reserve</span><div class="stack-sm">${[['g10', 'Grade 10'], ['g11', 'Grade 11'], ['g12', 'Grade 12'], ['grad', 'Graduates retaking']].map(([k, l]) => `<div class="swrow" style="max-width:250px"><span class="sm">${l}</span>${sw(s.grades[k], 'grade', `data-g="${k}"`, l)}</div>`).join('')}</div></div>
+   <div class="field"><label for="ag-cancel">Unpaid reservations are cancelled</label><select id="ag-cancel" class="input" data-chg="cancelDays">${days.map((d) => `<option value="${d}" ${s.cancelDays === d ? 'selected' : ''}>${plural(d, 'day')} after the payment due date</option>`).join('')}</select><p class="hint">or at the board's deadline, if that is earlier. Reminders go before.</p></div>
+  </div></section>${questionsCard(s)}`;
+}
+function questionsCard(s) {
+  const all = [...s.questions.map((q) => ({ q, where: 'with every reservation' })), ...s.offerings.flatMap((o) => o.questions.map((q) => ({ q, where: `with ${o.title}`, oid: o.id })))]; const f = S.q;
+  return `<section class="card mt16" id="questions"><h2 class="h3">Extra questions</h2><p class="sm muted mt4">Optional. The answers go into the reservations export; they never change a price or who may reserve.</p>
+  ${all.length ? `<ul class="mt8">${all.map(({ q, where, oid }) => `<li class="check"><div class="grow"><p class="sm">${esc(q.text)}${q.example ? ' <span class="badge info">example</span>' : ''}</p><p class="xs muted">${QTYPE[q.type]}${q.choices.length ? ': ' + q.choices.map(esc).join(' / ') : ''} · asked ${esc(where)}</p></div><button class="x" data-act="qDel" data-id="${q.id}" ${oid ? `data-o="${oid}"` : ''} aria-label="Remove the question">×</button></li>`).join('')}</ul>` : '<p class="sm muted mt8">None.</p>'}
+  <div class="grid-3 mt12"><div class="field"><label for="q-scope">Asked</label><select id="q-scope" class="input" data-chg="qScope"><option value="session">with every reservation</option>${s.offerings.map((o) => `<option value="${o.id}" ${f.scope === o.id ? 'selected' : ''}>with ${esc(o.title)}</option>`).join('')}</select></div>
+  <div class="field"><label for="q-type">Answer</label><select id="q-type" class="input" data-chg="qType">${Object.entries(QTYPE).map(([k, v]) => `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+  <div class="field"><label for="q-text">Question</label><input id="q-text" class="input" data-chg="qText" value="${esc(f.text)}" placeholder="e.g. Will the student bring their own calculator?"></div></div>
+  ${f.type === 'choice' ? `<div class="field mt8"><label for="q-ch">Choices, one per line</label><textarea id="q-ch" class="input" rows="3" data-chg="qChoices">${esc(f.choices)}</textarea></div>` : ''}<div class="row mt8"><button class="btn outline sm" data-act="qAdd">Add the question</button></div></section>`;
+}
+function reservationsTab(s) {
+  const L = s.reservations; const c = resCounts(s);
+  if (!L.length) return `<div class="card"><p class="sm muted">No reservations yet${s.status === 'draft' ? ': a draft is invisible to families' : ''}.</p></div>`;
+  const qs = s.questions;
+  return `<div class="row between"><p class="sm">${c.total} reservations · ${c.paid} paid · ${c.waiting} waiting for payment. Read-only: payments are the finance desk's.</p><button class="btn outline sm" data-act="export">Export (CSV)</button></div>
+  <div class="tablewrap mt12"><table class="t"><thead><tr><th>Student</th><th>Subject</th><th>What</th><th>Teacher</th><th>Earlier exam</th><th>Price</th><th>Status</th>${qs.length ? '<th>Answers</th>' : ''}</tr></thead><tbody>${L.map((l) => { const o = s.offerings.find((x) => x.id === l.oid); const r = o && o.rows.find((x) => x.key === l.rkey);
+    return `<tr><td>${esc(l.student)} <span class="xs muted">${esc(l.cls)}</span></td><td>${esc(o ? o.title : '?')}</td><td>${r ? esc(rowOptText(s, r, l.opt, 'en')) : ''}</td><td>${l.tid ? esc(tName(l.tid)) : OPT[l.opt].mode === 'ss' ? '<span class="muted">self study</span>' : '<span class="muted">to be announced</span>'}</td><td>${l.when ? `${ym(l.when)} <span class="xs muted">declared</span>` : '—'}</td><td>${money(l.price)}</td><td>${l.status === 'paid' ? '<span class="badge ok">Paid</span>' : '<span class="badge warn">Waiting for payment</span>'}</td>${qs.length ? `<td class="xs">${qs.map((q) => esc((l.answers || {})[q.id] || '—')).join(' · ')}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>
+  <p class="xs muted mt8">“Earlier exam” is what the family declared for a retake of one paper or an A.2. (D7): listed for anyone who wants to check it.</p>`;
+}
+
+/* ───────────────────────── 4. Subject editor ───────────────────────── */
+function subjectScreen() {
+  const E = S.edit; if (!E) return '<p class="muted">No subject is open.</p>';
+  const s = byId(E.sid); const o = E.off; const B = BOARDS[o.board];
+  return `<button class="link plain sm muted" data-act="edCancel">← ${esc(sessName(s))}</button>
+  <div class="row between top mt12"><div><div class="row"><h1 class="h1">${esc(o.title)}</h1>${E.isNew ? '<span class="badge info">new — not added yet</span>' : ''}${s.example ? '<span class="badge info">example session</span>' : ''}</div><p class="sm muted mt4">${B.name}${o.code ? ' · ' + esc(o.code) : ''} · ${o.group === 'OL' ? 'O.L.' : 'A.S./A.L.'} · ${esc(sessName(s))}${o.toCheck ? ' · its code is being confirmed by us' : ''}</p></div>
+   <div class="card tight" style="min-width:320px"><div class="swrow"><span class="swlabel">Accepting reservations</span>${sw(o.accepting, 'edAccepting', '', 'This subject accepts reservations')}</div><div class="field mt8"><label for="ed-close">Closes on <span class="muted">(optional)</span></label><input type="date" id="ed-close" class="input" value="${o.closesAt || ''}" data-chg="edCloses"></div><p class="hint">Closing stops new reservations; waiting ones can still be paid.</p></div></div>
+  <div class="ed mt16"><div class="stack">${gridCard(s, o)}${teachersCard(o)}${earlierCard(s, o)}${familiesCard(o)}
+   <div class="row"><button class="btn" data-act="edSave">${E.isNew ? 'Add the subject' : 'Save'}</button><button class="btn outline" data-act="edCancel">Cancel</button><span class="grow"></span>${E.isNew ? '' : '<button class="btn ghost" data-act="edRemove">Remove this subject</button>'}</div></div>
+  <aside class="pv" aria-label="What families see">${previewCard(s, o)}</aside></div>`;
+}
+function gridCard(s, o) {
+  const E = S.edit; const showFs = o.rows.some((r) => r.on && r.cells.fs) || o.rows.some((r) => r.key === E.more && cellAllowed(r, 'fs'));
+  const cols = ['fi', 'ri', 'rs'].concat(showFs ? ['fs'] : []);
+  const head = cols.map((c) => { const el = o.rows.filter((r) => r.on && !r.closed && cellAllowed(r, c)); const all = el.length && el.every((r) => r.cells[c]); return `<th class="c"><label><span>${OPT[c].col}</span><input type="checkbox" data-chg="colAll" data-c="${c}" ${all ? 'checked' : ''} ${el.length ? '' : 'disabled'} aria-label="${OPT[c].col}: tick or untick every row"></label></th>`; }).join('');
+  return `<section class="card" id="grid"><h2 class="h3">What can be entered, and how it is studied</h2><p class="sm muted mt4">Tick the rows the school offers, then how each is studied. The rows come from ${BOARDS[o.board].name}'s list for this subject${o.custom ? ' (not on the list: add rows below)' : ''}.</p>
+   <div class="row mt12" style="align-items:flex-end;gap:16px"><div class="field"><label for="ed-course">Course fee — the subject's</label><div class="row nowrap"><input type="number" id="ed-course" class="input fee" min="0" step="50" value="${o.courseFee ?? ''}" placeholder="not set" data-chg="subCourse">${o.courseFeeSrc === 'example' ? '<span class="badge info">example</span>' : o.courseFeeSrc === 'last_year' ? '<span class="badge warn">last year\'s</span>' : ''}</div></div><p class="sm muted" style="max-width:460px;padding-bottom:8px">Self study pays <b>${s.share}%</b> of the course fee (the session's share) and the whole exam fee. A row may have its own course fee.</p></div>
+   <div class="tablewrap mt12"><table class="t grid"><thead><tr><th><span class="sr">Offered</span></th><th>Row</th>${head}<th>Exam fee (EGP)</th><th>Course fee (EGP)</th></tr></thead><tbody>${o.rows.map((r) => gridRow(s, o, r, cols)).join('')}</tbody></table></div>
+   ${E.cr ? `<div class="card flat tight mt12"><p class="sm b">A row not on the list</p><div class="row mt8" style="align-items:flex-end"><div class="field grow"><label for="cr-name">Name families read</label><input id="cr-name" class="input s" data-chg="crName" value="${esc(E.cr.name)}" placeholder="e.g. Paper 3 only"></div><div class="field"><label for="cr-code">Code <span class="muted">(optional)</span></label><input id="cr-code" class="input s" style="width:120px" data-chg="crCode" value="${esc(E.cr.code)}"></div><div class="field"><label for="cr-fee">Its exam fee</label><input id="cr-fee" type="number" min="0" class="input s fee" data-chg="crFee" value="${esc(E.cr.fee)}" placeholder="not set"></div><button class="btn sm" data-act="crAdd">Add the row</button><button class="btn ghost sm" data-act="crCancel">Cancel</button></div></div>` : '<div class="row mt8"><button class="btn ghost sm" data-act="crOpen">+ Add a row not on the list</button></div>'}
+   <p class="xs muted mt8">Retake in school starts ticked wherever first entry in school is: on her forms a retaker may pick a teacher. Untick it where the school does not offer it.</p></section>`;
+}
+function gridRow(s, o, r, cols) {
+  const E = S.edit; const open = E.more === r.key && r.on;
+  const cells = cols.map((c) => (cellAllowed(r, c) ? `<td class="c"><input type="checkbox" data-chg="cell" data-r="${r.key}" data-c="${c}" ${r.cells[c] ? 'checked' : ''} ${r.on && !r.closed ? '' : 'disabled'} aria-label="${esc(r.label.en)}: ${OPT[c].col}"></td>` : '<td class="c muted" title="A one-paper row is a retake">—</td>')).join('');
+  const sub = r.kind === 'paper' ? (rowAsks(o, r) ? 'retake of one paper; the others carried from an earlier exam' : 'retake of one paper') : r.kind === 'a2' ? 'carries the A.S. from an earlier exam' : r.kind === 'qual' && r.sumOf ? `units ${r.sumOf.join(' + ')}` : r.kind === 'unit' && !r.required ? 'optional unit' : r.kind === 'custom' ? 'not on the list' : '';
+  const ts = r.teachers ? `<div class="xs mt4">${r.teachers.map((t) => esc(tName(t.tid)) + (t.online ? ' (online)' : '')).join(' or ')}</div>` : '';
+  let h = `<tr class="${r.on ? '' : 'offrow'}"><td><input type="checkbox" data-chg="rowOn" data-r="${r.key}" ${r.on ? 'checked' : ''} aria-label="Offer ${esc(r.label.en)}"></td>
+   <td class="rowc"><span class="b">${esc(r.label.en)}</span>${r.closed ? ' <span class="badge">closed</span>' : ''}${sub ? `<div class="xs muted">${esc(sub)}</div>` : ''}${ts}${s.type === 'winter' && r.on ? `<div class="xs mt4"><span class="badge info">exam in ${r.sitting === 'january' ? 'January' : 'November'}</span></div>` : ''}${r.on ? `<div><button class="link xs" data-act="rowMore" data-r="${r.key}" aria-expanded="${open}">${open ? 'Fewer options' : 'More options'}</button></div>` : ''}</td>${cells}
+   <td><input type="number" class="input s fee" min="0" step="50" value="${r.examFee ?? ''}" placeholder="not set" data-chg="rowFee" data-r="${r.key}" ${r.on ? '' : 'disabled'} aria-label="${esc(r.label.en)}: exam fee"><div class="xs ${r.examFee == null ? 'warnText' : 'muted'}" style="max-width:190px">${esc(feeSrcText(s, o, r))}</div></td>
+   <td><input type="number" class="input s fee" min="0" step="50" value="${r.courseFee ?? ''}" placeholder="as subject" data-chg="rowCourse" data-r="${r.key}" ${r.on ? '' : 'disabled'} aria-label="${esc(r.label.en)}: its own course fee"><div class="xs muted">${r.courseFee != null ? `its own${r.courseFeeSrc === 'example' ? ' (example)' : r.courseFeeSrc === 'last_year' ? " (last year's)" : ''}` : o.courseFee != null ? moneyTxt(o.courseFee) : '<span class="warnText">not set</span>'}</div></td></tr>`;
+  if (open) h += `<tr class="more"><td></td><td colspan="${cols.length + 3}">${moreOptions(s, o, r)}</td></tr>`;
+  return h;
+}
+function moreOptions(s, o, r) {
+  const E = S.edit; const parts = [];
+  if (cellAllowed(r, 'fs')) parts.push(`<label class="row sm"><input type="checkbox" data-chg="cell" data-r="${r.key}" data-c="fs" ${r.cells.fs ? 'checked' : ''}> First entry self study <span class="muted">— not taught this cycle</span></label>`);
+  parts.push(`<div class="row sm"><span>Self study pays</span><select class="input s" style="width:auto" data-chg="rowSsMode" data-r="${r.key}" aria-label="${esc(r.label.en)}: self study pays"><option value="share" ${r.ssFee == null && E.ssOwn !== r.key ? 'selected' : ''}>the session's ${s.share}% of the course fee</option><option value="own" ${r.ssFee != null || E.ssOwn === r.key ? 'selected' : ''}>its own amount</option></select>${r.ssFee != null || E.ssOwn === r.key ? `<input type="number" min="0" class="input s fee" value="${r.ssFee ?? ''}" data-chg="rowSsFee" data-r="${r.key}" placeholder="EGP" aria-label="${esc(r.label.en)}: self-study course amount">` : ''}</div>`);
+  const inSchool = r.cells.fi || r.cells.ri;
+  if (inSchool) {
+    const avail = S.teachers.filter((t) => !(r.teachers || []).some((x) => x.tid === t.id));
+    parts.push(`<div class="row sm"><span>Teachers for this row</span><select class="input s" style="width:auto" data-chg="rowTeachMode" data-r="${r.key}" aria-label="${esc(r.label.en)}: teachers"><option value="subject" ${!r.teachers ? 'selected' : ''}>as the subject</option><option value="own" ${r.teachers ? 'selected' : ''}>its own</option></select>
+    ${r.teachers ? `<span class="chips">${r.teachers.map((t) => `<span class="chip"><bdi>${esc(tName(t.tid))}</bdi><button class="tog" data-act="rowTeachOnline" data-r="${r.key}" data-t="${t.tid}" aria-pressed="${t.online}">online</button><button class="x" data-act="rowTeachDel" data-r="${r.key}" data-t="${t.tid}" aria-label="Remove ${esc(tName(t.tid))} from ${esc(r.label.en)}">×</button></span>`).join('')}<select class="input s" style="width:auto" data-chg="rowTeachAdd" data-r="${r.key}" aria-label="Add a teacher to ${esc(r.label.en)}"><option value="">Add…</option>${avail.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></span>` : ''}</div>`);
+  }
+  if (s.type === 'winter') parts.push(`<div class="row sm"><label class="row">Exam in <select class="input s" style="width:auto" data-chg="rowSitting" data-r="${r.key}"><option value="november" ${r.sitting === 'november' ? 'selected' : ''}>November</option><option value="january" ${r.sitting === 'january' ? 'selected' : ''}>January</option></select></label><label class="row">Closes on <input type="date" class="input s" style="width:auto" value="${r.closesAt || ''}" data-chg="rowCloses" data-r="${r.key}"></label><label class="row">Pay by <input type="date" class="input s" style="width:auto" value="${r.payBy || ''}" data-chg="rowPayBy" data-r="${r.key}"></label></div>`);
+  if (rowAsks(o, r)) parts.push('<p class="xs muted">Families taking it say which earlier exam it follows, from the subject\'s list below.</p>');
+  else if (r.kind === 'paper') parts.push(`<p class="xs muted">${BOARDS[o.board].name} does not ask which earlier exam a one-paper retake follows.</p>`);
+  return `<div class="stack-sm">${parts.join('')}</div>`;
+}
+function teachersCard(o) {
+  const E = S.edit; const avail = S.teachers.filter((t) => !o.teachers.some((x) => x.tid === t.id));
+  return `<section class="card" id="teachers"><h2 class="h3">Teachers</h2>
+  <div class="chips mt12">${o.teachers.map((t) => `<span class="chip"><bdi>${esc(tName(t.tid))}</bdi>${teacher(t.tid) && teacher(t.tid).team ? `<span class="xs muted">${esc(teacher(t.tid).team)}</span>` : ''}<button class="tog" data-act="tOnline" data-t="${t.tid}" aria-pressed="${t.online}">online</button><button class="tog" data-act="tExt" data-t="${t.tid}" aria-pressed="${t.external}">external team</button><button class="x" data-act="tDel" data-t="${t.tid}" aria-label="Remove ${esc(tName(t.tid))}">×</button></span>`).join('') || '<span class="sm muted">No teacher yet.</span>'}</div>
+  <div class="row mt12"><select class="input" style="max-width:300px" data-chg="tAdd" aria-label="Add a teacher"><option value="">Add a teacher…</option><optgroup label="The school's teachers">${avail.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</optgroup><option value="__new">A new teacher…</option></select>
+  ${E.newOpen ? `<input class="input" style="max-width:240px" id="t-new" data-chg="tNewName" value="${esc(E.newT)}" placeholder="Name as families will read it" aria-label="The new teacher's name"><button class="btn outline" data-act="tNewAdd">Add</button>` : ''}</div>
+  <div class="grid-2 mt16"><div class="swrow"><span class="swlabel">Teacher to be confirmed <span class="xs muted">— families read “teacher to be announced”</span></span>${sw(o.tbc, 'tbc', '', 'Teacher to be confirmed')}</div>
+  <div class="field"><label for="ed-choice">Who picks the teacher</label><select id="ed-choice" class="input" data-chg="choice"><option value="families" ${o.choice === 'families' ? 'selected' : ''}>Families choose (one is preselected)</option><option value="school" ${o.choice === 'school' ? 'selected' : ''}>The school assigns</option></select></div></div></section>`;
+}
+const earlierCandidates = (s) => { const out = []; for (let y = s.year; y >= s.year - 4; y--) for (const m of ['11', '06']) { const k = `${y}-${m}`; if (k < sessKey(s)) out.push(k); } return out; };
+function earlierCard(s, o) {
+  const asking = o.rows.filter((r) => r.on && rowAsks(o, r)); const notAsked = o.rows.filter((r) => r.on && r.kind === 'paper' && !rowAsks(o, r));
+  if (!asking.length) return notAsked.length ? `<section class="card"><h2 class="h3">Earlier exams</h2><p class="sm muted mt4">${BOARDS[o.board].name} does not ask which earlier exam a one-paper retake follows, so families are not asked.</p></section>` : '';
+  const key = sessKey(s); const B = BOARDS[o.board]; const def = defaultEarlier(s);
+  const shown = [...new Set([...def, ...o.earlier])].sort().reverse(); const cand = earlierCandidates(s).filter((e) => !shown.includes(e));
+  return `<section class="card" id="earlier"><h2 class="h3">Earlier exams a retake carries from</h2><p class="sm muted mt4">Asked of a family taking ${asking.map((r) => esc(r.label.en)).join(', ')}: they pick the exam they sat from this list. A student the school knows sat it has it filled in.</p>
+  <ul class="mt8 stack-sm">${shown.map((e) => { const on = o.earlier.includes(e); const age = monthsBetween(e, key); const old = B.carryMonths && age > B.carryMonths;
+    return `<li><label class="row sm"><input type="checkbox" data-chg="earlierTick" data-e="${e}" ${on ? 'checked' : ''}> ${ym(e)} <span class="xs muted">${def.includes(e) ? "(the board's previous two)" : '(added)'}</span></label>${old && on ? `<p class="notice warn mt4 xs" role="status">${ym(e)} is ${age} months before ${ym(key)}: older than ${B.name} carries a result forward (${B.carryMonths} months). It stays, since your list wins; the board may refuse the entry.</p>` : ''}</li>`; }).join('')}</ul>
+  <div class="row mt8"><select class="input s" style="width:auto" data-chg="earlierAdd" aria-label="Add an older earlier exam"><option value="">Add an older one…</option>${cand.map((e) => `<option value="${e}">${ym(e)}</option>`).join('')}</select></div></section>`;
+}
+function familiesCard(o) {
+  const f = S.edit.eq;
+  return `<section class="card" id="forfamilies"><h2 class="h3">For families</h2><div class="field mt12"><label for="ed-note">Note on the subject <span class="muted">(optional)</span></label><textarea id="ed-note" class="input" data-chg="edNote" placeholder="e.g. Taught on Saturdays.">${esc(o.note)}</textarea></div>
+  <p class="sm b mt16">Extra questions for this subject</p>${o.questions.length ? `<ul class="mt4">${o.questions.map((q) => `<li class="check"><p class="grow sm">${esc(q.text)} <span class="xs muted">${QTYPE[q.type]}${q.choices.length ? ': ' + q.choices.map(esc).join(' / ') : ''}</span></p><button class="x" data-act="eqDel" data-id="${q.id}" aria-label="Remove the question">×</button></li>`).join('')}</ul>` : '<p class="sm muted mt4">None.</p>'}
+  <div class="row mt8" style="align-items:flex-end"><div class="field"><label for="eq-type">Answer</label><select id="eq-type" class="input s" data-chg="eqType">${Object.entries(QTYPE).map(([k, v]) => `<option value="${k}" ${f.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="field grow"><label for="eq-text">Question</label><input id="eq-text" class="input s" data-chg="eqText" value="${esc(f.text)}" placeholder="e.g. Which calculator will the student use?"></div>${f.type === 'choice' ? `<div class="field grow"><label for="eq-ch">Choices, one per line</label><textarea id="eq-ch" class="input" rows="2" data-chg="eqChoices">${esc(f.choices)}</textarea></div>` : ''}<button class="btn outline sm" data-act="eqAdd">Add</button></div></section>`;
+}
+function previewCard(s, o) {
+  const mode = S.pv; const kn = o.earlier.slice().sort().reverse()[0] || defaultEarlier(s)[0];
+  const st = mode === 'retaker' ? { id: 'pv', known: { [o.ref]: kn }, grade: 12 } : { id: 'pv', known: {}, grade: 11 };
+  const m = missingOf(o); const scope = `pv:${mode}:${o.id}`; const hasEx = o.rows.some((r) => r.on && (rowCourse(o, r) == null || rowCourseSrc(o, r) === 'example'));
+  const view = famSubject(s, o, { lang: 'en', st, scope, example: true });
+  return `<section class="card"><div class="row between"><h2 class="h3">What families see</h2><div class="seg" role="group" aria-label="Preview as">${[['first', 'A first-time student'], ['retaker', 'A retaker']].map(([v, l]) => `<button type="button" data-act="pvMode" data-v="${v}" aria-pressed="${mode === v}">${l}</button>`).join('')}</div></div>
+  <p class="xs muted mt8">${mode === 'retaker' ? `A student the school knows sat ${esc(o.title)} in ${ym(kn)}: retake choices only, that exam filled in.` : 'A student with no earlier exam on record: first entry and retake choices (a retake is declared, as on the forms).'}</p>
+  ${!o.accepting ? '<p class="notice mt8">Closed: families do not see it.</p>' : m.exam.length ? `<p class="notice warn mt8">Not offered to families until every price is set: ${m.exam.map((r) => esc(r.label.en)).join(', ')} — exam fee not set.</p>` : ''}
+  ${hasEx ? '<p class="xs muted mt8">‡ an example course fee: the course fee is not set yet.</p>' : ''}
+  <div class="mt8">${view || '<p class="sm muted">Nothing to choose: no ticked row has a price.</p>'}</div><p class="xs muted mt8">One choice per box: all papers or one paper; A.S., A.2. or A.L.; one qualification. Units combine freely.</p></section>`;
+}
+
+/* ───────────────────────── 5. Family ───────────────────────── */
+function familyScreen() {
+  const s = famSession(); const lang = S.fam.lang; const L = FAM[lang]; const st = STUDENTS[S.fam.student]; const scope = `fam:${st.id}`;
+  const name = lang === 'ar' ? st.nameAr : st.name; const allowed = st.grade === 11 ? s.grades.g11 : st.grade === 12 ? s.grades.g12 : s.grades.g10;
+  const hidden = s.offerings.filter((o) => !famOffered(s, o, st));
+  const note = `<div class="mocknote" dir="ltr" lang="en"><b>Mock notes.</b> ${s.status === 'draft' ? 'June 2027 is a draft: families cannot see it yet; this is the page they will see once it opens. ' : ''}Prices marked ‡ use an example course fee (not set by the school). Not shown, a price not set or closed (E6): ${hidden.map((o) => esc(o.title)).join(', ') || 'none'}. Names are invented.</div>`;
+  const head = `<div class="mt16"><h1 class="h1">${esc(L.reserveFor(name))}</h1><p class="muted mt4">${esc(L.gradeLine(st.cls, sessName(s, lang)))}</p><p class="sm muted mt4">${esc(L.dates(s))}</p></div>`;
+  if (!allowed) return `${note}${head}<p class="notice bad mt16" role="alert">${esc(L.notOpen(st.grade))}</p>`;
+  if (S.fam.done) return `${note}${head}${famDone(s, st, lang)}`;
+  const offered = s.offerings.filter((o) => famOffered(s, o, st));
+  return `${note}${head}<p class="sm mt12">${esc(L.intro)}</p>${['OL', 'AS'].map((g) => { const xs = offered.filter((o) => o.group === g); return xs.length ? `<h2 class="h2 mt24"><bdi>${g === 'OL' ? 'O.L.' : 'A.S. / A.L.'}</bdi></h2><div class="fgrid mt8">${xs.map((o) => famSubject(s, o, { lang, st, scope, example: true })).join('')}</div>` : ''; }).join('')}${summaryCard(s, scope, st, lang, 'fam')}`;
+}
+function summaryCard(s, scope, st, lang, mode) {
+  const L = FAM[lang]; const lines = chosenLines(s, scope, st); const total = lines.reduce((a, x) => a + x.price.total, 0); const anyEx = lines.some((x) => x.price.example); const box = mode === 'fam' ? S.fam : S.desk;
+  return `<section class="card mt24" id="summary"><div class="row between"><p class="h3">${esc(L.nSubjects(lines.length))} · ${esc(L.total)} ${money(total, lang)}${anyEx ? ' ‡' : ''}</p><p class="xs muted">${esc(L.payBy)} ${s.paymentDueAt ? day(s.paymentDueAt, lang) : esc(L.tbaShort)}</p></div>
+  ${lines.length ? `<ul class="mt8 sm stack-sm">${lines.map((x) => `<li class="row between nowrap"><span><bdi>${esc(x.o.title)}</bdi> — ${esc(rowOptText(s, x.r, x.p.opt, lang))}${x.needsWhen ? ` <span class="badge warn">${esc(x.r.kind === 'a2' ? L.whenSatAS : L.whenSat)}</span>` : ''}</span><span>${money(x.price.total, lang)}${x.price.example ? ' ‡' : ''}</span></li>`).join('')}</ul>` : `<p class="sm muted mt8">${esc(L.nothingYet)}</p>`}
+  ${anyEx ? `<p class="xs muted mt8">${esc(L.ex)}</p>` : ''}
+  ${s.questions.length ? `<div class="mt16"><p class="sm b">${esc(L.questions)}</p>${s.questions.map((q) => questionField(q, scope, lang)).join('')}</div>` : ''}
+  <div class="stack-sm mt16" style="border-top:1px solid var(--border);padding-top:12px">${mode === 'fam' ? `<label class="consent"><input type="checkbox" data-chg="famRefund" ${S.fam.refund ? 'checked' : ''}> <span>${esc(refundConsent(s, lang))}</span></label><label class="consent"><input type="checkbox" data-chg="famDecl" ${S.fam.decl ? 'checked' : ''}> <span>${esc(DECL[lang])}</span></label>` : `<label class="consent"><input type="checkbox" data-chg="deskConsent" ${S.desk.consent ? 'checked' : ''}> <span>${DESK_CONSENT}</span></label><p class="xs muted">${esc(refundConsent(s, 'en'))} ${DECL.en}</p>`}</div>
+  ${box.err ? `<p class="notice bad mt12" role="alert">${esc(box.err)}</p>` : ''}
+  <div class="row mt12">${mode === 'fam' ? `<button class="btn" data-act="famReserve">${s.pricesFinal ? L.reservePay(moneyTxt(total, lang)) : L.reserveOnly}</button>` : `<button class="btn outline" data-act="deskReserve" data-collect="0">Reserve only</button><button class="btn" data-act="deskReserve" data-collect="1" ${s.pricesFinal ? '' : 'disabled'}>Reserve and collect ${moneyTxt(total)}</button>`}</div>
+  ${!s.pricesFinal ? `<p class="xs muted mt8">${mode === 'fam' ? esc(L.notFinal) : 'Prices are not final: reserve now; collect once they are.'}</p>` : ''}</section>`;
+}
+function famDone(s, st, lang) {
+  const L = FAM[lang]; const d = S.fam.done; const name = lang === 'ar' ? st.nameAr : st.name;
+  const items = d.lines.map((x) => { const o = s.offerings.find((y) => y.id === x.oid); const r = o && o.rows.find((y) => y.key === x.rkey); return `<li class="row between nowrap"><span><bdi>${esc(o ? o.title : '')}</bdi> — ${r ? esc(rowOptText(s, r, x.opt, lang)) : ''}</span><span>${money(x.total, lang)}</span></li>`; }).join('');
+  return `<section class="card mt16" id="done"><p class="h2">${esc(L.reserved(name))}</p><ul class="mt12 sm stack-sm">${items}</ul><p class="h3 mt12">${esc(L.total)} ${money(d.total, lang)}</p>
+  ${s.pricesFinal ? `<div class="row mt12"><button class="btn" data-act="famPay">${esc(L.payNow(moneyTxt(d.total, lang)))}</button></div><p class="xs muted mt8">${esc(L.payHow)}</p>` : `<p class="sm mt12">${esc(L.payLater(s.paymentDueAt ? day(s.paymentDueAt, lang) : L.tbaShort))}</p>`}
+  ${S.fam.paid ? `<p class="notice ok mt12">${esc(L.paid)}</p>` : ''}<p class="mt16"><button class="link sm" data-act="famEdit">${esc(L.change)}</button></p></section>`;
+}
+
+/* ───────────────────────── 6. Desk ───────────────────────── */
+function deskScreen() {
+  const s = famSession(); const d = S.desk; const st = STUDENTS[d.student]; const scope = `desk:${st.id}`;
+  if (d.stage === 'collect') {
+    const x = d.done;
+    return `<h1 class="h1">Collect</h1><p class="muted mt4">${esc(st.family)} — ${esc(st.name)} (${st.cls}) · ${sessName(s)}</p>
+    <section class="card mt16" id="collect"><div class="tablewrap"><table class="t"><thead><tr><th>Subject</th><th>What</th><th>Price</th></tr></thead><tbody>${x.lines.map((l) => { const o = s.offerings.find((y) => y.id === l.oid); const r = o.rows.find((y) => y.key === l.rkey); return `<tr><td>${esc(o.title)}</td><td>${esc(rowOptText(s, r, l.opt, 'en'))}</td><td>${money(l.total)}</td></tr>`; }).join('')}</tbody></table></div>
+    <p class="h3 mt12">Total ${money(x.total)}</p><div class="row mt12" style="align-items:flex-end;gap:12px"><div class="field"><label for="desk-instr">Paid with</label><select id="desk-instr" class="input" data-chg="deskInstr">${[['cash', 'Cash'], ['card', 'Credit / Debit Card'], ['instapay', 'InstaPay (at desk)'], ['other', 'Other']].map(([k, l]) => `<option value="${k}" ${d.instr === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="field"><label for="desk-bal">Balance to use (EGP)</label><input id="desk-bal" type="number" min="0" max="0" class="input fee" value="0" data-chg="deskBal"><p class="hint">The family's balance: EGP 0</p></div></div>
+    <div class="row mt16"><button class="btn" data-act="deskCollect">Collect ${moneyTxt(x.total)}</button><button class="btn outline" data-act="deskBack">Back</button></div><p class="xs muted mt8">One payment for the whole reservation, one receipt — no split by deadline.</p></section>`;
+  }
+  if (d.stage === 'done') {
+    const x = d.done;
+    return `<h1 class="h1">Desk</h1><section class="card mt16" id="desk-done"><p class="notice ${d.collected ? 'ok' : 'info'}">${d.collected ? `Collected ${moneyTxt(x.total)} by ${({ cash: 'cash', card: 'card', instapay: 'InstaPay at the desk', other: 'other' })[d.instr]} in one payment for ${esc(st.name)}: ${plural(x.lines.length, 'reservation')} paid. Receipt R-27-0001 (mock).` : `Reserved ${plural(x.lines.length, 'subject')} for ${esc(st.name)}: waiting for payment${s.paymentDueAt ? `, due ${day(s.paymentDueAt)}` : ''}.`}</p>
+    <div class="row mt12"><button class="btn outline" disabled title="Not in this mock">Print the reservation slip</button><button class="btn" data-act="deskNew">Next family</button></div></section>`;
+  }
+  const offered = s.offerings.filter((o) => famOffered(s, o, st)); const hidden = s.offerings.filter((o) => !famOffered(s, o, st));
+  return `<h1 class="h1">Desk</h1><p class="muted mt4">Reserve on a family's behalf — the same page the family sees — then collect.</p>
+  <div class="card tight mt16"><div class="row"><label class="b sm" for="desk-st">Family · student</label><select id="desk-st" class="input" style="max-width:460px" data-chg="deskStudent">${Object.values(STUDENTS).map((x) => `<option value="${x.id}" ${x.id === st.id ? 'selected' : ''}>${esc(x.family)} — ${esc(x.name)} (${x.cls}) · ${esc(x.what)}</option>`).join('')}</select><span class="sm muted">Balance EGP 0 · ${sessName(s)} ${s.status === 'open' ? 'accepting reservations' : '(a draft: shown as it will be)'}</span></div></div>
+  <div class="mocknote mt12"><b>Mock notes.</b> Prices marked ‡ use an example course fee. Not shown (a price not set): ${hidden.map((o) => esc(o.title)).join(', ') || 'none'}. Prices final: ${s.pricesFinal ? 'on — the desk can collect' : 'off — switch the stage to “open” or prices final on the Session page to collect'}.</div>
+  ${['OL', 'AS'].map((g) => { const xs = offered.filter((o) => o.group === g); return xs.length ? `<h2 class="h2 mt24">${g === 'OL' ? 'O.L.' : 'A.S. / A.L.'}</h2><div class="fgrid mt8">${xs.map((o) => famSubject(s, o, { lang: 'en', st, scope, example: true })).join('')}</div>` : ''; }).join('')}${summaryCard(s, scope, st, 'en', 'desk')}`;
+}
+
+/* ───────────────────────── Dialogs ───────────────────────── */
+function modal(title, body, foot, wide) { return `<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}" style="${wide ? 'max-width:760px' : ''}"><div class="mh"><h2 class="h2">${esc(title)}</h2><button class="x" data-act="closeDialog" aria-label="Close">×</button></div><div class="mbody">${body}</div><div class="mf">${foot}</div></div></div>`; }
+function layer() {
+  const d = S.dialog; let h = '';
+  if (d) {
+    const s = cur();
+    if (d.type === 'new') h = dlgNew(d);
+    else if (d.type === 'impact') h = modal(d.title, `<p class="sm">${esc(d.what)}</p><div class="notice warn mt12"><p class="b">${plural(d.imp.repriced, 'unpaid reservation')} will be re-priced</p><p class="sm mt4">Their families are told the new price.</p></div>${d.imp.finance ? `<div class="notice info mt8"><p class="b">${plural(d.imp.finance, 'paid reservation')} ${d.imp.finance === 1 ? 'is' : 'are'} listed for finance</p><p class="sm mt4">A charge or a refund is finance's act; their price stays until then.</p></div>` : ''}`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="confirmImpact">Save and re-price</button>');
+    else if (d.type === 'open') { const off = s.offerings.filter((o) => o.accepting && !missingOf(o).any); const not = s.offerings.filter((o) => o.accepting && missingOf(o).any); h = modal(`Open ${sessName(s)} to families`, `<p class="sm">Families can reserve from now. ${plural(off.length, 'subject')} will be offered${not.length ? `; ${plural(not.length, 'subject is', 'subjects are')} not (a price not set): ${not.map((o) => esc(o.title)).join(', ')}` : ''}.</p><p class="sm mt8">Payment due ${day(s.paymentDueAt)}; unpaid reservations are cancelled ${plural(s.cancelDays, 'day')} after it. Prices are ${s.pricesFinal ? 'final: families can pay' : 'not final: families reserve now and pay once you switch prices final'}.</p>`, `<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="confirmOpen">Open ${sessName(s)}</button>`); }
+    else if (d.type === 'blocked') h = modal(`${sessName(s)} cannot open yet`, `<ul class="stack-sm">${d.items.map((c) => `<li class="row nowrap top sm"><span class="dot block"></span><span>${esc(c.text)}</span></li>`).join('')}</ul>`, '<button class="btn" data-act="closeDialog">OK</button>');
+    else if (d.type === 'close') h = modal('Stop new reservations', `<p class="sm">Families can no longer reserve in ${sessName(s)}. ${plural(d.n, 'waiting reservation')} can still be paid: nothing expires because the session closes. You can reopen it.</p>`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="confirmClose">Stop new reservations</button>');
+    else if (d.type === 'final') h = modal('Prices final', `<p class="sm">Families can pay from now. ${plural(d.n, 'waiting reservation')} take${d.n === 1 ? 's' : ''} its due date from today. Once reservations exist this cannot be switched off; a later price change shows its impact first.</p>`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="confirmFinal">Make prices final</button>');
+    else if (d.type === 'refuse') h = modal(d.title, `<p class="sm">${esc(d.text)}</p>`, `<button class="btn outline" data-act="closeDialog">Back</button>${d.closeRow ? '<button class="btn" data-act="refuseCloseRow">Close the row instead</button>' : ''}${d.closeSubject ? '<button class="btn" data-act="refuseCloseSubject">Close the subject instead</button>' : ''}`);
+    else if (d.type === 'subjectClose') { const o = s.offerings.find((x) => x.id === d.oid); h = modal(`Close ${o.title}`, `<p class="sm">No new reservations for ${esc(o.title)}. ${plural(d.n, 'waiting reservation')} can still be paid.</p>`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="confirmSubjectClose">Close it</button>'); }
+    else if (d.type === 'remove') { const o = S.edit.off; h = modal(`Remove ${o.title}`, `<p class="sm">${esc(o.title)} leaves ${sessName(s)}. Nobody has reserved it.</p>`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn danger" data-act="confirmRemove">Remove</button>'); }
+    else if (d.type === 'copySubj') { const avail = REF.filter((r) => !s.offerings.some((o) => o.ref === r.ref)); h = modal('Copy a similar subject', `<div class="field"><label for="cp-from">Copy</label><select id="cp-from" class="input" data-chg="cpFrom">${s.offerings.map((o) => `<option value="${o.id}" ${d.from === o.id ? 'selected' : ''}>${esc(o.title)}</option>`).join('')}</select></div><div class="field mt12"><label for="cp-to">as</label><select id="cp-to" class="input" data-chg="cpTo"><option value="">Pick from the board's list…</option>${avail.map((r) => `<option value="${r.ref}" ${d.to === r.ref ? 'selected' : ''}>${esc(r.title)} · ${BOARDS[r.board].name}${r.code ? ' ' + esc(r.code) : ''}</option>`).join('')}</select></div><p class="hint mt8">Teachers, note, questions, earlier exams and how each row is studied come across where the new subject has the same kind of row. Its exam fees come from your lists.</p>`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="doCopySubject">Copy and open</button>'); }
+    else if (d.type === 'notList') h = modal('A subject not on the list', `<div class="grid-2"><div class="field"><label for="nl-board">Board</label><select id="nl-board" class="input" data-chg="nlBoard">${Object.entries(BOARDS).map(([k, b]) => `<option value="${k}" ${d.board === k ? 'selected' : ''}>${b.name}</option>`).join('')}</select></div><div class="field"><label for="nl-level">Group</label><select id="nl-level" class="input" data-chg="nlLevel"><option value="OL" ${d.level === 'OL' ? 'selected' : ''}>O.L.</option><option value="AS" ${d.level === 'AS' ? 'selected' : ''}>A.S./A.L.</option></select></div></div><div class="field mt12"><label for="nl-name">Subject name</label><input id="nl-name" class="input" data-chg="nlName" value="${esc(d.name)}" placeholder="e.g. Marine Science"></div><div class="field mt12"><label for="nl-code">Code <span class="muted">(optional)</span></label><input id="nl-code" class="input" data-chg="nlCode" value="${esc(d.code)}"></div><p class="hint mt8">Flagged to us: we add it to the reference with its rows and rules. It starts with ${d.level === 'OL' ? '“All papers”' : '“A.S.” and “A.L.”'}; you can add rows.</p>${d.err ? `<p class="notice bad mt8" role="alert">${esc(d.err)}</p>` : ''}`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="doNotOnList">Add and open</button>');
+    else if (d.type === 'dup') h = modal('Is this someone already on the list?', `<p class="sm">“${esc(d.name)}” looks like:</p><div class="stack-sm mt12">${d.matches.map((id) => { const subs = S.sessions.flatMap((x) => x.offerings.filter((o) => o.teachers.some((t) => t.tid === id)).map((o) => o.title)); return `<label class="row sm"><input type="radio" name="dup" value="${id}" data-chg="dupPick" ${d.pick === id ? 'checked' : ''}> <b>${esc(tName(id))}</b> <span class="muted">— ${subs.length ? 'teaches ' + [...new Set(subs)].map(esc).join(', ') : 'on the school\'s list'}</span></label>`; }).join('')}<label class="row sm"><input type="radio" name="dup" value="__new" data-chg="dupPick" ${d.pick === '__new' ? 'checked' : ''}> No — add “${esc(d.name)}” as a new teacher</label></div><p class="hint mt8">Checked by spelling and initials, so one person is not listed twice.</p>`, '<button class="btn outline" data-act="closeDialog">Cancel</button><button class="btn" data-act="dupUse">Use this</button>');
+  }
+  if (S.toast) h += `<div class="toast" role="status">${esc(S.toast)}</div>`;
+  return h;
+}
+
+/* ───────────────────────── Actions ───────────────────────── */
+let toastTimer;
+function toast(msg) { S.toast = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => { S.toast = null; render(); }, 2800); }
+function goScreen(k) {
+  if (k !== 'subject') S.edit = null;
+  if (k === 'subject' && !S.edit) { const j = famSession(); openEditor(j.id, offByRef(j, 'cam-3180').id); return; }
+  S.screen = k; S.dialog = null; window.scrollTo(0, 0);
+}
+function openEditor(sid, oid, isNew, draft) {
+  const s = byId(sid); S.sessionId = sid;
+  S.edit = { sid, off: draft || clone(s.offerings.find((o) => o.id === oid)), isNew: !!isNew, newOpen: false, newT: '', more: null, eq: { type: 'yesno', text: '', choices: '' }, cr: null, ssOwn: null };
+  S.screen = 'subject'; S.dialog = null; window.scrollTo(0, 0);
+}
+const draftRow = (key) => S.edit.off.rows.find((r) => r.key === key);
+const sortOfferings = (s) => { s.offerings = [...s.offerings.filter((o) => o.group === 'OL'), ...s.offerings.filter((o) => o.group !== 'OL')]; };
+function offFor(scope, oid) { return scope.startsWith('pv:') ? S.edit.off : famSession().offerings.find((o) => o.id === oid); }
+function scopeBox(scope) { return scope.startsWith('fam:') ? S.fam : scope.startsWith('desk:') ? S.desk : null; }
+
+const ACT = {
+  go: (d) => goScreen(d.screen),
+  reset: () => { const scr = S.screen === 'subject' ? 'home' : S.screen; initState(S.stage); S.screen = scr; toast('The mock is back to its start'); },
+  openSession: (d) => { S.sessionId = d.id; S.tab = 'subjects'; goScreen('session'); },
+  newSession: () => { const t = 'june'; S.dialog = { type: 'new', t, y: suggestYear(t), from: lastOfType(t) ? 'copy' : 'empty' }; },
+  closeDialog: () => { S.dialog = null; },
+  createSession: () => {
+    const d = S.dialog; const y = Number(d.y); const last = lastOfType(d.t); const from = last ? d.from : 'empty';
+    const s = from === 'copy' ? copySession(last, y) : baseSession(d.t, y);
+    S.sessions.push(s); S.dialog = null; S.sessionId = s.id; S.tab = 'subjects'; goScreen('session'); toast(`${sessName(s)} is a draft: families cannot see it`);
+  },
+  toggleAccepting: () => {
+    const s = cur();
+    if (s.status === 'open') { S.dialog = { type: 'close', n: resCounts(s).waiting }; return; }
+    const blockers = checks(s).filter((c) => c.level === 'block');
+    S.dialog = blockers.length ? { type: 'blocked', items: blockers } : { type: 'open' };
+  },
+  confirmOpen: () => { const s = cur(); s.status = 'open'; S.dialog = null; toast(`${sessName(s)} accepts reservations`); },
+  confirmClose: () => { const s = cur(); s.status = 'closed'; S.dialog = null; toast(`${sessName(s)}: no new reservations; waiting ones can still be paid`); },
+  togglePricesFinal: () => {
+    const s = cur();
+    if (s.pricesFinal) { if (s.reservations.length) { toast('Prices final stays on once reservations exist; a price change shows its impact first'); return; } s.pricesFinal = false; return; }
+    const w = resCounts(s).waiting; if (w) { S.dialog = { type: 'final', n: w }; return; }
+    s.pricesFinal = true; toast('Prices final: families can pay');
+  },
+  confirmFinal: () => { cur().pricesFinal = true; S.dialog = null; toast('Prices final: families can pay'); },
+  tab: (d) => { S.tab = d.tab; if (S.screen !== 'session') goScreen('session'); },
+  toggleChecks: () => { S.openChecks = !S.openChecks; },
+  checkOk: (d) => { cur().done[d.id] = true; },
+  checkGo: (d) => {
+    const s = byId(d.s); S.sessionId = s.id; const c = checks(s).find((x) => x.id === d.id);
+    if (c && c.off) { openEditor(s.id, c.off); return; }
+    if (c && c.tab) S.tab = c.tab; else S.tab = S.tab || 'subjects';
+    goScreen('session');
+    if (c && c.field) setTimeout(() => ACT.focusField({ f: c.field }), 0);
+    if (c && c.kind === 'doubts') setTimeout(() => { const el = document.getElementById('chk-doubts'); if (el) el.scrollIntoView({ block: 'center' }); }, 0);
+  },
+  focusField: (d) => { setTimeout(() => { const el = document.getElementById('d-' + d.f); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 0); },
+  confirmDoubts: () => {
+    const s = cur();
+    for (const d of s.doubts) { if (d.pick === d.a) continue; if (d.same) teacher(d.tid).name = d.pick; else { const nt = addTeacher(d.pick); for (const ref of d.refs) { const o = offByRef(s, ref); if (o) o.teachers = o.teachers.map((t) => (t.tid === d.tid ? { ...t, tid: nt.id } : t)); } } }
+    s.done.doubts = true; toast('Teacher names confirmed');
+  },
+  keepCourse: () => { const s = cur(); for (const o of s.offerings) { if (o.courseFeeSrc === 'last_year') o.courseFeeSrc = 'kept'; for (const r of o.rows) if (r.courseFeeSrc === 'last_year') r.courseFeeSrc = 'kept'; } toast("Last year's course fees kept"); },
+  saveAdminDate: (d) => { const v = S.adminDates[d.b]; if (!v) { toast('Pick the date first'); return; } BOARDS[d.b].deadlines[sessKey(cur())] = v; toast(`${BOARDS[d.b].name}: the date joins our reference`); },
+  addSubject: () => { const s = cur(); if (!S.addRef) { toast("Pick a subject from the board's list first"); return; } const o = newOffering(s, S.addRef); S.addRef = ''; openEditor(s.id, o.id, true, o); },
+  dlgCopySubject: () => { S.dialog = { type: 'copySubj', from: cur().offerings[0] ? cur().offerings[0].id : '', to: '' }; },
+  doCopySubject: () => {
+    const s = cur(); const d = S.dialog; if (!d.to || !d.from) { toast('Pick both subjects'); return; }
+    const src = s.offerings.find((o) => o.id === d.from); const o = newOffering(s, d.to);
+    Object.assign(o, { teachers: clone(src.teachers), note: src.note, choice: src.choice, tbc: src.tbc, earlier: src.earlier.slice(), questions: src.questions.map((q) => ({ ...clone(q), id: nid('q') })) });
+    o.rows.forEach((r, i) => { const same = src.rows.find((x) => x.key === r.key && x.kind === r.kind) || src.rows.filter((x) => x.kind === r.kind)[o.rows.filter((y) => y.kind === r.kind).indexOf(r)]; if (same) { r.on = same.on; r.cells = clone(same.cells); r.courseFee = same.courseFee; r.ssFee = same.ssFee; r.teachers = same.teachers ? clone(same.teachers) : null; } });
+    autoFees(s, o); openEditor(s.id, o.id, true, o);
+  },
+  dlgNotOnList: () => { S.dialog = { type: 'notList', board: 'cambridge', level: 'OL', name: '', code: '', err: null }; },
+  doNotOnList: () => {
+    const s = cur(); const d = S.dialog; if (!d.name.trim()) { d.err = 'Type the subject name.'; return; }
+    const title = `${d.name.trim()} ${d.level === 'OL' ? 'O.L.' : 'A.S./A.L.'}`;
+    const rows = d.level === 'OL' ? [ALL(d.code ? d.code.trim() : null)] : [R('as', 'as', 'A.S.', 'A.S.', []), R('al', 'al', 'A.L.', 'A.L.', [])];
+    const o = { id: nid('o'), ref: nid('custom-'), title, board: d.board, code: d.code.trim(), group: d.level, toCheck: false, custom: true, teachers: [], tbc: false, choice: 'families', note: '', accepting: true, closesAt: null, courseFee: null, courseFeeSrc: null, questions: [], earlier: defaultEarlier(s), rows: rows.map((r) => newRow(s, r)) };
+    o.rows.forEach((r) => { r.on = true; }); openEditor(s.id, o.id, true, o);
+  },
+  openSubject: (d) => openEditor(S.sessionId, d.id),
+  toggleSubjectAccepting: (d) => {
+    const s = cur(); const o = s.offerings.find((x) => x.id === d.id);
+    if (o.accepting && s.status === 'open') { S.dialog = { type: 'subjectClose', oid: o.id, n: linesOf(s, o.id).filter((l) => l.status === 'waiting').length }; return; }
+    o.accepting = !o.accepting;
+  },
+  confirmSubjectClose: () => { const s = cur(); const o = s.offerings.find((x) => x.id === S.dialog.oid); o.accepting = false; S.dialog = null; toast(`${o.title} closed to new reservations`); },
+  plExample: () => { S.pl.text = EXAMPLE_TEXT[S.pl.board]; S.pl.parsed = null; },
+  plRead: () => { if (!S.pl.text.trim()) { toast('Paste a list first'); return; } S.pl.parsed = matchList(cur(), S.pl.board, S.pl.text); },
+  plDiscard: () => { S.pl.parsed = null; S.pl.text = ''; },
+  plUse: () => {
+    const s = cur(); const res = S.pl.parsed; if (!res || !res.matched.length) return;
+    const board = S.pl.board; const name = `${BOARDS[board].name} ${ym(plFor(s))}`; const matched = res.matched;
+    withImpact(s, (ss) => applyList(ss, board, name, matched), `Use ${name}`, `${plural(matched.length, 'line')} of ${name} set exam fees in ${sessName(s)}.`, () => { S.pl = { board, forKey: '', text: '', parsed: null }; }, `${name}: its prices are used`);
+  },
+  keepLastYear: () => { const s = cur(); for (const { r } of lastYearRows(s)) r.kept = true; for (const o of s.offerings) recalc(o); toast("Last year's exam fees kept for the rest"); },
+  refAdd: () => { const s = cur(); const st = s.refund; const prev = st.length > 1 ? st[st.length - 2].week : 0; st.splice(st.length - 1, 0, { week: Math.min(prev + 1, 20), pct: 25 }); normRefund(s); },
+  refDel: (d) => { const s = cur(); s.refund.splice(Number(d.i), 1); normRefund(s); },
+  qAdd: () => {
+    const s = cur(); const f = S.q; if (!f.text.trim()) { toast('Type the question'); return; }
+    const q = { id: nid('q'), scope: f.scope, type: f.type, text: f.text.trim(), choices: f.type === 'choice' ? f.choices.split('\n').map((x) => x.trim()).filter(Boolean) : [] };
+    if (f.scope === 'session') s.questions.push(q); else s.offerings.find((o) => o.id === f.scope).questions.push(q);
+    S.q = { scope: 'session', type: 'yesno', text: '', choices: '' }; toast('Question added');
+  },
+  qDel: (d) => { const s = cur(); if (d.o) { const o = s.offerings.find((x) => x.id === d.o); o.questions = o.questions.filter((q) => q.id !== d.id); } else s.questions = s.questions.filter((q) => q.id !== d.id); },
+  export: () => toast('The export downloads a CSV of every reservation and its answers (not in the mock)'),
+  edCancel: () => { S.edit = null; goScreen('session'); },
+  edSave: () => {
+    const E = S.edit; const s = byId(E.sid); const o = E.off;
+    if (!o.rows.some((r) => r.on)) { toast('Tick at least one row'); return; }
+    if (E.isNew) { s.offerings.push(o); sortOfferings(s); S.edit = null; goScreen('session'); toast(`${o.title} added to ${sessName(s)}`); return; }
+    const old = s.offerings.find((x) => x.id === o.id); const blocked = [];
+    for (const l of linesOf(s, o.id)) { const r = o.rows.find((x) => x.key === l.rkey); if (!r || !r.on || !r.cells[l.opt]) blocked.push(l); }
+    if (blocked.length) { const l0 = blocked[0]; const r0 = old.rows.find((x) => x.key === l0.rkey); S.dialog = { type: 'refuse', title: 'Reservations use what you unticked', text: `${plural(blocked.length, 'reservation uses', 'reservations use')} ${r0.label.en} · ${OPT[l0.opt].en}. It cannot be unticked while they exist. Close the row instead: no new reservations, the existing ones stay.`, closeRow: l0.rkey }; return; }
+    withImpact(s, (ss) => { const i = ss.offerings.findIndex((x) => x.id === o.id); ss.offerings[i] = clone(o); }, `Save ${o.title}`, `The prices of ${o.title} change.`, () => { S.edit = null; goScreen('session'); }, `${o.title} saved`);
+  },
+  refuseCloseRow: () => { const E = S.edit; const s = byId(E.sid); const old = s.offerings.find((x) => x.id === E.off.id); const key = S.dialog.closeRow; const r = draftRow(key); const oldR = old.rows.find((x) => x.key === key); r.on = true; r.cells = clone(oldR.cells); r.closed = true; S.dialog = null; ACT.edSave(); },
+  edRemove: () => { const E = S.edit; const s = byId(E.sid); const n = linesOf(s, E.off.id).length; S.dialog = n ? { type: 'refuse', title: `${E.off.title} has reservations`, text: `${plural(n, 'reservation')} exist, so it cannot be removed. Close it instead: no new reservations; waiting ones can still be paid.`, closeSubject: true } : { type: 'remove' }; },
+  refuseCloseSubject: () => { S.edit.off.accepting = false; S.dialog = null; ACT.edSave(); },
+  confirmRemove: () => { const E = S.edit; const s = byId(E.sid); s.offerings = s.offerings.filter((o) => o.id !== E.off.id); const t = E.off.title; S.dialog = null; S.edit = null; goScreen('session'); toast(`${t} removed`); },
+  edAccepting: () => { S.edit.off.accepting = !S.edit.off.accepting; },
+  rowMore: (d) => { S.edit.more = S.edit.more === d.r ? null : d.r; },
+  tOnline: (d) => { const t = S.edit.off.teachers.find((x) => x.tid === d.t); t.online = !t.online; },
+  tExt: (d) => { const t = S.edit.off.teachers.find((x) => x.tid === d.t); t.external = !t.external; },
+  tDel: (d) => { const o = S.edit.off; o.teachers = o.teachers.filter((t) => t.tid !== d.t); },
+  tbc: () => { S.edit.off.tbc = !S.edit.off.tbc; },
+  tNewAdd: () => {
+    const E = S.edit; const name = (E.newT || '').trim(); if (!name) { toast('Type the name'); return; }
+    const matches = similarTeachers(name); if (matches.length) { S.dialog = { type: 'dup', name, matches: matches.map((t) => t.id), pick: matches[0].id }; return; }
+    const t = addTeacher(name); E.off.teachers.push({ tid: t.id, online: false, external: false }); E.off.tbc = false; E.newOpen = false; E.newT = '';
+  },
+  dupUse: () => {
+    const E = S.edit; const d = S.dialog; const tid = d.pick === '__new' ? addTeacher(d.name).id : d.pick;
+    if (!E.off.teachers.some((t) => t.tid === tid)) E.off.teachers.push({ tid, online: false, external: !!(teacher(tid) && teacher(tid).team) });
+    E.off.tbc = false; E.newOpen = false; E.newT = ''; S.dialog = null;
+  },
+  rowTeachDel: (d) => { const r = draftRow(d.r); r.teachers = r.teachers.filter((t) => t.tid !== d.t); },
+  rowTeachOnline: (d) => { const t = draftRow(d.r).teachers.find((x) => x.tid === d.t); t.online = !t.online; },
+  crOpen: () => { S.edit.cr = { name: '', code: '', fee: '' }; },
+  crCancel: () => { S.edit.cr = null; },
+  crAdd: () => {
+    const E = S.edit; const c = E.cr; if (!c.name.trim()) { toast('Type the row name'); return; }
+    const s = byId(E.sid); const r = newRow(s, R(nid('c'), 'custom', c.name.trim(), c.name.trim(), c.code ? [c.code.trim()] : []));
+    r.on = true; const fee = numOrNull(c.fee); if (fee != null) { r.examFee = fee; r.feeSrc = 'typed'; } E.off.rows.push(r); E.cr = null;
+  },
+  eqAdd: () => { const E = S.edit; const f = E.eq; if (!f.text.trim()) { toast('Type the question'); return; } E.off.questions.push({ id: nid('q'), scope: E.off.id, type: f.type, text: f.text.trim(), choices: f.type === 'choice' ? f.choices.split('\n').map((x) => x.trim()).filter(Boolean) : [] }); E.eq = { type: 'yesno', text: '', choices: '' }; },
+  eqDel: (d) => { const o = S.edit.off; o.questions = o.questions.filter((q) => q.id !== d.id); },
+  pvMode: (d) => { S.pv = d.v; },
+  setChild: (d) => { S.fam.student = d.v; S.fam.done = null; S.fam.err = null; S.fam.paid = false; },
+  setLang: (d) => { S.fam.lang = d.v; },
+  famReserve: () => {
+    const s = famSession(); const st = STUDENTS[S.fam.student]; const L = FAM[S.fam.lang]; const lines = chosenLines(s, `fam:${st.id}`, st);
+    if (!lines.length) { S.fam.err = L.errNone; return; } if (lines.some((x) => x.needsWhen)) { S.fam.err = L.errWhen; return; } if (!S.fam.refund || !S.fam.decl) { S.fam.err = L.errConsent; return; }
+    S.fam.err = null; S.fam.done = { lines: lines.map((x) => ({ oid: x.o.id, rkey: x.r.key, opt: x.p.opt, total: x.price.total })), total: lines.reduce((a, x) => a + x.price.total, 0) };
+    addLines(s, `fam:${st.id}`, st, lines, 'waiting'); window.scrollTo(0, 0);
+  },
+  famPay: () => { S.fam.paid = true; },
+  famEdit: () => { S.fam.done = null; S.fam.paid = false; },
+  deskReserve: (d) => {
+    const s = famSession(); const st = STUDENTS[S.desk.student]; const lines = chosenLines(s, `desk:${st.id}`, st);
+    if (!lines.length) { S.desk.err = 'Pick at least one subject.'; return; } if (lines.some((x) => x.needsWhen)) { S.desk.err = 'Answer “When did you sit it?” for each retake that asks it.'; return; } if (!S.desk.consent) { S.desk.err = `Tick “${DESK_CONSENT}”.`; return; }
+    S.desk.err = null; S.desk.done = { lines: lines.map((x) => ({ oid: x.o.id, rkey: x.r.key, opt: x.p.opt, total: x.price.total })), total: lines.reduce((a, x) => a + x.price.total, 0) };
+    S.desk.lines = lines; S.desk.collected = false; S.desk.stage = d.collect === '1' ? 'collect' : 'done';
+    if (d.collect !== '1') addLines(s, `desk:${st.id}`, st, lines, 'waiting'); window.scrollTo(0, 0);
+  },
+  deskCollect: () => { const s = famSession(); const st = STUDENTS[S.desk.student]; addLines(s, `desk:${st.id}`, st, S.desk.lines, 'paid'); S.desk.collected = true; S.desk.stage = 'done'; },
+  deskBack: () => { S.desk.stage = 'reserve'; },
+  deskNew: () => { const st = STUDENTS[S.desk.student]; delete S.picks[`desk:${st.id}`]; Object.assign(S.desk, { stage: 'reserve', consent: false, err: null, done: null, collected: false }); window.scrollTo(0, 0); },
+  grade: (d) => { const s = cur(); s.grades[d.g] = !s.grades[d.g]; },
+  confirmImpact: () => { const d = S.dialog; S.dialog = null; d.run(); if (d.doneMsg) toast(`${d.doneMsg}: ${plural(d.imp.repriced, 'reservation')} re-priced${d.imp.finance ? `, ${d.imp.finance} listed for finance` : ''}`); },
+};
+function addLines(s, scope, st, lines, status) {
+  s.reservations = s.reservations.filter((l) => l.scope !== scope);
+  for (const x of lines) { const ts = rowTeachers(x.o, x.r); s.reservations.push({ id: nid('l'), scope, student: st.name, cls: st.cls, oid: x.o.id, rkey: x.r.key, opt: x.p.opt, tid: OPT[x.p.opt].mode === 'school' && x.o.choice === 'families' && ts.length ? x.p.teacher || ts[0].tid : null, when: st.known[x.o.ref] || x.p.when || null, status, price: x.price.total, answers: clone(S.answers[scope] || {}) }); }
+}
+function normRefund(s) { let prev = 0; for (const st of s.refund) { if (st.week == null) continue; if (st.week <= prev) st.week = prev + 1; prev = st.week; } }
+function normName(x) { return x.toLowerCase().replace(/\b(ms|mr|mrs|miss|dr)\.?\s+/g, '').replace(/['’.\-]/g, '').replace(/\bel\s+/g, 'el').replace(/ee/g, 'i').replace(/ay/g, 'ai').replace(/y/g, 'i').replace(/ei/g, 'e').replace(/\s+/g, ' ').trim(); }
+function lev(a, b) { const d = []; for (let i = 0; i <= a.length; i++) { d[i] = [i]; for (let j = 1; j <= b.length; j++) d[i][j] = i === 0 ? j : Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); } return d[a.length][b.length]; }
+function similarTeachers(name) {
+  const n = normName(name); const nt = n.split(' ');
+  return S.teachers.filter((t) => { const m = normName(t.name); const mt = m.split(' '); if (m === n || lev(m, n) <= 2) return true; if (nt.length === 1 && mt[0] === nt[0]) return true; return nt.length > 1 && mt.length > 1 && nt[0] === mt[0] && lev(nt.slice(1).join(' '), mt.slice(1).join(' ')) <= 2; });
+}
+
+const CHG = {
+  stage: (d, el) => { initState(el.value); S.screen = 'home'; toast(el.value === 'open' ? 'June 2027 open, with example reservations and example course fees' : 'June 2027 as pre-loaded'); },
+  role: (d, el) => { S.role = el.value; },
+  subjectScreen: (d, el) => { const v = el.value; if (!v) return; if (v === 'winter') { const w = ensureWinterExample(); openEditor(w.id, w.offerings[0].id); return; } const j = famSession(); const o = offByRef(j, v); if (o) openEditor(j.id, o.id); else toast('That subject is not in June 2027 any more'); },
+  nsType: (d, el) => { const t = el.value; Object.assign(S.dialog, { t, y: suggestYear(t), from: lastOfType(t) ? 'copy' : 'empty' }); },
+  nsYear: (d, el) => { S.dialog.y = Number(el.value); },
+  nsFrom: (d, el) => { S.dialog.from = el.value; },
+  sessDate: (d, el) => { cur()[d.f] = el.value || null; },
+  doubtPick: (d, el) => { cur().doubts.find((x) => x.id === d.id).pick = el.value; },
+  adminDate: (d, el) => { S.adminDates[d.b] = el.value; },
+  addPick: (d, el) => { S.addRef = el.value; },
+  cpFrom: (d, el) => { S.dialog.from = el.value; }, cpTo: (d, el) => { S.dialog.to = el.value; },
+  nlBoard: (d, el) => { S.dialog.board = el.value; }, nlLevel: (d, el) => { S.dialog.level = el.value; }, nlName: (d, el) => { S.dialog.name = el.value; S.dialog.err = null; }, nlCode: (d, el) => { S.dialog.code = el.value; },
+  plBoard: (d, el) => { S.pl.board = el.value; S.pl.parsed = null; }, plFor: (d, el) => { S.pl.forKey = el.value; }, plText: (d, el) => { S.pl.text = el.value; },
+  missHow: (d, el) => {
+    const s = cur(); const v = el.value; if (!v) return; const o = s.offerings.find((x) => x.id === d.o); const r = o.rows.find((x) => x.key === d.r);
+    if (v === 'sum') { const parts = {}; for (const c of r.sumOf) parts[c] = findIn(allLists(o.board), c).amount; withImpact(s, (ss) => { const rr = ss.offerings.find((x) => x.id === o.id).rows.find((x) => x.key === r.key); rr.parts = clone(parts); rr.examFee = sumParts(parts); rr.feeSrc = 'units_sum'; rr.lastYear = false; recalc(ss.offerings.find((x) => x.id === o.id)); }, 'Exam fee', `${o.title} · ${r.label.en}: the sum of its units.`, null, `${o.title} · ${r.label.en}: sum of its units`); return; }
+    const [, lid, code] = v.split(':'); const l = S.sessions.flatMap((x) => x.lists).find((x) => x.id === lid); const amount = l.rows.find((x) => x[0] === code)[2];
+    withImpact(s, (ss) => { const oo = ss.offerings.find((x) => x.id === o.id); const rr = oo.rows.find((x) => x.key === r.key); rr.examFee = amount; rr.feeSrc = 'list'; rr.feeList = lid; rr.lastYear = false; recalc(oo); }, 'Exam fee', `${o.title} · ${r.label.en}: ${moneyTxt(amount)} from ${l.name}.`, null, `${o.title} · ${r.label.en}: copied from ${l.name}`);
+  },
+  missAmt: (d, el, input) => { if (input) return; setFee(cur(), d.o, d.r, numOrNull(el.value)); },
+  lyAmt: (d, el, input) => { if (input) return; setFee(cur(), d.o, d.r, numOrNull(el.value)); },
+  courseFee: (d, el, input) => { if (input) return; const s = cur(); const o = s.offerings.find((x) => x.id === d.o); const v = numOrNull(el.value); withImpact(s, (ss) => { const oo = ss.offerings.find((x) => x.id === o.id); oo.courseFee = v; oo.courseFeeSrc = null; }, `Course fee of ${o.title}`, `${o.title}: course fee ${v == null ? 'not set' : moneyTxt(v)}.`, null, null); },
+  refWeek: (d, el) => { const s = cur(); s.refund[Number(d.i)].week = Number(el.value); normRefund(s); },
+  refPct: (d, el) => { cur().refund[Number(d.i)].pct = Number(el.value); },
+  share: (d, el) => { const s = cur(); const v = Number(el.value); withImpact(s, (ss) => { ss.share = v; }, 'Self-study share', `Self study pays ${v}% of the course fee (was ${s.share}%).`, null, `Self study pays ${v}%`); },
+  cancelDays: (d, el) => { cur().cancelDays = Number(el.value); },
+  qScope: (d, el) => { S.q.scope = el.value; }, qType: (d, el) => { S.q.type = el.value; }, qText: (d, el) => { S.q.text = el.value; }, qChoices: (d, el) => { S.q.choices = el.value; },
+  edCloses: (d, el) => { S.edit.off.closesAt = el.value || null; },
+  rowOn: (d, el) => { const r = draftRow(d.r); r.on = el.checked; if (r.on && r.examFee == null) autoFees(byId(S.edit.sid), S.edit.off); if (!r.on && S.edit.more === r.key) S.edit.more = null; },
+  cell: (d, el) => { draftRow(d.r).cells[d.c] = el.checked; },
+  colAll: (d, el) => { for (const r of S.edit.off.rows) if (r.on && !r.closed && cellAllowed(r, d.c)) r.cells[d.c] = el.checked; },
+  rowFee: (d, el, input) => { if (input) return; const r = draftRow(d.r); const v = numOrNull(el.value); r.examFee = v; r.feeSrc = v == null ? null : 'typed'; r.lastYear = false; r.kept = false; recalc(S.edit.off); },
+  rowCourse: (d, el, input) => { if (input) return; const r = draftRow(d.r); r.courseFee = numOrNull(el.value); r.courseFeeSrc = null; },
+  subCourse: (d, el, input) => { if (input) return; S.edit.off.courseFee = numOrNull(el.value); S.edit.off.courseFeeSrc = null; },
+  rowSsMode: (d, el) => { const r = draftRow(d.r); if (el.value === 'share') { r.ssFee = null; S.edit.ssOwn = null; } else S.edit.ssOwn = r.key; },
+  rowSsFee: (d, el, input) => { if (input) return; draftRow(d.r).ssFee = numOrNull(el.value); },
+  rowTeachMode: (d, el) => { const r = draftRow(d.r); r.teachers = el.value === 'own' ? clone(S.edit.off.teachers) : null; },
+  rowTeachAdd: (d, el) => { if (!el.value) return; draftRow(d.r).teachers.push({ tid: el.value, online: false, external: false }); },
+  rowSitting: (d, el) => { draftRow(d.r).sitting = el.value; }, rowCloses: (d, el) => { draftRow(d.r).closesAt = el.value || null; }, rowPayBy: (d, el) => { draftRow(d.r).payBy = el.value || null; },
+  tAdd: (d, el) => { const v = el.value; if (!v) return; const E = S.edit; if (v === '__new') { E.newOpen = true; setTimeout(() => { const i = document.getElementById('t-new'); if (i) i.focus(); }, 0); return; } E.off.teachers.push({ tid: v, online: false, external: !!teacher(v).team }); E.off.tbc = false; },
+  tNewName: (d, el) => { S.edit.newT = el.value; },
+  choice: (d, el) => { S.edit.off.choice = el.value; },
+  earlierTick: (d, el) => { const o = S.edit.off; o.earlier = el.checked ? [...new Set([...o.earlier, d.e])] : o.earlier.filter((x) => x !== d.e); },
+  earlierAdd: (d, el) => { if (!el.value) return; S.edit.off.earlier.push(el.value); },
+  edNote: (d, el) => { S.edit.off.note = el.value; },
+  eqType: (d, el) => { S.edit.eq.type = el.value; }, eqText: (d, el) => { S.edit.eq.text = el.value; }, eqChoices: (d, el) => { S.edit.eq.choices = el.value; },
+  crName: (d, el) => { S.edit.cr.name = el.value; }, crCode: (d, el) => { S.edit.cr.code = el.value; }, crFee: (d, el) => { S.edit.cr.fee = el.value; },
+  dupPick: (d, el) => { S.dialog.pick = el.value; },
+  pick: (d, el) => {
+    const bag = pickBag(d.scope); bag[d.o] = bag[d.o] || {}; const box = scopeBox(d.scope); if (box) box.err = null;
+    if (!el.value) { delete bag[d.o][d.g]; return; }
+    const [row, opt] = el.value.split('|'); const prev = bag[d.o][d.g]; const o = offFor(d.scope, d.o); const r = o.rows.find((x) => x.key === row); const ts = rowTeachers(o, r);
+    bag[d.o][d.g] = { row, opt, teacher: prev && prev.row === row && prev.teacher ? prev.teacher : ts[0] ? ts[0].tid : null, when: prev && prev.row === row ? prev.when : '' };
+  },
+  pickTeacher: (d, el) => { pickBag(d.scope)[d.o][d.g].teacher = el.value; },
+  pickWhen: (d, el) => { pickBag(d.scope)[d.o][d.g].when = el.value; const box = scopeBox(d.scope); if (box) box.err = null; },
+  answer: (d, el) => { (S.answers[d.scope] = S.answers[d.scope] || {})[d.q] = el.value; },
+  famRefund: (d, el) => { S.fam.refund = el.checked; S.fam.err = null; }, famDecl: (d, el) => { S.fam.decl = el.checked; S.fam.err = null; },
+  deskStudent: (d, el) => { Object.assign(S.desk, { student: el.value, stage: 'reserve', consent: false, err: null, done: null }); },
+  deskConsent: (d, el) => { S.desk.consent = el.checked; S.desk.err = null; }, deskInstr: (d, el) => { S.desk.instr = el.value; }, deskBal: () => {},
+};
+function setFee(s, oid, rkey, v) {
+  const o = s.offerings.find((x) => x.id === oid); const r = o.rows.find((x) => x.key === rkey);
+  withImpact(s, (ss) => { const oo = ss.offerings.find((x) => x.id === oid); const rr = oo.rows.find((x) => x.key === rkey); rr.examFee = v; rr.feeSrc = v == null ? null : 'typed'; rr.lastYear = false; rr.kept = false; recalc(oo); }, 'Exam fee', `${o.title} · ${r.label.en}: ${v == null ? 'not set' : moneyTxt(v)}.`, null, null);
+}
+
+/* ───────────────────────── Render (a small DOM morph keeps focus and clicks across re-renders) ───────────────────────── */
+function morphChildren(from, to) {
+  const f = Array.from(from.childNodes); const t = Array.from(to.childNodes);
+  for (let i = 0; i < t.length; i++) { if (i < f.length) morphNode(f[i], t[i]); else from.appendChild(t[i]); }
+  for (let i = f.length - 1; i >= t.length; i--) from.removeChild(f[i]);
+}
+function morphNode(a, b) {
+  if (a.nodeType !== b.nodeType || a.nodeName !== b.nodeName) { if (a.parentNode) a.replaceWith(b); return; }
+  if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  for (const at of Array.from(a.attributes)) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for (const at of Array.from(b.attributes)) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+  if (a.nodeName === 'TEXTAREA') { if (document.activeElement !== a && a.value !== b.value) a.value = b.value; return; }
+  morphChildren(a, b);
+  if (a.nodeName === 'INPUT') { if (a.type === 'checkbox' || a.type === 'radio') a.checked = b.hasAttribute('checked'); else if (document.activeElement !== a) { const v = b.getAttribute('value') || ''; if (a.value !== v) a.value = v; } }
+  else if (a.nodeName === 'SELECT') { const o = b.querySelector('option[selected]') || b.querySelector('option'); const v = o ? (o.hasAttribute('value') ? o.getAttribute('value') : o.textContent) : ''; if (a.value !== v) a.value = v; }
+}
+function morphInto(el, html) { const t = document.createElement('div'); t.innerHTML = html; morphChildren(el, t); }
+let rendering = false, again = false;
+function render() {
+  if (rendering) { again = true; return; }
+  rendering = true;
+  try { paint(); } finally { rendering = false; }
+  if (again) { again = false; render(); }
+}
+function paint() {
+  document.documentElement.lang = ar() ? 'ar' : 'en'; document.documentElement.dir = ar() ? 'rtl' : 'ltr';
+  morphInto(document.getElementById('mockbar'), mockbar());
+  morphInto(document.getElementById('app'), app());
+  morphInto(document.getElementById('layer'), layer());
+}
+function initState(stage) {
+  seq = 100;
+  for (const b of Object.values(BOARDS)) for (const k of Object.keys(b.deadlines)) if (b === BOARDS.oxford) delete b.deadlines[k];
+  Object.assign(S, { stage, screen: 'home', role: 'coordinator', sessionId: 'jun2027', tab: 'subjects', teachers: TEACHER_SEED.map(([id, name, team]) => (team ? { id, name, team } : { id, name })), sessions: [makeJune2027()], dialog: null, toast: null, edit: null, addRef: '', pl: { board: 'cambridge', forKey: '', text: '', parsed: null }, q: { scope: 'session', type: 'yesno', text: '', choices: '' }, pv: 'first', picks: {}, answers: {}, fam: { student: 'y11b', lang: 'en', refund: false, decl: false, done: null, err: null, paid: false }, desk: { student: 'y11b', consent: false, stage: 'reserve', instr: 'cash', err: null, done: null, collected: false }, openChecks: true, adminDates: {} });
+  if (stage === 'open') applyOpenStage(S.sessions[0]);
+}
+
+document.addEventListener('click', (e) => { const el = e.target.closest('[data-act]'); if (!el || el.disabled) return; const fn = ACT[el.dataset.act]; if (!fn) return; fn(el.dataset, el, e); render(); });
+document.addEventListener('change', (e) => { const el = e.target.closest('[data-chg]'); if (!el) return; const fn = CHG[el.dataset.chg]; if (!fn) return; fn(el.dataset, el, false); render(); });
+document.addEventListener('input', (e) => { const el = e.target; if (!el.dataset || !el.dataset.chg) return; if (el.tagName === 'SELECT' || ['checkbox', 'radio', 'date', 'number'].includes(el.type)) return; const fn = CHG[el.dataset.chg]; if (fn) fn(el.dataset, el, true); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.dialog) { S.dialog = null; render(); } });
+
+initState('pre');
+render();
+window.__mock = { S, checks, render };
+})();
+</script>
+</body>
+</html>
