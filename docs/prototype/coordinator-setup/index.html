@@ -216,61 +216,78 @@ const nid = (p) => `${p}${++seq}`;
 const money = (n, lang) => (n == null ? '' : lang === 'ar' ? `<span class="num" dir="ltr">${n2(n)}</span> جنيه` : `<span class="num" dir="ltr">EGP ${n2(n)}</span>`);
 const moneyTxt = (n, lang) => (lang === 'ar' ? `${n2(n)} جنيه` : `EGP ${n2(n)}`);
 const normCode = (s) => String(s).toUpperCase().replace(/\s+/g, ' ').trim();
-const sumParts = (p) => Object.values(p).reduce((a, b) => a + b, 0);
 const numOrNull = (v) => (v === '' || v == null ? null : Math.max(0, Number(v)));
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
 
 /* ───────────────────────── Reference data (ours: §7) ───────────────────────── */
-const BOARDS = {
-  cambridge: { name: 'Cambridge', onePaperFee: 'syllabus', onePaperAsks: true, carryMonths: 13, deadlines: { '2027-06': '2027-02-21', '2028-06': '2028-02-21', '2027-11': '2027-09-15' } },
-  edexcel: { name: 'Edexcel', onePaperFee: 'paper', onePaperAsks: false, carryMonths: null, deadlines: { '2027-06': '2027-02-21', '2028-06': '2028-02-21', '2027-11': '2027-09-21' } },
-  oxford: { name: 'OxfordAQA', onePaperFee: 'syllabus', onePaperAsks: false, carryMonths: null, deadlines: {} },
+/* Board dates from packages/db/reference/boards.json on main (88d75b1): a null date is one the board has not published. */
+const BOARD_DEADLINES = {
+  cambridge: { '2025-06': '2025-02-21', '2025-11': '2025-08-16', '2026-06': '2026-02-21', '2026-11': '2026-08-16' },
+  edexcel: { '2026-06': '2026-03-21', '2026-10': '2026-08-28', '2026-11': '2026-09-12', '2027-01': '2026-10-16', '2027-06': '2027-03-21' },
+  oxford: { '2026-06': '2026-02-21', '2026-11': '2026-09-18', '2027-01': '2026-11-07', '2027-06': '2027-03-01' },
 };
-const ALIASES = { cambridge: { '9608 SY': ['cam-9618', 'as'] }, edexcel: {}, oxford: {} };
+const BOARDS = {
+  cambridge: { name: 'Cambridge', onePaperFee: 'syllabus', onePaperAsks: true, carryMonths: 13, retakeNote: ' (June has no separate retake deadline)', deadlines: {} },
+  edexcel: { name: 'Edexcel', onePaperFee: 'paper', onePaperAsks: false, carryMonths: null, retakeNote: '', deadlines: {} },
+  oxford: { name: 'OxfordAQA', onePaperFee: 'syllabus', onePaperAsks: false, carryMonths: null, retakeNote: '', deadlines: {} },
+};
+/* The reference's aliases (boards.json): printed codes that are a row's under another name. */
+const ALIASES = { cambridge: { '9608 SY': ['cam-9618', 'as'] }, edexcel: { '4WM1H': ['edx-4ma1', 'p1h'], '4WM2H': ['edx-4ma1', 'p2h'], '9AA01': ['edx-ara-al', 'gce'], '9AA1': ['edx-ara-al', 'gce'] }, oxford: {} };
+/* Aliases marked toCheck: never applied silently; she confirms a reading (boards.json, 4MA1H / 4MA2H on the November 2026 list). */
+const TO_CHECK = { cambridge: {}, edexcel: { '4MA1H': { ref: 'edx-4ma1', row: 'p1h' }, '4MA2H': { ref: 'edx-4ma1', row: 'p2h' } }, oxford: {} };
 
-function R(key, kind, en, ar, codes, extra) { return Object.assign({ key, kind, label: { en, ar }, codes: codes || [] }, extra || {}); }
-const ALL = (code, extra) => R('all', 'all', 'All papers', 'كل الأوراق', code ? [code] : [], extra);
-const P41 = () => R('p4', 'paper', 'Paper 41/42 only', 'الورقة 41/42 فقط', []);
-const ROUTES = (c) => [R('as', 'as', 'A.S.', 'A.S.', c ? [c + ' AS'] : []), R('a2', 'a2', 'A.2.', 'A.2.', c ? [c + ' A2'] : []), R('al', 'al', 'A.L.', 'A.L.', c ? [c + ' AL'] : [])];
-const UNITS = (list) => list.map(([key, short, code, req, winter]) => R(key, 'unit', `${short} (${code})`, `${short.replace('Unit', 'الوحدة')} (${code})`, [code], { required: !!req, winter }));
+/* The family wording of packages/validations/src/offering/labels.ts on main, ported. */
+const QUAL_AR = { 'International A Level': 'المستوى A الدولي', 'GCE A Level': 'المستوى A البريطاني' };
+function shortAr(sh) { if (/^theory paper$/i.test(sh)) return 'الورقة النظرية'; if (QUAL_AR[sh]) return QUAL_AR[sh]; let m = /^Paper (.+)$/.exec(sh); if (m) return `الورقة ${m[1]}`; m = /^Unit (.+)$/.exec(sh); if (m) return `الوحدة ${m[1]}`; return sh; }
+function rowPhrase(r, lang) {
+  switch (r.kind) {
+    case 'all': return lang === 'en' ? 'all papers' : 'كل الأوراق';
+    case 'paper': return lang === 'en' ? `${r.short} only` : `${shortAr(r.short)} فقط`;
+    case 'unit': case 'qual': { const name = lang === 'en' ? r.short : shortAr(r.short); return r.code && r.code !== r.short ? `${name} (${r.code})` : name; }
+    case 'as': return 'A.S.';
+    case 'a2': return lang === 'en' ? 'A.2. (carry forward)' : 'A.2. (نقل نتيجة)';
+    case 'al': return 'A.L.';
+    default: return r.short || '';
+  }
+}
+function rowLabelOf(r, lang) { const p = rowPhrase(r, lang); return lang === 'en' ? p.charAt(0).toUpperCase() + p.slice(1) : p; }
 
+function R(key, kind, short, codes, extra) { const r = Object.assign({ key, kind, short: short || null, code: null, codes: codes || [] }, extra || {}); r.label = { en: rowLabelOf(r, 'en'), ar: rowLabelOf(r, 'ar') }; return r; }
+const ALL = (code, extra) => R('all', 'all', null, code ? [code] : [], extra);
+const PAPER = (key, short, codes) => R(key, 'paper', short, codes || []);
+const P41 = () => PAPER('p4', 'Paper 41/42');
+const ROUTES = (c, as, a2, al) => [R('as', 'as', null, as.map((x) => `${c} ${x}`)), R('a2', 'a2', null, a2.map((x) => `${c} ${x}`)), R('al', 'al', null, al.map((x) => `${c} ${x}`))];
+const UNIT = (key, short, code, winter) => R(key, 'unit', short, [code], { code, winter });
+
+/* The 27 subjects of main's packages/db/reference/subjects/*.json (the school's 25, Cambridge 9700 and Edexcel 4AA1). */
 const REF = [
-  { ref: 'cam-3180', board: 'cambridge', code: '3180', title: 'Arabic O.L.', group: 'OL', rows: [ALL('3180 A'), R('p1', 'paper', 'Paper 1 only', 'الورقة 1 فقط', []), R('p2', 'paper', 'Paper 2 only', 'الورقة 2 فقط', [])] },
+  { ref: 'cam-3180', board: 'cambridge', code: '3180', title: 'Arabic O.L.', group: 'OL', rows: [ALL('3180 A'), PAPER('p1', 'Paper 1'), PAPER('p2', 'Paper 2')] },
   { ref: 'cam-0970', board: 'cambridge', code: '0970', title: 'Biology O.L.', group: 'OL', rows: [ALL('0970 CX'), P41()] },
   { ref: 'cam-0986', board: 'cambridge', code: '0986', title: 'Business O.L.', group: 'OL', rows: [ALL('0986 AX')] },
   { ref: 'cam-0971', board: 'cambridge', code: '0971', title: 'Chemistry O.L.', group: 'OL', rows: [ALL('0971 CX'), P41()] },
   { ref: 'cam-0653', board: 'cambridge', code: '0653', title: 'Combined Science O.L.', group: 'OL', rows: [ALL('0653 CX'), P41()] },
   { ref: 'cam-0984', board: 'cambridge', code: '0984', title: 'Computer Science O.L.', group: 'OL', rows: [ALL('0984 AX')] },
-  { ref: 'oxf-esl', board: 'oxford', code: '', title: 'English as a Second Language', group: 'OL', toCheck: true, rows: [ALL(null)] },
-  { ref: 'cam-0680', board: 'cambridge', code: '0680', title: 'Environmental Management O.L.', group: 'OL', rows: [ALL('0680 AX')] },
+  { ref: 'oxf-esl', board: 'oxford', code: '9280', title: 'English as a Second Language', group: 'OL', toCheck: true, rows: [ALL(null)] },
+  { ref: 'cam-0680', board: 'cambridge', code: '0680', title: 'Environmental Management O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
   { ref: 'cam-7156', board: 'cambridge', code: '7156', title: 'French O.L.', group: 'OL', rows: [ALL('7156 X')] },
   { ref: 'cam-7159', board: 'cambridge', code: '7159', title: 'German O.L.', group: 'OL', rows: [ALL('7159 Y')] },
-  { ref: 'cam-0457', board: 'cambridge', code: '0457', title: 'Global Perspectives O.L.', group: 'OL', rows: [ALL('0457 AX')] },
+  { ref: 'cam-0457', board: 'cambridge', code: '0457', title: 'Global Perspectives O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
   { ref: 'cam-gc', board: 'cambridge', code: '', title: 'Global Citizenship O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
   { ref: 'edx-4hb1', board: 'edexcel', code: '4HB1', title: 'Human Biology O.L.', group: 'OL', rows: [ALL('4HB1')] },
-  { ref: 'cam-0983', board: 'cambridge', code: '0983', title: 'ICT O.L.', group: 'OL', rows: [ALL('0983 DY'), R('th', 'paper', 'Theory paper only', 'الورقة النظرية فقط', [])] },
-  { ref: 'edx-4ma1', board: 'edexcel', code: '4MA1', title: 'Mathematics O.L.', group: 'OL', rows: [ALL(null, { sumOf: ['4MA1 1H', '4MA1 2H'] }), R('p1h', 'paper', 'Paper 1H only', 'الورقة 1H فقط', ['4MA1 1H']), R('p2h', 'paper', 'Paper 2H only', 'الورقة 2H فقط', ['4MA1 2H'])] },
+  { ref: 'cam-0983', board: 'cambridge', code: '0983', title: 'ICT O.L.', group: 'OL', rows: [ALL('0983 DY'), PAPER('th', 'Theory paper')] },
+  { ref: 'edx-4ma1', board: 'edexcel', code: '4MA1', title: 'Mathematics O.L.', group: 'OL', rows: [ALL(null, { sumOf: ['p1h', 'p2h'] }), PAPER('p1h', 'Paper 1H', ['4MA1/1H', '4MA1 1H']), PAPER('p2h', 'Paper 2H', ['4MA1/2H', '4MA1 2H'])] },
   { ref: 'cam-0972', board: 'cambridge', code: '0972', title: 'Physics O.L.', group: 'OL', rows: [ALL('0972 CX'), P41()] },
-  { ref: 'oxf-psy', board: 'oxford', code: '', title: 'Psychology O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
-  { ref: 'edx-ara-al', board: 'edexcel', code: 'YAA01 · 9AA0', title: 'Arabic A.L.', group: 'AS', rows: [R('ial', 'qual', 'International A Level (YAA01)', 'المستوى المتقدم الدولي (YAA01)', ['YAA01'], { sumOf: ['WAA01', 'WAA02'] }), R('gce', 'qual', 'GCE A Level (9AA0)', 'المستوى المتقدم GCE (9AA0)', ['9AA0'])] },
-  { ref: 'edx-bio-ial', board: 'edexcel', code: 'YBI11', title: 'Biology A.S./A.L.', group: 'AS', rows: UNITS([['u1', 'Unit 1', 'WBI11', 1, 'november'], ['u2', 'Unit 2', 'WBI12', 1, 'november'], ['u3', 'Unit 3', 'WBI13', 1, 'january'], ['u4', 'Unit 4', 'WBI14', 1, 'january'], ['u5', 'Unit 5', 'WBI15', 1, 'january'], ['u6', 'Unit 6', 'WBI16', 1, 'january']]) },
-  { ref: 'cam-9701', board: 'cambridge', code: '9701', title: 'Chemistry A.S.', group: 'AS', rows: ROUTES('9701') },
-  { ref: 'cam-9618', board: 'cambridge', code: '9618', title: 'Computer Science A.S./A.L.', group: 'AS', rows: ROUTES('9618') },
-  { ref: 'cam-fr-al', board: 'cambridge', code: '', title: 'French A.S./A.L.', group: 'AS', toCheck: true, rows: [R('as', 'as', 'A.S.', 'A.S.', []), R('al', 'al', 'A.L.', 'A.L.', [])] },
-  { ref: 'edx-math-ial', board: 'edexcel', code: 'YMA01', title: 'Mathematics A.S./A.L.', group: 'AS', rows: UNITS([['p1', 'P1', 'WMA11', 1, 'january'], ['p2', 'P2', 'WMA12', 1, 'january'], ['p3', 'P3', 'WMA13', 1, 'january'], ['p4', 'P4', 'WMA14', 1, 'january'], ['m1', 'M1', 'WME01', 0, 'january'], ['s1', 'S1', 'WST01', 0, 'january'], ['m2', 'M2', 'WME02', 0, 'january'], ['s2', 'S2', 'WST02', 0, 'january'], ['d1', 'D1', 'WDM11', 0, 'january'], ['fp1', 'FP1', 'WFM01', 0, 'january']]) },
-  { ref: 'cam-9702', board: 'cambridge', code: '9702', title: 'Physics A.S./A.L.', group: 'AS', rows: ROUTES('9702') },
-  { ref: 'cam-9990', board: 'cambridge', code: '9990', title: 'Psychology A.L.', group: 'AS', toCheck: true, rows: ROUTES('9990') },
-  // On the boards' lists, not offered in June 2027
-  { ref: 'cam-0455', board: 'cambridge', code: '0455', title: 'Economics O.L.', group: 'OL', rows: [ALL('0455 AX'), P41()] },
-  { ref: 'cam-0985', board: 'cambridge', code: '0985', title: 'Accounting O.L.', group: 'OL', rows: [ALL('0985 AX')] },
-  { ref: 'cam-0980', board: 'cambridge', code: '0980', title: 'Mathematics O.L. (Cambridge)', group: 'OL', rows: [ALL('0980 CX'), P41()] },
-  { ref: 'cam-0610', board: 'cambridge', code: '0610', title: 'Biology O.L. (0610)', group: 'OL', rows: [ALL('0610 CX'), P41()] },
-  { ref: 'cam-9709', board: 'cambridge', code: '9709', title: 'Mathematics A.S./A.L. (Cambridge)', group: 'AS', rows: ROUTES('9709') },
-  { ref: 'cam-9700', board: 'cambridge', code: '9700', title: 'Biology A.S./A.L. (Cambridge)', group: 'AS', rows: ROUTES('9700') },
-  { ref: 'cam-9708', board: 'cambridge', code: '9708', title: 'Economics A.S./A.L.', group: 'AS', rows: ROUTES('9708') },
-  { ref: 'edx-4ph1', board: 'edexcel', code: '4PH1', title: 'Physics O.L. (Edexcel)', group: 'OL', rows: [ALL('4PH1')] },
-  { ref: 'edx-4ch1', board: 'edexcel', code: '4CH1', title: 'Chemistry O.L. (Edexcel)', group: 'OL', rows: [ALL('4CH1')] },
-  { ref: 'edx-eco-ial', board: 'edexcel', code: 'YEC11', title: 'Economics A.S./A.L. (Edexcel)', group: 'AS', rows: UNITS([['u1', 'Unit 1', 'WEC11', 1], ['u2', 'Unit 2', 'WEC12', 1], ['u3', 'Unit 3', 'WEC13', 1], ['u4', 'Unit 4', 'WEC14', 1]]) },
+  { ref: 'oxf-psy', board: 'oxford', code: '9218', title: 'Psychology O.L.', group: 'OL', toCheck: true, rows: [ALL(null)] },
+  { ref: 'edx-ara-al', board: 'edexcel', code: 'YAA01 · 9AA0', title: 'Arabic A.L.', group: 'AS', rows: [UNIT('waa01', 'Unit 1', 'WAA01', 'january'), UNIT('waa02', 'Unit 2', 'WAA02', 'january'), R('ial', 'qual', 'International A Level', ['YAA01'], { code: 'YAA01', sumOf: ['waa01', 'waa02'] }), R('gce', 'qual', 'GCE A Level', ['9AA0'], { code: '9AA0' })] },
+  { ref: 'edx-bio-ial', board: 'edexcel', code: 'YBI11', title: 'Biology A.S./A.L.', group: 'AS', rows: [UNIT('u1', 'Unit 1', 'WBI11', 'november'), UNIT('u2', 'Unit 2', 'WBI12', 'november'), UNIT('u3', 'Unit 3', 'WBI13', 'january'), UNIT('u4', 'Unit 4', 'WBI14', 'january'), UNIT('u5', 'Unit 5', 'WBI15', 'january'), UNIT('u6', 'Unit 6', 'WBI16', 'january')] },
+  { ref: 'cam-9701', board: 'cambridge', code: '9701', title: 'Chemistry A.S.', group: 'AS', rows: ROUTES('9701', ['S1', 'S2'], ['BY', 'CT'], ['AX', 'HX']) },
+  { ref: 'cam-9618', board: 'cambridge', code: '9618', title: 'Computer Science A.S./A.L.', group: 'AS', rows: ROUTES('9618', ['SY'], ['BY', 'CT'], ['AY']) },
+  { ref: 'cam-fr-al', board: 'cambridge', code: '8028 · 9898', title: 'French A.S./A.L.', group: 'AS', toCheck: true, rows: [R('as', 'as', null, []), R('al', 'al', null, [])] },
+  { ref: 'edx-math-ial', board: 'edexcel', code: 'YMA01', title: 'Mathematics A.S./A.L.', group: 'AS', rows: [UNIT('p1', 'P1', 'WMA11'), UNIT('p2', 'P2', 'WMA12'), UNIT('p3', 'P3', 'WMA13'), UNIT('p4', 'P4', 'WMA14'), UNIT('m1', 'M1', 'WME01'), UNIT('m2', 'M2', 'WME02'), UNIT('s1', 'S1', 'WST01')] },
+  { ref: 'cam-9702', board: 'cambridge', code: '9702', title: 'Physics A.S./A.L.', group: 'AS', rows: ROUTES('9702', ['S1', 'S2'], ['BX', 'CQ'], ['AX', 'HX']) },
+  { ref: 'cam-9990', board: 'cambridge', code: '9990', title: 'Psychology A.L.', group: 'AS', toCheck: true, rows: ROUTES('9990', [], [], []) },
+  { ref: 'cam-9700', board: 'cambridge', code: '9700', title: 'Biology A.S./A.L. (Cambridge)', group: 'AS', rows: ROUTES('9700', ['S1', 'S2'], ['BY', 'CT'], ['AX', 'HX']) },
+  { ref: 'edx-4aa1', board: 'edexcel', code: '4AA1', title: 'Arabic O.L. (Edexcel)', group: 'OL', toCheck: true, rows: [ALL(null)] },
 ];
 const REFMAP = Object.fromEntries(REF.map((r) => [r.ref, r]));
 
@@ -282,17 +299,20 @@ const TEACHER_SEED = [
   ['t19', 'Shereen Okasha'], ['t20', 'Ramy Wagdy'], ['t21', 'Marwa Elkady'], ['t22', 'Peter Wassef'], ['t23', 'Mirna Ayad'], ['t24', 'Hala Mokhtar'],
 ];
 
-/* The fee lists as printed (§1), the latest she held for June 2027. */
+/* The fee lists as printed (§1), the latest she held for June 2027; codes as main's reference prints them. */
 const LISTS = [
-  { id: 'cam-jun26', board: 'cambridge', name: 'Cambridge June 2026', rows: [['3180 A', 'Arabic', 9850], ['0970 CX', 'Biology', 10850], ['0986 AX', 'Business', 9850], ['0971 CX', 'Chemistry', 10850], ['0653 CX', 'Combined Science', 10850], ['0984 AX', 'Computer Science', 9850], ['7156 X', 'French', 12550], ['7159 Y', 'German', 12550], ['0983 DY', 'Information and Communication Technology', 12950], ['0972 CX', 'Physics', 10850], ['9701 AS', 'Chemistry AS Level', 14100], ['9701 AL', 'Chemistry A Level', 18600], ['9608 SY', 'Computer Science AS Level', 11400], ['9618 A2', 'Computer Science A2', 12450], ['9618 AL', 'Computer Science A Level', 16950], ['9702 AS', 'Physics AS Level', 14100], ['9702 A2', 'Physics A2', 11400]] },
-  { id: 'edx-jun26', board: 'edexcel', name: 'Edexcel June 2026', rows: [['4MA1 1H', 'Mathematics A Paper 1H', 4600], ['4MA1 2H', 'Mathematics A Paper 2H', 4600], ['WAA01', 'Arabic Unit 1', 8950], ['WAA02', 'Arabic Unit 2', 9350], ['WBI15', 'Biology Unit 5', 4450], ['WBI16', 'Biology Unit 6', 4450], ['WMA11', 'Pure Mathematics P1', 4800], ['WMA12', 'Pure Mathematics P2', 4800], ['WMA13', 'Pure Mathematics P3', 4800], ['WMA14', 'Pure Mathematics P4', 4800], ['WME01', 'Mechanics M1', 4450], ['WST01', 'Statistics S1', 4450]] },
-  { id: 'edx-nov26', board: 'edexcel', name: 'Edexcel November 2026', rows: [['4HB1', 'Human Biology', 9840], ['4MA1 1H', 'Mathematics A Paper 1H', 9840], ['4MA1 2H', 'Mathematics A Paper 2H', 9840], ['WBI11', 'Biology Unit 1', 4790], ['WBI12', 'Biology Unit 2', 4790], ['WBI13', 'Biology Unit 3', 4790], ['WBI14', 'Biology Unit 4', 4790]] },
+  { id: 'cam-jun26', board: 'cambridge', name: 'Cambridge June 2026', rows: [['3180 A', 'Arabic', 9850], ['0970 CX', 'Biology', 10850], ['0986 AX', 'Business', 9850], ['0971 CX', 'Chemistry', 10850], ['0653 CX', 'Combined Science', 10850], ['0984 AX', 'Computer Science', 9850], ['7156 X', 'French', 12550], ['7159 Y', 'German', 12550], ['0983 DY', 'Information and Communication Technology', 12950], ['0972 CX', 'Physics', 10850], ['9701 S1', 'Chemistry AS Level', 14100], ['9701 AX', 'Chemistry A Level', 18600], ['9608 SY', 'Computer Science AS Level', 11400], ['9618 BY', 'Computer Science A2', 12450], ['9618 AY', 'Computer Science A Level', 16950], ['9702 S1', 'Physics AS Level', 14100], ['9702 BX', 'Physics A2', 11400]] },
+  { id: 'edx-jun26', board: 'edexcel', name: 'Edexcel June 2026', rows: [['4WM1H', 'Mathematics A Paper 1H', 4600], ['4WM2H', 'Mathematics A Paper 2H', 4600], ['WAA01', 'Arabic Unit 1', 8950], ['WAA02', 'Arabic Unit 2', 9350], ['WBI15', 'Biology Unit 5', 4450], ['WBI16', 'Biology Unit 6', 4450], ['WMA11', 'Pure Mathematics P1', 4800], ['WMA12', 'Pure Mathematics P2', 4800], ['WMA13', 'Pure Mathematics P3', 4800], ['WMA14', 'Pure Mathematics P4', 4800], ['WME01', 'Mechanics M1', 4450], ['WST01', 'Statistics S1', 4450]] },
+  { id: 'edx-nov26', board: 'edexcel', name: 'Edexcel November 2026', rows: [['4HB1', 'Human Biology', 9840], ['4MA1H', 'Mathematics A Paper 1H', 9840], ['4MA2H', 'Mathematics A Paper 2H', 9840], ['WBI11', 'Biology Unit 1', 4790], ['WBI12', 'Biology Unit 2', 4790], ['WBI13', 'Biology Unit 3', 4790], ['WBI14', 'Biology Unit 4', 4790]] },
 ];
-const EXAMPLE_TEXT = {
-  cambridge: ['3180 A     Arabic                         10,350', '0970 CX    Biology                        11,400', '0986 AX    Business                       10,350', '0971 CX    Chemistry                      11,400', '0653 CX    Combined Science               11,400', '0984 AX    Computer Science               10,350', '0680 AX    Environmental Management       10,350', '7156 X     French                         13,200', '7159 Y     German                         13,200', '0457 AX    Global Perspectives            10,900', '0983 DY    Information and Communication Technology  13,600', '0972 CX    Physics                        11,400', '9701 AS    Chemistry AS Level             14,800', '9701 AL    Chemistry A Level              19,500', '9618 AS    Computer Science AS Level      12,000', '9618 A2    Computer Science A2            13,100', '9618 AL    Computer Science A Level       17,800', '9702 AS    Physics AS Level               14,800', '9702 A2    Physics A2                     12,000', '9990 AL    Psychology A Level             19,500', '0610 CX    Biology                        11,400'].join('\n'),
-  edexcel: ['4HB1           Human Biology                10,300', '4MA1 1H        Mathematics A Paper 1H        4,850', '4MA1 2H        Mathematics A Paper 2H        4,850', 'WAA01          Arabic Unit 1                 9,400', 'WAA02          Arabic Unit 2                 9,800', 'WBI15          Biology Unit 5                4,650', 'WBI16          Biology Unit 6                4,650', 'WMA11          Pure Mathematics P1           5,050', 'WMA12          Pure Mathematics P2           5,050', 'WMA13          Pure Mathematics P3           5,050', 'WMA14          Pure Mathematics P4           5,050', 'WME01 / WST01  Mechanics M1 / Statistics S1  4,650', '9AA0           Arabic (GCE A Level)         21,000', 'XFR21          French (not ours)             9,000'].join('\n'),
-  oxford: ['9271   English as a Second Language   8,900', '9273   Psychology                     9,300'].join('\n'),
+/* "Fill with an example list": per board, and per month where the school holds that list as printed. */
+const EXAMPLES = {
+  cambridge: { any: ['3180 A     Arabic                         10,350', '0970 CX    Biology                        11,400', '0986 AX    Business                       10,350', '0971 CX    Chemistry                      11,400', '0653 CX    Combined Science               11,400', '0984 AX    Computer Science               10,350', '0680 AX    Environmental Management       10,350', '7156 X     French                         13,200', '7159 Y     German                         13,200', '0457 AX    Global Perspectives            10,900', '0983 DY    Information and Communication Technology  13,600', '0972 CX    Physics                        11,400', '9701 S1    Chemistry AS Level             14,800', '9701 AX    Chemistry A Level              19,500', '9618 SY    Computer Science AS Level      12,000', '9618 BY    Computer Science A2            13,100', '9618 AY    Computer Science A Level       17,800', '9702 S1    Physics AS Level               14,800', '9702 BX    Physics A2                     12,000', '9990 AX    Psychology A Level             19,500', '0610 CX    Biology                        11,400'].join('\n'), note: 'example figures, not the board\'s' },
+  edexcel: { any: ['4HB1           Human Biology                10,300', '4WM1H          Mathematics A Paper 1H        4,850', '4WM2H          Mathematics A Paper 2H        4,850', 'WAA01          Arabic Unit 1                 9,400', 'WAA02          Arabic Unit 2                 9,800', 'WBI15          Biology Unit 5                4,650', 'WBI16          Biology Unit 6                4,650', 'WMA11          Pure Mathematics P1           5,050', 'WMA12          Pure Mathematics P2           5,050', 'WMA13          Pure Mathematics P3           5,050', 'WMA14          Pure Mathematics P4           5,050', 'WME01 / WST01  Mechanics M1 / Statistics S1  4,650', '9AA0           Arabic (GCE A Level)         21,000', 'XFR21          French (not ours)             9,000'].join('\n'), note: 'example figures, not the board\'s',
+    '2026-11': ['4HB1     Human Biology              9,840', '4MA1H    Mathematics A Paper 1H     9,840', '4MA2H    Mathematics A Paper 2H     9,840', 'WBI11    Biology Unit 1             4,790', 'WBI12    Biology Unit 2             4,790', 'WBI13    Biology Unit 3             4,790', 'WBI14    Biology Unit 4             4,790'].join('\n'), note2026_11: "the school's November 2026 list as printed" },
+  oxford: { any: ['9280   English as a Second Language   8,900', '9218   Psychology                     9,300'].join('\n'), note: 'example figures, not the board\'s' },
 };
+const exampleFor = (board, k) => (EXAMPLES[board][k] ? { text: EXAMPLES[board][k], note: EXAMPLES[board]['note' + k.replace('-', '_')] } : { text: EXAMPLES[board].any, note: EXAMPLES[board].note });
 
 /* §8, row for row (cells: fi first entry in school · ri retake in school · rs retake self study · fs first entry self study). */
 const L26C = 'cam-jun26', L26E = 'edx-jun26', N26E = 'edx-nov26';
@@ -311,10 +331,10 @@ const PRE = [
   { ref: 'cam-gc', T: ['t17'], rows: { all: 'fi ri rs' } },
   { ref: 'edx-4hb1', T: ['t05'], rows: { all: 'fi ri rs' }, fees: { all: [9840, 'list', N26E] } },
   { ref: 'cam-0983', T: ['t18:external'], rows: { all: 'fi ri rs', th: 'rs' }, fees: { all: [12950, 'list', L26C], th: [12950, 'board_rule'] } },
-  { ref: 'edx-4ma1', T: ['t19', 't20', 't21'], rows: { all: 'fi ri rs', p1h: 'rs', p2h: 'rs' }, fees: { all: [9200, 'units_sum'], p1h: [4600, 'list', L26E], p2h: [4600, 'list', L26E] }, parts: { all: { '4MA1 1H': 4600, '4MA1 2H': 4600 } } },
+  { ref: 'edx-4ma1', T: ['t19', 't20', 't21'], rows: { all: 'fi ri rs', p1h: 'rs', p2h: 'rs' }, fees: { all: [9200, 'units_sum'], p1h: [4600, 'list', L26E], p2h: [4600, 'list', L26E] } },
   { ref: 'cam-0972', T: ['t22'], rows: { all: 'fi ri rs', p4: 'rs' }, fees: { all: [10850, 'list', L26C], p4: [10850, 'board_rule'] } },
   { ref: 'oxf-psy', T: ['t23'], rows: { all: 'fi ri rs' } },
-  { ref: 'edx-ara-al', T: ['t01', 't03'], rows: { ial: 'fi ri rs', gce: 'fi ri rs' }, rowT: { ial: ['t01'], gce: ['t03'] }, fees: { ial: [18300, 'units_sum'] }, parts: { ial: { WAA01: 8950, WAA02: 9350 } } },
+  { ref: 'edx-ara-al', T: ['t01', 't03'], rows: { ial: 'fi ri rs', gce: 'fi ri rs' }, rowT: { ial: ['t01'], gce: ['t03'] }, fees: { waa01: [8950, 'list', L26E], waa02: [9350, 'list', L26E], ial: [18300, 'units_sum'] } },
   { ref: 'edx-bio-ial', T: ['t24'], rows: { u1: 'rs', u2: 'rs', u3: 'rs', u4: 'rs', u5: 'fi rs', u6: 'fi rs' }, fees: { u1: [4790, 'list', N26E], u2: [4790, 'list', N26E], u3: [4790, 'list', N26E], u4: [4790, 'list', N26E], u5: [4450, 'list', L26E], u6: [4450, 'list', L26E] } },
   { ref: 'cam-9701', T: ['t08'], rows: { as: 'fi ri rs', al: 'fi ri rs' }, fees: { as: [14100, 'list', L26C], al: [18600, 'list', L26C] } },
   { ref: 'cam-9618', T: [], tbc: true, rows: { as: 'fi ri rs', a2: 'fi ri rs', al: 'fi ri rs' }, fees: { as: [11400, 'list', L26C], a2: [12450, 'list', L26C], al: [16950, 'list', L26C] } },
@@ -337,7 +357,7 @@ const FLAGS = [
   { id: 'f-cs', ref: 'cam-0984', text: 'Computer Science O.L.: your form asked about Paper 41/42 (with 2025 dates); 0984 has no such paper, so no one-paper row is offered. Add a row if it should be.' },
   { id: 'f-hb', tab: 'prices', text: "Human Biology O.L.: its exam fee (EGP 9,840) is from Edexcel's November 2026 list; the June 2026 list does not print it." },
   { id: 'f-bio', tab: 'prices', text: "Biology A.S./A.L.: units 1–4 (EGP 4,790 each) are from Edexcel's November 2026 list." },
-  { id: 'f-ma', tab: 'prices', text: 'Mathematics O.L.: EGP 4,600 a paper (Edexcel June 2026); the November 2026 list prints EGP 9,840 a paper. Check which is right.' },
+  { id: 'f-ma', tab: 'prices', text: 'Mathematics O.L.: EGP 4,600 a paper (Edexcel June 2026, printed 4WM1H and 4WM2H), so all papers EGP 9,200. The November 2026 list prints 4MA1H and 4MA2H at EGP 9,840: per paper, or more likely the whole qualification. The June figures stand until you say which.' },
 ];
 const STUDENTS = {
   y11b: { id: 'y11b', name: 'Youssef Adel', nameAr: 'يوسف عادل', cls: '11B', grade: 11, known: {}, family: 'Adel family', what: 'a first-time student' },
@@ -383,7 +403,7 @@ const FAM = {
     errNone: 'Pick at least one subject.', errWhen: 'Answer “When did you sit it?” for each retake that asks it.', errConsent: 'Tick the refund policy and the declaration.',
     reserved: (n) => `Reserved for ${n}`, payNow: (m) => `Pay ${m}`, payHow: 'Card, InstaPay or at the school: the checkout as today.', payLater: (d) => `You will be told when the prices are final. Pay by ${d}.`,
     change: 'Change the choices', paid: 'The checkout opens here: card, InstaPay or pay at the school, as today (not part of this mock).',
-    notOpen: (g) => `Not open to this student: grade ${g} may not reserve in this session.`, ex: '‡ includes an example course fee', oneOf: 'one choice',
+    notOpen: (g) => `Not open to this student: grade ${g} may not reserve in this session.`, ex: '‡ includes an example course fee', oneOf: 'one choice', showRetakes: 'Sat it before? Show retake choices', hideRetakes: 'Hide retake choices', child: 'Child',
   },
   ar: {
     reserveFor: (n) => `الحجز للطالب ${n}`, gradeLine: (c, sn) => `الصف ${c} · ${sn}`,
@@ -399,7 +419,7 @@ const FAM = {
     errNone: 'اختر مادة واحدة على الأقل.', errWhen: 'أجب عن «متى امتحنتَ فيها؟» لكل إعادة تطلبه.', errConsent: 'حدد سياسة الاسترداد والإقرار.',
     reserved: (n) => `تم الحجز للطالب ${n}`, payNow: (m) => `ادفع ${m}`, payHow: 'بالبطاقة أو إنستاباي أو في المدرسة: الدفع كما هو اليوم.', payLater: (d) => `سنبلغك حين تصبح الأسعار نهائية. ادفع قبل ${d}.`,
     change: 'تعديل الاختيارات', paid: 'تُفتح صفحة الدفع هنا: بالبطاقة أو إنستاباي أو في المدرسة كما هو اليوم (ليست جزءًا من هذا النموذج).',
-    notOpen: (g) => `غير متاح لهذا الطالب: لا يحجز الصف ${g} في هذه الجلسة.`, ex: '‡ يشمل رسوم تدريس للتوضيح', oneOf: 'اختيار واحد',
+    notOpen: (g) => `غير متاح لهذا الطالب: لا يحجز الصف ${g} في هذه الجلسة.`, ex: '‡ يشمل رسوم تدريس للتوضيح', oneOf: 'اختيار واحد', showRetakes: 'امتحنتَ فيها من قبل؟ اعرض خيارات الإعادة', hideRetakes: 'إخفاء خيارات الإعادة', child: 'الابن',
   },
 };
 const sessName = (s, lang) => (lang === 'ar' ? (s.type === 'june' ? `يونيو ${s.year}` : `نوفمبر ${s.year} / يناير ${s.year + 1}`) : s.type === 'june' ? `June ${s.year}` : `November ${s.year} / January ${s.year + 1}`);
@@ -441,14 +461,14 @@ function addTeacher(name) { const t = { id: nid('t'), name }; S.teachers.push(t)
 function baseSession(type, year) {
   return { id: nid('s'), type, year, status: 'draft', closesAt: null, paymentDueAt: null, firstLesson: null, pricesFinal: false, share: 50, refund: refundDefault(type), refundLocked: false, grades: { g10: false, g11: true, g12: true, grad: true }, cancelDays: 3, questions: [], offerings: [], lists: [], reservations: [], done: {}, doubts: null, flags: [], copiedFrom: null, datesMoved: false, example: false };
 }
-function newRow(sess, r) {
-  const on = r.kind === 'paper' || r.kind === 'a2' ? false : r.kind === 'unit' ? !!r.required : true;
+function newRow(sess, r, hasQual) {
+  const on = r.kind === 'paper' || r.kind === 'a2' ? false : r.kind === 'unit' ? !hasQual : true;
   const cells = r.kind === 'paper' ? { fi: false, ri: true, rs: true, fs: false } : { fi: true, ri: true, rs: true, fs: false };
-  return { key: r.key, kind: r.kind, label: clone(r.label), codes: r.codes.slice(), sumOf: r.sumOf ? r.sumOf.slice() : null, parts: null, on, cells, examFee: null, feeSrc: null, feeList: null, lastYear: false, kept: false, courseFee: null, courseFeeSrc: null, ssFee: null, teachers: null, sitting: sess.type === 'june' ? 'june' : (r.winter || 'november'), closesAt: null, payBy: null, closed: false, required: !!r.required };
+  return { key: r.key, kind: r.kind, short: r.short, code: r.code, label: clone(r.label), codes: r.codes.slice(), sumOf: r.sumOf ? r.sumOf.slice() : null, on, cells, examFee: null, feeSrc: null, feeList: null, lastYear: false, kept: false, courseFee: null, courseFeeSrc: null, ssFee: null, teachers: null, sitting: sess.type === 'june' ? 'june' : (r.winter || 'november'), closesAt: null, payBy: null, closed: false };
 }
 function newOffering(sess, ref, skipFees) {
   const R0 = REFMAP[ref];
-  const o = { id: nid('o'), ref, title: R0.title, board: R0.board, code: R0.code, group: R0.group, toCheck: !!R0.toCheck, custom: false, teachers: [], tbc: false, choice: 'families', note: '', accepting: true, closesAt: null, courseFee: null, courseFeeSrc: null, questions: [], earlier: defaultEarlier(sess), rows: R0.rows.map((r) => newRow(sess, r)) };
+  const o = { id: nid('o'), ref, title: R0.title, board: R0.board, code: R0.code, group: R0.group, toCheck: !!R0.toCheck, custom: false, teachers: [], tbc: false, choice: 'families', note: '', accepting: true, closesAt: null, courseFee: null, courseFeeSrc: null, questions: [], earlier: defaultEarlier(sess), accepted: [], rows: R0.rows.map((r) => newRow(sess, r, R0.rows.some((x) => x.kind === 'qual'))) };
   if (!skipFees) autoFees(sess, o);
   return o;
 }
@@ -461,14 +481,15 @@ function autoFees(sess, o) {
   for (const r of o.rows) {
     if (r.examFee != null) continue;
     for (const c of codesOf(o, r)) { const f = findIn(lists, c); if (f) { r.examFee = f.amount; r.feeSrc = 'list'; r.feeList = f.list.id; break; } }
-    if (r.examFee == null && r.sumOf) { const parts = {}; let ok = true; for (const c of r.sumOf) { const f = findIn(lists, c); if (f) parts[c] = f.amount; else ok = false; } if (ok) { r.parts = parts; r.examFee = sumParts(parts); r.feeSrc = 'units_sum'; } }
   }
   recalc(o);
 }
+/* A row made of others (Arabic YAA01 = WAA01 + WAA02; 4MA1 all papers = 1H + 2H) is their sum while its source is the sum (§6). */
+const sumRows = (o, r) => (r.sumOf || []).map((k) => o.rows.find((x) => x.key === k));
 function recalc(o) {
   const all = o.rows.find((r) => r.kind === 'all');
+  for (const r of o.rows) if (r.sumOf && (r.feeSrc === 'units_sum' || r.examFee == null)) { const ps = sumRows(o, r); if (ps.every((x) => x && x.examFee != null)) { r.examFee = ps.reduce((a, x) => a + x.examFee, 0); r.feeSrc = 'units_sum'; r.lastYear = ps.some((x) => x.lastYear && !x.kept); r.kept = false; } }
   for (const r of o.rows) {
-    if (r.feeSrc === 'units_sum' && r.parts && r.sumOf && r.sumOf.every((c) => r.parts[c] != null)) r.examFee = sumParts(r.parts);
     if (r.kind === 'paper' && BOARDS[o.board].onePaperFee === 'syllabus' && all && all.examFee != null && (r.examFee == null || r.feeSrc === 'board_rule')) { r.examFee = all.examFee; r.feeSrc = 'board_rule'; r.lastYear = all.lastYear; r.kept = all.kept; }
   }
 }
@@ -478,7 +499,6 @@ function buildPre(sess, p) {
   for (const r of o.rows) {
     const cells = p.rows[r.key]; r.on = !!cells; if (cells) r.cells = cellsFrom(cells);
     const f = p.fees && p.fees[r.key]; if (f) { r.examFee = f[0]; r.feeSrc = f[1]; r.feeList = f[2] || null; }
-    if (p.parts && p.parts[r.key]) r.parts = clone(p.parts[r.key]);
     if (p.rowT && p.rowT[r.key]) r.teachers = p.rowT[r.key].map(tSpec);
   }
   return o;
@@ -521,7 +541,7 @@ function applyOpenStage(s) {
     const hasUnits = o.rows.some((r) => r.kind === 'unit'), hasQual = o.rows.some((r) => r.kind === 'qual'), onlyAL = o.rows.filter((r) => r.on).every((r) => r.kind === 'al');
     o.courseFee = o.group === 'OL' ? 6000 : hasUnits ? 2500 : hasQual || onlyAL ? 12000 : 7500; o.courseFeeSrc = 'example';
     for (const r of o.rows) { if (r.kind === 'paper') { r.courseFee = 3000; r.courseFeeSrc = 'example'; } if (r.kind === 'al' && !onlyAL) { r.courseFee = 12000; r.courseFeeSrc = 'example'; } }
-    for (const e of o.earlier) s.done[`old-${o.id}-${e}`] = true;
+    o.accepted = o.earlier.slice();
   }
   Object.assign(s.done, { doubts: true, 'f-ar': true, 'f-cs': true, 'f-hb': true, 'f-bio': true, 'f-ma': true });
   s.reservations = EXAMPLE_LINES.map(([student, cls, ref, rkey, opt, tid, when, status], i) => { const o = offByRef(s, ref); const r = o.rows.find((x) => x.key === rkey); const p = priceOf(s, o, r, opt, false); return { id: 'l' + i, student, cls, oid: o.id, rkey, opt, tid, when, status, price: p ? p.total : null, answers: { q1: i % 6 === 0 ? 'Yes' : 'No' } }; });
@@ -533,9 +553,9 @@ function copySession(src, year) {
   s.datesMoved = !!(src.closesAt || src.paymentDueAt || src.firstLesson);
   s.questions = clone(src.questions).map((q) => ({ ...q, id: nid('q') }));
   s.offerings = src.offerings.map((o) => {
-    const c = clone(o); c.id = nid('o'); c.earlier = c.earlier.map((e) => ymShift(e, yrs)); c.closesAt = dShift(c.closesAt, yrs); c.questions = c.questions.map((q) => ({ ...q, id: nid('q') }));
+    const c = clone(o); c.id = nid('o'); c.earlier = c.earlier.map((e) => ymShift(e, yrs)); c.accepted = (c.accepted || []).map((e) => ymShift(e, yrs)); c.closesAt = dShift(c.closesAt, yrs); c.questions = c.questions.map((q) => ({ ...q, id: nid('q') }));
     if (c.courseFee != null) c.courseFeeSrc = 'last_year';
-    for (const r of c.rows) { r.closed = false; r.kept = false; if (r.examFee != null && r.feeSrc !== 'board_rule') r.lastYear = true; if (r.courseFee != null) r.courseFeeSrc = 'last_year'; r.closesAt = dShift(r.closesAt, yrs); r.payBy = dShift(r.payBy, yrs); }
+    for (const r of c.rows) { r.closed = false; r.kept = false; if (r.examFee != null && r.feeSrc !== 'board_rule' && r.feeSrc !== 'units_sum') r.lastYear = true; if (r.courseFee != null) r.courseFeeSrc = 'last_year'; r.closesAt = dShift(r.closesAt, yrs); r.payBy = dShift(r.payBy, yrs); }
     recalc(c); return c;
   });
   return s;
@@ -554,8 +574,8 @@ function lastYearRows(s) { return s.offerings.flatMap((o) => o.rows.filter((r) =
 /* The check list (§5.3): everything that blocks or deserves a look; `mine` = the coordinator can act on it. */
 function checks(s) {
   const out = []; const key = sessKey(s); const name = sessName(s);
-  if (!s.paymentDueAt) out.push({ id: 'due', level: 'block', mine: true, text: 'Payment due date not set: families need it, and unpaid reservations are cancelled a few days after it.', field: 'paymentDueAt' });
-  if (!s.firstLesson) out.push({ id: 'first', level: 'block', mine: true, text: 'First lesson not set: the refund weeks count from it.', field: 'firstLesson' });
+  if (!s.paymentDueAt) out.push({ id: 'due', level: 'block', mine: true, short: 'the payment due date', text: 'Payment due date not set: families need it, and unpaid reservations are cancelled a few days after it.', field: 'paymentDueAt' });
+  if (!s.firstLesson) out.push({ id: 'first', level: 'block', mine: true, short: 'the first lesson', text: 'First lesson not set: the refund weeks count from it.', field: 'firstLesson' });
   const accepting = s.offerings.filter((o) => o.accepting);
   const notOff = accepting.filter((o) => missingOf(o).any);
   if (notOff.length) {
@@ -572,13 +592,15 @@ function checks(s) {
   for (const f of s.flags) if (!s.done[f.id]) { const o = f.ref ? offByRef(s, f.ref) : null; out.push({ id: f.id, level: 'look', mine: true, text: f.text, ok: 'Looks right', off: o ? o.id : null, tab: f.tab }); }
   for (const o of s.offerings) {
     const B = BOARDS[o.board]; if (!B.carryMonths || !o.rows.some((r) => r.on && rowAsks(o, r))) continue;
-    for (const e of o.earlier) { const age = monthsBetween(e, key); const id = `old-${o.id}-${e}`; if (age > B.carryMonths && !s.done[id]) out.push({ id, level: 'look', mine: true, text: `${o.title}: ${ym(e)} is on its earlier exams, ${age} months before ${ym(key)} — older than ${B.name} carries a result forward (${B.carryMonths} months).`, ok: 'Keep it', off: o.id }); }
+    for (const e of o.earlier) { const age = monthsBetween(e, key); if (age > B.carryMonths && !(o.accepted || []).includes(e)) out.push({ id: `old-${o.id}-${e}`, level: 'look', mine: true, text: `${o.title}: ${ym(e)} is on its earlier exams, ${age} months before ${ym(key)} — older than ${B.name} carries a result forward (${B.carryMonths} months).`, acceptOld: { o: o.id, e }, off: o.id }); }
   }
   for (const b of [...new Set(accepting.map((o) => o.board))]) {
     const B = BOARDS[b]; const dl = s.type === 'june' ? B.deadlines[key] : B.deadlines[key] || null; const subs = accepting.filter((o) => o.board === b);
     if (!dl) {
       const priced = subs.filter((o) => !missingOf(o).exam.length);
-      out.push({ id: 'bd-' + b, level: priced.length ? 'block' : 'look', mine: false, adminDate: true, board: b, text: `${B.name} has no ${name} entry deadline in our reference yet. ${priced.length ? `It blocks opening: ${priced.map((o) => o.title).join(' and ')} would be offered without it.` : `It is needed before ${subs.map((o) => o.title).join(' and ')} can be offered (their exam fees are not set yet).`} The admin enters it once.` });
+      out.push({ id: 'bd-' + b, level: priced.length ? 'block' : 'look', mine: false, wait: true, adminDate: true, board: b, short: `${B.name}'s entry deadline (the admin)`,
+        text: `Waiting for the admin: ${B.name} has not published its ${name} entry deadline yet.${priced.length ? ' Open stays off until it is entered.' : ` It is needed before ${subs.map((o) => o.title).join(' and ')} can be offered.`}`,
+        adminText: `${B.name} has not published its ${name} entry deadline yet. Enter it once when it does${B.retakeNote}; it joins our reference for every session.` });
       continue;
     }
     if (s.paymentDueAt) { const cut = addDays(s.paymentDueAt, s.cancelDays); if (cut > dl) out.push({ id: 'cut-' + b, level: 'look', mine: true, text: `Unpaid reservations would be cancelled on ${day(cut)}, after ${B.name}'s entry deadline (${day(dl)}): the deadline cancels them first. Move the payment due date earlier?`, field: 'paymentDueAt' }); }
@@ -586,6 +608,10 @@ function checks(s) {
   }
   if (s.paymentDueAt && s.paymentDueAt < TODAY && !s.pricesFinal) out.push({ id: 'passed', level: 'look', mine: true, text: 'The payment due date has passed and prices are not final: families cannot pay yet.', field: 'paymentDueAt' });
   if (s.copiedFrom && s.datesMoved && !s.done.dates) out.push({ id: 'dates', level: 'look', mine: true, text: `The copy moved the dates one year: reservations close ${day(s.closesAt) || '—'}, payment due ${day(s.paymentDueAt) || '—'}, first lesson ${day(s.firstLesson) || '—'}.`, ok: 'They are right' });
+  for (const o of s.offerings) {
+    if (o.custom && !s.done['cn-' + o.id]) out.push({ id: 'cn-' + o.id, level: 'look', mine: true, text: `${o.title} is not on the list: families read its name as you typed it. A second look?`, ok: 'Looks right', off: o.id });
+    for (const r of o.rows) if (r.kind === 'custom' && r.on && !s.done[`cr-${o.id}-${r.key}`]) out.push({ id: `cr-${o.id}-${r.key}`, level: 'look', mine: true, text: `${o.title}: “${r.short}” is your own row — families read its name as you typed it. A second look?`, ok: 'Looks right', off: o.id });
+  }
   const codes = s.offerings.filter((o) => o.toCheck || o.custom);
   if (codes.length) out.push({ id: 'codes', level: 'info', mine: false, text: `We are confirming the board codes of ${codes.map((o) => o.title).join(', ')} — nothing to do.` });
   return out;
@@ -594,34 +620,45 @@ function checks(s) {
 /* ───────────────────────── Family view of one subject (F1, F2, D5–D9) ───────────────────────── */
 const groupKey = (r) => (r.kind === 'all' || r.kind === 'paper' ? 'papers' : ['as', 'a2', 'al'].includes(r.kind) ? 'routes' : r.kind === 'qual' ? 'quals' : 'u:' + r.key);
 function groupsOf(o) { const out = []; const by = {}; for (const r of o.rows) { if (!r.on || r.closed) continue; const k = groupKey(r); if (!by[k]) { by[k] = { key: k, rows: [] }; out.push(by[k]); } by[k].rows.push(r); } return out; }
-function famOptions(sess, o, r, st, example) { const known = st.known[o.ref]; return ['fi', 'fs', 'ri', 'rs'].filter((k) => r.cells[k] && cellAllowed(r, k) && !(known && OPT[k].attempt === 'first')).map((k) => ({ k, price: priceOf(sess, o, r, k, example) })).filter((x) => x.price); }
-function optLabel(sess, r, k, lang) { const base = OPT[k][lang]; if (OPT[k].mode === 'ss' && r.ssFee == null) return lang === 'ar' ? base.replace('دراسة ذاتية', `دراسة ذاتية ${sess.share}%`) : base.replace('self study', `self study ${sess.share}%`); return base; }
-const rowOptText = (sess, r, k, lang) => `${r.label[lang]} · ${optLabel(sess, r, k, lang)}`;
+/* which: 'first' (first entries only), 'retake' (retakes only), 'all'. */
+function famOptions(sess, o, r, st, example, which) { const known = st.known[o.ref]; const w = known ? 'retake' : which || 'all'; return ['fi', 'fs', 'ri', 'rs'].filter((k) => r.cells[k] && cellAllowed(r, k) && (w === 'all' || OPT[k].attempt === w)).map((k) => ({ k, price: priceOf(sess, o, r, k, example) })).filter((x) => x.price); }
+/* labels.ts optionLabel: attempt · mode · the row's phrase ("Retake · self study 50% · Paper 41/42 only"); plain "self study" on a row with its own amount. */
+const ATT = { first: { en: 'First entry', ar: 'قيد أول' }, retake: { en: 'Retake', ar: 'إعادة' } };
+function modeLabel(sess, r, k, lang) { if (OPT[k].mode === 'school') return lang === 'en' ? 'in school' : 'في المدرسة'; if (r.ssFee != null) return lang === 'en' ? 'self study' : 'دراسة ذاتية'; return lang === 'en' ? `self study ${sess.share}%` : `دراسة ذاتية ${sess.share}%`; }
+const optionLabel = (sess, r, k, lang) => [ATT[OPT[k].attempt][lang], modeLabel(sess, r, k, lang), rowPhrase(r, lang)].join(' · ');
 const pickBag = (scope) => (S.picks[scope] = S.picks[scope] || {});
 function famOffered(s, o, st) { if (!o.accepting || missingOf(o).exam.length) return false; return groupsOf(o).some((g) => g.rows.some((r) => famOptions(s, o, r, st, true).length)); }
+/* F2 as decided after the mock review: a student with no record of the subject sees first entries, and "Sat it before?" reveals
+   the retakes (never hidden for good); a student the school knows sat it sees retakes only, the exam filled in. */
 function famSubject(sess, o, ctx) {
   const lang = ctx.lang; const L = FAM[lang]; const st = ctx.st; const picks = pickBag(ctx.scope)[o.id] || {}; const known = st.known[o.ref];
+  const groups = groupsOf(o);
+  const has = (w) => groups.some((g) => g.rows.some((r) => famOptions(sess, o, r, st, ctx.example, w).length));
+  const anyFirst = !known && has('first'); const anyRetake = !known && has('retake');
+  const pickedRetake = Object.values(picks).some((p) => OPT[p.opt].attempt === 'retake');
+  const revealed = !!(S.reveal[ctx.scope] || {})[o.id] || pickedRetake;
+  const which = known ? 'retake' : !anyFirst || revealed ? 'all' : 'first';
   let body = ''; let chosen = false;
-  for (const g of groupsOf(o)) {
-    const many = g.rows.length > 1; const opts = [];
-    for (const r of g.rows) for (const x of famOptions(sess, o, r, st, ctx.example)) opts.push({ r, k: x.k, price: x.price });
+  for (const g of groups) {
+    const opts = [];
+    for (const r of g.rows) for (const x of famOptions(sess, o, r, st, ctx.example, which)) opts.push({ r, k: x.k, price: x.price });
     if (!opts.length) continue;
     const p = picks[g.key]; if (p) chosen = true;
-    const single = g.key.startsWith('u:');
-    const label = single ? g.rows[0].label[lang] : many ? L.what : `${L.what} · ${g.rows[0].label[lang]}`;
+    const label = g.key.startsWith('u:') ? g.rows[0].label[lang] : L.what;
     const nm = `pk-${ctx.scope}-${o.id}-${g.key}`;
     const optRow = (val, text, priceHtml, checked) => `<label class="opt${checked ? ' on' : ''}"><input type="radio" name="${esc(nm)}" value="${esc(val)}" data-chg="pick" data-scope="${esc(ctx.scope)}" data-o="${o.id}" data-g="${esc(g.key)}" ${checked ? 'checked' : ''}><span class="grow">${text}</span>${priceHtml}</label>`;
-    body += `<fieldset class="optset mt12"><legend class="lbl">${esc(label)}</legend>${optRow('', `<span class="muted">${esc(L.notTaking)}</span>`, '', !p)}${opts.map((x) => {
+    body += `<fieldset class="optset mt12"><legend class="lbl"><bdi>${esc(label)}</bdi></legend>${optRow('', `<span class="muted">${esc(L.notTaking)}</span>`, '', !p)}${opts.map((x) => {
       const ts = rowTeachers(o, x.r); const withT = x.r.teachers && ts.length === 1 && OPT[x.k].mode === 'school' ? ` · ${L.with} ${esc(tName(ts[0].tid))}` : '';
-      return optRow(`${x.r.key}|${x.k}`, `${many ? `<b><bdi>${esc(x.r.label[lang])}</bdi></b> · ` : ''}${esc(optLabel(sess, x.r, x.k, lang))}${withT}`, `<span class="price nowrap">${money(x.price.total, lang)}${x.price.example ? ' ‡' : ''}</span>`, p && p.row === x.r.key && p.opt === x.k);
+      return optRow(`${x.r.key}|${x.k}`, `${esc(optionLabel(sess, x.r, x.k, lang))}${withT}`, `<span class="price nowrap">${money(x.price.total, lang)}${x.price.example ? ' ‡' : ''}</span>`, p && p.row === x.r.key && p.opt === x.k);
     }).join('')}`;
     if (p) body += `<div class="optdetail">${pickDetails(sess, o, p, g, ctx, known)}</div>`;
     body += '</fieldset>';
   }
   if (!body) return '';
+  const reveal = anyFirst && anyRetake && !pickedRetake ? `<p class="mt8"><button type="button" class="link sm" data-act="reveal" data-scope="${esc(ctx.scope)}" data-o="${o.id}" aria-expanded="${revealed}">${esc(revealed ? L.hideRetakes : L.showRetakes)}</button></p>` : '';
   const ts = o.teachers; const allOnline = ts.length && ts.every((t) => t.online);
   const qs = chosen && o.questions.length ? `<div class="mt12">${o.questions.map((q) => questionField(q, ctx.scope, lang)).join('')}</div>` : '';
-  return `<article class="fcard${chosen ? ' chosen' : ''}"><div class="row between top"><div><span class="h3"><bdi>${esc(o.title)}</bdi></span> <span class="xs muted">${esc(BOARDS[o.board].name)}</span></div>${allOnline ? `<span class="badge info">${esc(L.taughtOnline)}</span>` : ''}</div>${o.note ? `<p class="sm muted mt4">${esc(o.note)}</p>` : ''}${known ? `<p class="notice info mt8">${esc(L.known(ym(known, lang)))}</p>` : ''}${body}${qs}</article>`;
+  return `<article class="fcard${chosen ? ' chosen' : ''}"><div class="row between top"><div><span class="h3"><bdi>${esc(o.title)}</bdi></span> <span class="xs muted">${esc(BOARDS[o.board].name)}</span></div>${allOnline ? `<span class="badge info">${esc(L.taughtOnline)}</span>` : ''}</div>${o.note ? `<p class="sm muted mt4">${esc(o.note)}</p>` : ''}${known ? `<p class="notice info mt8">${esc(L.known(ym(known, lang)))}</p>` : ''}${body}${reveal}${qs}</article>`;
 }
 function pickDetails(sess, o, p, g, ctx, known) {
   const lang = ctx.lang; const L = FAM[lang]; const r = o.rows.find((x) => x.key === p.row); if (!r) return '';
@@ -707,12 +744,12 @@ function homeScreen() {
   <div class="stack mt24">${list.map(homeCard).join('')}</div>`;
 }
 function homeCard(s) {
-  const items = checks(s).filter((c) => c.mine && c.level !== 'info'); const c = resCounts(s);
+  const items = checks(s).filter((c) => (c.mine || c.wait) && c.level !== 'info'); const c = resCounts(s);
   return `<section class="card"><div class="row between"><div class="row"><h2 class="h2"><bdi>${sessName(s)}</bdi></h2>${statusBadge(s)}</div><button class="btn" data-act="openSession" data-id="${s.id}">Open ${sessName(s)}</button></div>
   <p class="sm muted mt4">${datesLine(s)}</p>
   ${s.status === 'open' ? `<p class="sm mt8">What families are doing: <b>${c.total}</b> reservations · <b>${c.paid}</b> paid · <b>${c.waiting}</b> waiting for payment</p>` : ''}
   <h3 class="h3 mt16">${s.status === 'draft' ? 'Check before you open' : 'Needs a look'} <span class="muted">(${items.length})</span></h3>
-  ${items.length ? `<ul class="mt4">${items.map((x) => `<li class="check"><span class="dot ${x.level}"></span><p class="grow sm">${esc(x.text)}</p><button class="btn xs outline" data-act="checkGo" data-s="${s.id}" data-id="${x.id}">${x.field ? 'Set it' : x.off ? 'Open the subject' : x.tab ? `Go to ${TABS[x.tab]}` : 'Look'}</button></li>`).join('')}</ul>` : '<p class="sm muted mt8">Nothing to do.</p>'}</section>`;
+  ${items.length ? `<ul class="mt4">${items.map((x) => `<li class="check"><span class="dot ${x.level}"></span><p class="grow sm">${esc(x.text)}</p>${x.wait ? '' : `<button class="btn xs outline" data-act="checkGo" data-s="${s.id}" data-id="${x.id}">${x.field ? 'Set it' : x.off ? 'Open the subject' : x.tab ? `Go to ${TABS[x.tab]}` : 'Look'}</button>`}</li>`).join('')}</ul>` : '<p class="sm muted mt8">Nothing to do.</p>'}</section>`;
 }
 
 /* ───────────────────────── 2. Sessions ───────────────────────── */
@@ -747,11 +784,11 @@ function sessionScreen() {
   <div class="mt16" role="tabpanel">${body}</div>`;
 }
 function sessionHeader(s) {
-  const lines = s.reservations.length > 0;
+  const lines = s.reservations.length > 0; const blockers = s.status === 'open' ? [] : checks(s).filter((c) => c.level === 'block');
   const dateField = (f, label, hint) => `<div class="field"><label for="d-${f}">${label}</label><input type="date" id="d-${f}" class="input" value="${s[f] || ''}" data-chg="sessDate" data-f="${f}"><p class="hint">${hint}</p></div>`;
   return `<section class="card mt12"><div class="row between top"><div><div class="row"><h1 class="h1"><bdi>${sessName(s)}</bdi></h1>${statusBadge(s)}</div>
     <p class="sm muted mt4">${plural(s.offerings.length, 'subject')} · self study pays ${s.share}% of the course fee${s.copiedFrom ? ` · copied from ${sessName(byId(s.copiedFrom))}` : ''}</p></div>
-    <div class="stack-sm" style="min-width:320px"><div class="swrow"><span class="swlabel">Accepting reservations</span>${sw(s.status === 'open', 'toggleAccepting', '', 'Accepting reservations')}</div>
+    <div class="stack-sm" style="min-width:320px"><div class="swrow"><span class="swlabel">Accepting reservations</span>${sw(s.status === 'open', 'toggleAccepting', '', 'Accepting reservations', blockers.length > 0, blockers.length ? 'Open waits for the red items of the check list' : '')}</div>${blockers.length ? `<p class="xs warnText" id="open-waits">Open waits for ${blockers.map((c) => c.short || 'a red item').join(', ')}.</p>` : ''}
     <div class="swrow"><span class="swlabel">Prices final <span class="xs muted">— families can pay</span></span>${sw(s.pricesFinal, 'togglePricesFinal', '', 'Prices final', false, s.pricesFinal && lines ? 'One-way once reservations exist' : '')}</div></div></div>
     <div class="grid-3 mt16">${dateField('closesAt', 'Reservations close <span class="muted">(optional)</span>', 'Switches Accepting off that day.')}${dateField('paymentDueAt', 'Payment due', `Unpaid reservations are cancelled ${plural(s.cancelDays, 'day')} after it.`)}${dateField('firstLesson', 'First lesson', 'The refund weeks count from it.')}</div></section>`;
 }
@@ -768,12 +805,14 @@ function checkItem(s, c) {
   }
   let a = '';
   if (c.ok) a += `<button class="btn xs outline" data-act="checkOk" data-id="${c.id}">${c.ok}</button>`;
+  if (c.acceptOld) a += `<button class="btn xs outline" data-act="acceptOld" data-o="${c.acceptOld.o}" data-e="${c.acceptOld.e}">Keep it</button>`;
   if (c.act) a += `<button class="btn xs outline" data-act="${c.act}">${c.actLabel}</button>`;
   if (c.field) a += `<button class="btn xs ghost" data-act="focusField" data-f="${c.field}">Set it</button>`;
   if (c.off) a += `<button class="btn xs ghost" data-act="checkGo" data-s="${s.id}" data-id="${c.id}">Open the subject</button>`;
   if (c.tab) a += `<button class="btn xs ghost" data-act="tab" data-tab="${c.tab}">Go to ${TABS[c.tab]}</button>`;
-  if (c.adminDate) a += S.role === 'admin' ? `<input type="date" class="input s" style="width:160px" data-chg="adminDate" data-b="${c.board}" aria-label="${esc(BOARDS[c.board].name)} entry deadline"><button class="btn xs" data-act="saveAdminDate" data-b="${c.board}">Save the date</button>` : '<span class="badge">waiting for the admin</span>';
-  return `<li class="check"><span class="dot ${c.level}"></span><p class="grow sm">${esc(c.text)}</p><div class="row" style="flex:none;max-width:50%;justify-content:flex-end">${a}</div></li>`;
+  if (c.adminDate && S.role === 'admin') a += `<input type="date" class="input s" style="width:160px" data-chg="adminDate" data-b="${c.board}" aria-label="${esc(BOARDS[c.board].name)} entry deadline"><button class="btn xs" data-act="saveAdminDate" data-b="${c.board}">Save the date</button>`;
+  const text = c.adminDate && S.role === 'admin' ? c.adminText : c.text;
+  return `<li class="check"><span class="dot ${c.level}"></span><p class="grow sm">${esc(text)}</p><div class="row" style="flex:none;max-width:50%;justify-content:flex-end">${a}</div></li>`;
 }
 
 /* Subjects tab */
@@ -809,7 +848,7 @@ function feeSrcText(s, o, r) {
   if (r.kept) return "last year's, kept";
   if (r.feeSrc === 'list') { const l = S.sessions.flatMap((x) => x.lists).find((x) => x.id === r.feeList); return `from ${l ? l.name : 'a list'}`; }
   if (r.feeSrc === 'board_rule') return `the subject's fee (${BOARDS[o.board].name}'s rule)`;
-  if (r.feeSrc === 'units_sum') return `sum of its ${r.kind === 'qual' ? 'units' : 'papers'}: ${Object.entries(r.parts || {}).map(([k, v]) => `${k} ${n2(v)}`).join(' + ')}`;
+  if (r.feeSrc === 'units_sum') return `sum of its ${r.kind === 'qual' ? 'units' : 'papers'}: ${sumRows(o, r).map((x) => `${x.code || x.short} ${n2(x.examFee)}`).join(' + ')}`;
   return 'typed';
 }
 function pricesTab(s) {
@@ -822,14 +861,22 @@ function pasteCard(s) {
   return `<section class="card mt16" id="paste"><h2 class="h3">Paste a list as printed</h2><p class="sm muted mt4">Copy the board's fee list from the PDF or sheet and paste it here as it is: one line per code, name and amount. Lines match your rows by code; old codes and two codes printed on one line are understood.</p>
   <div class="row mt12" style="align-items:flex-end;gap:12px"><div class="field"><label for="pl-board">Board</label><select id="pl-board" class="input" data-chg="plBoard">${Object.entries(BOARDS).map(([k, b]) => `<option value="${k}" ${pl.board === k ? 'selected' : ''}>${b.name}</option>`).join('')}</select></div>
   <div class="field"><label for="pl-for">The list is the board's fees for</label><select id="pl-for" class="input" data-chg="plFor">${listForOptions(s).map((k) => `<option value="${k}" ${f === k ? 'selected' : ''}>${ym(k)}</option>`).join('')}</select></div><p class="sm" style="padding-bottom:10px">Its name: <b>${BOARDS[pl.board].name} ${ym(f)}</b></p></div>
-  <div class="field mt12"><label for="pl-text">The list, pasted</label><textarea id="pl-text" class="input" rows="7" data-chg="plText" placeholder="3180 A    Arabic    9,850" style="font-family:ui-monospace,Menlo,monospace;font-size:12px">${esc(pl.text)}</textarea><p class="hint"><button class="link" data-act="plExample">Fill with an example ${BOARDS[pl.board].name} list</button> — mock only: example figures, not the board's.</p></div>
+  <div class="field mt12"><label for="pl-text">The list, pasted</label><textarea id="pl-text" class="input" rows="7" data-chg="plText" placeholder="3180 A    Arabic    9,850" style="font-family:ui-monospace,Menlo,monospace;font-size:12px">${esc(pl.text)}</textarea><p class="hint"><button class="link" data-act="plExample">Fill with an example ${BOARDS[pl.board].name} ${ym(f)} list</button> — mock only: ${esc(exampleFor(pl.board, f).note)}.</p></div>
   <div class="row mt12"><button class="btn" data-act="plRead">Read the list</button>${pl.parsed ? '<button class="btn outline" data-act="plDiscard">Discard</button>' : ''}</div>${pl.parsed ? parsedView(s) : ''}</section>`;
 }
 function parsedView(s) {
   const res = S.pl.parsed;
-  return `<div class="mt16"><h3 class="h3">Matched <span class="muted">(${res.matched.length})</span></h3>${res.matched.length ? `<div class="tablewrap mt8"><table class="t"><thead><tr><th>Code as printed</th><th>Name as printed</th><th>Amount</th><th>Goes to</th><th>Now</th></tr></thead><tbody>${res.matched.map((m) => `<tr><td class="num">${esc(m.code)}</td><td>${esc(m.name)}</td><td>${money(m.amount)}</td><td>${m.targets.map((t) => `${esc(t.title)} · ${esc(t.label)}${t.part ? ' <span class="xs muted">(one of its units, summed)</span>' : ''}`).join('<br>')}</td><td>${m.targets.map((t) => (t.old == null ? '<span class="warnText">not set</span>' : t.old === m.amount && !t.ly ? 'same' : `${money(t.old)}${t.ly ? ' <span class="xs muted">last year\'s</span>' : ''}`)).join('<br>')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted mt4">No line matched a row of this session.</p>'}
+  return `<div class="mt16"><h3 class="h3">Matched <span class="muted">(${res.matched.length})</span></h3>${res.matched.length ? `<div class="tablewrap mt8"><table class="t"><thead><tr><th>Code as printed</th><th>Name as printed</th><th>Amount</th><th>Goes to</th><th>Now</th></tr></thead><tbody>${res.matched.map((m) => `<tr><td class="num">${esc(m.code)}</td><td>${esc(m.name)}</td><td>${money(m.amount)}</td><td>${m.targets.map((t) => `${esc(t.title)} · ${esc(t.label)}${t.into ? ` <span class="xs muted">(summed into ${esc(t.into)})</span>` : ''}`).join('<br>')}</td><td>${m.targets.map((t) => (t.old == null ? '<span class="warnText">not set</span>' : t.old === m.amount && !t.ly ? 'same' : `${money(t.old)}${t.ly ? ' <span class="xs muted">last year\'s</span>' : ''}`)).join('<br>')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sm muted mt4">No line matched a row of this session.</p>'}
   ${res.unused.length ? `<h3 class="h3 mt16">Not used <span class="muted">(${res.unused.length})</span></h3><div class="tablewrap mt8"><table class="t"><thead><tr><th>Line as printed</th><th>Why</th></tr></thead><tbody>${res.unused.map((u) => `<tr><td class="num">${esc(u.raw)}</td><td>${esc(u.why)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-  <div class="row mt12"><button class="btn" data-act="plUse" ${res.matched.length ? '' : 'disabled'}>Use these prices</button><span class="sm muted">One-paper rows that follow their subject, and sums of units, follow by themselves.</span></div></div>`;
+  ${(res.toCheck || []).map((g, gi) => toCheckView(s, g, gi)).join('')}
+  <div class="row mt12"><button class="btn" data-act="plUse" ${res.matched.length || (res.toCheck || []).some((g) => g.reading && g.reading !== 'skip') ? '' : 'disabled'}>Use these prices</button><span class="sm muted">One-paper rows that follow their subject, and sums of units, follow by themselves.${(res.toCheck || []).some((g) => !g.reading) ? ' Lines to check are left out until you choose how to read them.' : ''}</span></div></div>`;
+}
+function toCheckView(s, g, gi) {
+  const o = s.offerings.find((x) => x.id === g.oid); const all = o.rows.find((x) => x.kind === 'all'); const ps = g.lines.map((l) => o.rows.find((x) => x.key === l.row));
+  const amt = g.lines[0].amount; const per = g.lines.reduce((a, l) => a + l.amount, 0);
+  return `<div class="notice warn mt16" id="tocheck"><p class="b">To check: ${g.lines.map((l) => `${esc(l.code)} ${n2(l.amount)}`).join(' · ')} — ${esc(g.title)}</p>
+  <p class="sm mt4">This list prints ${g.lines.length} lines of ${moneyTxt(amt)} that can be read two ways. Per paper, it is more than double the June fee (${ps.map((r) => `${esc(r.label.en)} ${r.examFee != null ? moneyTxt(r.examFee) : 'not set'}`).join(', ')}). As the whole qualification, it matches Human Biology's ${moneyTxt(9840)} on the same list and June's ${all.examFee != null ? moneyTxt(all.examFee) : 'total'} plus about 7%. Confirm with the school, then choose; nothing is used until you do.</p>
+  <div class="row mt8"><label class="sm b" for="tc-${gi}">Read it as</label><select id="tc-${gi}" class="input s" style="width:auto;max-width:100%" data-chg="tcRead" data-i="${gi}"><option value="">Choose a reading…</option><option value="paper" ${g.reading === 'paper' ? 'selected' : ''}>Per paper: ${ps.map((r) => `${r.label.en} ${moneyTxt(amt)}`).join(', ')} (all papers ${moneyTxt(per)})</option><option value="whole" ${g.reading === 'whole' ? 'selected' : ''}>The whole qualification: all papers ${moneyTxt(amt)} (the papers keep their fees)</option><option value="skip" ${g.reading === 'skip' ? 'selected' : ''}>Leave these lines out</option></select></div></div>`;
 }
 function parseList(text) {
   const out = [];
@@ -847,37 +894,50 @@ function parseList(text) {
 }
 function targetsFor(s, board, code) {
   const c = normCode(code); const alias = ALIASES[board][c]; const out = [];
-  for (const o of s.offerings) { if (o.board !== board) continue; for (const r of o.rows) { if (!r.on) continue;
-    if (r.codes.map(normCode).includes(c) || (alias && alias[0] === o.ref && alias[1] === r.key)) out.push({ oid: o.id, rkey: r.key, title: o.title, label: r.label.en, old: r.examFee, ly: r.lastYear && !r.kept });
-    else if (r.sumOf && r.sumOf.map(normCode).includes(c)) out.push({ oid: o.id, rkey: r.key, title: o.title, label: r.label.en, old: r.parts ? (r.parts[r.sumOf.find((x) => normCode(x) === c)] ?? null) : null, part: r.sumOf.find((x) => normCode(x) === c), ly: r.lastYear && !r.kept });
+  for (const o of s.offerings) { if (o.board !== board) continue; for (const r of o.rows) {
+    const into = o.rows.find((x) => x.on && x.sumOf && x.sumOf.includes(r.key));
+    if (!r.on && !into) continue;
+    if (r.codes.map(normCode).includes(c) || (alias && alias[0] === o.ref && alias[1] === r.key)) out.push({ oid: o.id, rkey: r.key, title: o.title, label: r.label.en, old: r.examFee, ly: r.lastYear && !r.kept, into: into && !r.on ? into.label.en : null });
   } }
   return out;
 }
 function whyUnused(s, board, code) {
   const c = normCode(code);
-  for (const R0 of REF) { if (R0.board !== board) continue; for (const r of R0.rows) if (r.codes.map(normCode).includes(c) || (r.sumOf || []).map(normCode).includes(c)) { const inS = offByRef(s, R0.ref); return inS ? `${R0.title}: its ${r.label.en} row is not ticked` : `${R0.title} is not offered in this session`; } }
+  for (const R0 of REF) { if (R0.board !== board) continue; for (const r of R0.rows) if (r.codes.map(normCode).includes(c)) { const inS = offByRef(s, R0.ref); return inS ? `${R0.title}: its ${r.label.en} row is not ticked` : `${R0.title} is not offered in this session`; } }
+  const tc = REF.find((R0) => R0.board === board && R0.toCheck && R0.code && R0.code.split(' · ').some((x) => c === x || c.startsWith(x + ' ')));
+  if (tc) return `${tc.title}: we are confirming its code, so its lines are not matched yet`;
   return 'not recognised: no subject on our lists has this code';
 }
 function matchList(s, board, text) {
-  const matched = [], unused = [];
+  const matched = [], unused = [], toCheck = [];
   for (const p of parseList(text)) {
     if (p.bad || !p.codes.length) { unused.push({ raw: p.raw, why: p.bad ? 'no amount read on this line' : 'no code read on this line' }); continue; }
-    for (const code of p.codes) { const targets = targetsFor(s, board, code); if (targets.length) matched.push({ code, name: p.name, amount: p.amount, targets }); else unused.push({ raw: p.codes.length > 1 ? `${code} (on the line “${p.raw}”)` : p.raw, why: whyUnused(s, board, code) }); }
+    for (const code of p.codes) {
+      const tc = TO_CHECK[board][normCode(code)];
+      if (tc) { const o = offByRef(s, tc.ref); if (o) { let g = toCheck.find((x) => x.oid === o.id); if (!g) { g = { oid: o.id, title: o.title, lines: [], reading: '' }; toCheck.push(g); } g.lines.push({ code, name: p.name, amount: p.amount, row: tc.row }); continue; } }
+      const targets = targetsFor(s, board, code); if (targets.length) matched.push({ code, name: p.name, amount: p.amount, targets }); else unused.push({ raw: p.codes.length > 1 ? `${code} (on the line “${p.raw}”)` : p.raw, why: whyUnused(s, board, code) });
+    }
   }
-  return { matched, unused };
+  return { matched, unused, toCheck };
+}
+/* A to-check group read as she chose: per paper (each code on its row) or the whole qualification (all papers, once). */
+function readingTargets(s, g) {
+  const o = s.offerings.find((x) => x.id === g.oid); if (!o || !g.reading || g.reading === 'skip') return [];
+  if (g.reading === 'paper') return g.lines.map((l) => { const r = o.rows.find((x) => x.key === l.row); return { code: l.code, name: l.name, amount: l.amount, targets: [{ oid: o.id, rkey: r.key, title: o.title, label: r.label.en, old: r.examFee }] }; });
+  const all = o.rows.find((x) => x.kind === 'all'); const l = g.lines[0];
+  return [{ code: g.lines.map((x) => x.code).join(' / '), name: `${o.title}, the whole qualification`, amount: l.amount, targets: [{ oid: o.id, rkey: all.key, title: o.title, label: all.label.en, old: all.examFee, whole: true }] }];
 }
 function applyList(ss, board, name, matched) {
   const id = nid('L'); ss.lists.push({ id, board, name, rows: matched.map((m) => [m.code, m.name, m.amount]) });
   for (const m of matched) for (const t of m.targets) {
     const o = ss.offerings.find((x) => x.id === t.oid); const r = o && o.rows.find((x) => x.key === t.rkey); if (!r) continue;
-    if (t.part) { r.parts = r.parts || {}; r.parts[t.part] = m.amount; r.lastYear = false; r.kept = false; if (r.sumOf.every((x) => r.parts[x] != null)) { r.examFee = sumParts(r.parts); r.feeSrc = 'units_sum'; } }
-    else { r.examFee = m.amount; r.feeSrc = 'list'; r.feeList = id; r.lastYear = false; r.kept = false; }
+    r.examFee = m.amount; r.feeSrc = 'list'; r.feeList = id; r.lastYear = false; r.kept = false;
   }
   for (const o of ss.offerings) recalc(o);
 }
 function fillOptions(o, r) {
   const out = [];
-  if (r.sumOf) { const parts = {}; let ok = true; for (const c of r.sumOf) { const f = findIn(allLists(o.board), c); if (f) parts[c] = f.amount; else ok = false; } if (ok) out.push({ v: 'sum', label: `Sum of its ${r.kind === 'qual' ? 'units' : 'papers'}: ${moneyTxt(sumParts(parts))}` }); }
+  if (r.sumOf) { const ps = sumRows(o, r); if (ps.every((x) => x && x.examFee != null)) out.push({ v: 'sum', label: `Sum of its ${r.kind === 'qual' ? 'units' : 'papers'}: ${moneyTxt(ps.reduce((a, x) => a + x.examFee, 0))}` }); }
   for (const c of codesOf(o, r)) for (const l of allLists(o.board)) { const hit = l.rows.find((x) => normCode(x[0]) === normCode(c)); if (hit) out.push({ v: `copy:${l.id}:${hit[0]}`, label: `Copy from ${l.name}: ${moneyTxt(hit[2])}` }); }
   return out;
 }
@@ -934,7 +994,7 @@ function reservationsTab(s) {
   const qs = s.questions;
   return `<div class="row between"><p class="sm">${c.total} reservations · ${c.paid} paid · ${c.waiting} waiting for payment. Read-only: payments are the finance desk's.</p><button class="btn outline sm" data-act="export">Export (CSV)</button></div>
   <div class="tablewrap mt12"><table class="t"><thead><tr><th>Student</th><th>Subject</th><th>What</th><th>Teacher</th><th>Earlier exam</th><th>Price</th><th>Status</th>${qs.length ? '<th>Answers</th>' : ''}</tr></thead><tbody>${L.map((l) => { const o = s.offerings.find((x) => x.id === l.oid); const r = o && o.rows.find((x) => x.key === l.rkey);
-    return `<tr><td>${esc(l.student)} <span class="xs muted">${esc(l.cls)}</span></td><td>${esc(o ? o.title : '?')}</td><td>${r ? esc(rowOptText(s, r, l.opt, 'en')) : ''}</td><td>${l.tid ? esc(tName(l.tid)) : OPT[l.opt].mode === 'ss' ? '<span class="muted">self study</span>' : '<span class="muted">to be announced</span>'}</td><td>${l.when ? `${ym(l.when)} <span class="xs muted">declared</span>` : '—'}</td><td>${money(l.price)}</td><td>${l.status === 'paid' ? '<span class="badge ok">Paid</span>' : '<span class="badge warn">Waiting for payment</span>'}</td>${qs.length ? `<td class="xs">${qs.map((q) => esc((l.answers || {})[q.id] || '—')).join(' · ')}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>
+    return `<tr><td>${esc(l.student)} <span class="xs muted">${esc(l.cls)}</span></td><td>${esc(o ? o.title : '?')}</td><td>${r ? esc(optionLabel(s, r, l.opt, 'en')) : ''}</td><td>${l.tid ? esc(tName(l.tid)) : OPT[l.opt].mode === 'ss' ? '<span class="muted">self study</span>' : '<span class="muted">to be announced</span>'}</td><td>${l.when ? `${ym(l.when)} <span class="xs muted">declared</span>` : '—'}</td><td>${money(l.price)}</td><td>${l.status === 'paid' ? '<span class="badge ok">Paid</span>' : '<span class="badge warn">Waiting for payment</span>'}</td>${qs.length ? `<td class="xs">${qs.map((q) => esc((l.answers || {})[q.id] || '—')).join(' · ')}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>
   <p class="xs muted mt8">“Earlier exam” is what the family declared for a retake of one paper or an A.2. (D7): listed for anyone who wants to check it.</p>`;
 }
 
@@ -962,7 +1022,7 @@ function gridCard(s, o) {
 function gridRow(s, o, r, cols) {
   const E = S.edit; const open = E.more === r.key && r.on;
   const cells = cols.map((c) => (cellAllowed(r, c) ? `<td class="c"><input type="checkbox" data-chg="cell" data-r="${r.key}" data-c="${c}" ${r.cells[c] ? 'checked' : ''} ${r.on && !r.closed ? '' : 'disabled'} aria-label="${esc(r.label.en)}: ${OPT[c].col}"></td>` : '<td class="c muted" title="A one-paper row is a retake">—</td>')).join('');
-  const sub = r.kind === 'paper' ? (rowAsks(o, r) ? 'retake of one paper; the others carried from an earlier exam' : 'retake of one paper') : r.kind === 'a2' ? 'carries the A.S. from an earlier exam' : r.kind === 'qual' && r.sumOf ? `units ${r.sumOf.join(' + ')}` : r.kind === 'unit' && !r.required ? 'optional unit' : r.kind === 'custom' ? 'not on the list' : '';
+  const sub = r.kind === 'paper' ? (rowAsks(o, r) ? 'retake of one paper; the others carried from an earlier exam' : 'retake of one paper') : r.kind === 'a2' ? 'carries the A.S. from an earlier exam' : r.kind === 'qual' && r.sumOf ? `units ${sumRows(o, r).map((x) => x.code).join(' + ')}` : r.kind === 'unit' && o.rows.some((x) => x.sumOf && x.sumOf.includes(r.key)) ? 'a unit of the qualification below' : r.kind === 'custom' ? 'not on the list' : '';
   const ts = r.teachers ? `<div class="xs mt4">${r.teachers.map((t) => esc(tName(t.tid)) + (t.online ? ' (online)' : '')).join(' or ')}</div>` : '';
   let h = `<tr class="${r.on ? '' : 'offrow'}"><td><input type="checkbox" data-chg="rowOn" data-r="${r.key}" ${r.on ? 'checked' : ''} aria-label="Offer ${esc(r.label.en)}"></td>
    <td class="rowc"><span class="b">${esc(r.label.en)}</span>${r.closed ? ' <span class="badge">closed</span>' : ''}${sub ? `<div class="xs muted">${esc(sub)}</div>` : ''}${ts}${s.type === 'winter' && r.on ? `<div class="xs mt4"><span class="badge info">exam in ${r.sitting === 'january' ? 'January' : 'November'}</span></div>` : ''}${r.on ? `<div><button class="link xs" data-act="rowMore" data-r="${r.key}" aria-expanded="${open}">${open ? 'Fewer options' : 'More options'}</button></div>` : ''}</td>${cells}
@@ -1030,29 +1090,30 @@ function familyScreen() {
   const name = lang === 'ar' ? st.nameAr : st.name; const allowed = st.grade === 11 ? s.grades.g11 : st.grade === 12 ? s.grades.g12 : s.grades.g10;
   const hidden = s.offerings.filter((o) => !famOffered(s, o, st));
   const note = `<div class="mocknote" dir="ltr" lang="en"><b>Mock notes.</b> ${s.status === 'draft' ? 'June 2027 is a draft: families cannot see it yet; this is the page they will see once it opens. ' : ''}Prices marked ‡ use an example course fee (not set by the school). Not shown, a price not set or closed (E6): ${hidden.map((o) => esc(o.title)).join(', ') || 'none'}. Names are invented.</div>`;
-  const head = `<div class="mt16"><h1 class="h1">${esc(L.reserveFor(name))}</h1><p class="muted mt4">${esc(L.gradeLine(st.cls, sessName(s, lang)))}</p><p class="sm muted mt4">${esc(L.dates(s))}</p></div>`;
+  const pickChild = `<div class="row mt16"><label class="sm b" for="fam-child">${esc(L.child)}</label><select id="fam-child" class="input s" style="width:auto" data-chg="famChild">${Object.values(STUDENTS).map((x) => `<option value="${x.id}" ${x.id === st.id ? 'selected' : ''}>${esc(lang === 'ar' ? x.nameAr : x.name)} (${x.cls})</option>`).join('')}</select></div>`;
+  const head = `${pickChild}<div class="mt16"><h1 class="h1">${esc(L.reserveFor(name))}</h1><p class="muted mt4">${esc(L.gradeLine(st.cls, sessName(s, lang)))}</p><p class="sm muted mt4">${esc(L.dates(s))}</p></div>`;
   if (!allowed) return `${note}${head}<p class="notice bad mt16" role="alert">${esc(L.notOpen(st.grade))}</p>`;
-  if (S.fam.done) return `${note}${head}${famDone(s, st, lang)}`;
+  if (kid().done) return `${note}${head}${famDone(s, st, lang)}`;
   const offered = s.offerings.filter((o) => famOffered(s, o, st));
   return `${note}${head}<p class="sm mt12">${esc(L.intro)}</p>${['OL', 'AS'].map((g) => { const xs = offered.filter((o) => o.group === g); return xs.length ? `<h2 class="h2 mt24"><bdi>${g === 'OL' ? 'O.L.' : 'A.S. / A.L.'}</bdi></h2><div class="fgrid mt8">${xs.map((o) => famSubject(s, o, { lang, st, scope, example: true })).join('')}</div>` : ''; }).join('')}${summaryCard(s, scope, st, lang, 'fam')}`;
 }
 function summaryCard(s, scope, st, lang, mode) {
-  const L = FAM[lang]; const lines = chosenLines(s, scope, st); const total = lines.reduce((a, x) => a + x.price.total, 0); const anyEx = lines.some((x) => x.price.example); const box = mode === 'fam' ? S.fam : S.desk;
+  const L = FAM[lang]; const lines = chosenLines(s, scope, st); const total = lines.reduce((a, x) => a + x.price.total, 0); const anyEx = lines.some((x) => x.price.example); const box = mode === 'fam' ? kid() : S.desk;
   return `<section class="card mt24" id="summary"><div class="row between"><p class="h3">${esc(L.nSubjects(lines.length))} · ${esc(L.total)} ${money(total, lang)}${anyEx ? ' ‡' : ''}</p><p class="xs muted">${esc(L.payBy)} ${s.paymentDueAt ? day(s.paymentDueAt, lang) : esc(L.tbaShort)}</p></div>
-  ${lines.length ? `<ul class="mt8 sm stack-sm">${lines.map((x) => `<li class="row between nowrap"><span><bdi>${esc(x.o.title)}</bdi> — ${esc(rowOptText(s, x.r, x.p.opt, lang))}${x.needsWhen ? ` <span class="badge warn">${esc(x.r.kind === 'a2' ? L.whenSatAS : L.whenSat)}</span>` : ''}</span><span>${money(x.price.total, lang)}${x.price.example ? ' ‡' : ''}</span></li>`).join('')}</ul>` : `<p class="sm muted mt8">${esc(L.nothingYet)}</p>`}
+  ${lines.length ? `<ul class="mt8 sm stack-sm">${lines.map((x) => `<li class="row between nowrap"><span><bdi>${esc(x.o.title)}</bdi> — ${esc(optionLabel(s, x.r, x.p.opt, lang))}${x.needsWhen ? ` <span class="badge warn">${esc(x.r.kind === 'a2' ? L.whenSatAS : L.whenSat)}</span>` : ''}</span><span>${money(x.price.total, lang)}${x.price.example ? ' ‡' : ''}</span></li>`).join('')}</ul>` : `<p class="sm muted mt8">${esc(L.nothingYet)}</p>`}
   ${anyEx ? `<p class="xs muted mt8">${esc(L.ex)}</p>` : ''}
   ${s.questions.length ? `<div class="mt16"><p class="sm b">${esc(L.questions)}</p>${s.questions.map((q) => questionField(q, scope, lang)).join('')}</div>` : ''}
-  <div class="stack-sm mt16" style="border-top:1px solid var(--border);padding-top:12px">${mode === 'fam' ? `<label class="consent"><input type="checkbox" data-chg="famRefund" ${S.fam.refund ? 'checked' : ''}> <span>${esc(refundConsent(s, lang))}</span></label><label class="consent"><input type="checkbox" data-chg="famDecl" ${S.fam.decl ? 'checked' : ''}> <span>${esc(DECL[lang])}</span></label>` : `<label class="consent"><input type="checkbox" data-chg="deskConsent" ${S.desk.consent ? 'checked' : ''}> <span>${DESK_CONSENT}</span></label><p class="xs muted">${esc(refundConsent(s, 'en'))} ${DECL.en}</p>`}</div>
+  <div class="stack-sm mt16" style="border-top:1px solid var(--border);padding-top:12px">${mode === 'fam' ? `<label class="consent"><input type="checkbox" data-chg="famRefund" ${kid().refund ? 'checked' : ''}> <span>${esc(refundConsent(s, lang))}</span></label><label class="consent"><input type="checkbox" data-chg="famDecl" ${kid().decl ? 'checked' : ''}> <span>${esc(DECL[lang])}</span></label>` : `<label class="consent"><input type="checkbox" data-chg="deskConsent" ${S.desk.consent ? 'checked' : ''}> <span>${DESK_CONSENT}</span></label><p class="xs muted">${esc(refundConsent(s, 'en'))} ${DECL.en}</p>`}</div>
   ${box.err ? `<p class="notice bad mt12" role="alert">${esc(box.err)}</p>` : ''}
   <div class="row mt12">${mode === 'fam' ? `<button class="btn" data-act="famReserve">${s.pricesFinal ? L.reservePay(moneyTxt(total, lang)) : L.reserveOnly}</button>` : `<button class="btn outline" data-act="deskReserve" data-collect="0">Reserve only</button><button class="btn" data-act="deskReserve" data-collect="1" ${s.pricesFinal ? '' : 'disabled'}>Reserve and collect ${moneyTxt(total)}</button>`}</div>
   ${!s.pricesFinal ? `<p class="xs muted mt8">${mode === 'fam' ? esc(L.notFinal) : 'Prices are not final: reserve now; collect once they are.'}</p>` : ''}</section>`;
 }
 function famDone(s, st, lang) {
-  const L = FAM[lang]; const d = S.fam.done; const name = lang === 'ar' ? st.nameAr : st.name;
-  const items = d.lines.map((x) => { const o = s.offerings.find((y) => y.id === x.oid); const r = o && o.rows.find((y) => y.key === x.rkey); return `<li class="row between nowrap"><span><bdi>${esc(o ? o.title : '')}</bdi> — ${r ? esc(rowOptText(s, r, x.opt, lang)) : ''}</span><span>${money(x.total, lang)}</span></li>`; }).join('');
+  const L = FAM[lang]; const d = kid().done; const name = lang === 'ar' ? st.nameAr : st.name;
+  const items = d.lines.map((x) => { const o = s.offerings.find((y) => y.id === x.oid); const r = o && o.rows.find((y) => y.key === x.rkey); return `<li class="row between nowrap"><span><bdi>${esc(o ? o.title : '')}</bdi> — ${r ? esc(optionLabel(s, r, x.opt, lang)) : ''}</span><span>${money(x.total, lang)}</span></li>`; }).join('');
   return `<section class="card mt16" id="done"><p class="h2">${esc(L.reserved(name))}</p><ul class="mt12 sm stack-sm">${items}</ul><p class="h3 mt12">${esc(L.total)} ${money(d.total, lang)}</p>
   ${s.pricesFinal ? `<div class="row mt12"><button class="btn" data-act="famPay">${esc(L.payNow(moneyTxt(d.total, lang)))}</button></div><p class="xs muted mt8">${esc(L.payHow)}</p>` : `<p class="sm mt12">${esc(L.payLater(s.paymentDueAt ? day(s.paymentDueAt, lang) : L.tbaShort))}</p>`}
-  ${S.fam.paid ? `<p class="notice ok mt12">${esc(L.paid)}</p>` : ''}<p class="mt16"><button class="link sm" data-act="famEdit">${esc(L.change)}</button></p></section>`;
+  ${kid().paid ? `<p class="notice ok mt12">${esc(L.paid)}</p>` : ''}<p class="mt16"><button class="link sm" data-act="famEdit">${esc(L.change)}</button></p></section>`;
 }
 
 /* ───────────────────────── 6. Desk ───────────────────────── */
@@ -1061,7 +1122,7 @@ function deskScreen() {
   if (d.stage === 'collect') {
     const x = d.done;
     return `<h1 class="h1">Collect</h1><p class="muted mt4">${esc(st.family)} — ${esc(st.name)} (${st.cls}) · ${sessName(s)}</p>
-    <section class="card mt16" id="collect"><div class="tablewrap"><table class="t"><thead><tr><th>Subject</th><th>What</th><th>Price</th></tr></thead><tbody>${x.lines.map((l) => { const o = s.offerings.find((y) => y.id === l.oid); const r = o.rows.find((y) => y.key === l.rkey); return `<tr><td>${esc(o.title)}</td><td>${esc(rowOptText(s, r, l.opt, 'en'))}</td><td>${money(l.total)}</td></tr>`; }).join('')}</tbody></table></div>
+    <section class="card mt16" id="collect"><div class="tablewrap"><table class="t"><thead><tr><th>Subject</th><th>What</th><th>Price</th></tr></thead><tbody>${x.lines.map((l) => { const o = s.offerings.find((y) => y.id === l.oid); const r = o.rows.find((y) => y.key === l.rkey); return `<tr><td>${esc(o.title)}</td><td>${esc(optionLabel(s, r, l.opt, 'en'))}</td><td>${money(l.total)}</td></tr>`; }).join('')}</tbody></table></div>
     <p class="h3 mt12">Total ${money(x.total)}</p><div class="row mt12" style="align-items:flex-end;gap:12px"><div class="field"><label for="desk-instr">Paid with</label><select id="desk-instr" class="input" data-chg="deskInstr">${[['cash', 'Cash'], ['card', 'Credit / Debit Card'], ['instapay', 'InstaPay (at desk)'], ['other', 'Other']].map(([k, l]) => `<option value="${k}" ${d.instr === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="field"><label for="desk-bal">Balance to use (EGP)</label><input id="desk-bal" type="number" min="0" max="0" class="input fee" value="0" data-chg="deskBal"><p class="hint">The family's balance: EGP 0</p></div></div>
     <div class="row mt16"><button class="btn" data-act="deskCollect">Collect ${moneyTxt(x.total)}</button><button class="btn outline" data-act="deskBack">Back</button></div><p class="xs muted mt8">One payment for the whole reservation, one receipt — no split by deadline.</p></section>`;
   }
@@ -1116,7 +1177,9 @@ function openEditor(sid, oid, isNew, draft) {
 const draftRow = (key) => S.edit.off.rows.find((r) => r.key === key);
 const sortOfferings = (s) => { s.offerings = [...s.offerings.filter((o) => o.group === 'OL'), ...s.offerings.filter((o) => o.group !== 'OL')]; };
 function offFor(scope, oid) { return scope.startsWith('pv:') ? S.edit.off : famSession().offerings.find((o) => o.id === oid); }
-function scopeBox(scope) { return scope.startsWith('fam:') ? S.fam : scope.startsWith('desk:') ? S.desk : null; }
+function scopeBox(scope) { return scope.startsWith('fam:') ? kid(scope.slice(4)) : scope.startsWith('desk:') ? S.desk : null; }
+/* The family's page is per child: each child's choices, agreement and reservation stand on their own (F1). */
+function kid(id) { const k = id || S.fam.student; return (S.fam.kids[k] = S.fam.kids[k] || { refund: false, decl: false, done: null, err: null, paid: false }); }
 
 const ACT = {
   go: (d) => goScreen(d.screen),
@@ -1147,6 +1210,8 @@ const ACT = {
   tab: (d) => { S.tab = d.tab; if (S.screen !== 'session') goScreen('session'); },
   toggleChecks: () => { S.openChecks = !S.openChecks; },
   checkOk: (d) => { cur().done[d.id] = true; },
+  acceptOld: (d) => { const o = cur().offerings.find((x) => x.id === d.o); o.accepted = [...new Set([...(o.accepted || []), d.e])]; toast(`${o.title}: ${ym(d.e)} kept; the warning stays in the editor`); },
+  reveal: (d) => { const b = (S.reveal[d.scope] = S.reveal[d.scope] || {}); b[d.o] = !b[d.o]; },
   checkGo: (d) => {
     const s = byId(d.s); S.sessionId = s.id; const c = checks(s).find((x) => x.id === d.id);
     if (c && c.off) { openEditor(s.id, c.off); return; }
@@ -1187,15 +1252,16 @@ const ACT = {
     o.accepting = !o.accepting;
   },
   confirmSubjectClose: () => { const s = cur(); const o = s.offerings.find((x) => x.id === S.dialog.oid); o.accepting = false; S.dialog = null; toast(`${o.title} closed to new reservations`); },
-  plExample: () => { S.pl.text = EXAMPLE_TEXT[S.pl.board]; S.pl.parsed = null; },
+  plExample: () => { S.pl.text = exampleFor(S.pl.board, plFor(cur())).text; S.pl.parsed = null; },
   plRead: () => { if (!S.pl.text.trim()) { toast('Paste a list first'); return; } S.pl.parsed = matchList(cur(), S.pl.board, S.pl.text); },
   plDiscard: () => { S.pl.parsed = null; S.pl.text = ''; },
   plUse: () => {
-    const s = cur(); const res = S.pl.parsed; if (!res || !res.matched.length) return;
-    const board = S.pl.board; const name = `${BOARDS[board].name} ${ym(plFor(s))}`; const matched = res.matched;
+    const s = cur(); const res = S.pl.parsed; if (!res) return;
+    const matched = [...res.matched, ...(res.toCheck || []).flatMap((g) => readingTargets(s, g))]; if (!matched.length) return;
+    const board = S.pl.board; const name = `${BOARDS[board].name} ${ym(plFor(s))}`;
     withImpact(s, (ss) => applyList(ss, board, name, matched), `Use ${name}`, `${plural(matched.length, 'line')} of ${name} set exam fees in ${sessName(s)}.`, () => { S.pl = { board, forKey: '', text: '', parsed: null }; }, `${name}: its prices are used`);
   },
-  keepLastYear: () => { const s = cur(); for (const { r } of lastYearRows(s)) r.kept = true; for (const o of s.offerings) recalc(o); toast("Last year's exam fees kept for the rest"); },
+  keepLastYear: () => { const s = cur(); for (const o of s.offerings) for (const r of o.rows) if (r.lastYear) r.kept = true; for (const o of s.offerings) recalc(o); toast("Last year's exam fees kept for the rest"); },
   refAdd: () => { const s = cur(); const st = s.refund; const prev = st.length > 1 ? st[st.length - 2].week : 0; st.splice(st.length - 1, 0, { week: Math.min(prev + 1, 20), pct: 25 }); normRefund(s); },
   refDel: (d) => { const s = cur(); s.refund.splice(Number(d.i), 1); normRefund(s); },
   qAdd: () => {
@@ -1213,7 +1279,7 @@ const ACT = {
     if (E.isNew) { s.offerings.push(o); sortOfferings(s); S.edit = null; goScreen('session'); toast(`${o.title} added to ${sessName(s)}`); return; }
     const old = s.offerings.find((x) => x.id === o.id); const blocked = [];
     for (const l of linesOf(s, o.id)) { const r = o.rows.find((x) => x.key === l.rkey); if (!r || !r.on || !r.cells[l.opt]) blocked.push(l); }
-    if (blocked.length) { const l0 = blocked[0]; const r0 = old.rows.find((x) => x.key === l0.rkey); S.dialog = { type: 'refuse', title: 'Reservations use what you unticked', text: `${plural(blocked.length, 'reservation uses', 'reservations use')} ${r0.label.en} · ${OPT[l0.opt].en}. It cannot be unticked while they exist. Close the row instead: no new reservations, the existing ones stay.`, closeRow: l0.rkey }; return; }
+    if (blocked.length) { const l0 = blocked[0]; const r0 = old.rows.find((x) => x.key === l0.rkey); S.dialog = { type: 'refuse', title: 'Reservations use what you unticked', text: `${plural(blocked.length, 'reservation uses', 'reservations use')} “${optionLabel(s, r0, l0.opt, 'en')}”. It cannot be unticked while they exist. Close the row instead: no new reservations, the existing ones stay.`, closeRow: l0.rkey }; return; }
     withImpact(s, (ss) => { const i = ss.offerings.findIndex((x) => x.id === o.id); ss.offerings[i] = clone(o); }, `Save ${o.title}`, `The prices of ${o.title} change.`, () => { S.edit = null; goScreen('session'); }, `${o.title} saved`);
   },
   refuseCloseRow: () => { const E = S.edit; const s = byId(E.sid); const old = s.offerings.find((x) => x.id === E.off.id); const key = S.dialog.closeRow; const r = draftRow(key); const oldR = old.rows.find((x) => x.key === key); r.on = true; r.cells = clone(oldR.cells); r.closed = true; S.dialog = null; ACT.edSave(); },
@@ -1248,16 +1314,16 @@ const ACT = {
   eqAdd: () => { const E = S.edit; const f = E.eq; if (!f.text.trim()) { toast('Type the question'); return; } E.off.questions.push({ id: nid('q'), scope: E.off.id, type: f.type, text: f.text.trim(), choices: f.type === 'choice' ? f.choices.split('\n').map((x) => x.trim()).filter(Boolean) : [] }); E.eq = { type: 'yesno', text: '', choices: '' }; },
   eqDel: (d) => { const o = S.edit.off; o.questions = o.questions.filter((q) => q.id !== d.id); },
   pvMode: (d) => { S.pv = d.v; },
-  setChild: (d) => { S.fam.student = d.v; S.fam.done = null; S.fam.err = null; S.fam.paid = false; },
+  setChild: (d) => { S.fam.student = d.v; window.scrollTo(0, 0); },
   setLang: (d) => { S.fam.lang = d.v; },
   famReserve: () => {
     const s = famSession(); const st = STUDENTS[S.fam.student]; const L = FAM[S.fam.lang]; const lines = chosenLines(s, `fam:${st.id}`, st);
-    if (!lines.length) { S.fam.err = L.errNone; return; } if (lines.some((x) => x.needsWhen)) { S.fam.err = L.errWhen; return; } if (!S.fam.refund || !S.fam.decl) { S.fam.err = L.errConsent; return; }
-    S.fam.err = null; S.fam.done = { lines: lines.map((x) => ({ oid: x.o.id, rkey: x.r.key, opt: x.p.opt, total: x.price.total })), total: lines.reduce((a, x) => a + x.price.total, 0) };
+    if (!lines.length) { kid().err = L.errNone; return; } if (lines.some((x) => x.needsWhen)) { kid().err = L.errWhen; return; } if (!kid().refund || !kid().decl) { kid().err = L.errConsent; return; }
+    kid().err = null; kid().done = { lines: lines.map((x) => ({ oid: x.o.id, rkey: x.r.key, opt: x.p.opt, total: x.price.total })), total: lines.reduce((a, x) => a + x.price.total, 0) };
     addLines(s, `fam:${st.id}`, st, lines, 'waiting'); window.scrollTo(0, 0);
   },
-  famPay: () => { S.fam.paid = true; },
-  famEdit: () => { S.fam.done = null; S.fam.paid = false; },
+  famPay: () => { kid().paid = true; },
+  famEdit: () => { kid().done = null; kid().paid = false; },
   deskReserve: (d) => {
     const s = famSession(); const st = STUDENTS[S.desk.student]; const lines = chosenLines(s, `desk:${st.id}`, st);
     if (!lines.length) { S.desk.err = 'Pick at least one subject.'; return; } if (lines.some((x) => x.needsWhen)) { S.desk.err = 'Answer “When did you sit it?” for each retake that asks it.'; return; } if (!S.desk.consent) { S.desk.err = `Tick “${DESK_CONSENT}”.`; return; }
@@ -1296,10 +1362,11 @@ const CHG = {
   addPick: (d, el) => { S.addRef = el.value; },
   cpFrom: (d, el) => { S.dialog.from = el.value; }, cpTo: (d, el) => { S.dialog.to = el.value; },
   nlBoard: (d, el) => { S.dialog.board = el.value; }, nlLevel: (d, el) => { S.dialog.level = el.value; }, nlName: (d, el) => { S.dialog.name = el.value; S.dialog.err = null; }, nlCode: (d, el) => { S.dialog.code = el.value; },
-  plBoard: (d, el) => { S.pl.board = el.value; S.pl.parsed = null; }, plFor: (d, el) => { S.pl.forKey = el.value; }, plText: (d, el) => { S.pl.text = el.value; },
+  plBoard: (d, el) => { S.pl.board = el.value; S.pl.parsed = null; },
+  tcRead: (d, el) => { S.pl.parsed.toCheck[Number(d.i)].reading = el.value; }, plFor: (d, el) => { S.pl.forKey = el.value; }, plText: (d, el) => { S.pl.text = el.value; },
   missHow: (d, el) => {
     const s = cur(); const v = el.value; if (!v) return; const o = s.offerings.find((x) => x.id === d.o); const r = o.rows.find((x) => x.key === d.r);
-    if (v === 'sum') { const parts = {}; for (const c of r.sumOf) parts[c] = findIn(allLists(o.board), c).amount; withImpact(s, (ss) => { const rr = ss.offerings.find((x) => x.id === o.id).rows.find((x) => x.key === r.key); rr.parts = clone(parts); rr.examFee = sumParts(parts); rr.feeSrc = 'units_sum'; rr.lastYear = false; recalc(ss.offerings.find((x) => x.id === o.id)); }, 'Exam fee', `${o.title} · ${r.label.en}: the sum of its units.`, null, `${o.title} · ${r.label.en}: sum of its units`); return; }
+    if (v === 'sum') { withImpact(s, (ss) => { const oo = ss.offerings.find((x) => x.id === o.id); const rr = oo.rows.find((x) => x.key === r.key); rr.examFee = null; rr.feeSrc = 'units_sum'; recalc(oo); }, 'Exam fee', `${o.title} · ${r.label.en}: the sum of its units.`, null, `${o.title} · ${r.label.en}: sum of its units`); return; }
     const [, lid, code] = v.split(':'); const l = S.sessions.flatMap((x) => x.lists).find((x) => x.id === lid); const amount = l.rows.find((x) => x[0] === code)[2];
     withImpact(s, (ss) => { const oo = ss.offerings.find((x) => x.id === o.id); const rr = oo.rows.find((x) => x.key === r.key); rr.examFee = amount; rr.feeSrc = 'list'; rr.feeList = lid; rr.lastYear = false; recalc(oo); }, 'Exam fee', `${o.title} · ${r.label.en}: ${moneyTxt(amount)} from ${l.name}.`, null, `${o.title} · ${r.label.en}: copied from ${l.name}`);
   },
@@ -1341,7 +1408,8 @@ const CHG = {
   pickTeacher: (d, el) => { pickBag(d.scope)[d.o][d.g].teacher = el.value; },
   pickWhen: (d, el) => { pickBag(d.scope)[d.o][d.g].when = el.value; const box = scopeBox(d.scope); if (box) box.err = null; },
   answer: (d, el) => { (S.answers[d.scope] = S.answers[d.scope] || {})[d.q] = el.value; },
-  famRefund: (d, el) => { S.fam.refund = el.checked; S.fam.err = null; }, famDecl: (d, el) => { S.fam.decl = el.checked; S.fam.err = null; },
+  famChild: (d, el) => { S.fam.student = el.value; window.scrollTo(0, 0); },
+  famRefund: (d, el) => { kid().refund = el.checked; kid().err = null; }, famDecl: (d, el) => { kid().decl = el.checked; kid().err = null; },
   deskStudent: (d, el) => { Object.assign(S.desk, { student: el.value, stage: 'reserve', consent: false, err: null, done: null }); },
   deskConsent: (d, el) => { S.desk.consent = el.checked; S.desk.err = null; }, deskInstr: (d, el) => { S.desk.instr = el.value; }, deskBal: () => {},
 };
@@ -1382,8 +1450,8 @@ function paint() {
 }
 function initState(stage) {
   seq = 100;
-  for (const b of Object.values(BOARDS)) for (const k of Object.keys(b.deadlines)) if (b === BOARDS.oxford) delete b.deadlines[k];
-  Object.assign(S, { stage, screen: 'home', role: 'coordinator', sessionId: 'jun2027', tab: 'subjects', teachers: TEACHER_SEED.map(([id, name, team]) => (team ? { id, name, team } : { id, name })), sessions: [makeJune2027()], dialog: null, toast: null, edit: null, addRef: '', pl: { board: 'cambridge', forKey: '', text: '', parsed: null }, q: { scope: 'session', type: 'yesno', text: '', choices: '' }, pv: 'first', picks: {}, answers: {}, fam: { student: 'y11b', lang: 'en', refund: false, decl: false, done: null, err: null, paid: false }, desk: { student: 'y11b', consent: false, stage: 'reserve', instr: 'cash', err: null, done: null, collected: false }, openChecks: true, adminDates: {} });
+  for (const [k, b] of Object.entries(BOARDS)) b.deadlines = clone(BOARD_DEADLINES[k]);
+  Object.assign(S, { stage, screen: 'home', role: 'coordinator', sessionId: 'jun2027', tab: 'subjects', teachers: TEACHER_SEED.map(([id, name, team]) => (team ? { id, name, team } : { id, name })), sessions: [makeJune2027()], dialog: null, toast: null, edit: null, addRef: '', pl: { board: 'cambridge', forKey: '', text: '', parsed: null }, q: { scope: 'session', type: 'yesno', text: '', choices: '' }, pv: 'first', picks: {}, answers: {}, reveal: {}, fam: { student: 'y11b', lang: 'en', kids: {} }, desk: { student: 'y11b', consent: false, stage: 'reserve', instr: 'cash', err: null, done: null, collected: false }, openChecks: true, adminDates: {} });
   if (stage === 'open') applyOpenStage(S.sessions[0]);
 }
 
