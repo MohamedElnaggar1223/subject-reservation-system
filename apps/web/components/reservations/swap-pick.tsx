@@ -39,7 +39,7 @@ export function useSwapChoices(sessionId: string, studentId: string, currentItem
         if (p.mode === 'in_school' && it.teachers.length > 1) line.teacherId = null;
         return {
           key: `${it.id}|${p.attempt}|${p.mode}`,
-          label: `${o.subject.name}${it.kind === 'whole' ? '' : ` — ${it.label}`} · ${ENTRY[`${p.attempt}|${p.mode}`]}`,
+          label: `${o.subject.name}${it.kind === 'all_papers' ? '' : ` — ${it.label}`} · ${ENTRY[`${p.attempt}|${p.mode}`]}`,
           price: p.total ?? 0,
           provisional: p.provisional,
           line,

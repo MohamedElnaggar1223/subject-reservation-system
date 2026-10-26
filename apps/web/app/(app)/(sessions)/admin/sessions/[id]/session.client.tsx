@@ -132,7 +132,7 @@ function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
           <StatusBadge status={s.status} />
         </div>
         <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span><span>Reserve</span> <InstantText iso={s.startDate} /> – <InstantText iso={s.endDate} /></span>
+          <span><span>Reserve</span> {s.startDate ? <InstantText iso={s.startDate} /> : '—'} – {s.endDate ? <InstantText iso={s.endDate} /> : '—'}</span>
           <span><span>Course starts</span> <Day iso={s.courseStartsOn} /></span>
           <span><span>Due</span> <InstantText iso={s.paymentDueAt} /></span>
         </p>

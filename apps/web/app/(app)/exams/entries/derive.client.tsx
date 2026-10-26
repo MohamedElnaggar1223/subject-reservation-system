@@ -141,7 +141,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
                         ) : (
                           <>
                             <BoardText>{r.subject.name}</BoardText> <Code className="text-xs text-muted-foreground">{r.subject.code}</Code>
-                            {r.item && r.item.kind !== 'whole' && <span className="ms-1 text-xs text-muted-foreground">— <BoardText>{r.item.label}</BoardText></span>}
+                            {r.item && r.item.kind !== 'all_papers' && <span className="ms-1 text-xs text-muted-foreground">— <BoardText>{r.item.label}</BoardText></span>}
                             {r.chargeId && <Badge tone="info" className="ms-1">Cash-in</Badge>}
                           </>
                         )}

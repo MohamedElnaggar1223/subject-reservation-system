@@ -256,7 +256,7 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
     }
     // Sort sessions newest-first
     return Array.from(map.values()).sort(
-      (a, b) => new Date(b.session.endDate).getTime() - new Date(a.session.endDate).getTime()
+      (a, b) => new Date(b.session.endDate ?? b.session.startDate ?? 0).getTime() - new Date(a.session.endDate ?? a.session.startDate ?? 0).getTime()
     );
   })();
 
@@ -344,7 +344,7 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
                       </span>
                     </h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmt(session.startDate)} — {fmt(session.endDate)}
+                      {session.startDate ? fmt(session.startDate) : '—'} — {session.endDate ? fmt(session.endDate) : '—'}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

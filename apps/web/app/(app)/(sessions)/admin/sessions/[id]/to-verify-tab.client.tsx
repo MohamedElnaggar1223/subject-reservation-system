@@ -96,7 +96,7 @@ export default function ToVerifyTab({ session, viewerRole }: { session: SessionD
                     <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{r.student.number ?? ''}</bdi>{r.student.section && <> · <bdi data-i18n-skip="true">{r.student.section}</bdi></>}</div>
                   </td>
                   <td className="px-4 py-2">
-                    <bdi data-i18n-skip="true">{r.line.subject}</bdi>{r.line.kind !== 'whole' && <> — <bdi data-i18n-skip="true">{r.line.item}</bdi></>}
+                    <bdi data-i18n-skip="true">{r.line.subject}</bdi>{r.line.kind !== 'all_papers' && <> — <bdi data-i18n-skip="true">{r.line.item}</bdi></>}
                     <div className="text-xs text-muted-foreground">
                       <span>{r.attempt === 'retake' ? 'Retake' : r.line.carriesForward ? 'Carry forward' : 'First entry'}</span> · <span>{r.mode === 'self_study' ? 'self-study' : 'in school'}</span> · <Money amount={r.price} />
                     </div>
