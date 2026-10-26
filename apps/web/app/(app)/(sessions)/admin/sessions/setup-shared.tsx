@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
-  apiResponse, schoolDateString, impactSentence, IMPACT_CHANGED_REFUSAL, type ImpactType,
+  apiResponse, schoolDateString, impactSentence, IMPACT_CHANGED_REFUSAL, type ImpactType, type QuestionInputType,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import type { Tone } from '~/components/ui/tone';
@@ -79,6 +79,9 @@ export const CELL_SHORT: Record<CellKey, string> = {
   firstSelfStudy: 'first entry self study',
 };
 
+/** An extra question's answer kind (D13), as her screens name it. */
+export const QUESTION_KIND_WORDS: Record<QuestionInputType['kind'], string> = { yes_no: 'Yes / no', text: 'Short text', choice: 'A choice' };
+
 /** A session's status as families meet it (C4), and its badge's tone. */
 export const STATUS_TONE: Record<string, Tone> = { active: 'success', draft: 'neutral', closed: 'danger' };
 export const STATUS_WORDS: Record<string, string> = {
@@ -116,32 +119,44 @@ const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDo
 
 /**
  * A select whose choice does something at once (adds a teacher, an earlier exam; saves the share). Picked
- * with the mouse it acts on the pick; walked with the arrow keys (a closed select changes its value on each
- * key in some browsers) it waits for Enter or for her to leave the field, so a key press is never a save.
- * `value` '' with `reset` makes it a pick-to-add list that goes back to its prompt.
+ * with the mouse, or with Enter from the opened list, it acts on the pick; walked with the arrow keys on the
+ * closed select (each key changes its value in some browsers) it waits for Enter or for her to leave the
+ * field, so a key press is never a save. `value` '' with `reset` makes it a pick-to-add list that goes back
+ * to its prompt. `pending` holds the pick on screen while its save runs or asks first; once nothing is
+ * pending the select shows `value` again, so a save she cancels or the API refuses leaves the saved choice.
  */
-export function CommitSelect({ value, onCommit, reset, children, ...props }: Omit<React.ComponentProps<'select'>, 'onChange' | 'value' | 'onKeyDown' | 'onBlur'> & {
+export function CommitSelect({ value, onCommit, reset, pending = false, children, ...props }: Omit<React.ComponentProps<'select'>, 'onChange' | 'value' | 'onKeyDown' | 'onBlur'> & {
   value: string;
   onCommit: (value: string) => void;
   reset?: boolean;
+  pending?: boolean;
 }) {
+  // Walked to with the arrow keys and not yet committed.
   const walking = useRef(false);
-  const [local, setLocal] = useState(value);
-  useEffect(() => { setLocal(value); }, [value]);
+  // Set by an arrow key until the browser has handled it: the change it fires is a walk, not a pick. A change
+  // with no arrow key just before it is a pick (the mouse, or Enter in the opened list, which the list takes).
+  const arrow = useRef(false);
+  // A choice shown in place of `value`: walked to, or picked and being saved.
+  const [local, setLocal] = useState<string | null>(null);
+  useEffect(() => { if (!pending && !walking.current) setLocal(null); }, [pending, value]);
   const commit = (v: string) => {
     walking.current = false;
     if (v !== value && v !== '') onCommit(v);
-    setLocal(reset ? '' : v);
+    setLocal(reset ? null : v);
   };
   return (
     <select
       {...props}
-      value={local}
+      value={local ?? value}
       onKeyDown={(e) => {
-        if (ARROWS.has(e.key)) walking.current = true;
+        if (ARROWS.has(e.key)) {
+          walking.current = true;
+          arrow.current = true;
+          window.setTimeout(() => { arrow.current = false; }, 0);
+        }
         if (e.key === 'Enter') { e.preventDefault(); commit(e.currentTarget.value); }
       }}
-      onChange={(e) => { if (walking.current) setLocal(e.target.value); else commit(e.target.value); }}
+      onChange={(e) => { if (arrow.current) setLocal(e.target.value); else commit(e.target.value); }}
       onBlur={(e) => { if (walking.current) commit(e.currentTarget.value); }}
     >
       {children}
