@@ -107,6 +107,7 @@ ALTER TABLE "session_offer" ADD COLUMN "teacher_choice" text DEFAULT 'families' 
 ALTER TABLE "session_offer" ADD COLUMN "teacher_tbc" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "session_offer" ADD COLUMN "accepting" boolean DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE "session_offer" ADD COLUMN "closes_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "session_offer" ADD COLUMN "check_notes" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
 ALTER TABLE "session_offer_item" ADD COLUMN "first_in_school" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "session_offer_item" ADD COLUMN "retake_in_school" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "session_offer_item" ADD COLUMN "retake_self_study" boolean DEFAULT false NOT NULL;--> statement-breakpoint
@@ -120,6 +121,7 @@ ALTER TABLE "session_offer_item" ADD COLUMN "reference_codes" text[] DEFAULT '{}
 ALTER TABLE "session_offer_item" ADD COLUMN "allowed_prior_series_ids" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
 ALTER TABLE "session_offer_item" ADD COLUMN "closes_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "session_offer_item" ADD COLUMN "pay_by" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "session_offer_item" ADD COLUMN "cells_by_default" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
 ALTER TABLE "price_list" ADD CONSTRAINT "price_list_session_id_registration_session_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."registration_session"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "price_list" ADD CONSTRAINT "price_list_board_code_exam_board_code_fk" FOREIGN KEY ("board_code") REFERENCES "public"."exam_board"("code") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "price_list" ADD CONSTRAINT "price_list_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

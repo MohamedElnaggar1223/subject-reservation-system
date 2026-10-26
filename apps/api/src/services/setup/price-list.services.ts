@@ -24,7 +24,7 @@ import {
   and, eq, inArray, asc, sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { ApplyPriceListType, SetRowExamFeeType } from '@repo/validations';
+import { matchPrintedCode, printedCodeCandidates, normalizePrintedCode, type ApplyPriceListType, type SetRowExamFeeType, type SubjectsFile } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
 import { round2 } from '../pricing.services';
 import { SetupError, sessionForSetup, setupRethrow } from './offering.services';
@@ -37,39 +37,6 @@ type Executor = typeof db | Tx;
 type ItemRow = typeof sessionOfferItem.$inferSelect;
 
 // ─── Reading a printed list ──────────────────────────────────────────────────
-
-/*
- * PENDING P0's merge: `normalizePrintedCode`, `printedCodeCandidates` and `matchPrintedCode` are P0's
- * (`@repo/validations` offering/reference.ts) — the one matcher the reference check and this parser
- * share, so both read printed codes the same way. They are restated here, unchanged, until it lands;
- * on its merge this block is replaced by the import.
- */
-function normalizePrintedCode(printed: string): string {
-  return printed.toUpperCase().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/').trim();
-}
-function printedCodeCandidates(printed: string): string[] {
-  const n = normalizePrintedCode(printed);
-  const out = [n];
-  const m = /^(\S+) (\S+(?:\/\S+)+)$/.exec(n);
-  if (m) for (const opt of m[2]!.split('/')) out.push(`${m[1]} ${opt}`);
-  return out;
-}
-type PrintedCodeMatch = { subject: string; row: string; via: 'priceCode' | 'alias' };
-function matchPrintedCode(printed: string, board: { aliases: { printed: string; subject: string; row: string }[] }, subjects: { code: string; rows: { key: string; priceCodes: string[] }[] }[]): PrintedCodeMatch[] {
-  const wanted = new Set(printedCodeCandidates(printed));
-  const found = new Map<string, PrintedCodeMatch>();
-  for (const s of subjects) {
-    for (const r of s.rows) {
-      if (r.priceCodes.some((c) => wanted.has(normalizePrintedCode(c)))) found.set(`${s.code}/${r.key}`, { subject: s.code, row: r.key, via: 'priceCode' });
-    }
-  }
-  for (const a of board.aliases) {
-    if (wanted.has(normalizePrintedCode(a.printed)) && !found.has(`${a.subject}/${a.row}`)) {
-      found.set(`${a.subject}/${a.row}`, { subject: a.subject, row: a.row, via: 'alias' });
-    }
-  }
-  return [...found.values()];
-}
 
 export type ParsedLine = { lineNo: number; code: string; name: string; amount: number };
 
@@ -88,12 +55,27 @@ function splitAmount(raw: string): { printed: string; amount: number } | null {
 
 type Reference = Awaited<ReturnType<typeof referenceFor>>;
 
-/** The board's reference rows and aliases (the matcher's input) and the session's rows of that board. */
+/**
+ * The board's reference subjects and aliases as P0's matcher reads them (the reference check reads the files
+ * the same way), and the session's rows of that board.
+ */
 async function referenceFor(executor: Executor, sessionId: string, board: string) {
-  const refs = await executor.select({ subjectCode: referenceSubject.code, subjectName: referenceSubject.name, key: referenceRow.key, priceCodes: referenceRow.priceCodes, label: referenceRow.labelEn })
-    .from(referenceRow).innerJoin(referenceSubject, eq(referenceSubject.id, referenceRow.referenceSubjectId))
-    .where(eq(referenceSubject.boardCode, board));
-  const subjects = [...new Map(refs.map((r) => [r.subjectCode, { code: r.subjectCode, rows: refs.filter((x) => x.subjectCode === r.subjectCode).map((x) => ({ key: x.key, priceCodes: x.priceCodes })) }])).values()];
+  const subjectRows = await executor.select().from(referenceSubject).where(eq(referenceSubject.boardCode, board)).orderBy(asc(referenceSubject.sortOrder));
+  const rowRows = subjectRows.length
+    ? await executor.select().from(referenceRow).where(inArray(referenceRow.referenceSubjectId, subjectRows.map((s) => s.id))).orderBy(asc(referenceRow.sortOrder))
+    : [];
+  const refs = rowRows.map((r) => {
+    const s = subjectRows.find((x) => x.id === r.referenceSubjectId)!;
+    return { subjectCode: s.code, subjectName: s.name, key: r.key, label: r.labelEn };
+  });
+  const subjects: SubjectsFile = subjectRows.map((s) => ({
+    code: s.code, name: s.name, group: s.group as 'O.L.' | 'A.S./A.L.', level: s.level as 'igcse' | 'as_al', confirmed: s.confirmed,
+    ...(s.note ? { note: s.note } : {}), winterSitting: (s.winterSitting as 'november' | 'january' | null),
+    rows: rowRows.filter((r) => r.referenceSubjectId === s.id).map((r) => ({
+      key: r.key, kind: r.kind as SubjectsFile[number]['rows'][number]['kind'], codes: r.codes, priceCodes: r.priceCodes,
+      ...(r.short ? { short: r.short } : {}), label: { en: r.labelEn, ar: r.labelAr }, ...(r.sumOfUnits.length ? { sumOfUnits: r.sumOfUnits } : {}),
+    })),
+  }));
   const [b] = await executor.select({ aliases: examBoard.referenceAliases }).from(examBoard).where(eq(examBoard.code, board));
   const rows = await executor.select({ id: sessionOfferItem.id, key: sessionOfferItem.referenceKey, codes: sessionOfferItem.referenceCodes, label: sessionOfferItem.label, referenceCode: sessionOffer.referenceCode, subjectName: subject.name, subjectCode: subject.code })
     .from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId)).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
@@ -101,7 +83,8 @@ async function referenceFor(executor: Executor, sessionId: string, board: string
   return { refs, subjects, aliases: b?.aliases ?? [], rows };
 }
 
-type Target = { matchedKey: string; label: string; rowIds: string[] };
+/** A line's match: the reference row and the session's rows of it; `toCheck` (an alias in doubt) is applied only when confirmed. */
+type Target = { matchedKey: string; label: string; rowIds: string[]; toCheck?: true; note?: string };
 
 /** What a printed code reaches: the reference rows P0's matcher finds (and the session's rows of each), else a custom row by its own code. */
 function targetsOf(printed: string, ref: Reference): Target[] {
@@ -112,6 +95,7 @@ function targetsOf(printed: string, ref: Reference): Target[] {
       return {
         matchedKey: `${m.subject}:${m.row}`, label: r ? `${r.subjectName} — ${r.label}` : `${m.subject} ${m.row}`,
         rowIds: ref.rows.filter((x) => x.referenceCode === m.subject && x.key === m.row).map((x) => x.id),
+        ...(m.toCheck ? { toCheck: true as const, note: m.note } : {}),
       };
     });
   }
@@ -244,14 +228,23 @@ export async function applyPriceList(sessionId: string, input: ApplyPriceListTyp
       const priceRows = new Set<string>();
       let matched = 0;
       const unmatched: { code: string; name: string; amount: number }[] = [];
+      // A match through an alias in doubt (toCheck) is shown for her to confirm, never applied silently.
+      const toConfirm: { code: string; name: string; amount: number; label: string; note: string | null }[] = [];
       for (const [i, r] of input.rows.entries()) {
         const line = { lineNo: r.lineNo ?? i + 1, code: r.code, name: r.name, amount: r.amount };
-        const targets = targetsOf(r.code, ref);
-        if (!targets.length) {
+        const all = targetsOf(r.code, ref);
+        const doubtful = all.filter((t) => t.toCheck && !r.confirmed);
+        for (const t of doubtful) {
+          toConfirm.push({ code: r.code, name: r.name, amount: r.amount, label: t.label, note: t.note ?? null });
+          await tx.insert(priceListRow).values({ id: randomUUID(), priceListId: listId, lineNo: line.lineNo, code: r.code, name: r.name, amount: r.amount, matchedKey: t.matchedKey, matchedItemId: null });
+        }
+        const targets = all.filter((t) => !doubtful.includes(t));
+        if (!all.length) {
           unmatched.push({ code: r.code, name: r.name, amount: r.amount });
           await tx.insert(priceListRow).values({ id: randomUUID(), priceListId: listId, lineNo: line.lineNo, code: r.code, name: r.name, amount: r.amount });
           continue;
         }
+        if (!targets.length) continue;
         matched++;
         for (const t of targets) {
           const rowId = randomUUID();
@@ -272,12 +265,14 @@ export async function applyPriceList(sessionId: string, input: ApplyPriceListTyp
       const repriced = await applyReprice(tx, plan, { actorId, reason: `the price list "${input.name}" was applied to ${session.name}`, entity: { type: 'price_list', id: listId }, ctx });
       await logAction(actorId, 'PRICE_LIST_APPLIED', 'price_list', listId, existing ? { name: existing.name } : null,
         { sessionId, board: input.board, name: input.name, lines: input.rows.length, matched, unmatched: unmatched.length, rowsPriced: priceRows.size, repriced: repriced.length, listedForFinance: plan.listed.length }, ctx, tx);
-      return { impact, repriced, listId, matched, unmatched, rowsPriced: priceRows.size, sessionName: session.name };
+      return { impact, repriced, listId, matched, unmatched, toConfirm, rowsPriced: priceRows.size, sessionName: session.name };
     });
     await tellRepriced(out.repriced, `The exam fee changed in ${out.sessionName}`);
-    return { saved: true, impact: out.impact, listId: out.listId, matched: out.matched, unmatched: out.unmatched, rowsPriced: out.rowsPriced };
+    return { saved: true, impact: out.impact, listId: out.listId, matched: out.matched, unmatched: out.unmatched, toConfirm: out.toConfirm, rowsPriced: out.rowsPriced };
   } catch (err) {
-    if (err instanceof ImpactPending) return { saved: false, impact: err.impact, listId: null, matched: 0, unmatched: [] as { code: string; name: string; amount: number }[], rowsPriced: 0 };
+    if (err instanceof ImpactPending) {
+      return { saved: false, impact: err.impact, listId: null, matched: 0, unmatched: [] as { code: string; name: string; amount: number }[], toConfirm: [] as { code: string; name: string; amount: number; label: string; note: string | null }[], rowsPriced: 0 };
+    }
     setupRethrow(err);
   }
 }

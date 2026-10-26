@@ -306,7 +306,7 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
 
 export type CheckItem = {
   code: 'price_not_set' | 'teacher_tbc' | 'no_teacher' | 'nothing_ticked' | 'not_on_the_list' | 'sitting_no_board_date' | 'date_after_board_deadline'
-    | 'payment_date_passed' | 'teacher_name_doubt' | 'last_years_prices' | 'dates_to_check' | 'carried_from_too_old';
+    | 'payment_date_passed' | 'teacher_name_doubt' | 'last_years_prices' | 'dates_to_check' | 'carried_from_too_old' | 'ticked_by_default' | 'review_note';
   severity: 'blocks' | 'look';
   message: string;
   offeringId?: string;
@@ -336,13 +336,18 @@ export async function checkListOf(executor: Executor, s: SessionRow): Promise<Ch
     const taught = o.teachers.length > 0 || ticked.every((r) => !(r.cells.firstInSchool || r.cells.retakeInSchool) || r.teachers.length > 0);
     if (inSchool && !taught && !o.teacherTbc) items.push({ code: 'no_teacher', severity: 'look', message: `${name}: taught in school, but no teacher is named`, offeringId: o.id });
     if (o.notOnTheList) items.push({ code: 'not_on_the_list', severity: 'look', message: `${name}: not on the reference list — flagged for us to add`, offeringId: o.id });
+    for (const note of o.checkNotes) items.push({ code: 'review_note', severity: 'look', message: `${name}: ${note}`, offeringId: o.id });
     for (const r of ticked) {
+      if (r.cellsByDefault.length) {
+        const words: Record<string, string> = { firstInSchool: 'first entry in school', retakeInSchool: 'retake in school', retakeSelfStudy: 'retake in self study', firstSelfStudy: 'first entry in self study' };
+        items.push({ code: 'ticked_by_default', severity: 'look', offeringId: o.id, rowId: r.id, message: `${name} — ${r.label}: ${r.cellsByDefault.map((c) => words[c] ?? c).join(', ')} ticked by a default, not her form — confirm` });
+      }
       const sr = r.series;
       if (sr && !sr.hasBoardDate && !seen.has(sr.id)) {
         seen.add(sr.id);
         items.push({
           code: 'sitting_no_board_date', severity: 'blocks', seriesId: sr.id,
-          message: `${o.board.name} ${sr.month.charAt(0).toUpperCase()}${sr.month.slice(1)} ${sr.year}${sr.label ? ` (${sr.label})` : ''} has no board date yet: the admin enters it once`,
+          message: `${o.board.name} ${sr.month.charAt(0).toUpperCase()}${sr.month.slice(1)} ${sr.year}${sr.label ? ` (${sr.label})` : ''}: no board date yet (its entry deadline) — the admin enters it once`,
         });
       }
       const deadline = sr?.entryDeadline ?? null;

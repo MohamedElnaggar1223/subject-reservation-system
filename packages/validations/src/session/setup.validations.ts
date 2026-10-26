@@ -207,6 +207,8 @@ export const PriceListRowInput = z.object({
   code: z.string().trim().min(1).max(80),
   name: z.string().trim().max(200).default(''),
   amount: Money,
+  // A line matched through an alias in doubt (the reference's toCheck) is applied only once she confirms it.
+  confirmed: z.boolean().optional(),
 });
 
 /** POST /sessions/:id/price-lists — applied: matched rows take the amounts, unpaid lines re-priced. */

@@ -365,8 +365,9 @@ export const examBoard = pgTable(
     // reference data (packages/db/reference/boards.json), never edited by staff.
     onePaperAsksSitting: boolean("one_paper_asks_sitting").notNull().default(true),
     // E2: the printed codes a fee list uses for a reference row ("9608 SY" → 9618's A.S.), from the
-    // reference data: [{ printed, subject, row }].
-    referenceAliases: jsonb("reference_aliases").$type<{ printed: string; subject: string; row: string }[]>().notNull().default([]),
+    // reference data: [{ printed, subject, row, toCheck?, note? }] — a toCheck alias is shown for a person
+    // to confirm, never applied silently.
+    referenceAliases: jsonb("reference_aliases").$type<{ printed: string; subject: string; row: string; toCheck?: boolean; note?: string }[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -914,6 +915,9 @@ export const sessionOffer = pgTable(
     // C4, amendment 1: the subject's own Accepting switch and optional automatic close.
     accepting: boolean("accepting").notNull().default(true),
     closesAt: timestamp("closes_at", { withTimezone: true }),
+    // The pre-load's notes for her review (§8's flags; teachers only as placeholders), shown on the check
+    // list until she saves the subject.
+    checkNotes: text("check_notes").array().notNull().default(sql`'{}'::text[]`),
     // { converted: true } on an offer the conversion made (migration 0042).
     legacy: jsonb("legacy").$type<Record<string, unknown>>(),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
@@ -1013,6 +1017,9 @@ export const sessionOfferItem = pgTable(
     // D12: a winter row's own close date and pay-by date.
     closesAt: timestamp("closes_at", { withTimezone: true }),
     payBy: timestamp("pay_by", { withTimezone: true }),
+    // §3's defaults: the cells a default ticked rather than her form (Q10's retake in school), shown on the
+    // check list for her to confirm until she saves the row.
+    cellsByDefault: text("cells_by_default").array().notNull().default(sql`'{}'::text[]`),
     // { converted: true, no_series?: true }
     legacy: jsonb("legacy").$type<Record<string, unknown>>(),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),

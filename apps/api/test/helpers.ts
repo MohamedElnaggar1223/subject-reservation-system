@@ -324,8 +324,7 @@ export async function subjectFeeIn(adm: Client, seriesId: string, subjectId: str
  * Its header is made with the window's dates in one call (the deprecated dated contract of
  * `POST /sessions`: born open once its start has passed, a draft before — a preregistration target —
  * and no header change of its own in the session's audit trail, which scenarios count); its prices are
- * made final and every subject is offered through the coordinator's routes; `activate` opens a draft by
- * the Accepting switch.
+ * made final and every subject is offered through the coordinator's routes; `activate` opens a draft.
  */
 export async function session(
   adm: Client,
@@ -349,9 +348,11 @@ export async function session(
   const meta: SessionMeta = { id: r.id, oldType: sessionType, level: qualificationLevel, type, year, oldYear, label, adm };
   SESSIONS.push(meta);
   for (const sub of SUBJECTS.filter((x) => x.level === qualificationLevel)) await offerInSession(adm, meta, sub);
-  // A session whose start date has already passed is born active; only a draft is opened by hand.
+  // A session whose start date has already passed is born active; only a draft is opened by hand (the
+  // deprecated activation, as before: the suites' sittings carry an exam start and no entry deadline, which
+  // the Accepting switch's check list holds back — 08y and 08za open theirs by the switch).
   if (opts.activate && r.status === 'draft') {
-    await apiResponse(adm.api.v1.sessions[':id'].open.$post({ param: { id: r.id } }));
+    await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: r.id } }));
   }
   return r.id;
 }

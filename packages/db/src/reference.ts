@@ -12,68 +12,20 @@
  * Callable from the seed (`pnpm --filter @repo/db seed:reference`, which reads
  * packages/db/reference/*.json — P0's files) and from the integration suite with in-memory data.
  *
- * PENDING P0's merge: the shapes below are P0's (`@repo/validations` offering/reference.ts —
- * BoardsFile, SubjectsFile: a sitting's `levels`, a row's `winterSitting`, the notes); on its merge they
- * are imported from there, and the seed parses the files with P0's schemas before loading them.
+ * The shapes are P0's (`@repo/validations` offering/reference.ts): the seed reads the files through its
+ * schemas (`scripts/reference-files.ts`), and a test parses its in-memory data through them before loading.
  */
 
 import { randomUUID } from 'crypto';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { BoardsFile, SubjectsFile, ReferenceBoardCode } from '@repo/validations';
 import type * as schema from './schema';
 
-export type ReferenceSitting = {
-  month: 1 | 6 | 10 | 11;
-  year: number;
-  /** The levels the board sits that month ('igcse', 'as_al'): a winter row's "November" finds its sitting by level. */
-  levels: ('igcse' | 'as_al')[];
-  entryDeadline: string | null;
-  retakeDeadline: string | null;
-  examsStart: string | null;
-  source: string;
-  confirmed: boolean;
-  note?: string;
-};
-
-export type ReferenceBoard = {
-  code: 'cambridge' | 'pearson_edexcel' | 'oxford';
-  name: string;
-  onePaperFee: 'syllabus' | 'paper';
-  onePaperAsksSitting: boolean;
-  carryForwardMonths: number | null;
-  note?: string;
-  sittings: ReferenceSitting[];
-  aliases: { printed: string; subject: string; row: string; note?: string }[];
-};
-
-export type ReferenceRowData = {
-  key: string;
-  kind: 'all_papers' | 'paper' | 'unit' | 'as' | 'a2' | 'al' | 'qualification';
-  codes: string[];
-  priceCodes: string[];
-  short?: string;
-  label: { en: string; ar: string };
-  sumOfUnits?: string[];
-  /** The row's own winter sitting where it differs from the subject's; null: not sat in winter. */
-  winterSitting?: 'november' | 'january' | null;
-  note?: string;
-};
-
-export type ReferenceSubjectData = {
-  code: string;
-  name: string;
-  group: 'O.L.' | 'A.S./A.L.';
-  level: 'igcse' | 'as_al';
-  confirmed: boolean;
-  note?: string;
-  winterSitting: 'november' | 'january' | null;
-  rows: ReferenceRowData[];
-};
-
+/** What the loader takes: the boards file and, per board, its subjects file (parsed by P0's schemas). */
 export type ReferenceData = {
-  boards: ReferenceBoard[];
-  /** Per board code: its subjects (packages/db/reference/subjects/<board>.json). */
-  subjects: Partial<Record<ReferenceBoard['code'], ReferenceSubjectData[]>>;
+  boards: BoardsFile;
+  subjects: Partial<Record<ReferenceBoardCode, SubjectsFile>>;
 };
 
 export type ReferenceLoadResult = { boards: number; sittings: number; subjects: number; rows: number; removedSubjects: number; removedRows: number };
@@ -98,43 +50,8 @@ export function referenceDeadline(d: string | null): Date | null {
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 20, 59, 0));
 }
 
-/** The same checks P0's schema makes, enough to refuse a malformed file before anything is written. */
-export function assertReferenceData(data: ReferenceData): void {
-  const fail = (msg: string) => { throw new Error(`Reference data: ${msg}`); };
-  if (!Array.isArray(data.boards) || !data.boards.length) fail('no boards');
-  for (const b of data.boards) {
-    if (!['cambridge', 'pearson_edexcel', 'oxford'].includes(b.code)) fail(`unknown board ${b.code}`);
-    if (!['syllabus', 'paper'].includes(b.onePaperFee)) fail(`${b.code}: onePaperFee`);
-    for (const s of b.sittings ?? []) {
-      if (!MONTHS[s.month]) fail(`${b.code}: sitting month ${s.month}`);
-      if (!s.levels?.length || s.levels.some((l) => l !== 'igcse' && l !== 'as_al')) fail(`${b.code}: the levels of ${s.month}/${s.year}`);
-      for (const d of [s.entryDeadline, s.retakeDeadline, s.examsStart]) if (d !== null && !/^\d{4}-\d{2}-\d{2}$/.test(d)) fail(`${b.code}: date ${d}`);
-    }
-  }
-  for (const [board, subjects] of Object.entries(data.subjects)) {
-    if (!data.boards.some((b) => b.code === board)) fail(`subjects of a board not listed: ${board}`);
-    const codes = new Set<string>();
-    for (const s of subjects ?? []) {
-      if (!s.code) fail(`${board}: a subject with no code (a subject not on a list we hold loads as "not on the list")`);
-      if (codes.has(s.code)) fail(`${board}: ${s.code} twice`);
-      codes.add(s.code);
-      if (!['O.L.', 'A.S./A.L.'].includes(s.group)) fail(`${board} ${s.code}: group ${s.group}`);
-      if (!['igcse', 'as_al'].includes(s.level)) fail(`${board} ${s.code}: level ${s.level}`);
-      const keys = new Set<string>();
-      for (const r of s.rows) {
-        if (keys.has(r.key)) fail(`${board} ${s.code}: row ${r.key} twice`);
-        keys.add(r.key);
-        if (!['all_papers', 'paper', 'unit', 'as', 'a2', 'al', 'qualification'].includes(r.kind)) fail(`${board} ${s.code} ${r.key}: kind ${r.kind}`);
-        if (!r.label?.en || !r.label?.ar) fail(`${board} ${s.code} ${r.key}: a label in English and Arabic`);
-      }
-      for (const r of s.rows) for (const k of r.sumOfUnits ?? []) if (!keys.has(k)) fail(`${board} ${s.code} ${r.key}: sums ${k}, not a row of the subject`);
-    }
-  }
-}
-
 /** Load the reference data into the database (see the header). Runs in its own transaction, or the caller's. */
 export async function loadReference(executor: Db | Tx, data: ReferenceData, opts: { actorId?: string | null } = {}): Promise<ReferenceLoadResult> {
-  assertReferenceData(data);
   const run = async (tx: Tx | Db) => {
     const out: ReferenceLoadResult = { boards: 0, sittings: 0, subjects: 0, rows: 0, removedSubjects: 0, removedRows: 0 };
     for (const b of data.boards) {
@@ -180,7 +97,7 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
         out.sittings++;
       }
     }
-    for (const [board, subjects] of Object.entries(data.subjects) as [string, ReferenceSubjectData[]][]) {
+    for (const [board, subjects] of Object.entries(data.subjects) as [string, SubjectsFile][]) {
       const keep: string[] = [];
       for (const [i, s] of subjects.entries()) {
         const id = `${board}:${s.code}`;

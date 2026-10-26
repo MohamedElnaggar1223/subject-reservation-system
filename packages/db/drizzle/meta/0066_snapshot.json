@@ -1,6 +1,6 @@
 {
-  "id": "e6c8b2a9-598d-44f7-a300-a575ada992bf",
-  "prevId": "d15659db-974c-400d-a988-2233396fa456",
+  "id": "b10e0e07-6ab6-421e-91a0-501c3dbb6841",
+  "prevId": "a40eb624-f8ad-4a18-84da-2f0943f4cb72",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -15971,6 +15971,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "check_notes": {
+          "name": "check_notes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
         "legacy": {
           "name": "legacy",
           "type": "jsonb",
@@ -16274,6 +16281,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "cells_by_default": {
+          "name": "cells_by_default",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
         },
         "legacy": {
           "name": "legacy",

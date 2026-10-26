@@ -17,6 +17,7 @@ export async function sessionReservations(sessionId: string) {
   if (!s) throw new SetupError('Session not found', 404);
   const lines = (await db.execute(sql`
     select r.id, r.student_id as "studentId", st.name as "studentName", s.name as subject, i.label as row, i.kind, i.reference_codes as codes,
+      (i.self_study_fee is not null) as "ownSelfStudy",
       (select rr.short from reference_row rr join session_offer o on o.id = i.offer_id
         where rr.id = s.council || ':' || o.reference_code || ':' || i.reference_key) as short,
       r.attempt, r.mode, t.name as teacher, r.price_at_registration::float as price, r.status, r.due_at as "dueAt",
@@ -30,7 +31,7 @@ export async function sessionReservations(sessionId: string) {
     left join board_series ps on ps.id = r.prior_sitting_series_id
     where r.session_id = ${sessionId} and r.status in (${sql.join(LIVE.map((x) => sql`${x}`), sql`, `)})
     order by st.name, s.name, i.sort_order, r.id`)).rows as {
-      id: string; studentId: string; studentName: string; subject: string; row: string; kind: string; codes: string[]; short: string | null; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study';
+      id: string; studentId: string; studentName: string; subject: string; row: string; kind: string; codes: string[]; ownSelfStudy: boolean; short: string | null; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study';
       teacher: string | null; price: number; status: string; dueAt: Date | string; provisional: boolean; reservedAt: Date | string; carriedFrom: string | null;
     }[];
   const questions = await db.select().from(sessionQuestion).where(eq(sessionQuestion.sessionId, sessionId)).orderBy(asc(sessionQuestion.sortOrder));
@@ -47,7 +48,7 @@ export async function sessionReservations(sessionId: string) {
     session: { id: s.id, name: s.name, status: s.status },
     lines: lines.map((l) => ({
       ...l,
-      option: optionLabel(labelRowOf({ kind: l.kind, label: l.row, short: l.short, referenceCodes: l.codes, fromReference: l.short !== null }), { attempt: l.attempt, mode: l.mode }, { selfStudyShare: s.selfStudyPercent, lang: 'en' }),
+      option: optionLabel(labelRowOf({ kind: l.kind, label: l.row, short: l.short, referenceCodes: l.codes, fromReference: l.short !== null }), { attempt: l.attempt, mode: l.mode }, { selfStudyShare: l.ownSelfStudy ? null : s.selfStudyPercent, lang: 'en' }),
       paid: l.status === 'confirmed',
     })),
     questions: questions.map(({ id, offeringId, kind, prompt, choices }) => ({ id, offeringId, kind, prompt, choices })),

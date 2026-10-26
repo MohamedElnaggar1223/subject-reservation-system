@@ -1,5 +1,5 @@
 {
-  "id": "d15659db-974c-400d-a988-2233396fa456",
+  "id": "a40eb624-f8ad-4a18-84da-2f0943f4cb72",
   "prevId": "a497fac0-e63e-44e7-b5ab-b65fabda2933",
   "version": "7",
   "dialect": "postgresql",
@@ -15971,6 +15971,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "check_notes": {
+          "name": "check_notes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
         "legacy": {
           "name": "legacy",
           "type": "jsonb",
@@ -16274,6 +16281,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "cells_by_default": {
+          "name": "cells_by_default",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
         },
         "legacy": {
           "name": "legacy",

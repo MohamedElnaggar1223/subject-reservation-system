@@ -16,7 +16,7 @@
  * (9608 SY) aliased to its A.S., Pearson Edexcel Mathematics O.L. (4MA1) whose all papers sum its two
  * papers, and the IAL Arabic A Level (YAA01) whose qualification sums its two units.
  */
-import { academicYearStartOf } from '@repo/validations';
+import { academicYearStartOf, BoardsFileSchema, SubjectsFileSchema } from '@repo/validations';
 
 const Y = academicYearStartOf() + 1;
 const far = (n: number) => Y + n;
@@ -26,13 +26,29 @@ const sitting = (month: 1 | 6 | 10 | 11, year: number, levels: ('igcse' | 'as_al
   examsStart: `${year}-${String(month).padStart(2, '0')}-01`, source: 'test fixture (08y)', confirmed: false,
 });
 
+/** The fixture, parsed through P0's schemas as the seed parses the files (a malformed fixture fails here). */
 export function referenceFixture() {
+  const raw = rawFixture();
+  return {
+    boards: BoardsFileSchema.parse(raw.boards),
+    subjects: {
+      cambridge: SubjectsFileSchema.parse(raw.subjects.cambridge),
+      pearson_edexcel: SubjectsFileSchema.parse(raw.subjects.pearson_edexcel),
+      oxford: SubjectsFileSchema.parse(raw.subjects.oxford),
+    },
+  };
+}
+
+function rawFixture() {
   return {
     boards: [
       {
         code: 'cambridge' as const, name: 'Cambridge International', onePaperFee: 'syllabus' as const, onePaperAsksSitting: true, carryForwardMonths: 13,
         sittings: [sitting(6, far(6), ['igcse', 'as_al']), sitting(11, far(6), ['igcse', 'as_al'])],
-        aliases: [{ printed: '9608 SY', subject: '9618', row: 'as', note: 'the previous syllabus code' }],
+        aliases: [
+          { printed: '9608 SY', subject: '9618', row: 'as', note: 'the previous syllabus code' },
+          { printed: '9618 SX', subject: '9618', row: 'as', toCheck: true, note: 'printed once on a list; may be a misprint of 9618 S1' },
+        ],
       },
       {
         code: 'pearson_edexcel' as const, name: 'Pearson Edexcel', onePaperFee: 'paper' as const, onePaperAsksSitting: false, carryForwardMonths: null,

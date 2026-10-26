@@ -67,7 +67,10 @@ describe('08y: the coordinator sets up a session', () => {
     const boards = await apiResponse(coordinator.api.v1.reference.boards.$get());
     const cambridge = boards.find((b) => b.code === 'cambridge')!;
     expect(cambridge).toMatchObject({ onePaperFee: 'syllabus', onePaperAsksSitting: true, carryForwardMonths: 13 });
-    expect(cambridge.aliases).toEqual([{ printed: '9608 SY', subject: '9618', row: 'as', note: 'the previous syllabus code' }]);
+    expect(cambridge.aliases).toEqual([
+      { printed: '9608 SY', subject: '9618', row: 'as', note: 'the previous syllabus code' },
+      { printed: '9618 SX', subject: '9618', row: 'as', toCheck: true, note: 'printed once on a list; may be a misprint of 9618 S1' },
+    ]);
     const pearson = boards.find((b) => b.code === 'pearson_edexcel')!;
     expect(pearson).toMatchObject({ onePaperFee: 'paper', onePaperAsksSitting: false });
     expect(pearson.sittings.find((s) => s.month === 'october' && s.year === Y + 6)).toMatchObject({ levels: ['as_al'], monthNumber: 10, confirmed: false });

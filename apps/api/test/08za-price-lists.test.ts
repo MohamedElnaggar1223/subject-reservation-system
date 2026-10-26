@@ -26,7 +26,8 @@ const CAMBRIDGE = `Cambridge Registration Fees - June ${Y - 1} (Year 11 & 12)
 9608 SY   AS Level COMPUTER SCIENCE   11,400
 9618 BY / CT   A2 Level COMPUTER SCIENCE   12,450
 9618 AY   A Level COMPUTER SCIENCE   16,950
-9999 ZZ   SOMETHING ELSE   5,000`;
+9999 ZZ   SOMETHING ELSE   5,000
+9618 SX   AS Level COMPUTER SCIENCE   11,900`;
 
 const EDEXCEL = `Edexcel June ${Y - 1} (Registration Fees)
 WAA01   IAL Arabic AL   8,950
@@ -43,7 +44,7 @@ describe('08za: price lists', () => {
 
   const parse = (board: 'cambridge' | 'pearson_edexcel', text: string) =>
     apiResponse(coordinator.api.v1.sessions[':id']['price-lists'].parse.$post({ param: { id: june }, json: { board, text } }));
-  const apply = (board: 'cambridge' | 'pearson_edexcel', name: string, rows: { lineNo?: number; code: string; name: string; amount: number }[], expected?: Impact) =>
+  const apply = (board: 'cambridge' | 'pearson_edexcel', name: string, rows: { lineNo?: number; code: string; name: string; amount: number; confirmed?: boolean }[], expected?: Impact) =>
     coordinator.api.v1.sessions[':id']['price-lists'].$post({ param: { id: june }, json: { board, name, rows, ...(expected ? { expected } : {}) } });
   const fees = async () => Object.fromEntries((await sql<{ id: string; fee: number | null; source: string | null }>(
     `select id, exam_fee::float as fee, exam_fee_source as source from session_offer_item where session_id = $1`, [june])).map((r) => [r.id, [r.fee, r.source]]));
@@ -101,7 +102,11 @@ describe('08za: price lists', () => {
       [5, '9618 BY / CT', 'A2 Level COMPUTER SCIENCE', 12450, [['9618:a2', [row.csA2]]]],
       [6, '9618 AY', 'A Level COMPUTER SCIENCE', 16950, [['9618:al', [row.csAl]]]],
       [7, '9999 ZZ', 'SOMETHING ELSE', 5000, []],
+      [8, '9618 SX', 'AS Level COMPUTER SCIENCE', 11900, [['9618:as', [row.csAs]]]],
     ]);
+    // An alias in doubt (the reference's toCheck) still reaches its row, shown with why it is in doubt.
+    expect(p.rows[6]!.matches[0]).toMatchObject({ toCheck: true, note: 'printed once on a list; may be a misprint of 9618 S1' });
+    expect(p.rows[0]!.matches[0]!.toCheck).toBeUndefined();
     expect(p.unmatched.map((r) => r.code)).toEqual(['9999 ZZ']);
     expect(await fees()).toEqual(before);
     expect(await sql(`select id from price_list where session_id = $1`, [june])).toEqual([]);
@@ -112,17 +117,23 @@ describe('08za: price lists', () => {
     const rows = p.rows.map(({ lineNo, code, name, amount }) => ({ lineNo, code, name, amount }));
     const out = await apiResponse(apply('cambridge', `Cambridge June ${Y - 1}`, rows));
     expect(out).toMatchObject({ saved: true, impact: { repriced: 0, listedForFinance: 0 }, matched: 5, unmatched: [{ code: '9999 ZZ', name: 'SOMETHING ELSE', amount: 5000 }] });
+    // The alias in doubt is not applied unconfirmed: its 11,900 waits for her (the A.S. keeps the 11,400 its own codes gave it).
+    expect(out.toConfirm).toEqual([{ code: '9618 SX', name: 'AS Level COMPUTER SCIENCE', amount: 11900, label: 'Computer Science — A.S.', note: 'printed once on a list; may be a misprint of 9618 S1' }]);
     const f = await fees();
     expect([f[row.bioAll!], f[row.bioPaper!], f[row.csAs!], f[row.csA2!], f[row.csAl!]]).toEqual([
       [10850, 'list'], [10850, 'board_rule'], [11400, 'list'], [12450, 'list'], [16950, 'list'],
     ]);
     const list = await one<{ id: string; lines: number }>(`select l.id, (select count(distinct line_no)::int from price_list_row r where r.price_list_id = l.id) as lines from price_list l where session_id = $1 and board_code = 'cambridge'`, [june]);
-    expect(list.lines).toBe(6);
+    expect(list.lines).toBe(7);
     expect(await one(`select r.code, r.amount::float as amount from session_offer_item i join price_list_row r on r.id = i.price_list_row_id where i.id = $1`, [row.bioAll!])).toEqual({ code: '0970 CX', amount: 10850 });
     await apiResponse(apply('cambridge', `Cambridge June ${Y - 1}`, rows));
     expect(await fees()).toEqual(f);
     expect(await sql(`select id from price_list where session_id = $1 and board_code = 'cambridge'`, [june])).toEqual([{ id: list.id }]);
     expect(await sql(`select new_data->>'rowsPriced' as n from audit_log where action = 'PRICE_LIST_APPLIED' and entity_id = $1 order by created_at`, [list.id])).toEqual([{ n: '5' }, { n: '0' }]);
+    // Confirmed, it is applied like any other line.
+    const ok = await apiResponse(apply('cambridge', `Cambridge alias confirmed ${RUN}`, [{ lineNo: 1, code: '9618 SX', name: 'AS Level COMPUTER SCIENCE', amount: 11400, confirmed: true }]));
+    expect(ok).toMatchObject({ saved: true, matched: 1, toConfirm: [] });
+    expect(await one(`select r.code from session_offer_item i join price_list_row r on r.id = i.price_list_row_id where i.id = $1`, [row.csAs!])).toEqual({ code: '9618 SX' });
   });
 
   it("Pearson Edexcel's list: each paper at its own row's fee (the board prices papers), all papers the sum of its papers, the IAL qualification the sum of its units", async () => {
@@ -143,7 +154,9 @@ describe('08za: price lists', () => {
     const prices = await apiResponse(coordinator.api.v1.sessions[':id'].prices.$get({ param: { id: june } }));
     expect(prices.missing.map((m) => [m.rowId, m.subject, m.label, m.fill])).toEqual([[custom, `Global Citizenship ${RUN}`, 'Global Citizenship course', { unitsSum: null, boardRule: null, fromLists: [] }]]);
     expect(prices.courseFeeMissing).toEqual([]);
-    expect(prices.lists.map((l) => [l.name, l.lines, l.unmatched.map((u) => u.code)])).toEqual([[`Cambridge June ${Y - 1}`, 6, ['9999 ZZ']], [`Edexcel June ${Y - 1}`, 4, []]]);
+    expect(prices.lists.map((l) => [l.name, l.lines, l.unmatched.map((u) => u.code)])).toEqual([
+      [`Cambridge June ${Y - 1}`, 7, ['9999 ZZ']], [`Cambridge alias confirmed ${RUN}`, 1, []], [`Edexcel June ${Y - 1}`, 4, []],
+    ]);
     const bio = prices.rows.find((r) => r.rowId === row.bioPaper)!;
     expect(bio).toMatchObject({ examFee: 10850, examFeeSource: 'board_rule', fill: { boardRule: 10850 } });
     expect(prices.rows.find((r) => r.rowId === row.mathsAll)!.fill.unitsSum).toBe(9200);

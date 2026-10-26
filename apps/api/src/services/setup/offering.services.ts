@@ -371,6 +371,8 @@ async function writeRow(tx: Tx, c: RowContext, input: OfferingRowInputType, exis
     exclusiveGroup: exclusiveGroupFor(kind),
     allowedPriorSeriesIds: priors ?? existing?.allowedPriorSeriesIds ?? [],
     sortOrder,
+    // Saved by her, the row is reviewed: cells a default ticked (§3) are now hers.
+    cellsByDefault: [] as string[],
   };
   // The row's own teachers (null or empty: the offering's).
   const own = input.teachers === undefined ? undefined : await resolveTeachers(tx, c.offer.subjectId, input.teachers ?? [], c.actorId);
@@ -389,6 +391,7 @@ async function writeRow(tx: Tx, c: RowContext, input: OfferingRowInputType, exis
     closesAt: existing.closesAt, payBy: existing.payBy, examFee: existing.examFee, examFeeSource: existing.examFeeSource, priceListRowId: existing.priceListRowId,
     courseFee: existing.courseFee, selfStudyFee: existing.selfStudyFee, ...cellsOf(existing), availability: existing.availability,
     needsPriorSeries: existing.needsPriorSeries, exclusiveGroup: existing.exclusiveGroup, allowedPriorSeriesIds: existing.allowedPriorSeriesIds, sortOrder: existing.sortOrder,
+    cellsByDefault: existing.cellsByDefault,
   };
   const diff = Object.fromEntries(Object.entries(values).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify((before as Record<string, unknown>)[k])));
   const currentTeachers = (await tx.select().from(sessionOfferItemTeacher).where(eq(sessionOfferItemTeacher.itemId, existing.id)).orderBy(asc(sessionOfferItemTeacher.sortOrder)))
@@ -601,6 +604,8 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       const closesAt = next.closesAt !== undefined ? next.closesAt : offer.closesAt;
       const availability = offerAvailability(accepting, closesAt ?? null, now);
       if (availability !== offer.availability) next.availability = availability;
+      // Saved by her, the subject is reviewed: the pre-load's notes leave its check list.
+      if (offer.checkNotes.length) next.checkNotes = [];
       const live = (ids: string[]) => lines.filter((l) => ids.includes(l.itemId) && LIVE.includes(l.status)).reduce((a, l) => a + l.n, 0);
       // Closing the subject (its switch off, or a close date reached): the reservations that stand are counted.
       if (offer.availability !== 'closed' && availability === 'closed') linesAffected += live(rows.map((r) => r.id));
@@ -746,7 +751,8 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
         labelAr: rowLabel(labelRowOf({ ...r, short: ref?.short ?? null, fromReference: !!ref }), 'ar'),
         short: ref?.short ?? null, fromReference: !!ref, referenceKey: r.referenceKey, referenceCodes: r.referenceCodes,
         sitting: sittingOfSeries(session.sessionType, here?.month ?? null),
-        series: here ? { id: here.id, month: here.month, year: here.year, label: here.label, entryDeadline: here.entryDeadline, examsStart: here.examsStart, hasBoardDate: !!(here.entryDeadline || here.examsStart) } : null,
+        // C6, §14: a sitting a session uses needs its entry deadline before the session opens.
+        series: here ? { id: here.id, month: here.month, year: here.year, label: here.label, entryDeadline: here.entryDeadline, examsStart: here.examsStart, hasBoardDate: !!here.entryDeadline } : null,
         closesAt: r.closesAt, payBy: r.payBy,
         examFee: r.examFee, examFeeSource: r.examFeeSource, priceListRowId: r.priceListRowId,
         courseFee: r.courseFee, selfStudyFee: r.selfStudyFee,
@@ -756,6 +762,7 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
         exclusiveGroup: r.exclusiveGroup,
         teachers: rowTeachers.filter((t) => t.itemId === r.id).map(({ teacherId, name, kind, mode }) => ({ teacherId, name, external: kind === 'provider', online: mode === 'online' })),
         sortOrder: r.sortOrder,
+        cellsByDefault: r.cellsByDefault,
         // A row made by the deprecated routes keeps its fee keys until P1b (priced from the fee grid).
         legacyFeeKeys: r.examFee === null && r.entersKind !== 'subject',
         lines: {
@@ -773,6 +780,7 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
       board: { code: s.council, name: boardName, onePaperFee: onePaperFeeKey === 'unit' ? 'paper' as const : 'syllabus' as const },
       group: groupOfLevel(s.qualificationLevel),
       note: offer.notes, teacherChoice: offer.teacherChoice, teacherTbc: offer.teacherTbc, accepting: offer.accepting, closesAt: offer.closesAt,
+      checkNotes: offer.checkNotes,
       courseFee: offer.courseFee,
       teachers: teachers.filter((t) => t.offerId === offer.id).map(({ teacherId, name, kind, mode }) => ({ teacherId, name, external: kind === 'provider', online: mode === 'online' })),
       rows: view,
