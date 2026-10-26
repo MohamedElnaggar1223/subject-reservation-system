@@ -163,41 +163,74 @@ export type SessionIdType = z.infer<typeof SessionId>;
 // ─── Create and change ──────────────────────────────────────────────────────
 
 /**
- * A new session: six inputs (§4.1). The name and the refund policy follow from the type; with
- * `copyFromSessionId` the offers, teachers, items, availability and course fees of an earlier
- * session come across, and its board fees come across provisional.
+ * A new session (the coordinator rework, COORDINATOR_REWORK.md C1–C3, Appendix A): a type, a year,
+ * and where it starts from — `copyFromSessionId` copies that session whole with its years moved
+ * forward (C3), else it starts empty. The name is derived and never typed; it is born a draft.
+ *
+ * Deprecated, until P2 replaces the old screen and P1b adapts the suites: the legacy contract — a
+ * `startDate` (with `endDate`, `courseStartsOn`, `paymentDueAt`) makes the session the old way
+ * (open at once when its start has passed; `copyFromSessionId` then copies the offers only, with
+ * their board fees provisional). `label` (a second cycle of one type and year; a converted
+ * window's) is kept for both.
  */
 export const CreateSession = z
   .object({
     type: SessionTypeSchema,
     // The June year, or the winter's November year.
     year: SeriesYearSchema,
-    startDate: z.coerce.date(),
-    endDate: z.coerce.date(),
-    // The cycle's first lesson (the refund anchor).
-    courseStartsOn: DateOnlySchema,
-    // When every line is due unless an exception says otherwise.
-    paymentDueAt: z.coerce.date(),
+    copyFromSessionId: z.string().min(1).optional(),
     // Rare: a second cycle of the same type and year. The screen does not ask.
     label: z.string().trim().max(40).default(''),
-    copyFromSessionId: z.string().min(1).optional(),
+    /** @deprecated the legacy contract (see above). */
+    startDate: z.coerce.date().optional(),
+    /** @deprecated the legacy contract: the automatic close. */
+    endDate: z.coerce.date().optional(),
+    /** @deprecated the legacy contract: the cycle's first lesson (the refund anchor). */
+    courseStartsOn: DateOnlySchema.optional(),
+    /** @deprecated the legacy contract: when every line is due unless an exception says otherwise. */
+    paymentDueAt: z.coerce.date().optional(),
   })
-  .refine((d) => d.endDate > d.startDate, { message: 'End date must be after start date', path: ['endDate'] });
+  .refine((d) => !d.startDate || (!!d.endDate && !!d.courseStartsOn && !!d.paymentDueAt), {
+    message: 'The legacy contract names its end, course start and payment due date with its start', path: ['startDate'],
+  })
+  .refine((d) => !(d.startDate && d.endDate) || d.endDate > d.startDate, { message: 'End date must be after start date', path: ['endDate'] });
 
 export type CreateSessionType = z.infer<typeof CreateSession>;
 
 /**
- * The session's header. A draft may change any of it; an active session its end (with a reason),
- * course start and payment due; the refund policy until the first line carries a consent. The
- * type and year change only through "Correct series" (F0a).
+ * The session's header and what families agree to (the coordinator rework, C4–C7, D11, D13, E4;
+ * Appendix A): the optional close date, the payment due date, the first lesson, the self-study
+ * share, the grades that may reserve, the unpaid-cancel days, the refund policy (until the first
+ * family consents to it) and the session's extra questions. A share change answers its impact first
+ * (`expected`). Only what is sent changes.
+ *
+ * Deprecated, the legacy contract: `startDate` (a draft's), `endDate` (an open session's end changes
+ * with a reason) — `closesAt` is the new field for the same column.
  */
 export const UpdateSession = z
   .object({
-    startDate: z.coerce.date().optional(),
-    endDate: z.coerce.date().optional(),
+    closesAt: z.coerce.date().nullable().optional(),
     courseStartsOn: DateOnlySchema.optional(),
     paymentDueAt: z.coerce.date().optional(),
+    selfStudyPercent: z.number().int().min(0).max(100).optional(),
+    allowedGrades: z.array(z.enum(['10', '11', '12', 'graduates'])).min(1).max(4).optional(),
+    unpaidCancelDays: z.number().int().min(0).max(60).optional(),
     refundPolicy: RefundPolicySchema.optional(),
+    questions: z.array(z.object({
+      id: z.string().min(1).optional(),
+      kind: z.enum(['yes_no', 'text', 'choice']),
+      prompt: z.string().trim().min(2).max(300),
+      choices: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
+      required: z.boolean().default(false),
+    }).refine((q) => (q.kind === 'choice') === (q.choices.length > 0), { message: 'A choice question lists its choices; the others list none', path: ['choices'] })).max(20).optional(),
+    expected: z.object({
+      repriced: z.number().int().min(0), listedForFinance: z.number().int().min(0),
+      linesAffected: z.number().int().min(0), dueDatesMoved: z.number().int().min(0),
+    }).optional(),
+    /** @deprecated the legacy contract. */
+    startDate: z.coerce.date().optional(),
+    /** @deprecated the legacy contract (`closesAt` is the new field). */
+    endDate: z.coerce.date().optional(),
     reason: z.string().trim().max(500).optional(),
   })
   .refine((d) => !(d.startDate && d.endDate) || d.endDate > d.startDate, { message: 'End date must be after start date', path: ['endDate'] });

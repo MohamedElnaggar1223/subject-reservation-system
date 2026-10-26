@@ -45,7 +45,7 @@ export const ALL_PAPERS = 'All papers';
  * this display word is decided; its Arabic is in the web's sessions dictionary.
  */
 export function itemDisplayLabel(item: { kind: string; label: string }): string {
-  return item.kind === 'whole' && item.label.trim().toLowerCase() === WHOLE_ITEM_LABEL.toLowerCase() ? ALL_PAPERS : item.label;
+  return (item.kind === 'all_papers' || item.kind === 'whole') && item.label.trim().toLowerCase() === WHOLE_ITEM_LABEL.toLowerCase() ? ALL_PAPERS : item.label;
 }
 
 export const FEE_KEY_KINDS = ['unit', 'option', 'qualification', 'subject'] as const;

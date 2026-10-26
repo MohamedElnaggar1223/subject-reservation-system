@@ -41,8 +41,13 @@ export type LineInputType = z.infer<typeof LineInput>;
 /**
  * Why a line's price is what it is (priceLine), snapshotted on the line so the receipt and the
  * statement can say it ("course 14,000 × 50% + board 9,200 × 100%").
+ *
+ * Version 1 read the board part from the series' fee grid (`feeRows`); version 2 (the coordinator
+ * rework, COORDINATOR_REWORK.md §6, §9.1) reads the row's own exam fee and the session's self-study
+ * share, and keeps `feeRows` empty. The fields both versions share keep their names, so the
+ * statement, the receipt and the exceptions read either.
  */
-export type PricingBasis = {
+export type PricingBasisV1 = {
   v: 1;
   attempt: Attempt;
   mode: LineMode;
@@ -59,6 +64,22 @@ export type PricingBasis = {
   registrationFee: number;
   total: number;
 };
+
+/** Version 2: the row's exam fee (and where it came from), its course fee, the session's self-study share. */
+export type PricingBasisV2 = Omit<PricingBasisV1, 'v'> & {
+  v: 2;
+  /** The row the line enters (re-pricing is keyed by row). */
+  rowId: string;
+  /** The row's exam fee and its source ('list' | 'typed' | 'units_sum' | 'board_rule'). */
+  examFee: number;
+  examFeeSource: string | null;
+  /** The session's self-study share of the course fee at pricing time (E4). */
+  selfStudyShare: number;
+  /** The row's own self-study course amount, when it replaced the share (E4). */
+  selfStudyFee: number | null;
+};
+
+export type PricingBasis = PricingBasisV1 | PricingBasisV2;
 
 /**
  * The policies a line is checked against (§3.5's table), each exception-able through the
