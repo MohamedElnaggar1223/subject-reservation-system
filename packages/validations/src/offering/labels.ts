@@ -8,10 +8,12 @@
  *   "Retake · in school · Unit 5 (WBI15)"
  *
  * Pure functions, shared by the API, the web and the reference check. The self-study share is
- * the session's (E4), always a parameter. No board jargon reaches a family (F3): none of the
- * words in FAMILY_BANNED_WORDS appears in anything generated here. The Arabic follows
- * apps/web/lib/i18n-reservations.ts (قيد أول، إعادة، في المدرسة، دراسة ذاتية، كل الأوراق، نقل نتيجة);
- * codes (A.S., WBI15, 9AA0) are data and stay as printed.
+ * the session's (E4), always a parameter; a row that charges its own self-study amount (E4,
+ * `self_study_fee`) passes null and reads plain "self study". No board jargon reaches a family
+ * (F3): familyJargonIn finds the words of FAMILY_BANNED_WORDS with their plurals and, in Arabic,
+ * their attached forms (الدورة، للدورة، دورات …). The Arabic follows
+ * apps/web/lib/i18n-reservations.ts (قيد أول، إعادة، في المدرسة، دراسة ذاتية، كل الأوراق، نقل نتيجة)
+ * and "A Level" is المستوى A as elsewhere in the app; codes (A.S., WBI15, 9AA0) stay as printed.
  */
 
 import type { Attempt, LineMode } from '../registration/line.validations';
@@ -51,6 +53,21 @@ export const FAMILY_BANNED_WORDS: readonly string[] = [
   'دورة', 'سلسلة', 'مكوّن', 'مكون',
 ];
 
+/** The English words with their plurals (sittings, components, syllabi …). */
+const JARGON_EN = /(^|[^\p{L}])(sittings?|series|components?|awards?|syllab(?:us|uses|i)|option[ -]codes?|cash-ins?|entry methods?)(?=[^\p{L}]|$)/giu;
+
+/** A possessive ending: دورتها، مكوناته، سلاسلنا. */
+const AR_SUFFIX = '(?:ها|هم|هن|ه|ي|ك|كم|نا)';
+
+/**
+ * The Arabic words with their attached forms: a prefix (و ف ب ك ل, the article ال or لل, as in
+ * الدورة، للدورة، بالدورة، والدورة), the plural (دورات، سلاسل، مكونات) and a possessive (دورتها، دوراتها).
+ */
+const JARGON_AR = new RegExp(
+  `(^|[^\\p{L}])(?:[وفبكل]?(?:ال|لل)?)(دورة|دورت${AR_SUFFIX}|دورات${AR_SUFFIX}?|سلسلة|سلسلت${AR_SUFFIX}|سلاسل${AR_SUFFIX}?|مكو\u0651?ن(?:ات)?${AR_SUFFIX}?)(?=[^\\p{L}]|$)`,
+  'gu',
+);
+
 const ATTEMPT: Record<Attempt, Record<LabelLang, string>> = {
   first: { en: 'First entry', ar: 'قيد أول' },
   retake: { en: 'Retake', ar: 'إعادة' },
@@ -58,9 +75,19 @@ const ATTEMPT: Record<Attempt, Record<LabelLang, string>> = {
 
 const SEP = ' · ';
 
-/** "Paper 41/42" → "الورقة 41/42", "Unit 5" → "الوحدة 5", "Theory paper" → "الورقة النظرية"; codes and names stay. */
+/** A qualification row's name in Arabic ("A Level" is المستوى A in the app); its code is added as printed. */
+const QUALIFICATION_AR: Record<string, string> = {
+  'International A Level': 'المستوى A الدولي',
+  'GCE A Level': 'المستوى A البريطاني',
+};
+
+/**
+ * "Paper 41/42" → "الورقة 41/42", "Unit 5" → "الوحدة 5", "Theory paper" → "الورقة النظرية",
+ * "International A Level" → "المستوى A الدولي"; codes (P1, M1) stay.
+ */
 function shortInArabic(short: string): string {
   if (/^theory paper$/i.test(short)) return 'الورقة النظرية';
+  if (QUALIFICATION_AR[short]) return QUALIFICATION_AR[short]!;
   const paper = /^Paper (.+)$/.exec(short);
   if (paper) return `الورقة ${paper[1]}`;
   const unit = /^Unit (.+)$/.exec(short);
@@ -109,9 +136,13 @@ export function referenceRowLabel(row: LabelRow): { en: string; ar: string } {
   return { en: rowPhrase(row, 'en'), ar: rowPhrase(row, 'ar') };
 }
 
-/** "in school", or "self study 50%" with the session's share. */
-export function modeLabel(mode: LineMode, selfStudyShare: number, lang: LabelLang): string {
+/**
+ * "in school", or "self study 50%" with the session's share; plain "self study" when the share is
+ * null (a row charging its own self-study amount, E4, where no percentage is true).
+ */
+export function modeLabel(mode: LineMode, selfStudyShare: number | null, lang: LabelLang): string {
   if (mode === 'in_school') return lang === 'en' ? 'in school' : 'في المدرسة';
+  if (selfStudyShare === null) return lang === 'en' ? 'self study' : 'دراسة ذاتية';
   const share = formatShare(selfStudyShare);
   return lang === 'en' ? `self study ${share}%` : `دراسة ذاتية ${share}%`;
 }
@@ -121,8 +152,11 @@ function formatShare(share: number): string {
   return Number.isInteger(share) ? String(share) : String(Math.round(share * 100) / 100);
 }
 
-/** An option families pick (D9): "Retake · self study 50% · Paper 41/42 only". */
-export function optionLabel(row: LabelRow, option: OptionKind, opts: { selfStudyShare: number; lang: LabelLang }): string {
+/**
+ * An option families pick (D9): "Retake · self study 50% · Paper 41/42 only". `selfStudyShare` is
+ * the session's percentage, or null for a row with its own self-study amount ("Retake · self study · …").
+ */
+export function optionLabel(row: LabelRow, option: OptionKind, opts: { selfStudyShare: number | null; lang: LabelLang }): string {
   return [ATTEMPT[option.attempt][opts.lang], modeLabel(option.mode, opts.selfStudyShare, opts.lang), rowPhrase(row, opts.lang)].join(SEP);
 }
 
@@ -138,8 +172,12 @@ export function examMonthLabel(s: SittingRef, lang: LabelLang): string {
   return `${MONTHS[s.month]![lang]} ${s.year}`;
 }
 
-/** The words that make a text board jargon to a family (F3), or none. */
+/** The board jargon in a text (F3), as written there ("Sittings", "للدورة"), or none. */
 export function familyJargonIn(text: string): string[] {
-  const lower = text.toLowerCase();
-  return FAMILY_BANNED_WORDS.filter((w) => new RegExp(`(^|[^\\p{L}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}]|$)`, 'u').test(lower));
+  const found: string[] = [];
+  for (const re of [JARGON_EN, JARGON_AR]) {
+    re.lastIndex = 0;
+    for (const m of text.matchAll(re)) found.push(m[0].slice(m[1]!.length));
+  }
+  return found;
 }

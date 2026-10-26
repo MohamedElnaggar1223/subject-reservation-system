@@ -3,16 +3,32 @@
  * subjects the school offers with the rows each can be entered as. Kept in the repository as data
  * (`packages/db/reference/*.json`), maintained by us, read-only to staff; the June 2027 pre-load
  * (`packages/db/seeds/june-2027.json`, §8) is validated here too. P1a's loader reads every file
- * through these schemas; `pnpm --filter @repo/db reference:check` runs them over the files.
+ * through these schemas; `pnpm --filter @repo/db reference:check` runs them over the files (and CI
+ * runs it on every push).
  *
- * Additions to §7.1's shape (each optional or derivable, so nothing in §7.1 changes meaning):
- * - a sitting's `levels`: the levels the board sits in that month. Pearson sits International A
- *   Levels in October and January and International GCSEs in November; the school's lists call
- *   the IAL October sitting "November" (FEATURES_PLAN.md §6, 2), so a winter row's "november"
- *   resolves to the board's autumn sitting whose levels include the subject's level.
- * - a sitting's `note`, a board's `note`, a row's `note`, an alias's `note`: why, in plain words.
- * - a row's `winterSitting`: the row's own default where the school splits a subject across
- *   November and January (IAL Biology units 1–2 November, 3–4 January); absent, the subject's.
+ * Fields beyond §7.1's first sketch:
+ * - boards.json — a sitting's `levels` is REQUIRED (the plan now says so): the levels the board
+ *   sits in that month. Pearson sits International A Levels in October and January and
+ *   International GCSEs in November; the school's lists call the IAL October sitting "November"
+ *   (FEATURES_PLAN.md §6, 2), so a winter row's "november" resolves to the board's autumn sitting
+ *   whose levels include the subject's level. An alias's `toCheck` marks a printed code whose
+ *   reading is in doubt: it still reaches its row, but the match is shown for a person to confirm
+ *   (the check warns), never applied silently. Optional `note` on a board, a sitting, a row and an
+ *   alias: why, in plain words.
+ * - subjects/<board>.json — a row's optional `winterSitting`: its own default where the school
+ *   splits a subject across November and January (IAL Biology units 1–2 November, 3–4 January);
+ *   absent, the subject's; null, not sat in winter (GCE 9AA0).
+ * - june-2027.json (the session seed) — `session`: type, year, `refundPolicy` (C7's rows),
+ *   `selfStudyPercent` (E4), and C5's dates `closesAt`, `paymentDueAt`, `courseStartsOn` (null in
+ *   the pre-load: on no form). Each offering: `order` (§8's number, D10), `board` and `subject`
+ *   (the reference subject's code), `teachers` (placeholder keys with `online`/`external`),
+ *   `teacherTbc` (D4), `teacherChoice` ('families' | 'school', D5), `note` (the family note),
+ *   `courseFee`, `rows`, and `flags` (§8's notes for the check list; names only as {T-…}
+ *   placeholders). Each row: `key`, `cells` (D3's four columns), `cellsByDefault` (cells ticked by
+ *   a §3 default, Q10's RI*), `examFee`, `examFeeSource` (list, typed, units_sum, board_rule),
+ *   `examFeeList` (the school's list the figure was read on), `courseFee`,
+ *   `allowedPriorSittings` (D6; null when the board does not ask) and optional `teachers`.
+ * - seeds/local/<session>.teachers.json (git-ignored) — placeholder key → name.
  */
 
 import { z } from 'zod';
@@ -96,7 +112,11 @@ export const BoardAliasSchema = z.object({
   printed: nonEmpty,
   subject: nonEmpty,
   row: ReferenceKeySchema,
+  /** The printed code's reading is in doubt: show the match for a person to confirm, never apply it silently. */
+  toCheck: z.boolean().optional(),
   note: nonEmpty.optional(),
+}).superRefine((a, ctx) => {
+  if (a.toCheck && !a.note) addIssue(ctx, ['note'], 'An alias to check says what is in doubt');
 });
 export type BoardAlias = z.infer<typeof BoardAliasSchema>;
 
@@ -221,11 +241,12 @@ export function printedCodeCandidates(printed: string): string[] {
   return out;
 }
 
-export type PrintedCodeMatch = { subject: string; row: string; via: 'priceCode' | 'alias' };
+export type PrintedCodeMatch = { subject: string; row: string; via: 'priceCode' | 'alias'; toCheck?: true; note?: string };
 
 /**
  * Every reference row a printed code reaches through the rows' priceCodes and the board's aliases.
  * A well-formed reference gives exactly one; the check holds every row of the school's fee lists to it.
+ * A match through an alias marked `toCheck` carries the alias's note: a person confirms it.
  */
 export function matchPrintedCode(printed: string, board: Pick<ReferenceBoard, 'aliases'>, subjects: SubjectsFile): PrintedCodeMatch[] {
   const wanted = new Set(printedCodeCandidates(printed));
@@ -237,7 +258,7 @@ export function matchPrintedCode(printed: string, board: Pick<ReferenceBoard, 'a
   }
   for (const a of board.aliases) {
     if (wanted.has(normalizePrintedCode(a.printed)) && !found.has(`${a.subject}/${a.row}`)) {
-      found.set(`${a.subject}/${a.row}`, { subject: a.subject, row: a.row, via: 'alias' });
+      found.set(`${a.subject}/${a.row}`, { subject: a.subject, row: a.row, via: 'alias', ...(a.toCheck ? { toCheck: true as const, note: a.note } : {}) });
     }
   }
   return [...found.values()];
