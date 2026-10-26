@@ -1290,6 +1290,15 @@ describe('money invariants over the whole database', () => {
         and (a.new_data->>'boardDeadline')::timestamptz < a.created_at
     `);
     expect(late).toEqual([]);
+    // Every confirmation written since 0068 records it (the key present; null only for a line whose sitting has no
+    // board date): a row without it would be skipped above and prove nothing (L3 of the P1b review). 0068's
+    // journal time is the floor: a row written before it never had the key.
+    const unrecorded = await sql(`
+      select a.entity_id, a.created_at from audit_log a
+      where a.action = 'REGISTRATION_CONFIRMED' and not (a.new_data ? 'boardDeadline')
+        and a.created_at >= to_timestamp(1793024205511 / 1000.0)
+    `);
+    expect(unrecorded).toEqual([]);
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'REGISTRATION_CONFIRMED' and new_data->>'boardDeadline' is not null`))[0]?.n)).toBeGreaterThan(0);
   });
 
