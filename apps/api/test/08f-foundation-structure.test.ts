@@ -47,37 +47,32 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
     it('every reader sees every key, its default, and whether they may change it', async () => {
       const list = await apiResponse(officer.api.v1.settings.$get());
       const byKey = Object.fromEntries(list.map((s) => [s.key, s]));
-      expect(byKey['eligibility.graduateRetakes']).toMatchObject({ value: true, isDefault: true, canEdit: false, source: 'A-12' });
+      // P1b: A-12's switch left with the grade list (the session's); the declaration's text is the admin's.
+      expect(byKey['eligibility.graduateRetakes']).toBeUndefined();
+      expect(byKey['reservation.declarationText']).toMatchObject({ isDefault: true, canEdit: false });
+      expect(byKey['schoolFee.graduatesExempt']).toMatchObject({ value: true, isDefault: true, canEdit: false });
       expect(byKey['calendar.schoolWeekdays']).toMatchObject({ value: [0, 1, 2, 3, 4], canEdit: false });
       const mine = Object.fromEntries((await apiResponse(coordinator.api.v1.settings.$get())).map((s) => [s.key, s.canEdit]));
       expect(mine).toEqual({
         // The lead's decision of 16 Oct 2026 (15): the school's name on the sign-in page is the admin's.
         'school.name': false,
-        'eligibility.graduateRetakes': false,
+        // P1b: the declaration families tick (D13's wording) is the admin's.
+        'reservation.declarationText': false,
         'schoolFee.graduatesExempt': false,
         'schoolFee.newYearWithoutSchedule': false,
         'calendar.schoolWeekdays': true,
-        // The reservations rework (step 1): the pricing, payment and refund policies are finance's and the admin's.
-        'pricing.selfStudyCoursePercent': false,
-        'pricing.selfStudyBoardPercent': false,
-        'pricing.retakeTaughtCoursePercent': false,
-        'pricing.onePaperCoursePercent': false,
-        'pricing.payOnProvisionalFee': false,
+        // The reservations rework (step 1): the payment and refund policies are finance's and the admin's. P1b: the
+        // pricing.* percents left (the session's share, a row's prices), and so did payOnProvisionalFee (prices final).
         'payment.graceDays': false,
         'refund.defaultPolicy.june': false,
         'refund.defaultPolicy.winter': false,
-        // The reservations rework (step C): the overdue expiry is finance's and the admin's; late
-        // board entries (Q-20) the admin's alone.
-        'payment.expireOverdueAfterDays': false,
-        'exceptions.boardEntryDeadline': false,
+        // P1b: the overdue expiry is the session's unpaid-cancel days, and late board entries (Q-20) left.
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
         // F7: two more of the coordinator's pending answers, the import's defaults (IS-02, IS-03).
         'import.selfStudyOnTaught': true,
         'import.carryForward': true,
-        // The reservations rework, step B: whether an unverified declared sitting is held at its
-        // deadline is the owner's question (Q-22): the admin's setting.
-        'verification.unverifiedAtDeadline': false,
+        // P1b: the hold of an unverified declared sitting at its deadline left the reservation path (Q-22's setting gone).
         // F4: the school as an exam centre — the coordinator keeps these.
         'exams.centres': true,
         'exams.carryForward': true,
@@ -94,9 +89,9 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
 
     it('a change is refused to any role the key does not name, and nothing is written', async () => {
       for (const [who, key, value] of [
-        [coordinator, 'eligibility.graduateRetakes', false],
+        [coordinator, 'reservation.declarationText', 'I agree.'],
         [coordinator, 'schoolFee.graduatesExempt', false],
-        [finadmin, 'eligibility.graduateRetakes', false],
+        [finadmin, 'reservation.declarationText', 'I agree.'],
         [finadmin, 'calendar.schoolWeekdays', [0, 1, 2, 3]],
       ] as const) {
         const r = await refused(put(who, key, value));

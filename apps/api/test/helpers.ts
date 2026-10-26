@@ -359,7 +359,7 @@ export async function session(
   _name: string,
   sessionType: 'june' | 'october' | 'november' | 'january',
   qualificationLevel: 'igcse' | 'as_level' | 'a_level',
-  opts: { startDate: string; endDate: string; activate?: boolean; seriesYear?: number }
+  opts: { startDate: string; endDate: string; activate?: boolean; seriesYear?: number; allowedGrades?: readonly ('10' | '11' | '12' | 'graduates')[] }
 ): Promise<string> {
   const oldYear = opts.seriesYear ?? seriesYearInAcademicYear(sessionType, academicYearStartOf(new Date(opts.startDate)));
   const type = sessionType === 'june' ? 'june' as const : 'winter' as const;
@@ -373,6 +373,10 @@ export async function session(
     },
   }));
   await apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: r.id }, json: { final: true } }));
+  // P1b: eligibility reads the session's grade list (C7). Made by the legacy create (dates in the body), a suite's
+  // session takes the grades the old rules admitted — June grades 10 to 12, winter 11, 12 and graduates — unless a
+  // suite gives its own list.
+  if (opts.allowedGrades) await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: r.id }, json: { allowedGrades: [...opts.allowedGrades] } }));
   const meta: SessionMeta = { id: r.id, oldType: sessionType, level: qualificationLevel, type, year, oldYear, label, adm };
   SESSIONS.push(meta);
   for (const sub of SUBJECTS.filter((x) => x.level === qualificationLevel)) await offerInSession(adm, meta, sub);
