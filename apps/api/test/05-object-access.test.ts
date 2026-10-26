@@ -43,7 +43,7 @@ describe('object-level access between families', () => {
   let sessionId: string, draftId: string;
   // Family A's records
   let physA: string, chemA: string, geoA: string, deskPaymentA: string, physReceiptA: string;
-  let bioA: string, instaPaymentA: string, econA: string, preregA: string;
+  let bioA: string, instaPaymentA: string, econA: string;
   let crA: string, remarkStudentA: string, remarkParentA: string, linkA: string, notificationA: string;
   let withdrawalA: string, fileA: string, fileB: string, avatarB: string;
   // Family B's own records, used to test attaching A's file
@@ -107,9 +107,9 @@ describe('object-level access between families', () => {
       json: { registrationIds: [bioA], paymentMethod: 'instapay', escrowAmountToApply: 0 },
     }))).id!;
 
-    // A: a student request waiting for the parent, and a preregistration.
+    // A: a student request waiting for the parent. (No preregistration: a draft takes none since the coordinator
+    // rework, C4; the route refuses everyone, so B's attempts below are refused whatever the ownership check says.)
     econA = (await apiResponse(studentA.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [econ])) } })))[0]!.id;
-    preregA = (await apiResponse(parentA.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [lit])), studentId: studentAId } })))[0]!.id;
 
     // A: a drop request from the student on a confirmed subject.
     const cr = await apiResponse(studentA.api.v1.registrations[':id']['request-drop'].$post({ param: { id: chemA }, json: { reason: 'too much work' } }));
@@ -173,11 +173,10 @@ describe('object-level access between families', () => {
     expect(await statusOf('registration', econA)).toBe('pending_payment');
     await refusedAs('parentB direct-register A', parentB.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [maths])), studentId: studentAId } }));
     await refusedAs('parentB preregister A', parentB.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [maths])), studentId: studentAId } }));
-    await refusedAs('parentB cancel A prereg', parentB.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: preregA } }));
+    await refusedAs('parentB cancel A prereg', parentB.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: bioA } }));
 
     expect(await statusOf('registration', physA)).toBe('confirmed');
     expect(await statusOf('registration', bioA)).toBe('pending_payment');
-    expect(await statusOf('registration', preregA)).toBe('preregistered');
     expect(await sql(`select 1 from registration where student_id = $1 and subject_id = $2`, [studentAId, maths])).toEqual([]);
     expect(await sql(`select 1 from change_request where registration_id = $1 and id <> $2`, [physA, crA])).toEqual([]);
 

@@ -735,6 +735,22 @@ export async function runPaymentDeadlines(now: Date = new Date()) {
 }
 
 /**
+ * Bring lines past their cut-off (COORDINATOR_REWORK.md §6, C10): the due date moved back so that due + the
+ * session's unpaid-cancel days fell a minute ago — the cut-off a line reaches when its family has not paid. A line
+ * whose board deadline comes first is past its cut-off already, or not until that deadline. Returns each line's
+ * cut-off as the database computes it.
+ */
+export async function passCutOff(registrationIds: string[]) {
+  const ids = registrationIds.map((_, i) => `$${i + 1}`).join(', ');
+  await sql(`update registration r set due_at = now() - make_interval(days => s.unpaid_cancel_days) - interval '1 minute'
+    from registration_session s where s.id = r.session_id and r.id in (${ids})`, registrationIds);
+  const rows = await sql<{ id: string; cut_off: string }>(
+    `select id, line_cut_off(due_at, session_id, attempt, prior_sitting_series_id, board_series_id, declaration_rejected) as cut_off
+     from registration where id in (${ids})`, registrationIds);
+  return new Map(rows.map((r) => [r.id, new Date(r.cut_off)]));
+}
+
+/**
  * Run the scheduler's session step (close windows that ended, open drafts
  * whose start has come), as the scheduler does every minute. Like
  * runPaymentDeadlines, the scheduler is its only caller. It touches every
