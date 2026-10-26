@@ -210,7 +210,7 @@ function Editor({ o, s, canEdit }: { o: OfferingData; s: SetupSession; canEdit: 
           {canEdit && (
             <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-md">
               <Button disabled={!dirty || save.isPending} onClick={() => save.save(bodyOf(d, o))}>{save.isPending ? 'Saving…' : 'Save'}</Button>
-              <Button variant="outline" disabled={!dirty || save.isPending} onClick={() => setD(initial)}>Undo the changes</Button>
+              <Button variant="outline" disabled={!dirty || save.isPending} onClick={() => { setD(initial); save.reset(); }}>Undo the changes</Button>
               <span className="flex-1 text-xs text-muted-foreground">{dirty ? 'Changes not saved yet.' : 'Saved.'}</span>
               <Button variant="ghost" className="text-destructive" onClick={() => setRemoving(true)}>Remove this subject</Button>
               <div className="basis-full"><ErrorLine message={save.error} /></div>
@@ -537,7 +537,7 @@ function Teachers({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void; ca
           {adding && (
             <>
               <input className={cn(INPUT_CLASS, 'w-60')} value={name} onChange={(e) => { setName(e.target.value); check.reset(); }} placeholder="Name as families will read it" aria-label="The new teacher's name" />
-              <Button variant="outline" disabled={name.trim().length < 2 || check.isPending} onClick={() => check.mutate(name.trim())}>Add</Button>
+              <Button variant="outline" disabled={name.trim().length < 2 || check.isPending} onClick={() => check.mutate(name.trim())}>Add the teacher</Button>
             </>
           )}
         </div>
@@ -692,7 +692,7 @@ function ForFamilies({ d, setD, canEdit }: { d: Draft; setD: (d: Draft) => void;
               <textarea id="eq-choices" rows={2} className={cn(TEXTAREA_CLASS, 'mt-1')} value={choices} onChange={(e) => setChoices(e.target.value)} />
             </div>
           )}
-          <Button variant="outline" size="sm" disabled={!ready} onClick={() => { setD({ ...d, questions: [...d.questions, { kind, prompt: prompt.trim(), choices: kind === 'choice' ? list : [], required: false }] }); setPrompt(''); setChoices(''); }}>Add</Button>
+          <Button variant="outline" size="sm" disabled={!ready} onClick={() => { setD({ ...d, questions: [...d.questions, { kind, prompt: prompt.trim(), choices: kind === 'choice' ? list : [], required: false }] }); setPrompt(''); setChoices(''); }}>Add the question</Button>
         </div>
       )}
     </section>

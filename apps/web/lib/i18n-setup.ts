@@ -22,6 +22,8 @@
  * word, so a subject's name or code is never touched.
  */
 const HER_WORDS: [RegExp, string][] = [
+  // An all-papers row's stored label (WHOLE_ITEM_LABEL); her screens and families read "All papers".
+  [/\bWhole subject\b/g, 'All papers'],
   [/\bsittings\b/gi, 'exam months'],
   [/\bsitting\b/gi, 'exam month'],
   [/\bseries\b/gi, 'exam month'],
@@ -402,6 +404,7 @@ export const setupArabic: Record<string, string> = {
   'Teachers': 'المعلمون',
   'No teacher yet.': 'لا معلم بعد.',
   'Add a teacher': 'أضف معلمًا',
+  'Add the teacher': 'أضف المعلم',
   'Add a teacher…': 'أضف معلمًا…',
   'The school\'s teachers': 'معلمو المدرسة',
   'A new teacher…': 'معلم جديد…',
@@ -446,6 +449,18 @@ export const setupArabic: Record<string, string> = {
   'Sat in': 'جلس له في',
   'When did you sit it?': 'متى جلست له؟',
   'Sat it before? Show retake choices': 'جلس له من قبل؟ اعرض خيارات الإعادة',
+
+  // The API's refusals she can meet, in her words (herWords runs first)
+  'What this change does to families changed while you were looking: look at the new counts and save again': 'تغيّر ما يفعله هذا التعديل بالعائلات أثناء المراجعة: راجع الأعداد الجديدة واحفظ مرة أخرى',
+  'The close date must be in the future (switch Accepting off to close it now)': 'يجب أن يكون تاريخ الإغلاق في المستقبل (أوقف قبول الحجوزات للإغلاق الآن)',
+  'A family has consented to this session\'s refund policy: it can no longer change (an exception changes one student\'s)': 'وافقت عائلة على سياسة الاسترداد لهذه الجلسة: لم يعد تغييرها ممكنًا (الاستثناء يغيّرها لطالب واحد)',
+  'Families have reserved in this session: its prices stay final (a price changed later re-prices the unpaid lines and lists the paid ones for finance)': 'حجزت عائلات في هذه الجلسة: تبقى أسعارها نهائية (تغيير سعر لاحقًا يعيد تسعير غير المدفوع ويدرج المدفوع للمالية)',
+  'Nothing to change': 'لا شيء للتغيير',
+  'A one-paper row is always a retake: it takes no first entry': 'صف الورقة الواحدة إعادة دائمًا: لا يقبل قيدًا أول',
+  'A custom row has a name': 'للصف الخاص اسم',
+  'The board\'s entry deadline must be in the future': 'يجب أن يكون آخر موعد للقيد لدى المجلس في المستقبل',
+  'The retake deadline cannot be before the entry deadline': 'لا يمكن أن يسبق آخر موعد لقيد الإعادة آخر موعد للقيد',
+  'Another session of this type and year is already open: close it first': 'جلسة أخرى من هذا النوع والسنة مفتوحة بالفعل: أغلقها أولًا',
 
   // Her Home
   'Welcome back,': 'مرحبًا بعودتك،',
@@ -515,5 +530,32 @@ export function translateSetupText(text: string): string | null {
   if ((m = /^(\w+ \d{4}) is (\d+) months before this exam: older than (.+) carries a result forward \((\d+) months\)\.$/.exec(text))) {
     return `${months(m[1]!)} قبل هذا الامتحان بـ${m[2]} شهرًا: أقدم مما ينقله ${m[3]} من النتائج (${m[4]} شهرًا).`;
   }
+  // The impact before saving (impactSentence, @repo/validations): each part it can say, joined.
+  if (text === 'This changes nothing for families.') return 'هذا لا يغيّر شيئًا للعائلات.';
+  if ((m = /^This (.+)\.$/.exec(text))) {
+    const parts = m[1]!.split(/(?:, | and )(?=(?:re-prices|lists|changes|moves) )/);
+    const said = parts.map((p) => {
+      let x: RegExpExecArray | null;
+      if ((x = /^re-prices (\d+) unpaid reservations? \(the families are told\)$/.exec(p))) return `يعيد تسعير ${x[1]} حجز غير مدفوع (تُبلَّغ العائلات)`;
+      if ((x = /^lists (\d+) paid reservations? for finance \(their price stays\)$/.exec(p))) return `يدرج ${x[1]} حجز مدفوع للمالية (يبقى سعرها)`;
+      if ((x = /^changes (\d+) reservations? \(made payable, or closed to new ones\)$/.exec(p))) return `يغيّر ${x[1]} حجز (يصبح قابلًا للدفع، أو يُغلق أمام الجديد)`;
+      if ((x = /^moves the due date of (\d+) unpaid reservations?$/.exec(p))) return `ينقل موعد سداد ${x[1]} حجز غير مدفوع`;
+      return null;
+    });
+    if (said.every((x) => x !== null)) return `هذا ${said.join('، و')}.`;
+  }
+  // The API's refusals with a name or a count (after herWords).
+  if ((m = /^(.+): (\d+) reservations? use the (first entry in school|retake in school|retake in self study|first entry in self study) option — it stays ticked; close the row to stop new ones$/.exec(text))) {
+    const opt: Record<string, string> = { 'first entry in school': 'قيد أول في المدرسة', 'retake in school': 'إعادة في المدرسة', 'retake in self study': 'إعادة دراسة ذاتية', 'first entry in self study': 'قيد أول دراسة ذاتية' };
+    return `${m[1]}: ${m[2]} حجز يستخدم خيار «${opt[m[3]!]}» — يبقى محددًا؛ أغلق الصف لإيقاف الحجوزات الجديدة`;
+  }
+  if ((m = /^(.+) has reservations in this session: close it instead \(they stand\)$/.exec(text))) return `لدى ${m[1]} حجوزات في هذه الجلسة: أوقفها بدلًا من ذلك (تبقى الحجوزات)`;
+  if ((m = /^(.+) has (\d+) reservations?: a row with reservations is not removed — close it instead \(they stand\)$/.exec(text))) return `لدى ${m[1]} ${m[2]} حجز: الصف الذي عليه حجوزات لا يُزال — أغلقه بدلًا من ذلك (تبقى الحجوزات)`;
+  if ((m = /^(.+) has reservations in its exam month: a row's exam month does not change while reservations use it — close the row and add another$/.exec(text))) return `لدى ${m[1]} حجوزات في شهر امتحانه: لا يتغير شهر امتحان الصف ما دامت الحجوزات تستخدمه — أغلق الصف وأضف آخر`;
+  if ((m = /^(.+) is already in this session$/.exec(text))) return `${m[1]} موجودة بالفعل في هذه الجلسة`;
+  if ((m = /^(.+) is already under (.+): a row is added once$/.exec(text))) return `${m[1]} موجود بالفعل في ${m[2]}: يُضاف الصف مرة واحدة`;
+  if ((m = /^"(.+)" has answers: it is kept with them \(change its words instead\)$/.exec(text))) return `«${m[1]}» له إجابات: يبقى معها (غيّر كلماته بدلًا من ذلك)`;
+  if ((m = /^(.+) cannot open yet: (.+)$/.exec(text))) return `لا يمكن فتح ${months(m[1]!)} بعد: ${m[2]}`;
+  if ((m = /^(.+) is closed: reopen it to change it$/.exec(text))) return `${months(m[1]!)} مغلقة: أعد فتحها لتغييرها`;
   return null;
 }
