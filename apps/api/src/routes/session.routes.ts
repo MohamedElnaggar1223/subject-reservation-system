@@ -56,6 +56,7 @@ import {
   ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
+import { codeOf } from '../lib/refusal';
 import { requireAuth, requireAdmin, requireRole } from '../middleware/access-control.middleware';
 import { closePaymentsOfExpiredRegistrations } from '../services/payment.services';
 import type { HonoEnv } from '../lib/types';
@@ -155,7 +156,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, created, 201);
       } catch (err) {
         const f = failure(err, 'Failed to create session');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -177,7 +178,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...now!, ...saved });
       } catch (err) {
         const f = failure(err, 'Failed to update session');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -192,7 +193,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await sessionService.copySessionFrom(c.req.valid('param').id, c.req.valid('json').fromSessionId, c.get('user')!.id));
       } catch (err) {
         const f = failure(err, 'Failed to copy the session');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -206,7 +207,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await seriesService.getWindowSeries(c.req.valid('param').id));
       } catch (err) {
         const f = failure(err, 'Failed to load the session\'s series');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -221,7 +222,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await seriesService.moveRegistrations(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to move the registrations');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -251,9 +252,9 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...session, registrationsExpired: expired.length, paymentsClosed });
       } catch (err) {
         const message = clientMessage(err, 'Failed to correct the series');
-        if (err instanceof sessionService.SessionError) return error(c, message, err.status);
-        if (err instanceof StudentsKeptChanging) return error(c, message, err.status);
-        return error(c, message, message.includes('not found') ? 404 : message.includes('already') ? 409 : 400);
+        if (err instanceof sessionService.SessionError) return error(c, message, err.status, codeOf(err));
+        if (err instanceof StudentsKeptChanging) return error(c, message, err.status, codeOf(err));
+        return error(c, message, message.includes('not found') ? 404 : message.includes('already') ? 409 : 400, codeOf(err));
       }
     }
   )
@@ -288,7 +289,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, updated);
       } catch (err) {
         const msg = clientMessage(err, 'Failed to activate session');
-        return error(c, msg, 409);
+        return error(c, msg, 409, codeOf(err));
       }
     }
   )
@@ -306,7 +307,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await sessionService.deleteDraftSession(c.req.valid('param').id, c.req.valid('json').reason, c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to delete the session');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -360,7 +361,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await setup.openSetupSession(c.req.valid('param').id, c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to open the session');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -375,7 +376,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await setup.reopenSetupSession(c.req.valid('param').id, c.get('user')!.id, c.req.valid('json').reason, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to reopen the session');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -396,7 +397,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...now!, ...saved });
       } catch (err) {
         const f = failure(err, 'Failed to change prices final');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -413,7 +414,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.listOffers(c.req.valid('param').id));
       } catch (err) {
         const f = failure(err, 'Failed to load the session\'s subjects');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -433,7 +434,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.createOffer(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
       } catch (err) {
         const f = failure(err, 'Failed to add the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -448,7 +449,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.updateOffer(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to update the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -469,7 +470,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.saveOfferForm(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to save the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -483,7 +484,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.deleteOffer(id, offerId, c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to remove the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -498,7 +499,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.replaceTeacher(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to replace the teacher');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -513,7 +514,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.createItem(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
       } catch (err) {
         const f = failure(err, 'Failed to add the item');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -528,7 +529,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.updateItem(id, offerId, itemId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to update the item');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -542,7 +543,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.deleteItem(id, offerId, itemId, c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to remove the item');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -571,7 +572,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await previewGrade10(c.req.valid('param').id, c.req.valid('json').studentIds));
       } catch (err) {
         const f = failure(err, 'Failed to preview grade 10');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   )
@@ -585,7 +586,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await commitGrade10(c.req.valid('param').id, c.req.valid('json').studentIds, c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to register grade 10');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     }
   );

@@ -30,13 +30,17 @@ import { type Eligibility, type LinePolicyKey } from '@repo/validations';
 import { lineExceptions, type ExceptionScope } from './line-exceptions';
 import { schoolMonthIndex } from './series.services';
 import { mayReserveRow } from './window.services';
+import type { RefusalCode } from '../lib/refusal';
 import { studentRecordOf, knownSittingOf, type StudentRecord } from './known-sittings.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class LineRuleError extends Error {
-  /** `policyKey`: the exception that could lift it, or null for a rule nothing lifts. */
-  constructor(message: string, public readonly policyKey: LinePolicyKey | null, public readonly status: 400 | 409 = 400) {
+  /**
+   * `policyKey`: the exception that could lift it, or null for a rule nothing lifts. `refusalCode`: the rule's
+   * machine-readable code (decision 2 of the P1b review), passed by the routes with the sentence.
+   */
+  constructor(message: string, public readonly policyKey: LinePolicyKey | null, public readonly status: 400 | 409 = 400, public readonly refusalCode?: RefusalCode) {
     super(message);
   }
 }
@@ -140,10 +144,10 @@ export async function assertLineRules(
     if (!it || it.session_id !== ctx.sessionId) throw new LineRuleError('That item is not on offer in this session', null);
   }
   /** Refuse unless an exception of `key` covers the line; a one-shot one is used. */
-  const gate = async (key: LinePolicyKey, scope: ExceptionScope, message: string, status: 400 | 409 = 400) => {
+  const gate = async (key: LinePolicyKey, scope: ExceptionScope, message: string, code: RefusalCode, status: 400 | 409 = 400) => {
     const exc = await lineExceptions.active(tx, ctx.studentId, [key], scope, opts.lockExceptions === false ? undefined : { lock: 'update' });
     const e = exc.find((x) => !used.includes(x.id));
-    if (!e) throw new LineRuleError(message, key, status);
+    if (!e) throw new LineRuleError(message, key, status, code);
     if (e.oneShot) used.push(e.id);
   };
   const scopeOf = (it: ItemRow) => ({ sessionId: ctx.sessionId, subjectId: it.subject_id, offerId: it.offer_id, offerItemId: it.id, ...(it.board_series_id ? { boardSeriesId: it.board_series_id } : {}) });
@@ -155,23 +159,23 @@ export async function assertLineRules(
     if (!recheck) {
       // May reserve (§6): her dates (or a G4 later reserve date), never the board's deadline.
       const may = await mayReserveRow(tx, { studentId: ctx.studentId, offerItemId: it.id, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId }, now);
-      if (!may.allowed) throw new LineRuleError(may.message, may.code === 'NOT_ACCEPTING' ? 'deadline.reserve' : null, may.code === 'NOT_FOUND' ? 400 : 409);
+      if (!may.allowed) throw new LineRuleError(may.message, may.code === 'NOT_ACCEPTING' ? 'deadline.reserve' : null, may.code === 'NOT_FOUND' ? 400 : 409, may.code === 'NOT_FOUND' ? undefined : may.code);
       // The cells (D3): what the row offers.
       const cell = cellOf(l.attempt, l.mode);
       if (!it[cell]) {
         const offersAny = it.first_in_school || it.retake_in_school || it.retake_self_study || it.first_self_study;
         if (it.kind === 'paper' && l.attempt === 'first') {
           // "One paper ONLY" is always a retake (F6a; the database refuses a first-entry cell on it).
-          throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, null);
+          throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, null, 400, 'ONE_PAPER_IS_RETAKE');
         }
         if (cell === 'first_self_study' && offersAny) {
           // Decision 1 of 16 Oct 2026 ("Self Study … ONLY 2nd entry"): a first entry in self study where her
           // cells do not offer one is the student's exception, used once.
           await gate('gate.selfStudyFirstEntry', scopeOf(it), it.first_in_school
             ? 'Subjects can only be taken outside school when retaking or when the school does not offer them'
-            : `${name} is self study on a second entry only: name the earlier sitting, or ask for the exception`);
+            : `${name} is self study on a second entry only: name the earlier sitting, or ask for the exception`, 'SELF_STUDY_SECOND_ENTRY_ONLY');
         } else {
-          throw new LineRuleError(offersAny ? `${name} is not offered as ${OPTION_WORDS[cell]}` : `${name} is not offered in this session`, null);
+          throw new LineRuleError(offersAny ? `${name} is not offered as ${OPTION_WORDS[cell]}` : `${name} is not offered in this session`, null, 400, 'OPTION_NOT_OFFERED');
         }
       }
       // F2: a student known to have sat the subject reserves a retake.
@@ -179,18 +183,18 @@ export async function assertLineRules(
         record ??= await studentRecordOf(tx, ctx.studentId, ctx.sessionId);
         const known = knownSittingOf(record, { subjectId: it.subject_id, subjectQualificationId: it.subject_qualification_id, referenceCodes: it.reference_codes, month: it.month, year: it.year });
         if (known && !it.needs_prior_series) {
-          throw new LineRuleError(`${name} was sat before (${sittingWords(known.month, known.year)}): reserve it as a retake`, null, 409);
+          throw new LineRuleError(`${name} was sat before (${sittingWords(known.month, known.year)}): reserve it as a retake`, null, 409, 'RETAKE_ONLY');
         }
       }
     }
     // A retake names the sitting it follows (kept from v1; a legacy line's history is its sitting).
     if (!recheck && l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
-      throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared');
+      throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared', 400, 'RETAKE_SITTING_REQUIRED');
     }
     // The earlier exam it carries from (D6).
     if (!l.priorSittingSeriesId) {
       if (it.needs_prior_series && !recheck) {
-        await gate('gate.priorSeries', scopeOf(it), `${name} carries an earlier exam forward: name the one it is carried from`);
+        await gate('gate.priorSeries', scopeOf(it), `${name} carries an earlier exam forward: name the one it is carried from`, 'CARRIED_FROM_REQUIRED');
       }
       continue;
     }
@@ -201,7 +205,7 @@ export async function assertLineRules(
     if (!recheck && it.needs_prior_series && it.allowed_prior_series_ids.length) {
       // Her list for the row (D6): it wins over the board's carry-forward months either way.
       if (!it.allowed_prior_series_ids.includes(l.priorSittingSeriesId)) {
-        await gate('gate.priorSeries', scopeOf(it), `${priorName} is not one of the earlier exams ${name} is carried from`);
+        await gate('gate.priorSeries', scopeOf(it), `${priorName} is not one of the earlier exams ${name} is carried from`, 'CARRIED_FROM_NOT_ALLOWED');
       }
       continue;
     }
@@ -211,9 +215,9 @@ export async function assertLineRules(
     const here = it.year * 12 + schoolMonthIndex(it.month);
     const then = Number(prior.year) * 12 + schoolMonthIndex(prior.month);
     if (prior.board_code !== it.board_code) {
-      await gate('gate.priorSeries', scopeOf(it), `${name} carries an exam of its own board forward; ${priorName} was another board's`);
+      await gate('gate.priorSeries', scopeOf(it), `${name} carries an exam of its own board forward; ${priorName} was another board's`, 'CARRIED_FROM_NOT_ALLOWED');
     } else if (then >= here) {
-      await gate('gate.priorSeries', scopeOf(it), `${priorName} is not before ${seriesName(it)}: a carried exam comes first`);
+      await gate('gate.priorSeries', scopeOf(it), `${priorName} is not before ${seriesName(it)}: a carried exam comes first`, 'CARRIED_FROM_NOT_ALLOWED');
     }
   }
 
@@ -245,7 +249,7 @@ export async function assertLineRules(
     const k = `${it.offer_id}|${it.exclusive_group}`;
     const here = groups.get(k) ?? [];
     const name = nameOf(it);
-    if (here.length) await gate('gate.exclusiveItems', scopeOf(it), `${name} and ${here.join(', ')} cannot be reserved together`, 409);
+    if (here.length) await gate('gate.exclusiveItems', scopeOf(it), `${name} and ${here.join(', ')} cannot be reserved together`, 'EXCLUSIVE_OPTIONS', 409);
     groups.set(k, [...here, name]);
   }
 
@@ -260,7 +264,7 @@ export async function assertLineRules(
     const clash = taken.find((t) => t.series === it.board_series_id && t.keys.some((k) => keys.includes(k)));
     const name = nameOf(it);
     if (clash) {
-      await gate('gate.sameEntryOnce', scopeOf(it), `${name} is already reserved in ${seriesName(it)} (${clash.name}, ${clash.where}): the board takes one entry`, 409);
+      await gate('gate.sameEntryOnce', scopeOf(it), `${name} is already reserved in ${seriesName(it)} (${clash.name}, ${clash.where}): the board takes one entry`, 'SAME_ENTRY_ONCE', 409);
     }
     taken.push({ series: it.board_series_id, keys, where: 'this reservation', name });
   }

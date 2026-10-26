@@ -28,6 +28,7 @@ import { refundFor } from './refund.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterForInTx } from './eligibility.services';
 import { notifyFinanceOfHeldPreregistration, notifyPreregistrationsRefundedAtDeadline } from './notification.services';
 import { logger } from '../lib/logger';
+import { coded } from '../lib/refusal';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 
 function round2(n: number): number {
@@ -54,7 +55,7 @@ export const PREREGISTRATION_GONE_REFUSAL = 'Reservations open when the session 
 export async function createPreregistration(parentId: string, data: PreregisterRegistrationType): Promise<Awaited<ReturnType<typeof reserveLines>>> {
   const linked = await validateParentStudentLink(parentId, data.studentId);
   if (!linked) throw new Error('You are not linked to this student');
-  throw new Error(PREREGISTRATION_GONE_REFUSAL);
+  throw coded(new Error(PREREGISTRATION_GONE_REFUSAL), 'PREREGISTRATION_GONE');
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

@@ -25,6 +25,7 @@ import { db, registrationSession, sessionOffer, sessionOfferItem, subject, sql, 
 import { lineExceptions } from './line-exceptions';
 import { effectiveDeadlineFor, deadlinePassedSentence, type DeadlineKind } from './deadline.services';
 import { mayRegisterFor } from './eligibility.services';
+import { coded } from '../lib/refusal';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -63,10 +64,22 @@ export const CUT_OFF_PASSED_REFUSAL = (what: string, at: Date) =>
   `${what} was not paid by ${schoolDate(at)}, its last day to pay: it can no longer be paid — reserve it again while it is offered`;
 /** PRICES_NOT_FINAL (payment): reserved before the prices are final, paid once they are (E6). */
 export const PRICES_NOT_FINAL_REFUSAL = 'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices';
+/**
+ * PRICES_NOT_FINAL for one line when its session's prices are final: an older line priced from a fee not confirmed
+ * (the deprecated fee grid) whose row has no exam fee of its own yet. Its subject's price, not the session's.
+ */
+export const LINE_PRICE_NOT_FINAL_REFUSAL = (what: string) =>
+  `${what}'s price is not confirmed yet: the subject is reserved, and it can be paid once the school confirms its price`;
 
 export type ReserveVerdict =
   | { allowed: true; by: 'open' | 'later_reserve_date' }
   | { allowed: false; code: 'NOT_OPEN' | 'NOT_ACCEPTING' | 'BOARD_DEADLINE_PASSED' | 'NOT_FOUND'; message: string };
+
+/** A may-reserve refusal as the error a path throws, with its code (NOT_FOUND carries none). */
+export function reserveRefusal(v: Extract<ReserveVerdict, { allowed: false }>): Error {
+  const err = new Error(v.message);
+  return v.code === 'NOT_FOUND' ? err : coded(err, v.code);
+}
 
 /**
  * A G4 later reserve date covering the scope (the student's own or their family's), still ahead: one with no
@@ -202,7 +215,11 @@ export async function mayPay(executor: Executor, line: PayLine, what: string, no
       ? { allowed: false, code: 'BOARD_DEADLINE_PASSED', message: BOARD_DEADLINE_PASSED_REFUSAL(what, cutOff.cutOff), cutOff }
       : { allowed: false, code: 'CUT_OFF_PASSED', message: CUT_OFF_PASSED_REFUSAL(what, cutOff.cutOff), cutOff };
   }
-  if (line.priceProvisional) return { allowed: false, code: 'PRICES_NOT_FINAL', message: PRICES_NOT_FINAL_REFUSAL, cutOff };
+  if (line.priceProvisional) {
+    // The session's prices final yet this line's not: its own subject's price is what waits (L-lead of the P1b review).
+    const [s] = await executor.select({ pricesFinal: registrationSession.pricesFinal }).from(registrationSession).where(eq(registrationSession.id, line.sessionId));
+    return { allowed: false, code: 'PRICES_NOT_FINAL', message: s?.pricesFinal ? LINE_PRICE_NOT_FINAL_REFUSAL(what) : PRICES_NOT_FINAL_REFUSAL, cutOff };
+  }
   // Still at the school (F0a: left, cohort corrected): the grade list does not enter — changing it never strands a line.
   const e = await mayRegisterFor(line.studentId, line.sessionId, executor, { forNewReservation: false });
   if (!e.allowed) return { allowed: false, code: 'NOT_ELIGIBLE', message: e.reason!, cutOff };
@@ -220,15 +237,16 @@ export async function lineNames(executor: Executor, registrationIds: string[]): 
 }
 
 /**
- * Refuse unless every line may be paid now: the first refusal's sentence. Returns each line's cut-off.
- * The prices-final refusal is the session's (one sentence for the checkout and the desk).
+ * Refuse unless every line may be paid now: the first refusal's sentence and its code. Returns each line's cut-off.
+ * The prices-final refusal is the session's (one sentence for the checkout and the desk), or the line's own subject's
+ * when the session's prices are final and its price is not.
  */
 export async function assertMayPay(executor: Executor, lines: PayLine[], now: Date = new Date()): Promise<Map<string, LineCutOff>> {
   const names = await lineNames(executor, lines.map((l) => l.id));
   const out = new Map<string, LineCutOff>();
   for (const l of lines) {
     const v = await mayPay(executor, l, names.get(l.id) ?? 'This subject', now);
-    if (!v.allowed) throw new Error(v.message);
+    if (!v.allowed) throw coded(new Error(v.message), v.code);
     out.set(l.id, v.cutOff);
   }
   return out;

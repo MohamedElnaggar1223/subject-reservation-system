@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, deriveSessionName } from '@repo/validations';
 import {
-  admin, staff, onboard, refused, one, sql, money, notified, confirmed, pauseAtAudit, lockWaiters, CONSENT, type Client, type Impact, cairoDateIn,
+  admin, staff, onboard, refused, refusedWithCode, one, sql, money, notified, confirmed, pauseAtAudit, lockWaiters, CONSENT, type Client, type Impact, cairoDateIn,
 } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
@@ -201,7 +201,7 @@ describe('08y: the coordinator sets up a session', () => {
       .toEqual([{ kind: 'all_papers', availability: 'open', g: 'entry' }, { kind: 'paper', availability: 'self_study_only', g: 'entry' }]);
     // Asked again, the board rule gives the same fee: nothing changes.
     expect(await apiResponse(coordinator.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: june, rowId: row.bioPaper! }, json: { source: 'board_rule' } })))
-      .toEqual({ saved: true, impact: { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0 }, examFee: 10850, examFeeSource: 'board_rule' });
+      .toEqual({ saved: true, impact: { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0, cutOffsEarlier: 0, cutOffsPassed: 0 }, examFee: 10850, examFeeSource: 'board_rule' });
     expect((await offeringOf(coordinator, offering.bio!)).offeredToFamilies).toBe(true);
     // "One paper ONLY" is always a retake.
     expect(await refused(put(coordinator, offering.bio!, { rows: [
@@ -360,7 +360,7 @@ describe('08y: the coordinator sets up a session', () => {
     const f1 = await onboard(officer, `y08-pf-${RUN}`, 11);
     const [l1] = await apiResponse(reserve(f1, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]));
     expect(await lineOf(l1!.id)).toEqual({ status: 'pending_payment', price: 13850, course: 3000, exam: 10850, provisional: true, v: 2 });
-    expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f1.studentId, registrationIds: [l1!.id], instrumentUsed: 'cash' } })))).toMatchObject({ error: expect.stringContaining('prices of this session are not final') });
+    expect((await refusedWithCode(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f1.studentId, registrationIds: [l1!.id], instrumentUsed: 'cash' } })))).toMatchObject({ error: expect.stringContaining('prices of this session are not final'), code: 'PRICES_NOT_FINAL' });
     const final = (expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: june }, json: { final: true, ...(expected ? { expected } : {}) } }));
     const { shown, saved } = await confirmed(final);
     expect(shown).toMatchObject({ saved: false, pricesFinal: false, impact: { repriced: 0, listedForFinance: 0, linesAffected: 1 } });
@@ -393,8 +393,8 @@ describe('08y: the coordinator sets up a session', () => {
       const shown = await apiResponse(send());
       expect(shown).toMatchObject({ saved: false, impact: { repriced: 2, listedForFinance: 1, linesAffected: 0, dueDatesMoved: 0 } });
       expect((await offeringOf(coordinator, offering.bio!)).courseFee).toBe(3000);
-      expect(await refused(send({ repriced: 1, listedForFinance: 1, linesAffected: 0, dueDatesMoved: 0 })))
-        .toEqual({ status: 409, error: 'What this change does to families changed while you were looking: look at the new counts and save again' });
+      expect(await refusedWithCode(send({ repriced: 1, listedForFinance: 1, linesAffected: 0, dueDatesMoved: 0 })))
+        .toEqual({ status: 409, error: 'What this change does to families changed while you were looking: look at the new counts and save again', code: 'IMPACT_CHANGED' });
       expect((await offeringOf(coordinator, offering.bio!)).courseFee).toBe(3000);
       expect((await lineOf(unpaidLine)).price).toBe(13850);
       expect((await apiResponse(send(shown.impact))).saved).toBe(true);
@@ -488,10 +488,10 @@ describe('08y: the coordinator sets up a session', () => {
     it('a subject closed (C4): its reservations stand and are counted first; no new one is taken and families no longer see it; reopened, it is offered again', async () => {
       const send = (accepting: boolean) => (expected?: Impact) => apiResponse(put(coordinator, offering.bio!, { accepting, ...(expected ? { expected } : {}) }));
       const { shown } = await confirmed(send(false));
-      expect(shown.impact).toEqual({ repriced: 0, listedForFinance: 0, linesAffected: 3, dueDatesMoved: 0 });
+      expect(shown.impact).toEqual({ repriced: 0, listedForFinance: 0, linesAffected: 3, dueDatesMoved: 0, cutOffsEarlier: 0, cutOffsPassed: 0 });
       const f = await onboard(officer, `y08-closed-${RUN}`, 11);
       // P1b (mayReserve): NOT_ACCEPTING names the subject.
-      expect(await refused(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]))).toMatchObject({ error: 'Biology is not taking reservations' });
+      expect(await refusedWithCode(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]))).toMatchObject({ error: 'Biology is not taking reservations', code: 'NOT_ACCEPTING' });
       expect((await familyRead(f)).offerings).toEqual([]);
       expect((await lineOf(unpaidLine)).status).toBe('pending_payment');
       await confirmed(send(true));
@@ -599,8 +599,8 @@ describe('08y: the coordinator sets up a session', () => {
     const f = await onboard(officer, `y08-rights-${RUN}`, 11);
     // Biology asks a required question since the case above (D13, P1b): a reservation answers it.
     const lab = (await familyRead(f)).offerings[0]!.questions.find((q) => q.prompt === 'Lab group')!;
-    const unanswered = await refused(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]));
-    expect(unanswered).toEqual({ status: 400, error: 'Answer: Lab group' });
+    const unanswered = await refusedWithCode(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]));
+    expect(unanswered).toEqual({ status: 400, error: 'Answer: Lab group', code: 'ANSWER_REQUIRED' });
     const [line] = await apiResponse(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }], [{ questionId: lab.id, value: 'Saturday' }]));
     expect(await one(`select value from registration_answer where question_id = $1 and student_id = $2`, [lab.id, f.studentId])).toEqual({ value: 'Saturday' });
     expect((await refused(coordinator.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [line!.id], instrumentUsed: 'cash' } }))).status).toBe(403);

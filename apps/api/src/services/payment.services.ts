@@ -66,6 +66,7 @@ import {
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { schoolDateTime, assertMayPay, mayPay, cutOffsOf, lineNames, BOARD_DEADLINE_PASSED_REFUSAL } from './window.services';
+import { coded } from '../lib/refusal';
 import { effectiveDeadlineFor, effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
 import { senderNames } from './settings.services';
 import { PRICE_CHANGED_REFUSAL } from './pricing.services';
@@ -199,7 +200,7 @@ export async function initiatePayment(
   if (!isPrereg) {
     const notReady = regs.filter((r) => r.status !== 'pending_payment');
     if (notReady.length > 0) {
-      throw new Error('One or more registrations are not ready for payment');
+      throw coded(new Error('One or more registrations are not ready for payment'), 'NOT_WAITING');
     }
   }
 
@@ -215,7 +216,7 @@ export async function initiatePayment(
     const names = await lineNames(db, regs.map((r) => r.id));
     for (const r of regs) {
       const d = await effectiveDeadlineFor(db, r);
-      if (d.at && d.at <= new Date()) throw new Error(BOARD_DEADLINE_PASSED_REFUSAL(names.get(r.id) ?? 'This subject', d.at, d.kind));
+      if (d.at && d.at <= new Date()) throw coded(new Error(BOARD_DEADLINE_PASSED_REFUSAL(names.get(r.id) ?? 'This subject', d.at, d.kind)), 'BOARD_DEADLINE_PASSED');
     }
     const opened = sessions.filter((s) => s.status !== 'draft');
     if (opened.length) throw new Error(`These sessions have already opened — pay through the normal flow: ${opened.map((s) => s.name).join(', ')}`);
@@ -327,17 +328,23 @@ export async function initiatePayment(
     // In id order, as every path that locks several registrations does, so
     // two of them can never wait on each other.
     const locked = await tx
-      .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
+      .select({
+        id: registration.id, status: registration.status, price: registration.priceAtRegistration,
+        studentId: registration.studentId, sessionId: registration.sessionId, priceProvisional: registration.priceProvisional,
+      })
       .from(registration)
       .where(inArray(registration.id, data.registrationIds))
       .orderBy(registration.id)
       .for('update');
     const expected = isPrereg ? 'preregistered' : 'pending_payment';
     if (locked.length !== data.registrationIds.length || locked.some((r) => r.status !== expected)) {
-      throw new Error('One or more registrations are not ready for payment');
+      throw coded(new Error('One or more registrations are not ready for payment'), 'NOT_WAITING');
     }
     // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
-    if (locked.some((l) => l.price !== regs.find((r) => r.id === l.id)?.priceAtRegistration)) throw new Error(PRICE_CHANGED_REFUSAL);
+    if (locked.some((l) => l.price !== regs.find((r) => r.id === l.id)?.priceAtRegistration)) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
+    // May pay, asked again under the lines' locks (L2 of the P1b review): the cut-off may have passed, or the
+    // student left, since the check above.
+    if (!isPrereg) await assertMayPay(tx, locked);
     // A line under a live plan is paid by its instalments: only the plan's capture pays it (§3.10 item 7).
     await assertNoLivePlan(tx, data.registrationIds);
 
@@ -532,13 +539,13 @@ export async function confirmPayment(
         : r.status === 'pending_payment' && current.status === 'pending_verification';
       if (byBoardDeadline) {
         const d = await effectiveDeadlineFor(tx, r);
-        if (d.at && d.at <= now) throw new Error(BOARD_DEADLINE_PASSED_REFUSAL(what, d.at, d.kind));
+        if (d.at && d.at <= now) throw coded(new Error(BOARD_DEADLINE_PASSED_REFUSAL(what, d.at, d.kind)), 'BOARD_DEADLINE_PASSED');
         continue;
       }
       if (r.status === 'pending_payment') {
         const v = await mayPay(tx, { id: r.id, studentId: pay.studentId, sessionId: r.sessionId, status: r.status, priceProvisional: r.priceProvisional }, what, now);
         if (v.allowed) continue;
-        throw new Error(v.message);
+        throw coded(new Error(v.message), v.code);
       }
       throw new Error(
         'Payment cannot be confirmed — at least one registration is no longer payable (already expired or ended).'
@@ -1451,7 +1458,7 @@ export async function submitInstapayReference(
   // transfer can be taken for it (MO-10; each line's own effective deadline since the rework).
   const deadlines = await effectiveDeadlinesOf(db, links.map((l) => l.registration.id));
   const passed = [...deadlines.values()].find((d) => d.at && d.at <= new Date());
-  if (passed) throw new Error(BOARD_DEADLINE_PASSED_REFUSAL('This payment', passed.at!, passed.kind));
+  if (passed) throw coded(new Error(BOARD_DEADLINE_PASSED_REFUSAL('This payment', passed.at!, passed.kind)), 'BOARD_DEADLINE_PASSED');
 
   const duplicateReference = 'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.';
   // A family's reference set aside when finance recorded the transfer under
@@ -2269,7 +2276,7 @@ async function lockChargesForPayment(tx: Tx, studentId: string, chargeIds: strin
   // chargeRules (§6): the deadline, and the price exceptions scoped to each charge.
   const priced: ChargeRow[] = [];
   for (const c of rows) priced.push(await repriceChargeInTx(tx, c, null, undefined, { forPayment: true }));
-  if (expected && priced.some((c) => Math.abs(c.amount - (expected.get(c.id) ?? c.amount)) > 0.001)) throw new Error(PRICE_CHANGED_REFUSAL);
+  if (expected && priced.some((c) => Math.abs(c.amount - (expected.get(c.id) ?? c.amount)) > 0.001)) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
 
   const groups = new Map<string, ChargeGroup>();
   for (const c of priced) {

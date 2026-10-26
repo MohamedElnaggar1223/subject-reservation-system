@@ -52,6 +52,16 @@ export async function refused(p: Promise<{ status: number; json(): Promise<unkno
   return { status: res.status, error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? '') };
 }
 
+/**
+ * A refusal with its machine-readable code (decision 2 of the P1b review: `{ success: false, error, code? }`); `code` is
+ * undefined for a refusal that has none.
+ */
+export async function refusedWithCode(p: Promise<{ status: number; json(): Promise<unknown> }>) {
+  const res = await p;
+  const body = (await res.json().catch(() => ({}))) as { error?: unknown; code?: unknown };
+  return { status: res.status, error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? ''), code: typeof body.code === 'string' ? body.code : undefined };
+}
+
 /** Raw SQL against the test database. Values are bound, never interpolated. */
 export async function sql<T = Json>(text: string, params: unknown[] = []): Promise<T[]> {
   const { db, sql: s } = await dbmod();
@@ -532,7 +542,7 @@ export async function sessionName(sessionId: string) {
 
 // ─── The coordinator's set-up (COORDINATOR_REWORK.md Appendix A) ─────────────
 
-export type Impact = { repriced: number; listedForFinance: number; linesAffected: number; dueDatesMoved: number };
+export type Impact = { repriced: number; listedForFinance: number; linesAffected: number; dueDatesMoved: number; cutOffsEarlier?: number; cutOffsPassed?: number };
 
 /**
  * A set-up change that answers its impact first (A3): sent once; when it is not saved, sent again with

@@ -32,6 +32,8 @@ import {
 import { logAction, type AuditContext } from '../audit.services';
 import { getSetting } from '../settings.services';
 import { redateLines } from '../deadline.services';
+import { cutOffsOf } from '../window.services';
+import { coded } from '../../lib/refusal';
 import { hasActiveSessionOfType, SessionError } from '../session.services';
 import { capturePreregistrationsForSession } from '../prereg.services';
 import { notifySessionOpened, getStudentAndParentBroadcastIds } from '../notification.services';
@@ -121,10 +123,13 @@ export const START_DATE_REFUSAL = 'This draft opens with the Accepting switch on
 /**
  * PUT /sessions/:id — the header and what families agree to (both contracts; see the header). A share
  * change re-prices the session's unpaid self-study lines and lists the rest for finance; a payment due
- * date change re-dates the waiting lines: both answer their impact first (`expected`; dueDatesMoved).
- * The coordinator sets and clears the close date (owner decision 26 Oct; C4): the scheduler closes the
- * session at it, and that close, like the switch's, still expires the waiting lines (finalizePendingRecords)
- * until P1b replaces the expiry with the cut-off sweep (C10).
+ * date change re-dates the waiting lines; a cut of the unpaid-cancel days, or a due date moved, brings the
+ * unpaid lines' cut-off forward (C10: line_cut_off reads the session's current days), counted as
+ * cutOffsEarlier and, of those, cutOffsPassed (already past it: the next tick expires them). Each answers
+ * its impact first (`expected`; IMPACT_CHANGED if the counts moved). The coordinator sets and clears the
+ * close date (owner decision 26 Oct; C4): the scheduler closes the session at it, and that close, like the
+ * switch's, stops new reservations only — a waiting line stays payable until its cut-off (C10, the sweep in
+ * overdue.services.ts).
  */
 export async function updateSetupSession(id: string, data: UpdateSessionType, actorId: string, ctx?: AuditContext): Promise<SessionSave> {
   try {
@@ -190,6 +195,13 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
           oldValue: JSON.stringify({ paymentDueAt: current.paymentDueAt, courseStartsOn: current.courseStartsOn }), newValue: 'true', reason: data.reason ?? undefined,
         });
       }
+      // The unpaid lines' cut-offs before the change (D1 of the P1b review): the days and the due date move them.
+      // The lines locked in id order after the session (the re-date below takes the same order).
+      const unpaid = 'unpaidCancelDays' in next || 'paymentDueAt' in next
+        ? (await tx.select({ id: registration.id }).from(registration)
+          .where(and(eq(registration.sessionId, id), eq(registration.status, 'pending_payment'))).orderBy(registration.id).for('update')).map((l) => l.id)
+        : [];
+      const cutOffsBefore = await cutOffsOf(tx, unpaid);
       if (Object.keys(next).length || datesConfirmed) {
         await tx.update(registrationSession).set({
           ...next,
@@ -208,11 +220,22 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
           .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING))).orderBy(registration.id).for('update');
         dueMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s payment due date changed');
       }
-      const impact = addImpact(priced, { dueDatesMoved: dueMoved });
+      // The cut-offs after it (line_cut_off reads the session as this transaction now has it).
+      const cutOffsAfter = await cutOffsOf(tx, unpaid);
+      let cutOffsEarlier = 0;
+      let cutOffsPassed = 0;
+      for (const lineId of unpaid) {
+        const was = cutOffsBefore.get(lineId)?.cutOff;
+        const is = cutOffsAfter.get(lineId)?.cutOff;
+        if (!was || !is || is >= was) continue;
+        cutOffsEarlier++;
+        if (is <= now && was > now) cutOffsPassed++;
+      }
+      const impact = addImpact(priced, { dueDatesMoved: dueMoved, cutOffsEarlier, cutOffsPassed });
       settleImpact(impact, data.expected);
       await logAction(actorId, 'SESSION_UPDATED', 'session', id,
         Object.fromEntries(Object.keys(next).map((k) => [k, (current as Record<string, unknown>)[k] ?? null])),
-        { ...next, ...(questionsChanged ? { questions: data.questions!.map((q) => q.prompt) } : {}), ...(datesConfirmed ? { datesConfirmed: true } : {}), reason: data.reason ?? null, dueDatesMoved: dueMoved, repriced: repriced.length }, ctx, tx);
+        { ...next, ...(questionsChanged ? { questions: data.questions!.map((q) => q.prompt) } : {}), ...(datesConfirmed ? { datesConfirmed: true } : {}), reason: data.reason ?? null, dueDatesMoved: dueMoved, cutOffsEarlier, cutOffsPassed, repriced: repriced.length }, ctx, tx);
       return { impact, repriced, dueMoved, name: current.name };
     });
     await tellRepriced(out.repriced, `The self-study share of ${out.name} changed`);
@@ -284,8 +307,12 @@ export async function reopenSetupSession(id: string, actorId: string, reason: st
 /** PRICES_FINAL is one-way once a line exists (§6). */
 export const PRICES_FINAL_ONE_WAY = 'Families have reserved in this session: its prices stay final (a price changed later re-prices the unpaid lines and lists the paid ones for finance)';
 
+/** Prices final with waiting lines whose row has no exam fee (PRICE_NOT_SET): their fees are set first. */
+export const PRICES_FINAL_UNPRICED_REFUSAL = (rows: string[], lines: number) =>
+  `Set the exam fee of ${rows.join(', ')} first: ${lines} unpaid ${lines === 1 ? 'reservation was' : 'reservations were'} priced from a fee that is not confirmed, and could not be paid once the prices are final`;
+
 /**
- * PUT /sessions/:id/prices-final — switched on: every waiting line priced while they were not final
+ * PUT /sessions/:id/prices-final — switched on (refused while a waiting line's row has no exam fee): every waiting line priced while they were not final
  * becomes payable and is re-dated from now (§6); its impact (the lines made payable, the due dates
  * moved) answered first. Switched off: only while no line exists.
  */
@@ -303,17 +330,30 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
         await logAction(actorId, 'SESSION_PRICES_FINAL', 'session', id, { pricesFinal: true }, { pricesFinal: false }, ctx, tx);
         return { saved: true, impact: NO_IMPACT, dueDatesMoved: 0 };
       }
+      // A waiting line priced from a fee not confirmed, on a row with no exam fee of its own (an older line priced
+      // from the deprecated fee grid): switching final would leave it unpayable under a session that reads "prices
+      // final". Refused, its rows named, until their exam fees are set (L-lead of the P1b review).
+      const unpriced = await tx.select({ subject: subject.name, kind: sessionOfferItem.kind, label: sessionOfferItem.label, lines: sql<number>`count(*)::int` })
+        .from(registration)
+        .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
+        .innerJoin(subject, eq(subject.id, registration.subjectId))
+        .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING), eq(registration.priceProvisional, true), sql`${sessionOfferItem.examFee} is null`))
+        .groupBy(subject.name, sessionOfferItem.kind, sessionOfferItem.label, sessionOfferItem.sortOrder)
+        .orderBy(asc(subject.name), asc(sessionOfferItem.sortOrder));
+      if (unpriced.length) {
+        const n = unpriced.reduce((a, u) => a + Number(u.lines), 0);
+        throw coded(new SessionError(PRICES_FINAL_UNPRICED_REFUSAL(unpriced.map((u) => (u.kind === 'all_papers' ? u.subject : `${u.subject} — ${u.label}`)), n), 409), 'PRICE_NOT_SET');
+      }
       await tx.update(registrationSession).set({ pricesFinal: true, pricesFinalAt: now, updatedAt: now }).where(eq(registrationSession.id, id));
-      // The waiting provisional lines of rows priced by their own exam fee (whatever the basis' version: a
-      // converted line on a converted row too), locked in id order after the session; a line of a row still
-      // priced from the deprecated fee grid keeps its grid's provisional mark.
+      // The waiting provisional lines (every one has a row priced by its own exam fee, above; whatever the basis'
+      // version: a converted line on a converted row too), locked in id order after the session.
       const waiting = await tx.select({ id: registration.id }).from(registration)
         .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
         .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING), eq(registration.priceProvisional, true), isNotNull(sessionOfferItem.examFee)))
         .orderBy(registration.id).for('update', { of: registration });
       if (waiting.length) await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(inArray(registration.id, waiting.map((w) => w.id)));
       const moved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s prices were made final');
-      const impact: Impact = { repriced: 0, listedForFinance: 0, linesAffected: waiting.length, dueDatesMoved: moved };
+      const impact: Impact = { ...NO_IMPACT, linesAffected: waiting.length, dueDatesMoved: moved };
       settleImpact(impact, data.expected);
       await logAction(actorId, 'SESSION_PRICES_FINAL', 'session', id, { pricesFinal: false }, { pricesFinal: true, pricesFinalAt: now.toISOString(), linesMadePayable: waiting.length, dueDatesMoved: moved }, ctx, tx);
       return { saved: true, impact, dueDatesMoved: moved };

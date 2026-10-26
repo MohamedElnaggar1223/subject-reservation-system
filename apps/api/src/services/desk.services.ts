@@ -25,7 +25,8 @@ import { assertSchoolFeeGate } from './registration.services';
 import { reserveLines, consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { exceptionsOfLines } from './line-exceptions-read.services';
 import { lineDepositsSql } from './escrow.services';
-import { mayReserveSession, subjectsOfItems, assertMayPay, cutOffsOf } from './window.services';
+import { mayReserveSession, subjectsOfItems, assertMayPay, cutOffsOf, reserveRefusal } from './window.services';
+import { coded } from '../lib/refusal';
 import { PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow, InsufficientBalanceError } from './escrow.services';
@@ -175,7 +176,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   // May reserve (§6): the session open, or a G4 later reserve date (a subject's covers that subject alone). Each
   // line's subject, row and board deadline are asked when it is made.
   const w = await mayReserveSession(db, data.studentId, sess.id, new Date(), await subjectsOfItems(db, data.lines.map((l) => l.offerItemId)));
-  if (!w.allowed) throw new Error(w.message);
+  if (!w.allowed) throw reserveRefusal(w);
 
   // The reservations rework (§3.10 item 1): the year's school fee collected in the same action,
   // first — the registration's gate asks for it — in a payment of its own.
@@ -471,7 +472,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
     throw new Error('One or more subjects do not belong to this student');
   }
   if (regs.some((r) => r.status !== 'pending_payment')) {
-    throw new Error('One or more subjects are not waiting for payment');
+    throw coded(new Error('One or more subjects are not waiting for payment'), 'NOT_WAITING');
   }
   // May pay (§6), per line: waiting, not past its cut-off, its prices final, the student still at the school (F0a,
   // SO-7; the session's grade list does not enter). The session's or the subject's close does not stop it.
@@ -509,7 +510,10 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
     const touched = [...new Set([...lineIds, ...planLineIds])].sort();
     const held = touched.length
       ? await tx
-        .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
+        .select({
+          id: registration.id, status: registration.status, price: registration.priceAtRegistration,
+          studentId: registration.studentId, sessionId: registration.sessionId, priceProvisional: registration.priceProvisional,
+        })
         .from(registration)
         .where(inArray(registration.id, touched))
         .orderBy(registration.id)
@@ -520,10 +524,13 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
       // nothing else is already paying for them.
       const locked = held.filter((r) => lineIds.includes(r.id));
       if (locked.length !== lineIds.length || locked.some((r) => r.status !== 'pending_payment')) {
-        throw new Error('One or more subjects are not waiting for payment');
+        throw coded(new Error('One or more subjects are not waiting for payment'), 'NOT_WAITING');
       }
       // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
-      if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
+      if (locked.some((l) => l.price !== prices.get(l.id))) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
+      // May pay, asked again under the lines' locks (L2 of the P1b review): the cut-off may have passed, or the
+      // student left, since the check above.
+      await assertMayPay(tx, locked);
       // A line under a live plan is paid by its instalments only (§3.10 item 7).
       await assertNoLivePlan(tx, lineIds);
       const open = await tx

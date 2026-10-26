@@ -25,6 +25,7 @@ import {
   SessionPreviewQuery, SessionReservationsQuery,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
+import { codeOf } from '../lib/refusal';
 import { requireAuth, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
@@ -55,7 +56,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await addOffering(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
       } catch (err) {
         const f = fail(err, 'Failed to add the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -68,7 +69,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await getOffering(id, offeringId));
       } catch (err) {
         const f = fail(err, 'Failed to load the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -83,7 +84,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, { saved: saved.saved, impact: saved.impact, offering: await getOffering(id, offeringId) });
       } catch (err) {
         const f = fail(err, 'Failed to save the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -96,7 +97,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await deleteOffering(id, offeringId, c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = fail(err, 'Failed to remove the subject');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -110,7 +111,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await parsePriceList(c.req.valid('param').id, body.board, body.text));
       } catch (err) {
         const f = fail(err, 'Failed to read the list');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -123,7 +124,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await applyPriceList(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = fail(err, 'Failed to apply the list');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -135,7 +136,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await sessionPrices(c.req.valid('param').id));
       } catch (err) {
         const f = fail(err, 'Failed to load the prices');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -149,7 +150,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, await setRowExamFee(id, rowId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = fail(err, 'Failed to set the exam fee');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -165,7 +166,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, { as: q.as, ...read });
       } catch (err) {
         const f = fail(err, 'Failed to build the preview');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     })
 
@@ -184,7 +185,7 @@ export const setupRoutes = new Hono<HonoEnv>()
         return success(c, r);
       } catch (err) {
         const f = fail(err, 'Failed to load the reservations');
-        return error(c, f.message, f.status);
+        return error(c, f.message, f.status, codeOf(err));
       }
     });
 

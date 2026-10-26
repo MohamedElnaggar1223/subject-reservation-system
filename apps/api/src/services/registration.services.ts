@@ -45,7 +45,7 @@ import {
 } from './notification.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, type Eligibility } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { mayReserveSession, mayReserveRow, subjectsOfItems } from './window.services';
+import { mayReserveSession, mayReserveRow, subjectsOfItems, reserveRefusal } from './window.services';
 import { reserveLines } from './reservation.services';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ import { reserveLines } from './reservation.services';
  */
 async function assertMayReserve(studentId: string, sessionId: string, newLines: readonly { offerItemId: string }[]) {
   const w = await mayReserveSession(db, studentId, sessionId, new Date(), await subjectsOfItems(db, newLines.map((l) => l.offerItemId)));
-  if (!w.allowed) throw new Error(w.message);
+  if (!w.allowed) throw reserveRefusal(w);
 }
 
 /**
@@ -66,7 +66,7 @@ async function assertMayReserve(studentId: string, sessionId: string, newLines: 
  */
 async function assertMayReserveLine(line: { studentId: string; offerItemId: string; attempt: string; priorSittingSeriesId: string | null }) {
   const w = await mayReserveRow(db, line);
-  if (!w.allowed) throw new Error(w.message);
+  if (!w.allowed) throw reserveRefusal(w);
 }
 
 /**

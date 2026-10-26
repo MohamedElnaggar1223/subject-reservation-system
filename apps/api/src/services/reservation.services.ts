@@ -33,6 +33,7 @@ import {
   type SeriesMonth,
 } from '@repo/validations';
 import { insertLines, type InsertLinesInput } from './line.services';
+import { coded } from '../lib/refusal';
 import { LIVE_LINE_STATUSES as LIVE } from './setup/model';
 import { findOrCreateSeries, OfferError } from './offer.services';
 import { PRICE_CHANGED_REFUSAL, round2 } from './pricing.services';
@@ -243,7 +244,7 @@ export async function resolveReservationLines(
         const pool = await teachersOf(tx, it.id, it.offerId);
         if (pool.length === 1) teacherId = pool[0]!;
         else if (pool.length > 1 && it.teacherChoice === 'families' && !it.teacherTbc) {
-          throw new ReservationError(`Choose the teacher of ${name}`);
+          throw coded(new ReservationError(`Choose the teacher of ${name}`), 'TEACHER_REQUIRED');
         }
       }
     }
@@ -277,7 +278,7 @@ async function writeAnswers(tx: Tx, a: { studentId: string; sessionId: string; i
     const before = await tx.select({ questionId: registrationAnswer.questionId }).from(registrationAnswer)
       .where(and(eq(registrationAnswer.studentId, a.studentId), inArray(registrationAnswer.questionId, required.map((q) => q.id))));
     const missing = required.filter((q) => !before.some((b) => b.questionId === q.id));
-    if (missing.length) throw new ReservationError(`Answer: ${missing.map((q) => q.prompt).join('; ')}`);
+    if (missing.length) throw coded(new ReservationError(`Answer: ${missing.map((q) => q.prompt).join('; ')}`), 'ANSWER_REQUIRED');
   }
   for (const ans of a.answers) {
     await tx.insert(registrationAnswer).values({ id: randomUUID(), questionId: ans.questionId, studentId: a.studentId, sessionId: a.sessionId, value: ans.value, answeredBy: a.answeredBy })
@@ -417,7 +418,7 @@ export async function reserveLines(
   await writeAnswers(tx, { studentId: a.studentId, sessionId: a.sessionId, itemIds: inserted.map((r) => r.offerItemId), answers: answers ?? [], answeredBy: a.requestedBy });
   const expected = new Map(asked.filter((l) => l.expectedPrice !== undefined).map((l) => [l.offerItemId, l.expectedPrice!]));
   if (inserted.some((r) => expected.has(r.offerItemId) && round2(expected.get(r.offerItemId)!) !== round2(r.priceAtRegistration))) {
-    throw new ReservationError(PRICE_CHANGED_REFUSAL, 409);
+    throw coded(new ReservationError(PRICE_CHANGED_REFUSAL, 409), 'PRICE_CHANGED');
   }
   if (channel) await writeConsents(tx, inserted.map((r) => r.id), { channel, confirmedBy: a.requestedBy });
   // A declared sitting the school's own results show is verified at once (F4; the review of
