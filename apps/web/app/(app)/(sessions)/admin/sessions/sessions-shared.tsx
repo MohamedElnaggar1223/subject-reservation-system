@@ -23,40 +23,18 @@ export const fetchSession = (id: string) => apiResponse(api.v1.sessions[':id'].$
 export type SessionDetail = Awaited<ReturnType<typeof fetchSession>>;
 export type SessionSeries = SessionDetail['series'][number];
 
-export const fetchOffers = (id: string) => apiResponse(api.v1.sessions[':id'].offers.$get({ param: { id } }));
-export type OffersData = Awaited<ReturnType<typeof fetchOffers>>;
-export type OfferRow = OffersData['offers'][number];
-export type ItemRow = OfferRow['items'][number];
-
-export const fetchAddable = (id: string) => apiResponse(api.v1.sessions[':id'].offers.addable.$get({ param: { id } }));
-export type AddableRow = Awaited<ReturnType<typeof fetchAddable>>[number];
-
-/** The family's form as staff preview it (F6a): the family read with no student. */
-export const fetchPreview = (sessionId: string) => apiResponse(api.v1.registrations.offers.preview.$get({ query: { sessionId } }));
-export type PreviewData = Awaited<ReturnType<typeof fetchPreview>>;
-
-export const fetchFeeGrid = (seriesId: string) => apiResponse(api.v1['board-fees'].$get({ query: { seriesId } }));
-export type FeeGrid = Awaited<ReturnType<typeof fetchFeeGrid>>;
-export type FeeRow = FeeGrid['rows'][number];
-
 export const fetchMoney = (id: string, query: Partial<SessionMoneyQueryType>) =>
   apiResponse(api.v1.sessions[':id'].money.$get({ param: { id }, query: { filter: query.filter ?? 'all', ...(query.offerId ? { offerId: query.offerId } : {}), ...(query.sectionId ? { sectionId: query.sectionId } : {}) } }));
 export type MoneyData = Awaited<ReturnType<typeof fetchMoney>>;
 
 export const SESSIONS_KEY = ['sessions'] as const;
 export const sessionKey = (id: string) => ['sessions', id] as const;
-export const offersKey = (id: string) => ['sessions', id, 'offers'] as const;
-export const previewKey = (id: string) => ['sessions', id, 'preview'] as const;
 export const moneyKey = (id: string) => ['sessions', id, 'money'] as const;
-export const feesKey = (seriesId: string) => ['board-fees', seriesId] as const;
 
 // ─── Words ───────────────────────────────────────────────────────────────────
 
 export const STATUS_TONE: Record<string, Tone> = { draft: 'neutral', active: 'success', closed: 'danger' };
 export const STATUS_LABEL: Record<string, string> = { draft: 'Draft', active: 'Open', closed: 'Closed' };
-export const AVAILABILITY_SHORT: Record<string, string> = {
-  open: 'Open', retake_only: 'Retakes only', self_study_only: 'Self-study only', closed: 'Closed',
-};
 export const LINE_STATUS_LABEL: Record<string, string> = {
   pending_approval: 'Waiting for the parent', pending_payment: 'Unpaid', preregistered: 'Preregistered', confirmed: 'Paid',
   expired: 'Expired', dropped: 'Dropped', rejected: 'Rejected',
@@ -142,26 +120,6 @@ export function Drawer({ title, subtitle, onClose, children }: { title: string; 
         <div className="space-y-6 px-6 py-5">{children}</div>
       </div>
     </div>
-  );
-}
-
-/**
- * What a copy of another session's subjects brought across closed — no teacher left to teach it, no
- * course fee (MO-9) — and what came across self-study only at a course fee of 0, its reason recorded
- * (the Copy dialog and the New session screen; F7's review of 2ca07a4's round, item 3).
- */
-export function CopySummary({ copied }: { copied: { offers: number; closedNoTeacher: number; closedNoFee: string[]; zeroFeeSelfStudy: { subject: string }[] } }) {
-  if (!copied.closedNoTeacher && !copied.closedNoFee.length && !copied.zeroFeeSelfStudy.length) return null;
-  return (
-    <Notice tone="warning" title="Copied; some subjects need a look">
-      {copied.closedNoTeacher > 0 && <p><span>Closed, no teacher to teach them:</span> <span className="tabular-nums">{copied.closedNoTeacher}</span></p>}
-      {copied.closedNoFee.length > 0 && (
-        <p><span>Closed, no course fee (open them once it is set):</span> <bdi data-i18n-skip="true">{copied.closedNoFee.join(', ')}</bdi></p>
-      )}
-      {copied.zeroFeeSelfStudy.length > 0 && (
-        <p><span>Self-study only at a course fee of 0, priced at the board fee alone:</span> <bdi data-i18n-skip="true">{copied.zeroFeeSelfStudy.map((z) => z.subject).join(', ')}</bdi></p>
-      )}
-    </Notice>
   );
 }
 

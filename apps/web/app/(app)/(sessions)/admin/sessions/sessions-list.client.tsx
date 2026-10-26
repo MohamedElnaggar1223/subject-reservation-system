@@ -1,214 +1,153 @@
 'use client';
 
 /**
- * Sessions (RESERVATIONS_REWORK.md §4.1).
+ * Sessions (COORDINATOR_REWORK.md §5.1–§5.2, C1–C3; Appendix A `GET/POST /sessions`).
  *
- * The spreadsheet version: one Google Form per level per cycle (three a June), each built or
- * copy-edited by hand with its subjects, teachers and fees, and a links sheet that lists them;
- * the series each form feeds and its deadline are remembered, not written down.
- *
- * Here: one session per cycle — June, or November–January — with every level in it. A row says
- * when families reserve, when the course starts and when money is due, which boards' series it
- * enters and their deadlines, and what is paid and owed. "New session" takes six inputs; the
- * name, the refund policy and the series follow, and "Copy from" brings last cycle's subjects,
- * teachers, items and course fees (board fees come across provisional).
+ * The spreadsheet version: a links sheet per cycle and a Drive folder of Google Forms, each copied
+ * from last cycle's and edited by hand — every year moved, every subject re-checked. Here a session
+ * is one cycle (June, or November / January), a card says where it stands, and "New session" asks
+ * three things, each picked from a list: the type, the year, and where it starts from — a copy of the
+ * last session of the type (its subjects, rows, teachers, notes, questions, policy and share, every
+ * year moved forward, prices as last year's) or empty. The name is made from the type and year, never
+ * typed. A new session is a draft: families do not see it until it accepts reservations.
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, academicYearStartOf, deriveSessionName, refundPolicySentence, DEFAULT_REFUND_POLICIES, ROLES, type SessionType } from '@repo/validations';
+import { apiResponse, deriveSessionName, ROLES, type SessionType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
-import { Badge, Notice } from '~/components/ui/tone';
+import { Badge } from '~/components/ui/tone';
 import { EmptyState } from '~/components/ui/query-state';
-import { DeadlineBadge, SeriesName } from '~/app/(app)/exams/exams-shared';
-import {
-  fetchSessions, SESSIONS_KEY, StatusBadge, Money, Day, Modal, Field, INPUT_CLASS, ErrorLine, errorText, type SessionRow,
-  CopySummary,
-} from './sessions-shared';
+import { cn } from '~/lib/utils';
+import { fetchSessions, SESSIONS_KEY, Money, Day, Modal, Field, INPUT_CLASS, ErrorLine, type SessionRow } from './sessions-shared';
+import { STATUS_WORDS, STATUS_TONE, refusalText } from './setup-shared';
 
-/** The series year a new session most likely is: June of the academic year's end, or this November. */
-function suggestedYear(type: SessionType): number {
-  const ay = academicYearStartOf();
-  return type === 'june' ? ay + 1 : ay;
-}
+const TYPE_WORDS: Record<SessionType, string> = { june: 'June', winter: 'November / January' };
 
 export default function SessionsListClient({ viewerRole }: { viewerRole: string }): React.JSX.Element {
-  const isAdmin = viewerRole === ROLES.ADMIN;
+  const canCreate = viewerRole === ROLES.ADMIN || viewerRole === ROLES.COORDINATOR;
   const { data: sessions } = useSuspenseQuery({ queryKey: [...SESSIONS_KEY, 'admin'], queryFn: fetchSessions });
   const [creating, setCreating] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'june' | 'winter'>('all');
-  // The cycle's order (F6): the open session first, then those being prepared, then the closed ones,
-  // newest first — the one she is running is at the top, not the one furthest in the future.
+  // The cycle's order: the one taking reservations, then the drafts, then the closed ones — newest first in each.
   const rank = (s: SessionRow) => (s.status === 'active' ? 0 : s.status === 'draft' ? 1 : 2);
-  const shown = sessions
-    .filter((s) => filter === 'all' || s.sessionType === filter)
-    .sort((a, b) => rank(a) - rank(b) || (rank(a) < 2
-      ? +new Date(a.startDate ?? a.createdAt) - +new Date(b.startDate ?? b.createdAt)
-      : +new Date(b.startDate ?? b.createdAt) - +new Date(a.startDate ?? a.createdAt)));
-  const open = sessions.filter((s) => s.status === 'active').length;
-  const drafts = sessions.filter((s) => s.status === 'draft').length;
-
+  const shown = [...sessions].sort((a, b) => rank(a) - rank(b) || b.seriesYear - a.seriesYear || a.sessionType.localeCompare(b.sessionType));
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Sessions</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            <span>{open}</span> <span>open</span> · <span>{drafts}</span> <span>draft</span> · <span>{sessions.length}</span> <span>in all</span>
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">A session is one cycle — June, or November / January. Families see it once it accepts reservations.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-border bg-card p-0.5 text-sm" role="group" aria-label="Show">
-            {(['all', 'june', 'winter'] as const).map((f) => (
-              <button key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f}
-                className={`rounded-md px-3 py-1.5 ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                {f === 'all' ? 'All' : f === 'june' ? 'June' : 'Winter'}
-              </button>
-            ))}
-          </div>
-          {isAdmin && <Button onClick={() => setCreating(true)}>New session</Button>}
-        </div>
+        {canCreate && <Button onClick={() => setCreating(true)}>New session</Button>}
       </div>
-
-      {shown.length === 0 ? (
-        <EmptyState title="No sessions yet" message={isAdmin ? 'A session is one cycle — June, or November to January — with every level in it.' : undefined} />
-      ) : (
-        <ul className="space-y-3">
-          {shown.map((s) => <SessionCard key={s.id} s={s} viewerRole={viewerRole} />)}
-        </ul>
-      )}
-
-      {creating && <NewSessionModal sessions={sessions} onClose={() => setCreating(false)} />}
+      {shown.length === 0
+        ? <EmptyState title="No sessions yet" message="A session is one cycle — June, or November / January — with every subject in it." />
+        : <ul className="space-y-3">{shown.map((s) => <SessionCard key={s.id} s={s} viewerRole={viewerRole} sessions={sessions} />)}</ul>}
+      {creating && <NewSession sessions={sessions} onClose={() => setCreating(false)} />}
     </div>
   );
 }
 
-function SessionCard({ s, viewerRole }: { s: SessionRow; viewerRole: string }) {
+function SessionCard({ s, viewerRole, sessions }: { s: SessionRow; viewerRole: string; sessions: SessionRow[] }) {
   const money = viewerRole === ROLES.ADMIN || viewerRole === ROLES.FINANCE_ADMIN || viewerRole === ROLES.FINANCE_OFFICER;
+  const copiedFrom = s.copiedFromSessionId ? sessions.find((x) => x.id === s.copiedFromSessionId) : null;
+  const href = `/admin/sessions/${s.id}`;
   return (
     <li className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/admin/sessions/${s.id}`} className="font-display text-lg font-semibold text-foreground hover:underline">
-              <bdi>{s.name}</bdi>
-            </Link>
-            <StatusBadge status={s.status} />
+            <Link href={href as never} className="font-display text-lg font-semibold text-foreground hover:underline"><bdi>{s.name}</bdi></Link>
+            <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{STATUS_WORDS[s.status] ?? s.status}</Badge>
+            {copiedFrom && <Badge tone="neutral"><span>copied from</span>&nbsp;<bdi>{copiedFrom.name}</bdi></Badge>}
           </div>
           <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span><span>Families reserve</span> <Day iso={s.startDate} /> – <Day iso={s.endDate} /></span>
-            <span><span>Course starts</span> <Day iso={s.courseStartsOn} /></span>
+            <span><span>Reservations close</span> {s.endDate ? <Day iso={s.endDate} /> : <span>— (optional)</span>}</span>
             <span><span>Payment due</span> <Day iso={s.paymentDueAt} /></span>
+            <span><span>First lesson</span> <Day iso={`${s.courseStartsOn}T12:00:00.000Z`} /></span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link href={`/admin/sessions/${s.id}`}>Open</Link></Button>
-          {money && s.summary.lines > 0 && <Button asChild variant="outline" size="sm"><Link href={`/admin/sessions/${s.id}#money`}>Money</Link></Button>}
+          <Button asChild variant="outline" size="sm"><Link href={href as never}>Open</Link></Button>
+          {money && s.summary.lines > 0 && <Button asChild variant="outline" size="sm"><Link href={`${href}#money` as never}>Money</Link></Button>}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-        {s.summary.offers === 0 && s.status !== 'closed'
-          ? <span className="text-amber-700 dark:text-amber-400">No subjects on the sheet yet.</span>
-          : <span className="text-foreground"><span>{s.summary.offers}</span> <span>{s.summary.offers === 1 ? 'subject' : 'subjects'}</span> · <span>{s.summary.boards}</span> <span>{s.summary.boards === 1 ? 'board' : 'boards'}</span></span>}
-        {s.boardSeries.length > 0 && <span className="text-muted-foreground">·</span>}
-        {s.boardSeries.map((b) => (
-          <span key={b.id} className="inline-flex items-center gap-1.5">
-            <SeriesName boardName={b.boardName} month={b.month} year={b.year} label={b.label} />
-            {b.entryDeadline
-              ? <><span className="text-muted-foreground"><span>entries by</span> <Day iso={b.entryDeadline} /></span> <DeadlineBadge iso={b.entryDeadline} /></>
-              : b.retakeDeadline
-              ? <DeadlineBadge iso={b.entryDeadline} />
-              : b.examsStart ? <Badge tone="neutral"><span>exams</span>&nbsp;<Day iso={b.examsStart} /></Badge> : <Badge tone="warning">Dates not set</Badge>}
-          </span>
-        ))}
-      </div>
-      {s.summary.lines > 0 && (
-        <p className="mt-2 text-sm text-muted-foreground">
-          <span>{s.summary.lines}</span> <span>{s.summary.lines === 1 ? 'reservation' : 'reservations'}</span> · <span>{s.summary.paid}</span> <span>paid</span> · <span>{s.summary.unpaid}</span> <span>unpaid</span>
-          {money && s.summary.outstanding > 0 && <> (<Money amount={s.summary.outstanding} /> <span>outstanding</span>)</>}
-          {s.summary.overdue > 0 && <> · <Badge tone="danger"><span>{s.summary.overdue}</span>&nbsp;<span>overdue</span></Badge></>}
-        </p>
-      )}
+      <p className="mt-3 text-sm text-foreground">
+        <span>{s.summary.offers}</span> <span>{s.summary.offers === 1 ? 'subject' : 'subjects'}</span>
+        {' · '}<span>{s.summary.lines}</span> <span>{s.summary.lines === 1 ? 'reservation' : 'reservations'}</span>
+        {s.summary.lines > 0 && <>, <span>{s.summary.paid}</span> <span>paid</span>, <span>{s.summary.unpaid}</span> <span>waiting for payment</span></>}
+        {money && s.summary.outstanding > 0 && <> (<Money amount={s.summary.outstanding} /> <span>outstanding</span>)</>}
+        {' · '}<span>{s.pricesFinal ? 'prices final' : 'prices not final'}</span>
+      </p>
     </li>
   );
 }
 
-function NewSessionModal({ sessions, onClose }: { sessions: SessionRow[]; onClose: () => void }) {
+/** C1–C3: the type and year picked, where it starts from picked, the name shown (never typed). */
+function NewSession({ sessions, onClose }: { sessions: SessionRow[]; onClose: () => void }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const thisYear = new Date().getFullYear();
+  const years = [thisYear, thisYear + 1, thisYear + 2];
+  const lastOf = (t: SessionType) => sessions.filter((x) => x.sessionType === t && !x.label).sort((a, b) => b.seriesYear - a.seriesYear)[0] ?? null;
+  // The year after the last session of the type (the one she makes next), within the three offered.
+  const suggest = (t: SessionType) => {
+    const last = lastOf(t);
+    const next = last ? last.seriesYear + 1 : t === 'june' ? thisYear + 1 : thisYear;
+    return Math.min(Math.max(next, years[0]!), years[2]!);
+  };
   const [type, setType] = useState<SessionType>('june');
-  const [year, setYear] = useState(String(suggestedYear('june')));
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [courseStartsOn, setCourseStartsOn] = useState('');
-  const [paymentDueAt, setPaymentDueAt] = useState('');
-  const sameKind = useMemo(() => sessions.filter((s) => s.sessionType === type).sort((a, b) => b.seriesYear - a.seriesYear), [sessions, type]);
-  const [copyFrom, setCopyFrom] = useState<string>('');
-  const copyDefault = sameKind[0]?.id ?? '';
-  const copySource = copyFrom === 'none' ? '' : copyFrom || copyDefault;
-  const y = Number(year);
+  const [year, setYear] = useState(() => suggest('june'));
+  const last = useMemo(() => lastOf(type), [type, sessions]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [from, setFrom] = useState<'copy' | 'empty'>('copy');
+  const start = last ? from : 'empty';
+  const name = deriveSessionName(type, year);
+  const exists = sessions.some((x) => x.sessionType === type && x.seriesYear === year && !x.label);
   const create = useMutation({
-    mutationFn: async () => apiResponse(api.v1.sessions.$post({
-      json: {
-        type, year: y, startDate: new Date(startDate).toISOString(), endDate: new Date(endDate).toISOString(), courseStartsOn,
-        paymentDueAt: new Date(paymentDueAt).toISOString(), ...(copySource ? { copyFromSessionId: copySource } : {}),
-      },
-    })),
+    mutationFn: async () => apiResponse(api.v1.sessions.$post({ json: { type, year, ...(start === 'copy' && last ? { copyFromSessionId: last.id } : {}) } })),
     onSuccess: async (made) => {
       await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
-      // What the copy brought across closed, or self-study only at 0, is said before the session opens (MO-9).
-      const c = made.copied;
-      if (!c || (!c.closedNoTeacher && !c.closedNoFee.length && !c.zeroFeeSelfStudy.length)) window.location.assign(`/admin/sessions/${made.id}`);
+      router.push(`/admin/sessions/${made.id}`);
     },
   });
-  const made = create.data && create.data.copied && (create.data.copied.closedNoTeacher > 0 || create.data.copied.closedNoFee.length > 0 || create.data.copied.zeroFeeSelfStudy.length > 0)
-    ? create.data : null;
-  const ready = Number.isInteger(y) && y >= 2000 && y <= 2100 && startDate && endDate && courseStartsOn && paymentDueAt;
-
   return (
     <Modal title="New session" onClose={onClose}>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (ready) create.mutate(); }}>
-        <ErrorLine message={create.error ? errorText(create.error) : null} />
-        {made && made.copied && <CopySummary copied={made.copied} />}
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!exists) create.mutate(); }}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Type" htmlFor="ns-type">
-            <select id="ns-type" className={INPUT_CLASS} value={type} onChange={(e) => { const t = e.target.value as SessionType; setType(t); setYear(String(suggestedYear(t))); setCopyFrom(''); }}>
-              <option value="june">June</option>
-              <option value="winter">Winter (November – January)</option>
+            <select id="ns-type" className={INPUT_CLASS} value={type} onChange={(e) => { const t = e.target.value as SessionType; setType(t); setYear(suggest(t)); }}>
+              {(Object.keys(TYPE_WORDS) as SessionType[]).map((t) => <option key={t} value={t}>{TYPE_WORDS[t]}</option>)}
             </select>
           </Field>
-          <Field label={type === 'june' ? 'June of' : 'November of'} htmlFor="ns-year">
-            <input id="ns-year" className={INPUT_CLASS} type="number" inputMode="numeric" min={2000} max={2100} value={year} onChange={(e) => setYear(e.target.value)} />
+          <Field label="Year" htmlFor="ns-year">
+            <select id="ns-year" className={INPUT_CLASS} value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
           </Field>
         </div>
-        <Notice tone="neutral">
-          <span>It will be called</span> <strong><bdi>{Number.isInteger(y) ? deriveSessionName(type, y) : '—'}</bdi></strong>.{' '}
-          <span>Refunds:</span> <span>{refundPolicySentence(DEFAULT_REFUND_POLICIES[type])}</span>
-        </Notice>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Reserve from" htmlFor="ns-from"><input id="ns-from" className={INPUT_CLASS} type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} required /></Field>
-          <Field label="Reserve to" htmlFor="ns-to"><input id="ns-to" className={INPUT_CLASS} type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} required /></Field>
-          <Field label="Course starts" htmlFor="ns-course"><input id="ns-course" className={INPUT_CLASS} type="date" value={courseStartsOn} onChange={(e) => setCourseStartsOn(e.target.value)} required /></Field>
-          <Field label="Payment due" htmlFor="ns-due"><input id="ns-due" className={INPUT_CLASS} type="datetime-local" value={paymentDueAt} onChange={(e) => setPaymentDueAt(e.target.value)} required /></Field>
-        </div>
-        <Field label="Copy from" htmlFor="ns-copy" hint="Subjects, teachers, their papers and course fees come across; board fees come across as not published yet, until the board publishes.">
-          <select id="ns-copy" className={INPUT_CLASS} value={copyFrom || copyDefault || 'none'} onChange={(e) => setCopyFrom(e.target.value)}>
-            <option value="none">Start empty</option>
-            {sameKind.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        <Field label="Start from" htmlFor="ns-from"
+          hint={start === 'copy'
+            ? "Every subject, row, teacher, note, question, policy and share comes across. Earlier exams and dates move on a year; prices come across as last year's, not final."
+            : 'No subjects: add them from the boards’ lists.'}>
+          <select id="ns-from" className={INPUT_CLASS} value={start} onChange={(e) => setFrom(e.target.value as 'copy' | 'empty')}>
+            <option value="copy" disabled={!last}>{last ? `Copy the last ${TYPE_WORDS[type]} session (${last.name})` : 'Copy the last session of this type (there is none yet)'}</option>
+            <option value="empty">Empty</option>
           </select>
         </Field>
-        <p className="text-xs text-muted-foreground">
-          A session whose reserving starts now or earlier opens at once; otherwise it opens on its start date. Families may preregister for a session that has not opened.
-        </p>
+        <div className="rounded-lg border border-border bg-muted/40 p-3">
+          <p className="text-xs text-muted-foreground">The session&apos;s name — made from the type and the year</p>
+          <p className="font-display text-lg font-semibold text-foreground"><bdi>{name}</bdi></p>
+        </div>
+        {exists && <p role="alert" className={cn('rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive')}><bdi>{name}</bdi> <span>already exists.</span></p>}
+        <ErrorLine message={create.error ? refusalText(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          {made
-            ? <Button type="button" onClick={() => window.location.assign(`/admin/sessions/${made.id}`)}>Open the session</Button>
-            : <Button type="submit" disabled={!ready || create.isPending}>{create.isPending ? 'Creating…' : 'Create session'}</Button>}
+          <Button type="submit" disabled={exists || create.isPending}>{create.isPending ? 'Creating…' : <span><span>Create</span> <bdi>{name}</bdi></span>}</Button>
         </div>
       </form>
     </Modal>
   );
 }
-
