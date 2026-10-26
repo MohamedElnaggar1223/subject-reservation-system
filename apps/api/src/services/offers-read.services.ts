@@ -22,14 +22,17 @@
  * in self-study elsewhere is the student's exception, asked by assertLineRules.
  */
 
-import { db, sql } from '@repo/db';
-import { sessionSeriesMonths, SERIES_MONTH_LABELS, type SeriesMonth } from '@repo/validations';
+import { db, sql, registrationSession, sessionQuestion, boardSeries, subject, and, eq, isNull, inArray, asc } from '@repo/db';
+import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
 import { availabilityConstraints } from './offer.services';
-import { priceLine } from './pricing.services';
+import { priceLine, PricingError } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { examSittingsOf, examKeysOf } from './reservation.services';
 import { lineExceptions, coversScope } from './line-exceptions';
+import { offeringsView } from './setup/offering.services';
+import { refundSentenceOf } from './setup/session-setup.services';
+import { optionLabel, rowLabel, sittingLabel, labelRowOf, both } from './setup/labels';
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
@@ -144,7 +147,7 @@ async function readOffers(sessionId: string, studentId: string | null) {
       const held = history.find((h) => h.itemId === i.id && h.sessionId === sessionId && !['rejected', 'expired', 'dropped'].includes(h.status));
       const combos: { attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study' }[] = [];
       // A one-paper item is a retake only (the forms' "One paper ONLY").
-      const firstEntries = !c.retakeOnly && i.kind !== 'one_paper';
+      const firstEntries = !c.retakeOnly && i.kind !== 'paper';
       if (!c.closed) {
         if (firstEntries && !c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'in_school' });
         // Self study is a second entry ("Self Study 50% … ONLY 2nd entry", decision 1 of 16 Oct 2026): a first
@@ -239,4 +242,126 @@ async function readOffers(sessionId: string, studentId: string | null) {
     return out.sort((x, y) => (y.year * 12 + MONTH_ORDER[y.month]!) - (x.year * 12 + MONTH_ORDER[x.month]!));
   });
   return { session, eligibility, preview: !studentId, offers: outOffers, declarableSittings: declarable };
+}
+
+// ─── Version 2: the family payload (COORDINATOR_REWORK.md F1–F3, Appendix A) ─────────────────────
+
+/**
+ * What a family sees for one child in a session (Appendix A's `GET /registrations/offers` payload,
+ * served beside today's read until P3 replaces the Reserve page): one entry per subject the session
+ * offers families — accepting, every ticked row priced (E6) — with each row's options from its
+ * ticked cells, the price beside each, the teachers of an in-school option and the sittings a retake
+ * may carry from. No board jargon (F3): a row's sitting is "June", "November" or "January".
+ *
+ * Records decide what shows (F2): a student the system knows has sat the subject (a confirmed line of
+ * it in an earlier session, or F4's result or sent entry) sees the retake options only, with that
+ * sitting filled in; every other student sees first entry and retake.
+ *
+ * The coordinator's live preview (`GET /sessions/:id/preview`) is the same read for a first-timer or
+ * a retaker, with no student: a draft is shown, prices carry no family's exception, a retaker's sitting
+ * is the row's first allowed one. A draft is invisible to families (C4).
+ */
+export async function familyOfferings(
+  sessionId: string,
+  viewer: { studentId: string } | { preview: 'first_timer' | 'retaker'; offeringId?: string },
+) {
+  const [s] = await db.select().from(registrationSession).where(eq(registrationSession.id, sessionId));
+  if (!s) return null;
+  const preview = 'preview' in viewer;
+  const studentId = preview ? null : viewer.studentId;
+  const sessionQs = await db.select().from(sessionQuestion)
+    .where(and(eq(sessionQuestion.sessionId, sessionId), isNull(sessionQuestion.offeringId))).orderBy(asc(sessionQuestion.sortOrder));
+  const session = {
+    id: s.id, name: s.name, status: s.status, closesAt: s.endDate, paymentDueAt: s.paymentDueAt, pricesFinal: s.pricesFinal,
+    refundSentence: refundSentenceOf(s), declaration: DECLARATION_TEXT, selfStudyShare: s.selfStudyPercent,
+    questions: sessionQs.map(({ id, kind, prompt, choices, required }) => ({ id, kind, prompt, choices, required })),
+  };
+  // C4: a draft is invisible to families.
+  if (!preview && s.status === 'draft') return { session, offerings: [] };
+  const all = await offeringsView(db, sessionId, preview && viewer.offeringId ? [viewer.offeringId] : undefined);
+  const now = new Date();
+  // F2: what the student is known to have sat — confirmed lines of the subject in other sessions, and F4's results and sent entries.
+  const history = studentId ? await db.execute(sql`
+    select r.subject_id as "subjectId", r.board_series_id as "seriesId", i.reference_codes as codes, bs.month, bs.year,
+      s.qualification_id as "subjectQualificationId",
+      coalesce((select array_agg(su.unit_id) from subject_unit su where su.subject_id = s.id), '{}') as "subjectUnits"
+    from registration r join session_offer_item i on i.id = r.offer_item_id join subject s on s.id = r.subject_id
+    left join board_series bs on bs.id = r.board_series_id
+    where r.student_id = ${studentId} and r.session_id <> ${sessionId} and r.status = 'confirmed' and r.board_series_id is not null`)
+    .then((x) => x.rows as { subjectId: string; seriesId: string; codes: string[]; month: string; year: number; subjectQualificationId: string | null; subjectUnits: string[] }[]) : [];
+  const exams = studentId ? await examSittingsOf(studentId) : [];
+  const priorIds = [...new Set(all.flatMap((o) => o.rows.flatMap((r) => r.allowedPriorSittings.map((p) => p.id))))];
+  const priors = new Map((priorIds.length ? await db.select().from(boardSeries).where(inArray(boardSeries.id, priorIds)) : []).map((p) => [p.id, p]));
+  const order = (m: string, y: number) => y * 12 + (MONTH_ORDER[m] ?? 0);
+  const offerings = [];
+  for (const o of all) {
+    if (!preview && !o.offeredToFamilies) continue;
+    const closedOffering = !o.accepting || !!(o.closesAt && o.closesAt <= now);
+    const offerQs = o.questions;
+    const [subj] = await db.select({ qualificationId: subject.qualificationId }).from(subject).where(eq(subject.id, o.subject.id));
+    const rows = [];
+    for (const r of o.rows) {
+      const ticked = (Object.keys(r.cells) as (keyof typeof r.cells)[]).filter((k) => r.cells[k]);
+      if (!ticked.length) continue;
+      const here = r.series ? order(r.series.month, r.series.year) : Infinity;
+      // F2: the latest sitting on record of the subject before this row's, by the row's codes where both name them.
+      const known = studentId ? [
+        ...history.filter((h) => h.subjectId === o.subject.id && order(h.month, h.year) < here
+          && (!h.codes.length || !r.referenceCodes.length || h.codes.some((c) => r.referenceCodes.includes(c))))
+          .map((h) => ({ id: h.seriesId, month: h.month, year: h.year })),
+        ...exams.filter((e) => subj?.qualificationId && e.key === `q:${subj.qualificationId}` && order(e.month, e.year) < here)
+          .map((e) => ({ id: e.seriesId, month: e.month, year: e.year })),
+      ].sort((a, b) => order(b.month, b.year) - order(a.month, a.year))[0] ?? null
+        : viewer && 'preview' in viewer && viewer.preview === 'retaker'
+          ? (() => { const p = r.allowedPriorSittings[0]; return p ? { id: p.id, month: p.month, year: p.year } : { id: null, month: 'june', year: (r.series?.year ?? s.seriesYear) - 1 }; })()
+          : null;
+      const allowedSittings = r.allowedPriorSittings.map((p) => priors.get(p.id)).filter((p): p is NonNullable<typeof p> => !!p)
+        .map((p) => ({ id: p.id, label: sittingLabel(p.month, p.year) }));
+      const rowTeachers = (r.teachers.length ? r.teachers : o.teachers).map((t) => ({ id: t.teacherId, name: t.name, online: t.online }));
+      const options = [];
+      for (const cell of ticked) {
+        const attempt = cell === 'firstInSchool' || cell === 'firstSelfStudy' ? 'first' as const : 'retake' as const;
+        const mode = cell === 'firstInSchool' || cell === 'retakeInSchool' ? 'in_school' as const : 'self_study' as const;
+        // F2: a student known to have sat it sees the retake options only.
+        if (known && attempt === 'first') continue;
+        let price: { total: number; examFee: number; courseFee: number } | null = null;
+        try {
+          const p = studentId
+            ? await priceLine(db, { item: { id: r.id }, attempt, mode, studentId, sessionId })
+            : await priceLine(db, { item: { id: r.id }, attempt, mode, studentId: '', sessionId }, { exceptionIds: [] });
+          price = { total: p.total, examFee: p.registrationFee, courseFee: p.courseFee };
+        } catch (err) {
+          // A price not set reads as "no price yet"; any other failure is a failure, not a missing price.
+          if (!(err instanceof PricingError)) throw err;
+          price = null;
+        }
+        options.push({
+          attempt, mode,
+          label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), { attempt, mode }, { selfStudyShare: r.selfStudyFee !== null ? null : s.selfStudyPercent, lang })),
+          price,
+          // D6: an A.2. and a one-paper retake (where the board asks) name the sitting they carry from.
+          needsCarriedFrom: r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2'),
+          allowedSittings: r.needsCarriedFrom ? allowedSittings : [],
+          teachers: mode === 'in_school' && !o.teacherTbc ? rowTeachers : [],
+        });
+      }
+      if (!options.length) continue;
+      rows.push({
+        id: r.id, label: both((lang) => rowLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), lang)), kind: r.kind, sitting: r.sitting,
+        closed: closedOffering || !!(r.closesAt && r.closesAt <= now), payBy: r.payBy, exclusiveGroup: r.exclusiveGroup,
+        knownSitting: known ? { id: known.id, label: sittingLabel(known.month, known.year) } : null,
+        options,
+      });
+    }
+    if (!rows.length) continue;
+    offerings.push({
+      id: o.id, name: o.subject.name, board: o.board.name, group: o.group, note: o.note, teacherChoice: o.teacherChoice,
+      teacherTbc: o.teacherTbc, accepting: !closedOffering,
+      questions: offerQs,
+      rows,
+    });
+  }
+  // D10: O.L. subjects, then A.S. / A.L.
+  offerings.sort((a, b) => (a.group === b.group ? 0 : a.group === 'O.L.' ? -1 : 1));
+  return { session, offerings };
 }

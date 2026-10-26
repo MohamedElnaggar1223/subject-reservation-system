@@ -104,7 +104,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
                     <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{l.student.number ?? ''}</bdi>{l.student.section && <> · <bdi data-i18n-skip="true">{l.student.section}</bdi></>}</div>
                   </td>
                   <td className="px-4 py-2 align-top">
-                    <bdi data-i18n-skip="true">{l.subject.name}</bdi>{l.item.kind !== 'whole' && <> — <bdi>{l.item.label}</bdi></>}
+                    <bdi data-i18n-skip="true">{l.subject.name}</bdi>{l.item.kind !== 'all_papers' && <> — <bdi>{l.item.label}</bdi></>}
                     <div className="text-xs text-muted-foreground">
                       <span>{l.attempt === 'retake' ? 'Retake' : 'First entry'}</span> · <span>{l.mode === 'self_study' ? 'Self-study' : 'In school'}</span>
                     </div>

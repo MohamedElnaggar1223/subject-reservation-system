@@ -324,11 +324,12 @@ export async function notifySessionOpened(data: {
   sessionId: string;
   sessionName: string;
   sessionType: string;
-  deadline: Date;
+  /** The session's automatic close; null when it closes by hand only (the coordinator rework, C4). */
+  deadline: Date | null;
   studentIds: string[];
   parentIds: string[];
 }) {
-  const deadline = data.deadline.toLocaleDateString('en-GB', {
+  const deadline = data.deadline === null ? 'until the school closes it' : data.deadline.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',

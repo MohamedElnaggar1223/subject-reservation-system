@@ -51,7 +51,7 @@ const DOT: Record<Tone, string> = {
  * says so; with nothing in progress at all, it shows the last session, the one the next starts from.
  */
 function current(sessions: SessionRow[]): { shown: SessionRow[]; noneRunning: boolean; fallback?: boolean } {
-  const byStart = (a: SessionRow, b: SessionRow) => +new Date(a.startDate) - +new Date(b.startDate);
+  const byStart = (a: SessionRow, b: SessionRow) => +new Date(a.startDate ?? a.createdAt) - +new Date(b.startDate ?? b.createdAt);
   const open = sessions.filter((s) => s.status === 'active').sort(byStart);
   const drafts = sessions.filter((s) => s.status === 'draft').sort(byStart);
   const tail = sessions.filter((s) => s.status === 'closed' && (s.summary.unpaid > 0

@@ -13,7 +13,8 @@
     "start": "node ./dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check-types": "tsc -p tsconfig.test.json --noEmit"
+    "check-types": "tsc -p tsconfig.test.json --noEmit",
+    "seed:june-2027": "tsx scripts/seeds/june-2027.ts"
   },
   "dependencies": {
     "@better-auth/expo": "^1.4.7",

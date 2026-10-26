@@ -43,8 +43,8 @@ async function refundSnapshotOf(tx: Tx, sessionId: string): Promise<RefundPolicy
   const policy = s?.refundPolicy as RefundPolicy | null | undefined;
   if (policy?.steps?.length) return { kind: 'weeks', steps: policy.steps };
   let windows = await tx.select().from(refundWindow).where(eq(refundWindow.sessionId, sessionId)).orderBy(asc(refundWindow.startsAt));
-  if (!windows.length && s) {
-    windows = await tx.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(s.startDate))).orderBy(asc(refundWindow.startsAt));
+  if (!windows.length && s?.startDate) {
+    windows = await tx.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(s.startDate!))).orderBy(asc(refundWindow.startsAt));
   }
   return { kind: 'dates', windows: windows.map((w) => ({ startsAt: w.startsAt.toISOString(), endsAt: w.endsAt.toISOString(), percent: w.percentage })) };
 }

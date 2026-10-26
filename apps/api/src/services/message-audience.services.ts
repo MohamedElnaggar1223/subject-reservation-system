@@ -56,7 +56,7 @@ export type AudienceMember = {
 export type ResolvedAudience = {
   members: AudienceMember[];
   /** The session {session} and {closes} read (the list's, else the message's context). */
-  session: { id: string; name: string; endDate: Date } | null;
+  session: { id: string; name: string; endDate: Date | null } | null;
   /** The variables every recipient of this audience can be given. */
   fills: MessageVariable[];
   label: string;
@@ -309,7 +309,7 @@ async function sessionUnpaid(executor: Executor, def: Extract<StoredAudienceDefi
     const payable = await payableLines(executor, lines.map((l) => l.id), now, payOnProvisional);
     for (const l of lines) {
       if (!payable.has(l.id)) continue;
-      addOwed(owed, l.student.id, { amount: l.price, dueAt: new Date(l.dueAt), item: l.item.kind === 'whole' ? l.subject.name : `${l.subject.name} — ${l.item.label}`, sessionId: session.id, sessionName: session.name, lineId: l.id });
+      addOwed(owed, l.student.id, { amount: l.price, dueAt: new Date(l.dueAt), item: l.item.kind === 'all_papers' ? l.subject.name : `${l.subject.name} — ${l.item.label}`, sessionId: session.id, sessionName: session.name, lineId: l.id });
     }
   }
   if (def.include !== 'lines' && !def.offerId) {

@@ -468,6 +468,10 @@ function levelWord(level: string): string {
   return level === 'igcse' ? 'IGCSE' : level === 'as_level' ? 'AS Level' : 'A Level';
 }
 
+/** A board change refused on a subject the coordinator set up with its board's rows (the coordinator rework). */
+export const BOARD_CHANGE_REFUSAL = (subjectName: string, sessionName: string) =>
+  `${subjectName} is set up in ${sessionName} with its board's rows and fees: a board change does not move it — remove it from that session and add it again from the reference list under the other board`;
+
 /**
  * Change a subject's board in the caller's transaction (the subject row locked FOR UPDATE by
  * the caller). Since the reservations rework a subject is entered by its items (RESERVATIONS_
@@ -488,6 +492,15 @@ export async function applyBoardChange(
 ) {
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
+  // A subject set up through the coordinator's subject editor (a row with its own exam fee, in any session — a
+  // closed one too: reopened, it would hold a new-board subject with the old board's rows) is the board's
+  // reference subject there: its rows, codes and fees are that board's, so a board change cannot carry it —
+  // she removes the subject from the session and adds it again under its board.
+  const [pricedByRows] = (await tx.execute(sql`
+    select w.name as "sessionName" from session_offer_item i join session_offer o on o.id = i.offer_id join registration_session w on w.id = i.session_id
+    where o.subject_id = ${s.id} and i.exam_fee is not null
+    order by w.name limit 1`)).rows as { sessionName: string }[];
+  if (pricedByRows) throw new CatalogueError(BOARD_CHANGE_REFUSAL(s.name, pricedByRows.sessionName), 409);
   const plan = await followBoardChange(tx, s, newBoard, boardNamesNow, actorId, locked);
   // F4's entries of the lines that move (after the lines, §2.1): a sent one refuses the change, the
   // drafts are withdrawn with it and made again in the new board's series (the review of 426d565, item 2).

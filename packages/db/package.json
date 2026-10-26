@@ -12,6 +12,7 @@
         "db:studio": "drizzle-kit studio",
         "db:up": "docker compose up -d",
         "seed": "tsx seed.ts",
+        "seed:reference": "tsx load-reference.ts",
         "reference:check": "tsx scripts/reference-check.ts",
         "reference:labels": "tsx scripts/reference-labels.ts"
     },

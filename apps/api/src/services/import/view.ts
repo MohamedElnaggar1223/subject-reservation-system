@@ -776,14 +776,14 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       if (!offer) findCache.set(key, null);
       else {
         const it = await findItem(db, offer.offer.id, label, where);
-        const onePaper = it.candidates.filter((c) => c.kind === 'one_paper' || c.kind === 'unit').map((c) => ({ id: c.id, label: c.label }));
+        const onePaper = it.candidates.filter((c) => c.kind === 'paper' || c.kind === 'unit').map((c) => ({ id: c.id, label: c.label }));
         // A "one paper" note (the forms' "(One paper ONLY)") is never the whole subject (the review of 2ca07a4,
         // item 1): when the words name no paper, findItem falls back to the whole item. Unless findItem found a
         // one-paper item (or a unit, itself one paper), the line's item is the subject's one-paper item when it
         // has exactly one and the words name no other paper; else staff choose among them.
         let foundId = it.item?.id ?? null;
         let how: ImportLinePlan['found'] | null = it.how;
-        if (d.noteOnePaper && !(it.item && (it.item.kind === 'one_paper' || it.item.kind === 'unit'))) {
+        if (d.noteOnePaper && !(it.item && (it.item.kind === 'paper' || it.item.kind === 'unit'))) {
           const papersNamed = namedCodes(label).filter((c) => /^paper \d/.test(c));
           foundId = !papersNamed.length && onePaper.length === 1 ? onePaper[0]!.id : null;
           how = foundId ? 'paper' : null;
@@ -889,7 +889,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     // The forms' "One paper ONLY" is always a retake (F6a, the lead's decision of 11 Oct 2026: assertLineRules
     // refuses a first entry on a one-paper item): a one-paper line is planned as a retake whatever the
     // coordinator's answer or staff's choice on the line says (the review of F6a, finding 3).
-    const onePaper = t.itemKind === 'one_paper';
+    const onePaper = t.itemKind === 'paper';
     const saysRetake = onePaper || e.attempt === 'retake' || (e.attempt !== 'first' && (d.noteRetake || d.noteOnePaper));
     const declared = (p: { month: Series['type']; year: number; from: 'line' | 'note' | 'carry_forward' }) => ({ ...p, source: 'declared_by_desk' as const });
     const legacyPrior = legacy ? { month: legacy.type, year: legacy.year, source: 'legacy' as const, from: 'history' as const } : null;

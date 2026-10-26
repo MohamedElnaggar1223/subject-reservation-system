@@ -329,7 +329,7 @@ function Unentered({ data, series }: { data: EntryListData; series: BoardSeriesR
                   <td className="px-3 py-2 font-medium text-foreground"><bdi data-i18n-skip="true">{u.studentName}</bdi></td>
                   <td className="px-3 py-2">
                     <BoardText>{u.subjectName}</BoardText> <Code className="text-xs text-muted-foreground">{u.subjectCode}</Code>
-                    {u.itemKind !== 'whole' && <span className="ms-1 text-xs text-muted-foreground">— <BoardText>{u.itemLabel}</BoardText></span>}
+                    {u.itemKind !== 'all_papers' && <span className="ms-1 text-xs text-muted-foreground">— <BoardText>{u.itemLabel}</BoardText></span>}
                     {u.declaredUnverified && <div className="mt-1"><Badge tone="warning">Declared sitting, not verified</Badge></div>}
                   </td>
                   <td className="px-3 py-2 text-foreground">

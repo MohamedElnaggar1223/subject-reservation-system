@@ -360,6 +360,14 @@ export const examBoard = pgTable(
     // one-paper item is made (offer.services.ts withOnePaper and insertItem's default fee keys);
     // an item made keeps its keys.
     onePaperFeeKey: text("one_paper_fee_key").notNull().default("qualification"),
+    // The coordinator rework (COORDINATOR_REWORK.md §7, D6): whether a one-paper retake asks the
+    // sitting it carries from (Edexcel International GCSE 1H/2H: not asked). Loaded from the
+    // reference data (packages/db/reference/boards.json), never edited by staff.
+    onePaperAsksSitting: boolean("one_paper_asks_sitting").notNull().default(true),
+    // E2: the printed codes a fee list uses for a reference row ("9608 SY" → 9618's A.S.), from the
+    // reference data: [{ printed, subject, row, toCheck?, note? }] — a toCheck alias is shown for a person
+    // to confirm, never applied silently.
+    referenceAliases: jsonb("reference_aliases").$type<{ printed: string; subject: string; row: string; toCheck?: boolean; note?: string }[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -621,10 +629,13 @@ export const registrationSession = pgTable(
     // Kept nullable and unread for one release, then dropped (§3.1, §7 step
     // 3): the level is per subject now.
     qualificationLevel: text("qualification_level"),
-    // When families may reserve. The cut-off is per item: each item is
-    // reservable until its series' deadline (§3.3).
-    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
-    endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+    // The coordinator rework (COORDINATOR_REWORK.md §9.1, C4): the session opens by its
+    // Accepting switch only. `start_date` is written when it opens (null on a draft made
+    // through the new contract, so the scheduler never opens it); `end_date` is the optional
+    // automatic close date (null: none). A session made with the deprecated legacy dates keeps
+    // them as before.
+    startDate: timestamp("start_date", { withTimezone: true }),
+    endDate: timestamp("end_date", { withTimezone: true }),
     // The cycle's first lesson: the refund anchor unless something closer to
     // the student says otherwise (§3.1). Not null after migration 0043.
     courseStartsOn: date("course_starts_on", { mode: "string" }).notNull(),
@@ -653,6 +664,19 @@ export const registrationSession = pgTable(
     editHistory: jsonb("edit_history")
       .$type<SessionEditEntry[]>()
       .default([]),
+    // ── The coordinator rework (COORDINATOR_REWORK.md §4, §9.1) ──
+    // E4: the share of the course fee a self-study option pays (the exam fee is paid whole).
+    selfStudyPercent: integer("self_study_percent").notNull().default(50),
+    // E6: families may reserve before it, pay only once it is on; one-way once a line exists.
+    pricesFinal: boolean("prices_final").notNull().default(false),
+    pricesFinalAt: timestamp("prices_final_at", { withTimezone: true }),
+    // D11: who may reserve — '10', '11', '12', 'graduates' (replaces eligibility.graduateRetakes for
+    // new reservations; read by P1b's eligibility).
+    allowedGrades: text("allowed_grades").array().notNull().default(sql`'{11,12,graduates}'::text[]`),
+    // C10: an unpaid line expires this many days after its due date (P1b's cut-off sweep reads it).
+    unpaidCancelDays: integer("unpaid_cancel_days").notNull().default(3),
+    // C3: the session it was copied from (its year rolled forward).
+    copiedFromSessionId: text("copied_from_session_id").references((): AnyPgColumn => registrationSession.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -660,6 +684,10 @@ export const registrationSession = pgTable(
       .notNull(),
   },
   (table) => [
+    check("session_self_study_percent_range", sql`${table.selfStudyPercent} BETWEEN 0 AND 100`),
+    check("session_unpaid_cancel_days_range", sql`${table.unpaidCancelDays} BETWEEN 0 AND 60`),
+    check("session_allowed_grades_valid", sql`${table.allowedGrades} <@ ARRAY['10', '11', '12', 'graduates']::text[]`),
+    check("session_prices_final_at", sql`NOT ${table.pricesFinal} OR ${table.pricesFinalAt} IS NOT NULL`),
     index("reg_session_status_idx").on(table.status),
     index("reg_session_type_idx").on(table.sessionType),
     // Reservations rework: one active session per (type, year, label) —
@@ -722,6 +750,14 @@ export const boardSeries = pgTable(
     resultsOn: date("results_on", { mode: "string" }),
     certificatesOn: date("certificates_on", { mode: "string" }),
     notes: text("notes"),
+    // The coordinator rework (COORDINATOR_REWORK.md §7, C6): where the dates came from in the
+    // reference data and whether they are confirmed against the board's published key dates.
+    datesSource: text("dates_source"),
+    datesConfirmed: boolean("dates_confirmed").notNull().default(false),
+    // The levels the board sits in this month (the reference data's `levels`: 'igcse' | 'as_al'). Pearson
+    // sits International A Levels in October and International GCSEs in November; the school calls both
+    // "November", so a winter row's "November" resolves to the autumn sitting of its subject's level.
+    levels: text("levels").array().notNull().default(sql`'{}'::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -758,26 +794,8 @@ export const sessionBoardSeries = pgTable(
   ]
 );
 
-/** A subject a window enters in another of its series of that board than the default. */
-export const sessionSubjectSeries = pgTable(
-  "session_subject_series",
-  {
-    sessionId: text("session_id").notNull(),
-    subjectId: text("subject_id").notNull().references(() => subject.id, { onDelete: "cascade" }),
-    boardSeriesId: text("board_series_id").notNull(),
-    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.sessionId, table.subjectId] }),
-    // Only to a series the window feeds; unlinking the series removes the route.
-    foreignKey({
-      name: "sessionSubjectSeries_link_fk",
-      columns: [table.sessionId, table.boardSeriesId],
-      foreignColumns: [sessionBoardSeries.sessionId, sessionBoardSeries.boardSeriesId],
-    }).onDelete("cascade"),
-  ]
-);
+// `session_subject_series` (a subject routed to a non-default series of its window) has been dead
+// since the rework's routing (0042): dropped by the coordinator rework (COORDINATOR_REWORK.md §9.1).
 
 /**
  * PARENT-STUDENT LINK RELATIONS
@@ -873,16 +891,33 @@ export const sessionOffer = pgTable(
     sessionId: text("session_id").notNull().references(() => registrationSession.id, { onDelete: "restrict" }),
     // The catalogue's registrable row (board, qualification, units as F0b maps them).
     subjectId: text("subject_id").notNull().references(() => subject.id, { onDelete: "restrict" }),
-    // 'open' (first entries and retakes) | 'retake_only' | 'self_study_only' | 'closed'
+    // 'open' (first entries and retakes) | 'retake_only' | 'self_study_only' | 'closed'.
+    // The coordinator rework: ignored by the new screens and kept in step with `accepting` (closed
+    // when it is off) until P1b drops it; today's line rules still read it.
     availability: text("availability").notNull().default("open"),
-    // EGP for a first entry in school this cycle (Q-14).
-    courseFee: numeric("course_fee", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    // EGP for a first entry in school this cycle (Q-14). The coordinator rework (E1): null = not set
+    // (distinct from 0); a subject with a price not set is not offered to families.
+    courseFee: numeric("course_fee", { precision: 12, scale: 2, mode: "number" }),
     // Null: the session's course start.
     courseStartsOn: date("course_starts_on", { mode: "string" }),
-    // The grade-10 core mandate for this cycle (replaces subject.is_core).
+    // The grade-10 core mandate for this cycle (replaces subject.is_core). Unused by the new screens.
     grade10Core: boolean("grade10_core").notNull().default(false),
+    // The family note (D9: an optional note per subject; free text never carries meaning).
     notes: text("notes"),
     sortOrder: integer("sort_order").notNull().default(0),
+    // ── The coordinator rework (COORDINATOR_REWORK.md §4, §9.1) ──
+    // D1: the reference subject it was picked from (reference_subject.code); null for one "not on the list".
+    referenceCode: text("reference_code"),
+    // D5: 'families' (families choose the teacher of an in-school option) | 'school' (the school assigns).
+    teacherChoice: text("teacher_choice").notNull().default("families"),
+    // D4, amendment 3: the teacher is to be confirmed (families read "teacher to be announced").
+    teacherTbc: boolean("teacher_tbc").notNull().default(false),
+    // C4, amendment 1: the subject's own Accepting switch and optional automatic close.
+    accepting: boolean("accepting").notNull().default(true),
+    closesAt: timestamp("closes_at", { withTimezone: true }),
+    // The pre-load's notes for her review (§8's flags; teachers only as placeholders), shown on the check
+    // list until she saves the subject.
+    checkNotes: text("check_notes").array().notNull().default(sql`'{}'::text[]`),
     // { converted: true } on an offer the conversion made (migration 0042).
     legacy: jsonb("legacy").$type<Record<string, unknown>>(),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
@@ -898,7 +933,8 @@ export const sessionOffer = pgTable(
     unique("sessionOffer_id_session_key").on(table.id, table.sessionId),
     index("sessionOffer_subjectId_idx").on(table.subjectId),
     check("session_offer_availability_valid", sql`${table.availability} IN ('open', 'retake_only', 'self_study_only', 'closed')`),
-    check("session_offer_course_fee_nonneg", sql`${table.courseFee} >= 0`),
+    check("session_offer_course_fee_nonneg", sql`${table.courseFee} IS NULL OR ${table.courseFee} >= 0`),
+    check("session_offer_teacher_choice_valid", sql`${table.teacherChoice} IN ('families', 'school')`),
   ]
 );
 
@@ -933,25 +969,57 @@ export const sessionOfferItem = pgTable(
     id: text("id").primaryKey(),
     offerId: text("offer_id").notNull(),
     sessionId: text("session_id").notNull(),
-    // As the form words it: "Whole subject", "Paper 4 only (retake)", "P1".
+    // As the form words it: "Whole subject", "Paper 4 only (retake)", "P1". The coordinator rework
+    // (D9): generated from the row's kind and codes for a row made through the new routes.
     label: text("label").notNull(),
-    // 'whole' | 'one_paper' | 'unit' | 'route' | 'qualification'
-    kind: text("kind").notNull().default("whole"),
+    // The coordinator rework (COORDINATOR_REWORK.md §4, D2): 'all_papers' | 'paper' | 'unit' | 'as' |
+    // 'a2' | 'al' | 'qualification' | 'custom' (migration 0066 converted 'whole' → 'all_papers',
+    // 'one_paper' → 'paper', 'route' → 'as' / 'a2' / 'al'; the deprecated item routes map theirs).
+    kind: text("kind").notNull().default("all_papers"),
     // What it enters with the board: 'award' (qualification_id), 'option'
     // (qualification_option_id), 'units' (session_offer_item_unit), 'subject'
     // (the offer's row itself, unmapped).
     entersKind: text("enters_kind").notNull(),
     qualificationId: text("qualification_id").references(() => qualification.id, { onDelete: "restrict" }),
     qualificationOptionId: text("qualification_option_id").references(() => qualificationOption.id, { onDelete: "restrict" }),
-    // Null only on a converted item of a window that fed no series (closed).
+    // Null only on a converted item of a window that fed no series (closed). The coordinator rework:
+    // the row's sitting (June, November, January of the session), made by findOrCreateSeries.
     boardSeriesId: text("board_series_id"),
+    // Kept in step with the four cells below (deriveAvailability) until P1b drops it.
     availability: text("availability").notNull().default("open"),
-    // Null: the offer's course fee.
+    // Null: the offer's course fee (E3: the course fee overridden per row).
     courseFee: numeric("course_fee", { precision: 12, scale: 2, mode: "number" }),
+    // D6: set from the board rule (a one-paper retake asks its sitting where the board does; an A.2. always).
     needsPriorSeries: boolean("needs_prior_series").notNull().default(false),
     requiredInSeries: boolean("required_in_series").notNull().default(false),
+    // D8: set by the kind, never by staff on a row made through the new routes.
     exclusiveGroup: text("exclusive_group"),
     sortOrder: integer("sort_order").notNull().default(0),
+    // ── The coordinator rework (COORDINATOR_REWORK.md §4, §9.1) ──
+    // D3: how it is studied — the four cells.
+    firstInSchool: boolean("first_in_school").notNull().default(false),
+    retakeInSchool: boolean("retake_in_school").notNull().default(false),
+    retakeSelfStudy: boolean("retake_self_study").notNull().default(false),
+    firstSelfStudy: boolean("first_self_study").notNull().default(false),
+    // E1–E5: the exam fee (null = not set, distinct from 0) and where it came from.
+    examFee: numeric("exam_fee", { precision: 12, scale: 2, mode: "number" }),
+    // 'list' (a pasted price list's row) | 'typed' | 'units_sum' | 'board_rule'
+    examFeeSource: text("exam_fee_source"),
+    priceListRowId: text("price_list_row_id").references((): AnyPgColumn => priceListRow.id, { onDelete: "set null" }),
+    // E4: the row's own self-study course amount, in place of the session's share of the course fee.
+    selfStudyFee: numeric("self_study_fee", { precision: 12, scale: 2, mode: "number" }),
+    // D1–D2: the reference row it was suggested from (its stable key: a copy and a price-list match
+    // refer to it) and its codes; null and empty for a custom row.
+    referenceKey: text("reference_key"),
+    referenceCodes: text("reference_codes").array().notNull().default(sql`'{}'::text[]`),
+    // D6: the sittings (board_series ids) a retake or an A.2. may carry from — her list.
+    allowedPriorSeriesIds: text("allowed_prior_series_ids").array().notNull().default(sql`'{}'::text[]`),
+    // D12: a winter row's own close date and pay-by date.
+    closesAt: timestamp("closes_at", { withTimezone: true }),
+    payBy: timestamp("pay_by", { withTimezone: true }),
+    // §3's defaults: the cells a default ticked rather than her form (Q10's retake in school), shown on the
+    // check list for her to confirm until she saves the row.
+    cellsByDefault: text("cells_by_default").array().notNull().default(sql`'{}'::text[]`),
     // { converted: true, no_series?: true }
     legacy: jsonb("legacy").$type<Record<string, unknown>>(),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
@@ -975,10 +1043,16 @@ export const sessionOfferItem = pgTable(
     index("sessionOfferItem_offerId_idx").on(table.offerId),
     index("sessionOfferItem_sessionId_idx").on(table.sessionId),
     index("sessionOfferItem_boardSeriesId_idx").on(table.boardSeriesId),
-    check("session_offer_item_kind_valid", sql`${table.kind} IN ('whole', 'one_paper', 'unit', 'route', 'qualification')`),
+    check("session_offer_item_kind_valid", sql`${table.kind} IN ('all_papers', 'paper', 'unit', 'as', 'a2', 'al', 'qualification', 'custom')`),
     check("session_offer_item_enters_valid", sql`(${table.entersKind} = 'award' AND ${table.qualificationId} IS NOT NULL) OR (${table.entersKind} = 'option' AND ${table.qualificationOptionId} IS NOT NULL) OR ${table.entersKind} IN ('units', 'subject')`),
     check("session_offer_item_availability_valid", sql`${table.availability} IN ('open', 'retake_only', 'self_study_only', 'closed')`),
     check("session_offer_item_course_fee_nonneg", sql`${table.courseFee} IS NULL OR ${table.courseFee} >= 0`),
+    check("session_offer_item_exam_fee_nonneg", sql`${table.examFee} IS NULL OR ${table.examFee} >= 0`),
+    check("session_offer_item_self_study_fee_nonneg", sql`${table.selfStudyFee} IS NULL OR ${table.selfStudyFee} >= 0`),
+    check("session_offer_item_exam_fee_source_valid", sql`${table.examFeeSource} IS NULL OR ${table.examFeeSource} IN ('list', 'typed', 'units_sum', 'board_rule')`),
+    check("session_offer_item_exam_fee_has_source", sql`(${table.examFee} IS NULL) = (${table.examFeeSource} IS NULL)`),
+    // "One paper ONLY" is always a retake (F6a): a one-paper row takes no first entry.
+    check("session_offer_item_paper_no_first", sql`${table.kind} <> 'paper' OR NOT (${table.firstInSchool} OR ${table.firstSelfStudy})`),
   ]
 );
 
@@ -1087,6 +1161,194 @@ export const boardFee = pgTable(
     check("board_fee_confirmed_whole", sql`(${table.provisional} AND ${table.confirmedAt} IS NULL) OR (NOT ${table.provisional} AND ${table.confirmedAt} IS NOT NULL)`),
   ]
 );
+
+/**
+ * ============================================
+ * THE COORDINATOR REWORK — PRICE LISTS, QUESTIONS, REFERENCE DATA
+ * ============================================
+ *
+ * COORDINATOR_REWORK.md §4, §7, §9.1. A price list is one board's fee list as the coordinator
+ * pasted it for a session ("Cambridge June 2026"): every line as printed, and the row of the
+ * session each matched (by the reference row's price codes and the board's aliases). Its amounts
+ * become the rows' exam fees (source 'list'); the list is kept so the screen can show what was
+ * pasted and what did not match.
+ */
+export const priceList = pgTable(
+  "price_list",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull().references(() => registrationSession.id, { onDelete: "cascade" }),
+    boardCode: text("board_code").notNull().references(() => examBoard.code, { onDelete: "restrict" }),
+    // As she names it: "Cambridge June 2026".
+    name: text("name").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("priceList_session_board_name_idx").on(table.sessionId, table.boardCode, table.name),
+  ]
+);
+
+/** One line of a pasted price list, as printed, and the session's row it matched (if any). */
+export const priceListRow = pgTable(
+  "price_list_row",
+  {
+    id: text("id").primaryKey(),
+    priceListId: text("price_list_id").notNull().references(() => priceList.id, { onDelete: "cascade" }),
+    lineNo: integer("line_no").notNull(),
+    // The code and the name as printed ("0970 CX", "Biology"; "S1 / S2" pairs kept as printed).
+    code: text("code").notNull(),
+    name: text("name").notNull().default(""),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    // The reference row key it matched (subject code and row key) and the session's row.
+    matchedKey: text("matched_key"),
+    matchedItemId: text("matched_item_id").references((): AnyPgColumn => sessionOfferItem.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("priceListRow_list_idx").on(table.priceListId),
+    index("priceListRow_item_idx").on(table.matchedItemId),
+    check("price_list_row_amount_nonneg", sql`${table.amount} >= 0`),
+  ]
+);
+
+/**
+ * D13 (amendment 6): an extra question of a session, or of one subject of it — yes/no, short text
+ * or a choice. It never affects price or eligibility; the answers go into the reservations export.
+ */
+export const sessionQuestion = pgTable(
+  "session_question",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull().references(() => registrationSession.id, { onDelete: "cascade" }),
+    // Null: asked once for the session; else asked with that subject.
+    offeringId: text("offering_id").references(() => sessionOffer.id, { onDelete: "cascade" }),
+    // 'yes_no' | 'text' | 'choice'
+    kind: text("kind").notNull(),
+    prompt: text("prompt").notNull(),
+    choices: text("choices").array().notNull().default(sql`'{}'::text[]`),
+    required: boolean("required").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("sessionQuestion_session_idx").on(table.sessionId),
+    index("sessionQuestion_offering_idx").on(table.offeringId),
+    check("session_question_kind_valid", sql`${table.kind} IN ('yes_no', 'text', 'choice')`),
+    check("session_question_choices", sql`(${table.kind} = 'choice') = (cardinality(${table.choices}) > 0)`),
+  ]
+);
+
+/** A family's answer to an extra question, per student and session (D13). */
+export const registrationAnswer = pgTable(
+  "registration_answer",
+  {
+    id: text("id").primaryKey(),
+    questionId: text("question_id").notNull().references(() => sessionQuestion.id, { onDelete: "restrict" }),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    sessionId: text("session_id").notNull().references(() => registrationSession.id, { onDelete: "restrict" }),
+    value: text("value").notNull(),
+    answeredBy: text("answered_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("registrationAnswer_question_student_idx").on(table.questionId, table.studentId),
+    index("registrationAnswer_session_idx").on(table.sessionId),
+  ]
+);
+
+/**
+ * The reference data (COORDINATOR_REWORK.md §7): the subjects we maintain per board, loaded by a
+ * seed from packages/db/reference/*.json (P0's files), read-only to staff. A subject the coordinator
+ * picks becomes a `subject` row on first use; its suggested rows become the offering's rows.
+ */
+export const referenceSubject = pgTable(
+  "reference_subject",
+  {
+    // `${board}:${code}`.
+    id: text("id").primaryKey(),
+    boardCode: text("board_code").notNull().references(() => examBoard.code, { onDelete: "restrict" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    // 'O.L.' | 'A.S./A.L.' — the school's two groups (D10).
+    group: text("group").notNull(),
+    // 'igcse' | 'as_al'
+    level: text("level").notNull(),
+    // A code on no list we hold is not confirmed (§7).
+    confirmed: boolean("confirmed").notNull().default(false),
+    note: text("note"),
+    // A winter session's default sitting for its rows (D12): 'november' | 'january' | null.
+    winterSitting: text("winter_sitting"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    loadedAt: timestamp("loaded_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("referenceSubject_board_code_idx").on(table.boardCode, table.code),
+    check("reference_subject_group_valid", sql`${table.group} IN ('O.L.', 'A.S./A.L.')`),
+    check("reference_subject_level_valid", sql`${table.level} IN ('igcse', 'as_al')`),
+    check("reference_subject_winter_valid", sql`${table.winterSitting} IS NULL OR ${table.winterSitting} IN ('november', 'january')`),
+  ]
+);
+
+/** A reference subject's suggested row (D2): what it can be entered as, with its codes and the codes its price list prints. */
+export const referenceRow = pgTable(
+  "reference_row",
+  {
+    // `${board}:${subject code}:${key}`.
+    id: text("id").primaryKey(),
+    referenceSubjectId: text("reference_subject_id").notNull().references(() => referenceSubject.id, { onDelete: "cascade" }),
+    // Stable across years: what a copied row and a price-list match refer to.
+    key: text("key").notNull(),
+    // 'all_papers' | 'paper' | 'unit' | 'as' | 'a2' | 'al' | 'qualification'
+    kind: text("kind").notNull(),
+    codes: text("codes").array().notNull().default(sql`'{}'::text[]`),
+    priceCodes: text("price_codes").array().notNull().default(sql`'{}'::text[]`),
+    short: text("short"),
+    labelEn: text("label_en").notNull(),
+    labelAr: text("label_ar").notNull(),
+    // A qualification made of units: its exam fee is the sum of these rows' (keys of the same subject).
+    sumOfUnits: text("sum_of_units").array().notNull().default(sql`'{}'::text[]`),
+    // The row's own default winter sitting where the school splits a subject (IAL Biology units 1–2 in
+    // November, 3–4 in January): 'november' | 'january', 'none' (not sat in winter), null (the subject's).
+    winterSitting: text("winter_sitting"),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex("referenceRow_subject_key_idx").on(table.referenceSubjectId, table.key),
+    check("reference_row_winter_valid", sql`${table.winterSitting} IS NULL OR ${table.winterSitting} IN ('november', 'january', 'none')`),
+    check("reference_row_kind_valid", sql`${table.kind} IN ('all_papers', 'paper', 'unit', 'as', 'a2', 'al', 'qualification')`),
+  ]
+);
+
+export const priceListRelations = relations(priceList, ({ one, many }) => ({
+  session: one(registrationSession, { fields: [priceList.sessionId], references: [registrationSession.id] }),
+  rows: many(priceListRow),
+}));
+
+export const priceListRowRelations = relations(priceListRow, ({ one }) => ({
+  list: one(priceList, { fields: [priceListRow.priceListId], references: [priceList.id] }),
+}));
+
+export const referenceSubjectRelations = relations(referenceSubject, ({ many }) => ({
+  rows: many(referenceRow),
+}));
+
+export const referenceRowRelations = relations(referenceRow, ({ one }) => ({
+  subject: one(referenceSubject, { fields: [referenceRow.referenceSubjectId], references: [referenceSubject.id] }),
+}));
 
 /**
  * ============================================
@@ -1307,7 +1569,6 @@ export const registrationSessionRelations = relations(registrationSession, ({ ma
   registrations: many(registration),
   // F0b: the board series the window feeds, and its subject routes.
   boardSeriesLinks: many(sessionBoardSeries),
-  subjectRoutes: many(sessionSubjectSeries),
   // Reservations rework: the session's offers (its links sheet).
   offers: many(sessionOffer),
 }));
@@ -1466,12 +1727,6 @@ export const boardSeriesRelations = relations(boardSeries, ({ one, many }) => ({
 export const sessionBoardSeriesRelations = relations(sessionBoardSeries, ({ one }) => ({
   session: one(registrationSession, { fields: [sessionBoardSeries.sessionId], references: [registrationSession.id] }),
   boardSeries: one(boardSeries, { fields: [sessionBoardSeries.boardSeriesId], references: [boardSeries.id] }),
-}));
-
-export const sessionSubjectSeriesRelations = relations(sessionSubjectSeries, ({ one }) => ({
-  session: one(registrationSession, { fields: [sessionSubjectSeries.sessionId], references: [registrationSession.id] }),
-  subject: one(subject, { fields: [sessionSubjectSeries.subjectId], references: [subject.id] }),
-  boardSeries: one(boardSeries, { fields: [sessionSubjectSeries.boardSeriesId], references: [boardSeries.id] }),
 }));
 
 /**

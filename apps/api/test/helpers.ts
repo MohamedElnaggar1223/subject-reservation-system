@@ -152,21 +152,34 @@ export async function onboard(officer: Client, tag: string, grade: 9 | 10 | 11 |
   return { parent: await signIn(parentEmail), student: await signIn(studentEmail), studentId: r.student.id };
 }
 
-// ─── Catalogue ───────────────────────────────────────────────────────────────
+// ─── Sessions and offerings ──────────────────────────────────────────────────
 
 type Level = 'igcse' | 'as_level' | 'a_level';
 type OldType = 'june' | 'october' | 'november' | 'january';
 type Board = 'cambridge' | 'pearson_edexcel' | 'oxford';
+type Sitting = 'june' | 'november' | 'january';
 
 /**
- * The reservations rework (RESERVATIONS_REWORK.md §3.2): a subject is reserved through a
- * session's offer of it. The suites' windows offer every subject the file made at the window's
- * level — what the conversion does for a converted window (§7: "an offer for every subject … and
- * for every active subject at its level") — so the money scenarios keep naming subjects. Each
- * file's subjects and sessions are remembered here (vitest runs each file in its own module
- * scope). The rework's own scenarios (08n, 08p, 08t) make their offers explicitly.
+ * The coordinator rework (COORDINATOR_REWORK.md §12, "helpers first"): a suite's sessions and their
+ * subjects are set up through the coordinator's routes — a session of a type and year
+ * (`POST /sessions`), its dates (`PUT /sessions/:id`), prices final, and for each subject an
+ * offering (`POST /sessions/:id/offerings`, the subject "not on the list" by its code) saved with an
+ * all-papers row, its cells and its exam fee (`PUT …/offerings/:offeringId`). The suites' windows
+ * offer every subject the file made at the window's level — what the conversion did for a converted
+ * window — so the money scenarios keep naming subjects. Each file's subjects and sessions are
+ * remembered here (vitest runs each file in its own module scope). The rework's own scenarios make
+ * their offers explicitly.
+ *
+ * A suite session keeps a label of its own (so no two collide, one open per type, year and label)
+ * and its rows sit in that label's sittings, made with an exam start far ahead (reservable, with no
+ * entry deadline until a test sets one) — the board dates a real session reads from the reference
+ * data. The deprecated routes (feedSeries, placeItemsIn, subjectFeeIn) stay for the scenarios P1b adapts.
  */
-type SubjectMeta = { id: string; level: Level; council: Board; courseFee: number; registrationFee: number; isOfferedAtSchool: boolean; isCore: boolean };
+type SubjectMeta = {
+  id: string; code: string; name: string; level: Level; council: Board; courseFee: number; registrationFee: number; isOfferedAtSchool: boolean; isCore: boolean;
+  // Offered the old way (the deprecated offers route, its fee read from the series' fee grid; no exam fee on its row).
+  pricedByGrid: boolean;
+};
 type SessionMeta = { id: string; oldType: OldType; level: Level; type: 'june' | 'winter'; year: number; oldYear: number; label: string; adm: Client };
 const SUBJECTS: SubjectMeta[] = [];
 const SESSIONS: SessionMeta[] = [];
@@ -174,7 +187,7 @@ const RUN = Math.random().toString(36).slice(2, 6);
 let labels = 0;
 let suiteTeacher: Promise<string> | null = null;
 
-/** The file's teacher: an open offer names who teaches it (§3.2). */
+/** The file's teacher: an in-school option names who teaches it (D4). */
 async function teacherOfTheSuite(adm: Client): Promise<string> {
   suiteTeacher ??= apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher (suite ${RUN})` } })).then((t) => t!.id);
   return suiteTeacher;
@@ -188,19 +201,26 @@ export async function subject(
   extra: {
     qualificationLevel?: 'igcse' | 'as_level' | 'a_level'; isOfferedAtSchool?: boolean; isCore?: boolean;
     council?: 'cambridge' | 'pearson_edexcel' | 'oxford';
+    /**
+     * Offered the old way in the file's windows: the deprecated offers route with a whole-subject item in the
+     * suite's series and its fee on the series' grid — a subject priced from the grid, as converted data and a
+     * subject only in closed sessions still are (the board-change scenarios P1b retires with that machinery).
+     */
+    pricedByGrid?: boolean;
   } = {}
 ): Promise<string> {
+  const { pricedByGrid, ...fields } = extra;
   const r = await apiResponse(
     adm.api.v1.subjects.$post({
       json: {
         name, code, council: extra.council ?? 'cambridge', courseFee: fees.course, registrationFee: fees.registration,
-        isOfferedAtSchool: true, isCore: false, ...extra,
+        isOfferedAtSchool: true, isCore: false, ...fields,
       },
     })
   );
   const meta: SubjectMeta = {
-    id: r.id, level: extra.qualificationLevel ?? 'igcse', council: extra.council ?? 'cambridge', courseFee: fees.course,
-    registrationFee: fees.registration, isOfferedAtSchool: extra.isOfferedAtSchool ?? true, isCore: extra.isCore ?? false,
+    id: r.id, code, name, level: extra.qualificationLevel ?? 'igcse', council: extra.council ?? 'cambridge', courseFee: fees.course,
+    registrationFee: fees.registration, isOfferedAtSchool: extra.isOfferedAtSchool ?? true, isCore: extra.isCore ?? false, pricedByGrid: !!pricedByGrid,
   };
   SUBJECTS.push(meta);
   // Offered in the file's open and draft windows of its level, as the conversion offers it.
@@ -218,20 +238,19 @@ const BOARD_MONTHS: Record<Board, OldType[]> = {
   oxford: ['january', 'june', 'november'],
 };
 
-/** The month a suite window's subject of this board is entered in: the window's own, else one of its session the board sits. */
-function monthFor(s: SessionMeta, board: Board, level: Level): { month: OldType; year: number } {
-  if (s.type === 'june') return { month: 'june', year: s.year };
-  const months: { month: OldType; year: number }[] = [
-    { month: s.oldType, year: s.oldYear },
-    { month: 'november', year: s.year }, { month: 'october', year: s.year }, { month: 'january', year: s.year + 1 },
-  ];
-  return months.find((m) => BOARD_MONTHS[board].includes(m.month) && !(level === 'igcse' && (m.month === 'october' || m.month === 'january')))!;
+/**
+ * The sitting a suite window's subject of this board sits in (C1, D12): June in a June window; in a
+ * winter one January for a January window whose board sits it (IGCSE never does), else November.
+ */
+function sittingFor(s: SessionMeta, board: Board, level: Level): { sitting: Sitting; month: OldType; year: number } {
+  if (s.type === 'june') return { sitting: 'june', month: 'june', year: s.year };
+  if (s.oldType === 'january' && BOARD_MONTHS[board].includes('january') && level !== 'igcse') return { sitting: 'january', month: 'january', year: s.year + 1 };
+  return { sitting: 'november', month: 'november', year: s.year };
 }
 
 /**
- * A suite window's own series for a board (labelled with the window's label, so no two files
- * share one), with an exam start far ahead: reservable, with no entry deadline until a test
- * sets one (§3.3: a series with neither date takes no line).
+ * A suite window's own sitting for a board (labelled with the window's label, so no two files share
+ * one), with an exam start far ahead: reservable, with no entry deadline until a test sets one.
  */
 async function suiteSeries(adm: Client, s: SessionMeta, board: Board, level: Level): Promise<string> {
   // A session's series may have been corrected since it was made ("Correct series"): read it again.
@@ -243,7 +262,7 @@ async function suiteSeries(adm: Client, s: SessionMeta, board: Board, level: Lev
     else if (s.oldType === 'june') s.oldType = 'november';
     s.oldYear = s.oldType === 'january' ? now.year + 1 : now.year;
   }
-  const { month, year } = monthFor(s, board, level);
+  const { month, year } = sittingFor(s, board, level);
   const [found] = await sql<{ id: string }>(`select id from board_series where board_code = $1 and month = $2 and year = $3 and label = $4`, [board, month, year, s.label]);
   if (found) return found.id;
   const made = await apiResponse(adm.api.v1['board-series'].$post({
@@ -252,28 +271,60 @@ async function suiteSeries(adm: Client, s: SessionMeta, board: Board, level: Lev
   return made.id;
 }
 
-/** Offer a subject in a suite window: its whole item, in the window's series, at its registration fee. */
+/**
+ * Offer a subject in a suite window through the coordinator's routes: the subject "not on the list" by
+ * its code, its course fee and teacher, and one all-papers row in the window's sitting — first entry,
+ * retake in school and in self study where the school teaches it, retake in self study where it does
+ * not — at its registration fee as the exam fee. A core subject keeps the grade-10 flag (a parked
+ * feature: set through the deprecated offer route the new model does not carry).
+ */
 async function offerInSession(adm: Client, s: SessionMeta, sub: SubjectMeta) {
   // A subject's board may have changed since it was made (a board-change test): read it again.
-  const [now] = await sql<{ council: Board }>(`select council from subject where id = $1`, [sub.id]);
-  if (now) sub.council = now.council;
-  const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
+  const [now] = await sql<{ council: Board; name: string; code: string }>(`select council, name, code from subject where id = $1`, [sub.id]);
+  if (now) { sub.council = now.council; sub.name = now.name; sub.code = now.code; }
+  if (sub.pricedByGrid) {
+    // The old way (the deprecated offers route; its fee on the series' grid).
+    const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
+    const teacherId = await teacherOfTheSuite(adm);
+    await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: s.id },
+      json: {
+        subjectId: sub.id, availability: sub.isOfferedAtSchool ? 'open' : 'self_study_only', courseFee: sub.courseFee, grade10Core: sub.isCore,
+        teachers: sub.isOfferedAtSchool ? [{ teacherId, mode: 'in_school' }] : [],
+        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
+      },
+    }));
+    await setSuiteFee(adm, seriesId, sub);
+    return;
+  }
+  await suiteSeries(adm, s, sub.council, sub.level);
+  const { sitting } = sittingFor(s, sub.council, sub.level);
   const teacherId = await teacherOfTheSuite(adm);
-  await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+  const made = await apiResponse(adm.api.v1.sessions[':id'].offerings.$post({
     param: { id: s.id },
+    json: { custom: { board: sub.council, name: sub.name, level: sub.level === 'igcse' ? 'igcse' : 'as_al', group: sub.level === 'igcse' ? 'O.L.' : 'A.S./A.L.', code: sub.code } },
+  }));
+  await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+    param: { id: s.id, offeringId: made.id },
     json: {
-      subjectId: sub.id,
-      availability: sub.isOfferedAtSchool ? 'open' : 'self_study_only',
+      // Added to an open session it starts switched off until reviewed: the suite's subjects are offered at once.
+      accepting: true,
       courseFee: sub.courseFee,
-      grade10Core: sub.isCore,
-      teachers: sub.isOfferedAtSchool ? [{ teacherId, mode: 'in_school' }] : [],
-      items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
+      teachers: sub.isOfferedAtSchool ? [{ teacherId, online: false, external: false }] : [],
+      rows: [{
+        kind: 'all_papers', referenceCodes: [sub.code], sitting, examFee: sub.registrationFee,
+        cells: sub.isOfferedAtSchool
+          ? { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false }
+          : { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: false },
+      }],
     },
   }));
-  await setSuiteFee(adm, seriesId, sub);
+  if (sub.isCore) {
+    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: s.id, offerId: made.id }, json: { grade10Core: true, reason: 'suite: a grade-10 core subject' } }));
+  }
 }
 
-/** The subject's registration fee as its board fee in a series (confirmed: it is the price). */
+/** The subject's registration fee as its board fee in a series (confirmed): the deprecated fee grid, read by an item made by the deprecated routes. */
 async function setSuiteFee(adm: Client, seriesId: string, sub: SubjectMeta) {
   const [row] = await sql<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id = $2`, [seriesId, sub.id]);
   if (row) return;
@@ -283,7 +334,7 @@ async function setSuiteFee(adm: Client, seriesId: string, sub: SubjectMeta) {
   }));
 }
 
-/** A file subject's board fee in a series (its registration fee), as finance sets it on the Fees tab. */
+/** A file subject's board fee in a series (its registration fee), as finance sets it on the deprecated Fees tab. */
 export async function subjectFeeIn(adm: Client, seriesId: string, subjectId: string) {
   const sub = SUBJECTS.find((x) => x.id === subjectId);
   if (!sub) throw new Error('subjectFeeIn(): a subject this file made');
@@ -291,12 +342,17 @@ export async function subjectFeeIn(adm: Client, seriesId: string, subjectId: str
 }
 
 /**
- * A registration window, as a session of the reservations rework: a window of June stays June,
- * an October or November window is the winter session of its year, a January one the winter of
- * the year before; each gets a label of its own (so the suites' sessions never collide) and
- * offers every subject the file made at the window's level. Its exam series year (F0a) defaults
- * to the series of that type in the academic year the window opens in, so a student's grade in
- * it is their grade that year. A test about the series itself passes `seriesYear`.
+ * A registration window, as a session set up by the coordinator: a window of June stays June, an
+ * October or November window is the winter session of its year, a January one the winter of the year
+ * before; each gets a label of its own (so the suites' sessions never collide) and offers every
+ * subject the file made at the window's level. Its exam series year (F0a) defaults to the series of
+ * that type in the academic year the window opens in, so a student's grade in it is their grade that
+ * year. A test about the series itself passes `seriesYear`.
+ *
+ * Its header is made with the window's dates in one call (the deprecated dated contract of
+ * `POST /sessions`: born open once its start has passed, a draft before — a preregistration target —
+ * and no header change of its own in the session's audit trail, which scenarios count); its prices are
+ * made final and every subject is offered through the coordinator's routes; `activate` opens a draft.
  */
 export async function session(
   adm: Client,
@@ -309,20 +365,20 @@ export async function session(
   const type = sessionType === 'june' ? 'june' as const : 'winter' as const;
   const year = sessionType === 'january' ? oldYear - 1 : oldYear;
   const label = `t${++labels}-${RUN}`;
-  const r = await apiResponse(
-    adm.api.v1.sessions.$post({
-      json: {
-        type, year, label, startDate: opts.startDate, endDate: opts.endDate,
-        courseStartsOn: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(opts.startDate)),
-        paymentDueAt: opts.endDate,
-      },
-    })
-  );
+  const r = await apiResponse(adm.api.v1.sessions.$post({
+    json: {
+      type, year, label, startDate: opts.startDate, endDate: opts.endDate,
+      courseStartsOn: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(opts.startDate)),
+      paymentDueAt: opts.endDate,
+    },
+  }));
+  await apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: r.id }, json: { final: true } }));
   const meta: SessionMeta = { id: r.id, oldType: sessionType, level: qualificationLevel, type, year, oldYear, label, adm };
   SESSIONS.push(meta);
   for (const sub of SUBJECTS.filter((x) => x.level === qualificationLevel)) await offerInSession(adm, meta, sub);
-  // A session whose start date has already passed is born active; only a
-  // draft can (and needs to) be activated by hand.
+  // A session whose start date has already passed is born active; only a draft is opened by hand (the
+  // deprecated activation, as before: the suites' sittings carry an exam start and no entry deadline, which
+  // the Accepting switch's check list holds back — 08y and 08za open theirs by the switch).
   if (opts.activate && r.status === 'draft') {
     await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: r.id } }));
   }
@@ -330,13 +386,13 @@ export async function session(
 }
 
 /**
- * The teachers of a session's offer of a subject (the reservations rework: who teaches it this
- * cycle is the offer's, picked from the subject's pool; a line names one of them).
+ * The teachers of a session's offering of a subject (D4: who teaches it this cycle is the offering's;
+ * a line names one of them).
  */
 export async function teachOffer(adm: Client, sessionId: string, subjectId: string, teacherIds: string[]) {
   const o = await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [sessionId, subjectId]);
-  await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$put({
-    param: { id: sessionId, offerId: o.id }, json: { teachers: teacherIds.map((teacherId) => ({ teacherId, mode: 'in_school' as const })), reason: 'suite: who teaches it this cycle' },
+  await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+    param: { id: sessionId, offeringId: o.id }, json: { teachers: teacherIds.map((teacherId) => ({ teacherId, online: false, external: false })) },
   }));
 }
 
@@ -349,12 +405,11 @@ export async function offer(adm: Client, sessionId: string, subjectId: string) {
 }
 
 /**
- * F0b's "feed a series" in the reservations rework: a board series of the window's own month and
- * year (labelled with `label`), into which the window's items of that board go — with their live
- * lines when they sat in the window's own suite series (as F0b entered a window's unrouted
- * registrations in its first series), or beside them when they sat in an earlier fed series (the
- * old one closed: new lines go to the new one, as F0b's new default did). Its fee rows are the
- * subjects' registration fees. Returns the series id.
+ * F0b's "feed a series" (deprecated with the item routes; P1b retires the scenarios that use it): a
+ * board series of the window's own month and year (labelled with `label`), into which the window's
+ * rows of that board go — with their live lines when they sat in the window's own suite sitting, or
+ * beside them when they sat in an earlier fed series (the old one closed: new lines go to the new
+ * one). Its fee rows are the subjects' registration fees. Returns the series id.
  */
 export async function feedSeries(
   adm: Client,
@@ -375,10 +430,10 @@ export async function feedSeries(
 }
 
 /**
- * A suite window's items of a series' board go into that series (F0b's "this window feeds it,
- * as the default for its board"): an item still in the window's own suite series moves with its
- * live lines; one in an earlier fed series stays for its lines, closed, and a new item in the
- * series takes new lines. Each subject's registration fee is its board fee there.
+ * A suite window's rows of a series' board go into that series (F0b's "this window feeds it", through
+ * the deprecated item routes): a row still in the window's own suite sitting moves with its live
+ * lines; one in an earlier fed series stays for its lines, closed, and a new item in the series takes
+ * new lines (priced from the fee grid, each subject's registration fee its board fee there).
  */
 export async function placeItemsIn(adm: Client, sessionId: string, seriesId: string) {
   const s = SESSIONS.find((x) => x.id === sessionId);
@@ -409,13 +464,13 @@ export async function placeItemsIn(adm: Client, sessionId: string, seriesId: str
 }
 
 /**
- * The SQL for a subject's whole item in a session (`$s`, `$t`: the session's and subject's
+ * The SQL for a subject's all-papers row in a session (`$s`, `$t`: the session's and subject's
  * placeholders) — what resolveItem picks — for a test that inserts a line by hand.
  */
 export const wholeItemSql = (s: string, t: string) =>
-  `(select i.id from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = ${s} and o.subject_id = ${t} and i.kind = 'whole' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1)`;
+  `(select i.id from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = ${s} and o.subject_id = ${t} and i.kind = 'all_papers' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1)`;
 
-/** The series a session's (open) items of a board are entered in. */
+/** The series a session's (open) rows of a board sit in. */
 export async function seriesOfSession(sessionId: string, board: 'cambridge' | 'pearson_edexcel' | 'oxford' = 'pearson_edexcel') {
   return (await one<{ id: string }>(`select distinct i.board_series_id as id from session_offer_item i join board_series bs on bs.id = i.board_series_id
     where i.session_id = $1 and bs.board_code = $2 and i.availability <> 'closed'`, [sessionId, board])).id;
@@ -424,20 +479,20 @@ export async function seriesOfSession(sessionId: string, board: 'cambridge' | 'p
 /** Both consents ticked: every reservation path takes them since step B (RESERVATIONS_REWORK.md §3.5). */
 export const CONSENT = { refundPolicy: true, declaration: true } as const;
 
-/** A subject's whole item in a session — what resolveItem picks: an open one first, then one with a series. */
+/** A subject's all-papers row in a session — what resolveItem picks: an open one first, then one with a series. */
 async function wholeItemOf(sessionId: string, subjectId: string) {
   const [it] = await sql<{ id: string; offer_availability: string; availability: string }>(
     `select i.id, o.availability as offer_availability, i.availability from session_offer_item i join session_offer o on o.id = i.offer_id
-     where o.session_id = $1 and o.subject_id = $2 and i.kind = 'whole' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1`,
+     where o.session_id = $1 and o.subject_id = $2 and i.kind = 'all_papers' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1`,
     [sessionId, subjectId]);
   return it ?? null;
 }
 
 /**
  * A file's subjects as one reservation's `lines` and `consent` (step B: every reservation path
- * takes lines — one per item — and both consents, not `subjectIds`): each subject's whole item in
- * the session, a first entry, in school unless the item is self-study only; `teachers` names a
- * line's teacher (else the server's default: the item's or offer's only teacher, or none).
+ * takes lines — one per item — and both consents, not `subjectIds`): each subject's all-papers row in
+ * the session, a first entry, in school unless the row is self-study only; `teachers` names a
+ * line's teacher (else the server's default: the row's or offering's only teacher, or none).
  * A subject the session does not offer becomes an item id the server refuses as not on offer.
  */
 export async function reservationOf(
@@ -459,7 +514,7 @@ export async function reservationOf(
   return { lines, consent: CONSENT };
 }
 
-/** A swap's new line (step B): the subject's whole item in the session of the line being swapped, a first entry. */
+/** A swap's new line (step B): the subject's all-papers row in the session of the line being swapped, a first entry. */
 export async function swapTo(registrationId: string, subjectId: string) {
   const [r] = await sql<{ session_id: string }>(`select session_id from registration where id = $1`, [registrationId]);
   const { lines } = await reservationOf(r?.session_id ?? '', [subjectId]);
@@ -469,6 +524,36 @@ export async function swapTo(registrationId: string, subjectId: string) {
 /** A session's name (derived from its type, year and label since the reservations rework). */
 export async function sessionName(sessionId: string) {
   return (await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionId])).name;
+}
+
+// ─── The coordinator's set-up (COORDINATOR_REWORK.md Appendix A) ─────────────
+
+export type Impact = { repriced: number; listedForFinance: number; linesAffected: number; dueDatesMoved: number };
+
+/**
+ * A set-up change that answers its impact first (A3): sent once; when it is not saved, sent again with
+ * the counts it answered as `expected`, as the coordinator's screen does after showing them. Returns
+ * the first answer (the counts shown) and the saved one.
+ */
+export async function confirmed<T extends { saved: boolean; impact: Impact }>(send: (expected?: Impact) => Promise<T>): Promise<{ shown: T; saved: T }> {
+  const shown = await send();
+  if (shown.saved) return { shown, saved: shown };
+  const saved = await send(shown.impact);
+  expect(saved.saved, JSON.stringify(saved.impact)).toBe(true);
+  return { shown, saved };
+}
+
+/**
+ * C6's one exception, as the admin makes it from the check list (PUT /reference/sittings/:id/board-date): a
+ * sitting the reference data gives no board entry deadline gets one (and its retake deadline), once.
+ */
+export async function boardDate(adm: Client, seriesId: string, d: { entryDeadline: string; retakeDeadline?: string | null }) {
+  return apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: seriesId }, json: d }));
+}
+
+/** The school's date (Cairo) `days` from now, as a board prints a date ('YYYY-MM-DD'). */
+export function cairoDateIn(days: number): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() + days * 86_400_000));
 }
 
 // ─── Observation ─────────────────────────────────────────────────────────────

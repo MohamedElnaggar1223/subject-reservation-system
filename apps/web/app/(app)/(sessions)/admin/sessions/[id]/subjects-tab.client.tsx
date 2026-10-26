@@ -103,11 +103,11 @@ const ROUTE_ORDER = (i: ItemRow) => (i.qualification?.level === 'as_level' ? 0 :
 function sections(o: OfferRow) {
   const qualificationItems = o.items.filter((i) => i.kind === 'qualification');
   return {
-    papers: o.items.filter((i) => i.kind === 'one_paper'),
-    routes: o.items.filter((i) => i.kind === 'route').sort((a, b) => ROUTE_ORDER(a) - ROUTE_ORDER(b)),
+    papers: o.items.filter((i) => i.kind === 'paper'),
+    routes: o.items.filter((i) => i.kind === 'as' || i.kind === 'a2' || i.kind === 'al').sort((a, b) => ROUTE_ORDER(a) - ROUTE_ORDER(b)),
     units: o.items.filter((i) => i.kind === 'unit'),
     // Two qualifications under one subject (Arabic A Level, Edexcel): the whole item is the first of them.
-    qualifications: qualificationItems.length ? o.items.filter((i) => i.kind === 'qualification' || i.kind === 'whole') : [],
+    qualifications: qualificationItems.length ? o.items.filter((i) => i.kind === 'qualification' || i.kind === 'all_papers') : [],
   };
 }
 
@@ -241,7 +241,7 @@ function FormPhrases({ o, shares }: { o: OfferRow; shares: Shares }) {
   }
   const s = sections(o);
   const parts: React.ReactNode[] = [];
-  const whole = o.items.find((i) => i.kind === 'whole' && i.availability !== 'closed');
+  const whole = o.items.find((i) => i.kind === 'all_papers' && i.availability !== 'closed');
   const ssShare = pct(shares.selfStudyCoursePercent);
   if (o.availability === 'self_study_only') parts.push(<span key="ss" className="font-medium">Retake (Self Study ONLY)</span>);
   if (whole && !s.qualifications.length) {
@@ -299,8 +299,8 @@ function FormPhrases({ o, shares }: { o: OfferRow; shares: Shares }) {
 }
 
 function SheetRow({ o, shares, onOpen, onPreview }: { o: OfferRow; shares: Shares; onOpen: () => void; onPreview: () => void }) {
-  const main = o.items.find((i) => i.kind === 'whole' && i.availability !== 'closed') ?? o.items.find((i) => i.availability !== 'closed') ?? o.items[0];
-  const share = Math.round(o.courseFee * shares.selfStudyCoursePercent) / 100;
+  const main = o.items.find((i) => i.kind === 'all_papers' && i.availability !== 'closed') ?? o.items.find((i) => i.availability !== 'closed') ?? o.items[0];
+  const share = Math.round((o.courseFee ?? 0) * shares.selfStudyCoursePercent) / 100;
   const warnings = o.warnings.filter((w) => !(w === 'no_teacher' && o.availability === 'closed'));
   return (
     <tr className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30" onClick={onOpen}>
@@ -319,8 +319,8 @@ function SheetRow({ o, shares, onOpen, onPreview }: { o: OfferRow; shares: Share
       <td className="px-3 py-3 align-top">{o.teachers.length ? <TeacherNames teachers={o.teachers} /> : <span className="text-muted-foreground">—</span>}</td>
       <td className="px-3 py-3 align-top"><FormPhrases o={o} shares={shares} /></td>
       <td className="px-3 py-3 text-end align-top">
-        <Money amount={o.courseFee} />
-        {o.courseFee > 0 && <div className="whitespace-nowrap text-xs text-muted-foreground"><span>self study</span> <span dir="ltr">{pct(shares.selfStudyCoursePercent)}</span>: <Money amount={share} /></div>}
+        <Money amount={o.courseFee ?? 0} />
+        {(o.courseFee ?? 0) > 0 && <div className="whitespace-nowrap text-xs text-muted-foreground"><span>self study</span> <span dir="ltr">{pct(shares.selfStudyCoursePercent)}</span>: <Money amount={share} /></div>}
       </td>
       <td className="px-3 py-3 text-end align-top">
         {!main || main.boardFee.missing ? <span className="text-muted-foreground">not set yet</span> : (
@@ -552,7 +552,7 @@ function SubjectForm({ session, shares, offer, addable, canEdit, carry, onSaved,
   const fee = f.courseFee === '' ? null : Number(f.courseFee);
   const share = fee !== null ? Math.round(fee * shares.selfStudyCoursePercent) / 100 : null;
   // MO-9: self-study only at 0 says why, once (an offer already so keeps its reason).
-  const asksZeroReason = f.availability === 'self_study_only' && fee === 0 && !(offer && offer.availability === 'self_study_only' && !(offer.courseFee > 0));
+  const asksZeroReason = f.availability === 'self_study_only' && fee === 0 && !(offer && offer.availability === 'self_study_only' && !((offer.courseFee ?? 0) > 0));
   const pool = [...new Set([...(offer?.teachers.map((t) => t.teacherId) ?? []), ...(addable?.teachers.map((t) => t.teacherId) ?? []), ...f.teachers.map((t) => t.teacherId)])];
   // The sittings a unit may be entered in: the session's months its board sits.
   const months = sessionSeriesMonths(session.sessionType, session.seriesYear).filter((m) => !board || board.seriesMonths.includes(m.month));
@@ -922,7 +922,7 @@ function AddQualification({ session, offer, pool, onAdded }: {
     mutationFn: async (q: OfferRow['qualificationsToAdd'][number]) => {
       // The API offers a qualification only beside a single whole item (the review of 744e553, item 5): without it
       // nothing would make the new one a choice against the subject's own entry.
-      const whole = offer.items.find((i) => i.kind === 'whole');
+      const whole = offer.items.find((i) => i.kind === 'all_papers');
       if (!whole) throw new Error("This subject has no whole-subject item for the new qualification to be a choice against");
       const group = whole.exclusiveGroup ?? 'qualification';
       if (!whole.exclusiveGroup) {

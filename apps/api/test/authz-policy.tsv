@@ -126,14 +126,14 @@ POST	/v1/school-fees/schedules	D	D	D	D	A	A	D	D	D
 GET	/v1/school-fees/status	D	A	A	A	A	A	D	D	D
 GET	/v1/session	D	A	A	A	A	A	A	A	A
 POST	/v1/sessions/:id/activate	D	D	D	D	D	A	D	D	D
-POST	/v1/sessions/:id/close	D	D	D	D	D	A	D	D	D
+POST	/v1/sessions/:id/close	D	D	D	D	D	A	A	D	D
 GET	/v1/sessions/:id	D	D	D	A	A	A	A	D	D
-PUT	/v1/sessions/:id	D	D	D	D	D	A	D	D	D
+PUT	/v1/sessions/:id	D	D	D	D	D	A	A	D	D
 DELETE	/v1/sessions/:id	D	D	D	D	D	A	D	D	D
 GET	/v1/sessions/active	D	A	A	A	A	A	A	D	D
 GET	/v1/sessions/upcoming	D	A	A	A	A	A	A	D	D
 GET	/v1/sessions	D	D	D	A	A	A	A	D	D
-POST	/v1/sessions	D	D	D	D	D	A	D	D	D
+POST	/v1/sessions	D	D	D	D	D	A	A	D	D
 PUT	/v1/subjects/:id/activate	D	D	D	D	D	A	D	D	D
 PUT	/v1/subjects/:id/core	D	D	D	D	D	A	D	D	D
 GET	/v1/subjects/:id/teachers	D	A	A	A	A	A	D	D	D
@@ -147,7 +147,7 @@ DELETE	/v1/teachers/:id	D	D	D	D	D	A	D	D	D
 GET	/v1/teachers/:id	D	A	A	A	A	A	A	D	D
 PUT	/v1/teachers/:id	D	D	D	D	D	A	D	D	D
 GET	/v1/teachers	D	A	A	A	A	A	A	D	D
-POST	/v1/teachers	D	D	D	D	D	A	D	D	D
+POST	/v1/teachers	D	D	D	D	D	A	A	D	D
 GET	/v1/users/:id/summary	D	D	D	A	A	A	D	D	D
 GET	/v1/users/:id	D	D	D	D	D	A	D	D	D
 PUT	/v1/users/:id	D	D	D	D	D	A	D	D	D
@@ -431,3 +431,26 @@ GET	/v1/schedule/feed	D	A	A	A	A	A	A	A	A
 POST	/v1/schedule/feed	D	A	A	A	A	A	A	A	A
 DELETE	/v1/schedule/feed	D	A	A	A	A	A	A	A	A
 GET	/v1/ical/:token	A	A	A	A	A	A	A	A	A
+# The coordinator rework, P1a (COORDINATOR_REWORK.md B1, Appendix A): all of set-up is the coordinator's
+# and the admin's; finance reads the set-up GETs (B3). POST /v1/sessions, PUT /v1/sessions/:id (the close
+# date included), the close and POST /v1/teachers (above) gained the coordinator (owner decision 26 Oct: she
+# sets the closing date and closes; the close keeps its expiry until P1b); the teacher list's duplicate check
+# is set-up's.
+POST	/v1/sessions/:id/open	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/reopen	D	D	D	D	D	A	A	D	D
+PUT	/v1/sessions/:id/prices-final	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/offerings	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions/:id/offerings/:offeringId	D	D	D	A	A	A	A	D	D
+PUT	/v1/sessions/:id/offerings/:offeringId	D	D	D	D	D	A	A	D	D
+DELETE	/v1/sessions/:id/offerings/:offeringId	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/price-lists/parse	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/price-lists	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions/:id/prices	D	D	D	A	A	A	A	D	D
+PUT	/v1/sessions/:id/rows/:rowId/exam-fee	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions/:id/preview	D	D	D	A	A	A	A	D	D
+GET	/v1/sessions/:id/reservations	D	D	D	A	A	A	A	D	D
+GET	/v1/reference/boards	D	D	D	A	A	A	A	D	D
+GET	/v1/reference/subjects	D	D	D	A	A	A	A	D	D
+# C6's one exception: the admin enters a sitting's missing board entry deadline once (the review of P1a, D2).
+PUT	/v1/reference/sittings/:id/board-date	D	D	D	D	D	A	D	D	D
+GET	/v1/teachers/duplicates	D	D	D	D	D	A	A	D	D

@@ -328,7 +328,7 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
   // The forms' "One paper ONLY" is always a retake: the plan makes a one-paper line one whatever is chosen
   // (F6a, the lead's decision of 11 Oct 2026), so "First entry" on it selected and changed nothing (F6a's
   // review). When every line is one paper there is no entry to choose; a split with other items keeps it.
-  const allOnePaper = lines.length > 0 && lines.every((l) => items.find((it) => it.id === l.offerItemId)?.kind === 'one_paper');
+  const allOnePaper = lines.length > 0 && lines.every((l) => items.find((it) => it.id === l.offerItemId)?.kind === 'paper');
   return (
     <section aria-labelledby="row-line" className="rounded-lg border border-border p-3">
       <h3 id="row-line" className="mb-2 text-sm font-semibold text-foreground">{lines.length > 1 ? 'The lines in the session' : 'The line in the session'}</h3>

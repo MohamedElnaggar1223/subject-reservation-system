@@ -25,7 +25,7 @@ import { entriesFollowMoveInTx } from './exam-entry.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { lastInstalmentBeingCheckedSql } from './plan.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
-import { deriveSessionName, seriesLabel, sessionSeriesMonths, type CorrectSessionSeriesType, type CreateSessionType, type UpdateSessionType } from '@repo/validations';
+import { deriveSessionName, seriesLabel, sessionSeriesMonths, type CorrectSessionSeriesType, type CreateSessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
 import { seriesRuleSentence, windowChangeMisfit, boardSeriesName, openCheckoutsSpanningDeadlines } from './series.services';
@@ -268,7 +268,11 @@ const sameCycle = (s: { sessionType: string; seriesYear: number; label: string }
  * the board fees come across provisional. A session whose start has come opens at once (one
  * active session per type, year and label). Created and audited in one transaction.
  */
-export async function createSession(data: CreateSessionType, actorId: string, ctx?: AuditContext) {
+/** The legacy contract's input (CreateSession with its dates; the route sends it here only when `startDate` is given). */
+export type LegacyCreateSession = CreateSessionType & { startDate: Date; endDate: Date; courseStartsOn: string; paymentDueAt: Date };
+
+/** @deprecated the legacy contract (COORDINATOR_REWORK.md P1a): the new one is setup/session-setup.services.ts createSetupSession. */
+export async function createSession(data: LegacyCreateSession, actorId: string, ctx?: AuditContext) {
   const initialStatus = resolveInitialStatus(data.startDate);
   const label = data.label ?? '';
   if (initialStatus === 'active' && (await hasActiveSessionOfType(data.type, data.year, label))) {
@@ -340,71 +344,8 @@ export async function copySessionFrom(id: string, fromSessionId: string, actorId
   }
 }
 
-/**
- * Change a session's header, audited in the same transaction (SESSION_UPDATED, before and
- * after, with the reason). A draft may change its dates, course start, payment due date and
- * refund policy; an active session its end (in the future, with a reason), course start and
- * payment due date, and its refund policy until the first line carries a consent (§3.1) —
- * after that, only an exception changes one student's. A closed session is history. The type and
- * year change only through "Correct series". A new payment due date moves the due dates of the
- * session's waiting lines (dueDateFor), each audited.
- */
-export async function updateSession(id: string, data: UpdateSessionType, actorId: string, ctx?: AuditContext) {
-  return db.transaction(async (tx) => {
-    const [current] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
-    if (!current) throw new SessionError('Session not found', 404);
-    if (current.status === 'closed') throw new SessionError('Cannot update a closed session');
-    const next: Partial<typeof registrationSession.$inferInsert> = {};
-    if (current.status === 'active') {
-      if (data.startDate && data.startDate.getTime() !== current.startDate.getTime()) {
-        throw new SessionError('An open session keeps its start date');
-      }
-      if (data.endDate && data.endDate.getTime() !== current.endDate.getTime()) {
-        if (data.endDate <= new Date()) throw new SessionError('New end date must be in the future (close the session to end it now)');
-        if (!data.reason || data.reason.trim().length < 5) throw new SessionError('Please provide a reason for the deadline change');
-        next.endDate = data.endDate;
-        if (data.endDate.getTime() > Date.now() + 24 * 60 * 60 * 1000) next.reminderSentAt = null;
-      }
-    } else {
-      if (data.startDate) next.startDate = data.startDate;
-      if (data.endDate) next.endDate = data.endDate;
-    }
-    if ((next.endDate ?? current.endDate) <= (next.startDate ?? current.startDate)) throw new SessionError('End date must be after start date');
-    if (data.courseStartsOn && data.courseStartsOn !== current.courseStartsOn) next.courseStartsOn = data.courseStartsOn;
-    if (data.paymentDueAt && data.paymentDueAt.getTime() !== current.paymentDueAt.getTime()) next.paymentDueAt = data.paymentDueAt;
-    if (data.refundPolicy && JSON.stringify(data.refundPolicy) !== JSON.stringify(current.refundPolicy)) {
-      const [consented] = await tx.select({ id: registrationConsent.id }).from(registrationConsent)
-        .innerJoin(registration, eq(registration.id, registrationConsent.registrationId))
-        .where(and(eq(registration.sessionId, id), eq(registrationConsent.kind, 'refund_policy'))).limit(1);
-      if (consented) throw new SessionError('A family has consented to this session\'s refund policy: it can no longer change (an exception changes one student\'s)', 409);
-      next.refundPolicy = data.refundPolicy;
-    }
-    if (!Object.keys(next).length) throw new SessionError('Nothing to change');
-    const history = Object.entries(next)
-      .filter(([k]) => k !== 'reminderSentAt')
-      .map(([field, v]) => ({
-        editedBy: actorId, editedAt: new Date().toISOString(), field,
-        oldValue: JSON.stringify((current as Record<string, unknown>)[field] ?? null), newValue: JSON.stringify(v ?? null), reason: data.reason ?? undefined,
-      }));
-    const [updated] = await tx.update(registrationSession).set({
-      ...next,
-      editHistory: sql`COALESCE(${registrationSession.editHistory}, '[]'::jsonb) || ${JSON.stringify(history)}::jsonb`,
-      updatedAt: new Date(),
-    }).where(eq(registrationSession.id, id)).returning();
-    // The payment due date moved: the waiting lines' due dates follow.
-    let dueMoved = 0;
-    if (next.paymentDueAt) {
-      const waiting = await tx.select({ id: registration.id }).from(registration)
-        .where(and(eq(registration.sessionId, id), inArray(registration.status, ['pending_approval', 'pending_payment', 'preregistered'])))
-        .orderBy(registration.id).for('update');
-      dueMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s payment due date changed');
-    }
-    await logAction(actorId, 'SESSION_UPDATED', 'session', id,
-      Object.fromEntries(Object.keys(next).map((k) => [k, (current as Record<string, unknown>)[k] ?? null])),
-      { ...next, reason: data.reason ?? null, dueDatesMoved: dueMoved }, ctx, tx);
-    return { ...updated!, dueDatesMoved: dueMoved };
-  });
-}
+// Changing a session's header is setup/session-setup.services.ts updateSetupSession since the coordinator
+// rework (both contracts: the new fields and the legacy start/end with their old rules).
 
 /**
  * The session's header for its screen (§4.2): the session, the series its items are entered in
@@ -964,7 +905,7 @@ export async function autoManageSessions(): Promise<{
   closed: number;
   closedSessions: { id: string; name: string; sessionType: string }[];
   activated: number;
-  activatedSessions: { id: string; name: string; sessionType: string; endDate: Date }[];
+  activatedSessions: { id: string; name: string; sessionType: string; endDate: Date | null }[];
 }> {
   const now = new Date();
 
@@ -996,7 +937,7 @@ export async function autoManageSessions(): Promise<{
   });
 
   let activatedCount = 0;
-  const activatedSessions: { id: string; name: string; sessionType: string; endDate: Date }[] = [];
+  const activatedSessions: { id: string; name: string; sessionType: string; endDate: Date | null }[] = [];
 
   for (const draft of draftsDue) {
     const conflict = await hasActiveSessionOfType(draft.sessionType, draft.seriesYear, draft.label);

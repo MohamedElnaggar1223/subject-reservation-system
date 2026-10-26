@@ -294,7 +294,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     // Other fields still change, audited with the reason in the same transaction.
     const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [draft])).end);
     const later = await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: draft }, json: { endDate: new Date(end.getTime() + days(1)), reason: 'clearer dates' } }));
-    expect(new Date(later.endDate).getTime()).toBe(end.getTime() + days(1));
+    expect(new Date(later.endDate!).getTime()).toBe(end.getTime() + days(1));
     expect(await sql(`select new_data->>'reason' as reason from audit_log where action = 'SESSION_UPDATED' and entity_id = $1`, [draft]))
       .toEqual([{ reason: 'clearer dates' }]);
   });

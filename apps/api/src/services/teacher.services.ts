@@ -30,6 +30,7 @@ export async function createTeacher(data: CreateTeacherType) {
       phone: data.phone ?? null,
       email: data.email ?? null,
       isActive: true,
+      kind: data.kind ?? 'person',
     })
     .returning();
   return created;

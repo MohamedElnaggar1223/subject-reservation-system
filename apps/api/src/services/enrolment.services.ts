@@ -938,8 +938,9 @@ export async function offerDeliveries(startYear: number, subjectIds: string[], e
     if (!t) return !unitId;
     return unitId ? t.units.has(unitId) : t.whole || t.units.size === 0;
   };
-  const at = (d: Date | string) => new Date(d).getTime();
-  const latestFirst = (a: { sessionStart: Date | string; sessionCreated: Date }, b: { sessionStart: Date | string; sessionCreated: Date }) =>
+  // A session not opened yet has no start (the coordinator rework): it reads as the oldest.
+  const at = (d: Date | string | null) => (d === null ? 0 : new Date(d).getTime());
+  const latestFirst = (a: { sessionStart: Date | string | null; sessionCreated: Date }, b: { sessionStart: Date | string | null; sessionCreated: Date }) =>
     at(b.sessionStart) - at(a.sessionStart) || at(b.sessionCreated) - at(a.sessionCreated);
   return (subjectId: string, unitId: string | null, teacherId: string): 'in_school' | 'online' => {
     const mine = <T extends { subjectId: string; teacherId: string }>(xs: T[]) => xs.filter((x) => x.subjectId === subjectId && x.teacherId === teacherId);

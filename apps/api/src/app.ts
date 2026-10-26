@@ -26,6 +26,8 @@ import { links } from './routes/link.routes';
 import { users } from './routes/user.routes';
 import { subjects } from './routes/subject.routes';
 import { sessions } from './routes/session.routes';
+import { setupRoutes } from './routes/setup.routes';
+import { referenceRoutes } from './routes/reference.routes';
 import { registrations } from './routes/registration.routes';
 import { payments } from './routes/payment.routes';
 import { escrowRoutes } from './routes/escrow.routes';
@@ -421,7 +423,10 @@ const v1 = new Hono<HonoEnv>()
   .route('/users', users)
   .route('/subjects', subjects)
   .route('/sessions', sessions)
+  // The coordinator rework: a session's set-up as the coordinator works (offerings, prices, preview, reservations).
+  .route('/sessions', setupRoutes)
   .route('/sessions', sessionVerifyRoutes)
+  .route('/reference', referenceRoutes)
   .route('/registrations', registrations)
   .route('/registrations', registrationSwapRoutes)
   .route('/registrations', lineRoutes)

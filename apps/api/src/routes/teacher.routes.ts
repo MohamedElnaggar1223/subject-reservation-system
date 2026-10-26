@@ -2,7 +2,9 @@
  * Teacher API Routes (V3 §6.7)
  *
  * GET    /teachers      - List teachers (any authenticated user; pickers)
- * POST   /teachers      - Create teacher (admin)
+ * GET    /teachers/duplicates?name= - The school's teachers a new name may be (admin, coordinator; D4)
+ * POST   /teachers      - Create teacher (admin, coordinator: the coordinator rework, B1); a body naming its
+ *                         `kind` is refused when the name looks like a teacher on the list, until `confirmed`
  * GET    /teachers/:id  - Teacher detail with linked subjects
  * PUT    /teachers/:id  - Update teacher (admin)
  * DELETE /teachers/:id  - Deactivate teacher (admin, soft)
@@ -16,13 +18,17 @@ import {
   TeacherId,
   ListTeachersQuery,
   LinkTeacherAccount,
+  TeacherDuplicatesQuery,
+  ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
-import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
+import { requireAuth, requireAdmin, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as teacherService from '../services/teacher.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { teacherForViewer } from '../lib/teacher-view';
+import { db } from '@repo/db';
+import { teacherDuplicates, duplicateTeacherRefusal } from '../services/setup/teacher-names';
 
 const forViewer = teacherForViewer;
 
@@ -38,9 +44,18 @@ export const teachers = new Hono<HonoEnv>()
     return success(c, rows.map((t) => forViewer(t, user.role)));
   })
 
-  .post('/', requireAdmin(), zValidator('json', CreateTeacher), async (c) => {
+  /** The school's teachers a new name may be: spelling and initials ("Ms. Mai" against "May Magdy"; D4). */
+  .get('/duplicates', requireRole(ROLES.ADMIN, ROLES.COORDINATOR), zValidator('query', TeacherDuplicatesQuery), async (c) =>
+    success(c, { duplicates: await teacherDuplicates(db, c.req.valid('query').name) }))
+
+  .post('/', requireRole(ROLES.ADMIN, ROLES.COORDINATOR), zValidator('json', CreateTeacher), async (c) => {
     const user = c.get('user')!;
     const data = c.req.valid('json');
+    // The set-up contract (the body names its kind): one person is not entered twice under two spellings.
+    if (data.kind && !data.confirmed) {
+      const dups = await teacherDuplicates(db, data.name);
+      if (dups.length) return error(c, duplicateTeacherRefusal(data.name, dups), 409);
+    }
     const created = await teacherService.createTeacher(data);
     await logAction(user.id, 'TEACHER_CREATED', 'teacher', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] TEACHER_CREATED failed:', err));

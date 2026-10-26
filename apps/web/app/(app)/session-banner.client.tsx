@@ -17,7 +17,8 @@ type ActiveSession = {
   id: string;
   name: string;
   sessionType: string;
-  endDate: string;
+  // Null: the session closes by hand only (the coordinator rework's Accepting switch, C4).
+  endDate: string | null;
 };
 
 type Remaining = {
@@ -113,19 +114,21 @@ export default function SessionBanner({ sessions }: { sessions: ActiveSession[] 
                   Registration open — {s.name}
                 </p>
                 <p className="text-xs text-muted-foreground capitalize">
-                  {s.sessionType} session · closes {new Date(s.endDate).toLocaleString('en-GB', {
+                  {s.sessionType} session{s.endDate && <> · closes {new Date(s.endDate).toLocaleString('en-GB', {
                     day: '2-digit', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit',
-                  })}
+                  })}</>}
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Closing in
-              </p>
-              <Countdown endDate={s.endDate} />
-            </div>
+            {s.endDate && (
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Closing in
+                </p>
+                <Countdown endDate={s.endDate} />
+              </div>
+            )}
           </div>
         </Link>
       ))}

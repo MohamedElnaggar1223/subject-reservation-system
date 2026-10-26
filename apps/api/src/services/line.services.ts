@@ -75,6 +75,10 @@ async function lockForLines(tx: Tx, sessionId: string, itemIds: string[]) {
   await tx.select({ id: sessionBoardSeries.id }).from(sessionBoardSeries).where(eq(sessionBoardSeries.sessionId, sessionId)).orderBy(sessionBoardSeries.id).for('share');
   const seriesIds = [...new Set(items.map((i) => i.seriesId).filter((s): s is string => !!s))].sort();
   if (seriesIds.length) await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, seriesIds)).orderBy(boardSeries.id).for('share');
+  // The coordinator rework (§9.2): the session, the offering and the row FOR SHARE in that order —
+  // priceLine v2 reads the session's self-study share and prices-final, and a share change or the
+  // prices-final switch takes the session FOR UPDATE before the rows and the lines.
+  await tx.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, sessionId)).for('share');
   const offerIds = [...new Set(items.map((i) => i.offerId))].sort();
   if (offerIds.length) await tx.select({ id: sessionOffer.id }).from(sessionOffer).where(inArray(sessionOffer.id, offerIds)).orderBy(sessionOffer.id).for('share');
   const held = itemIds.length
@@ -177,7 +181,8 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
     }
     const exc = await lineExceptions.active(tx, input.studentId, ['deadline.payment'], { sessionId: input.sessionId, subjectId: it.offer.subjectId, offerItemId: it.item.id });
     const dueAt = computeDueAt({
-      basis: session.paymentDueAt, reservedAt: now, graceDays, provisional: price.provisional, feeConfirmedAt: null,
+      // §6: the row's pay-by if set (D12), else the session's payment due date (dueDateFor reads the same).
+      basis: it.item.payBy ?? session.paymentDueAt, reservedAt: now, graceDays, provisional: price.provisional, feeConfirmedAt: null,
       exceptionDate: exc.find((e) => e.valueDate)?.valueDate ?? null, cap: deadlines.get(l.offerItemId) ?? null,
     });
     records.push({

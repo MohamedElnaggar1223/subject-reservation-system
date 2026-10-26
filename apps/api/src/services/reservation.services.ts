@@ -162,7 +162,7 @@ async function teachersOf(executor: Executor, itemId: string, offerId: string) {
     .where(eq(sessionOfferTeacher.offerId, offerId)).orderBy(asc(sessionOfferTeacher.sortOrder))).map((t) => t.teacherId);
 }
 
-const itemName = (it: { kind: string; subjectName: string; label: string }) => (it.kind === 'whole' ? it.subjectName : `${it.subjectName} — ${it.label}`);
+const itemName = (it: { kind: string; subjectName: string; label: string }) => (it.kind === 'all_papers' ? it.subjectName : `${it.subjectName} — ${it.label}`);
 
 // ─── From the page's lines to insertLines' lines ─────────────────────────────
 
@@ -259,8 +259,8 @@ export async function refundTermsFor(executor: Executor, sessionId: string): Pro
   const policy = s?.refundPolicy as RefundPolicy | null | undefined;
   if (policy?.steps?.length) return { kind: 'weeks', steps: policy.steps };
   let windows = await executor.select().from(refundWindow).where(eq(refundWindow.sessionId, sessionId)).orderBy(asc(refundWindow.startsAt));
-  if (!windows.length && s) {
-    windows = await executor.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(s.startDate))).orderBy(asc(refundWindow.startsAt));
+  if (!windows.length && s?.startDate) {
+    windows = await executor.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(s.startDate!))).orderBy(asc(refundWindow.startsAt));
   }
   return { kind: 'dates', windows: windows.map((w) => ({ startsAt: w.startsAt.toISOString(), endsAt: w.endsAt.toISOString(), percent: w.percentage })) };
 }

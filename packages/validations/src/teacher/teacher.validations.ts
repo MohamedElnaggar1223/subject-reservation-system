@@ -30,6 +30,13 @@ export const CreateTeacher = z.object({
     .optional()
     .nullable(),
   email: z.string().email('Invalid email').optional().nullable(),
+  /**
+   * The coordinator rework (D4): 'person' or 'provider' (an external team). A body that names its kind
+   * is the set-up contract: a name that looks like a teacher already on the list is refused until it is
+   * sent again with `confirmed` (GET /teachers/duplicates lists them first).
+   */
+  kind: z.enum(['person', 'provider']).optional(),
+  confirmed: z.boolean().optional(),
 });
 export type CreateTeacherType = z.infer<typeof CreateTeacher>;
 

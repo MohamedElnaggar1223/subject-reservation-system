@@ -38,14 +38,14 @@ type ItemRow = {
   required_in_series: boolean; exclusive_group: string | null;
   offer_availability: string; grade10_core: boolean; subject_id: string; subject_name: string;
   board_code: string | null; month: string | null; year: number | null; series_label: string | null; board_name: string | null;
-  carry_forward_months: number | null;
+  carry_forward_months: number | null; reference_codes: string[];
 };
 
 async function loadItems(tx: Tx, ids: string[]): Promise<Map<string, ItemRow & { units: string[] }>> {
   if (!ids.length) return new Map();
   const r = await tx.execute(sql`
     select i.id, i.offer_id, i.session_id, i.label, i.kind, i.enters_kind, i.qualification_id, i.board_series_id, i.availability,
-      i.needs_prior_series, i.required_in_series, i.exclusive_group,
+      i.needs_prior_series, i.required_in_series, i.exclusive_group, i.reference_codes,
       o.availability as offer_availability, o.grade10_core, o.subject_id, s.name as subject_name,
       bs.board_code, bs.month, bs.year, bs.label as series_label, b.name as board_name, b.carry_forward_months,
       coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units
@@ -58,8 +58,14 @@ async function loadItems(tx: Tx, ids: string[]): Promise<Map<string, ItemRow & {
   return new Map((r.rows as (ItemRow & { units: string[] })[]).map((x) => [x.id, x]));
 }
 
-/** What an item enters, as keys two lines collide on: an award (q:), a unit (u:), an unmapped row (s:). */
-function entryKeys(i: { enters_kind: string; qualification_id: string | null; subject_id: string; units: string[] }) {
+/**
+ * What an item enters, as keys two lines collide on: an award (q:), a unit (u:), an unmapped row (s:).
+ * A row the coordinator's set-up made enters no catalogue award or unit: its keys are its codes
+ * (c:, scoped to its subject) — "the same row code once per sitting" (COORDINATOR_REWORK.md §9.2) — so two
+ * units of one subject (P1, P2) are two entries, not one.
+ */
+function entryKeys(i: { enters_kind: string; qualification_id: string | null; subject_id: string; units: string[]; reference_codes?: string[] | null }) {
+  if (i.enters_kind === 'subject' && i.reference_codes?.length) return i.reference_codes.map((c) => `c:${i.subject_id}:${c}`);
   if (i.enters_kind === 'award' || i.enters_kind === 'option') return i.qualification_id ? [`q:${i.qualification_id}`] : [`s:${i.subject_id}`];
   if (i.enters_kind === 'units') return i.units.map((u) => `u:${u}`);
   return [`s:${i.subject_id}`];
@@ -116,7 +122,7 @@ export async function assertLineRules(
   for (const l of lines) {
     const it = items.get(l.offerItemId)!;
     const c = availabilityConstraints(it.offer_availability, it.availability);
-    const name = it.kind === 'whole' ? it.subject_name : `${it.subject_name} — ${it.label}`;
+    const name = it.kind === 'all_papers' ? it.subject_name : `${it.subject_name} — ${it.label}`;
     if (recheck) {
       // Only the carry-forward period below.
     } else if (c.closed) await gate('gate.availability', scopeOf(it), `${name} is closed in this session`);
@@ -124,7 +130,7 @@ export async function assertLineRules(
     else if (c.selfStudyOnly && l.mode !== 'self_study') await gate('gate.availability', scopeOf(it), `${name} is self-study only: the school does not teach it this cycle`);
     // "One paper ONLY" is always a retake (the lead's decision of 11 Oct 2026, F6a): a one-paper
     // item takes no first entry, whatever its availability. A rule, not a gate: no exception lifts it.
-    if (!recheck && it.kind === 'one_paper' && l.attempt === 'first') {
+    if (!recheck && it.kind === 'paper' && l.attempt === 'first') {
       throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, 'gate.availability');
     }
     if (!recheck && l.mode === 'self_study' && l.attempt === 'first') {
@@ -169,7 +175,7 @@ export async function assertLineRules(
   // The student's live lines, every session: exclusive groups, the same entry once, required items, core.
   const r = await tx.execute(sql`
     select r.id, r.session_id, r.offer_item_id, r.board_series_id, i.offer_id, i.exclusive_group, i.enters_kind, i.qualification_id, i.kind,
-      i.label, o.subject_id, s.name as subject_name, rs.name as session_name,
+      i.label, i.reference_codes, o.subject_id, s.name as subject_name, rs.name as session_name,
       coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units
     from registration r
     join session_offer_item i on i.id = r.offer_item_id
@@ -179,21 +185,21 @@ export async function assertLineRules(
     where r.student_id = ${ctx.studentId} and r.status not in ('rejected', 'expired', 'dropped')`);
   const existing = (r.rows as { id: string }[]).filter((x) => !excluded.has(x.id)) as unknown as {
     id: string; session_id: string; offer_item_id: string; board_series_id: string | null; offer_id: string; exclusive_group: string | null;
-    enters_kind: string; qualification_id: string | null; kind: string; label: string; subject_id: string; subject_name: string; session_name: string; units: string[];
+    enters_kind: string; qualification_id: string | null; kind: string; label: string; reference_codes: string[]; subject_id: string; subject_name: string; session_name: string; units: string[];
   }[];
 
   // Exclusive groups: one live line per group per offer, in this session.
   const groups = new Map<string, string[]>();
   for (const e of existing.filter((x) => x.session_id === ctx.sessionId && x.exclusive_group)) {
     const k = `${e.offer_id}|${e.exclusive_group}`;
-    groups.set(k, [...(groups.get(k) ?? []), e.kind === 'whole' ? e.subject_name : `${e.subject_name} — ${e.label}`]);
+    groups.set(k, [...(groups.get(k) ?? []), e.kind === 'all_papers' ? e.subject_name : `${e.subject_name} — ${e.label}`]);
   }
   for (const l of recheck ? [] : lines) {
     const it = items.get(l.offerItemId)!;
     if (!it.exclusive_group) continue;
     const k = `${it.offer_id}|${it.exclusive_group}`;
     const here = groups.get(k) ?? [];
-    const name = it.kind === 'whole' ? it.subject_name : `${it.subject_name} — ${it.label}`;
+    const name = it.kind === 'all_papers' ? it.subject_name : `${it.subject_name} — ${it.label}`;
     if (here.length) await gate('gate.exclusiveItems', scopeOf(it), `${name} and ${here.join(', ')} cannot be reserved together`, 409);
     groups.set(k, [...here, name]);
   }
@@ -201,13 +207,13 @@ export async function assertLineRules(
   // The same unit or award once per student in one board series, across sessions.
   const taken = existing
     .filter((e) => e.board_series_id)
-    .map((e) => ({ series: e.board_series_id!, keys: entryKeys(e), where: e.session_name, name: e.kind === 'whole' ? e.subject_name : `${e.subject_name} — ${e.label}` }));
+    .map((e) => ({ series: e.board_series_id!, keys: entryKeys(e), where: e.session_name, name: e.kind === 'all_papers' ? e.subject_name : `${e.subject_name} — ${e.label}` }));
   for (const l of lines) {
     const it = items.get(l.offerItemId)!;
     if (!it.board_series_id) continue;
     const keys = entryKeys(it);
     const clash = taken.find((t) => t.series === it.board_series_id && t.keys.some((k) => keys.includes(k)));
-    const name = it.kind === 'whole' ? it.subject_name : `${it.subject_name} — ${it.label}`;
+    const name = it.kind === 'all_papers' ? it.subject_name : `${it.subject_name} — ${it.label}`;
     if (clash) {
       await gate('gate.sameEntryOnce', scopeOf(it), `${name} is already reserved in ${seriesName(it)} (${clash.name}, ${clash.where}): the board takes one entry`, 409);
     }

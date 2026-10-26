@@ -17,7 +17,7 @@ import {
   db, user, subject, teacher, subjectTeacher, registrationSession, registration, boardSeries, boardFee, examBoard, examUnit,
   qualification, qualificationOption, sessionBoardSeries, sessionOffer, sessionOfferTeacher, sessionOfferItem,
   sessionOfferItemUnit, sessionOfferItemTeacher, sessionOfferItemFeeKey, courseEnrolment, subjectUnit, qualificationUnit, qualificationOptionUnit,
-  and, eq, ne, inArray, isNull, sql, asc,
+  and, eq, ne, inArray, isNull, isNotNull, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -38,6 +38,7 @@ import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 import { upsertEnrolments, lineEnrolmentUnits, groupFollowNotices, type EnrolmentRowInput } from './enrolment.services';
+import { cellsOfAvailability, kindOfLegacy, NO_CELLS } from './setup/model';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -317,7 +318,7 @@ async function wholeItemOption(executor: Executor, offerId: string, qualificatio
   if (!qualificationId) return null;
   const wholes = await executor.select({ optionId: sessionOfferItem.qualificationOptionId }).from(sessionOfferItem)
     .innerJoin(qualificationOption, eq(qualificationOption.id, sessionOfferItem.qualificationOptionId))
-    .where(and(eq(sessionOfferItem.offerId, offerId), eq(sessionOfferItem.kind, 'whole'), eq(sessionOfferItem.entersKind, 'option'),
+    .where(and(eq(sessionOfferItem.offerId, offerId), eq(sessionOfferItem.kind, 'all_papers'), eq(sessionOfferItem.entersKind, 'option'),
       eq(qualificationOption.qualificationId, qualificationId)));
   return wholes.length === 1 ? wholes[0]!.optionId : null;
 }
@@ -422,12 +423,18 @@ async function insertItem(
     needsPrior = !!o?.cf;
   }
   const id = randomUUID();
+  // The coordinator rework: the deprecated route's kind in her words, and the four cells kept in step with
+  // its availability (with the offer's) until P1b drops the old column (migration 0066's conversion).
+  const [offerAvail] = await tx.select({ availability: sessionOffer.availability }).from(sessionOffer).where(eq(sessionOffer.id, offer.id));
+  const [q] = enters.qualificationId ? await tx.select({ level: qualification.level }).from(qualification).where(eq(qualification.id, enters.qualificationId)) : [];
+  const kind = kindOfLegacy(d.kind, { needsPriorSeries: !!needsPrior, label: d.label, qualificationLevel: q?.level ?? null });
   await tx.insert(sessionOfferItem).values({
-    id, offerId: offer.id, sessionId: session.id, label: d.label, kind: d.kind, entersKind: d.enters.kind,
+    id, offerId: offer.id, sessionId: session.id, label: d.label, kind, entersKind: d.enters.kind,
     qualificationId: d.enters.kind === 'subject' ? null : enters.qualificationId, qualificationOptionId: enters.optionId,
     boardSeriesId: seriesId, availability: d.availability, courseFee: d.courseFee ?? null,
     needsPriorSeries: !!needsPrior, requiredInSeries: d.requiredInSeries, exclusiveGroup: d.exclusiveGroup ?? null,
     sortOrder: d.sortOrder ?? 0, createdBy: actorId,
+    ...cellsOfAvailability(offerAvail?.availability ?? 'open', d.availability, kind, !!needsPrior),
   });
   if (enters.unitIds.length) await tx.insert(sessionOfferItemUnit).values(enters.unitIds.map((unitId) => ({ itemId: id, unitId })));
   // A one-paper item made without fee keys (the item endpoint) reads them as its board prices one paper (F8-05):
@@ -493,7 +500,7 @@ export async function createOffer(sessionId: string, data: CreateOfferType, acto
       const offerId = randomUUID();
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sessionOffer).where(eq(sessionOffer.sessionId, sessionId)) as [{ n: number }];
       await tx.insert(sessionOffer).values({
-        id: offerId, sessionId, subjectId: s.id, availability: data.availability, courseFee: data.courseFee,
+        id: offerId, sessionId, subjectId: s.id, availability: data.availability, accepting: data.availability !== 'closed', courseFee: data.courseFee,
         courseStartsOn: data.courseStartsOn ?? null, grade10Core: data.grade10Core, notes: data.notes ?? null, sortOrder: n, createdBy: actorId,
       });
       if (teachers.length) {
@@ -541,11 +548,40 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
   });
 }
 
+/** The refusal of a price or a close the deprecated routes would make on a subject priced by its rows. */
+type PricedByRowsChange = 'its course fee' | 'closing it' | 'what it offers' | 'the sitting of a row with reservations';
+const PRICED_BY_ROWS_WORDS: Record<PricedByRowsChange, string> = {
+  'its course fee': 'its course fee',
+  'closing it': 'whether it takes reservations',
+  'what it offers': 'what it offers (its rows\' options, and whether it takes reservations)',
+  'the sitting of a row with reservations': "a row's sitting (not while reservations use the row: close it and add another)",
+};
+export const PRICED_BY_ROWS_REFUSAL = (name: string, what: PricedByRowsChange) =>
+  `${name} is priced by its rows (the coordinator rework): change ${PRICED_BY_ROWS_WORDS[what]} in the subject editor, where what it does to families is counted first`;
+
+/**
+ * A subject set up through the subject editor (any row with its own exam fee) is priced, opened and closed,
+ * ticked and placed there: the deprecated offer, item and form routes change neither its course fee, nor its
+ * availability or a row's (which would rewrite its cells — untick an option reservations use, re-tick a first
+ * entry, switch a switched-off subject back on), nor the sitting of a row with reservations (they would
+ * re-price, count and refuse nothing the editor does). Their other edits (teachers, notes, grade 10) still work.
+ */
+async function assertNotPricedByRows(tx: Tx, offerId: string, name: string, what: PricedByRowsChange) {
+  const [v2] = await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem)
+    .where(and(eq(sessionOfferItem.offerId, offerId), isNotNull(sessionOfferItem.examFee))).limit(1);
+  if (v2) throw new OfferError(PRICED_BY_ROWS_REFUSAL(name, what), 409);
+}
+
+const feeOf = (v: number | string | null) => (v === null ? null : Number(v));
+
 /** updateOffer's change of an offer the caller holds FOR UPDATE (the offer endpoint and the form). */
 async function changeOfferInTx(
   tx: Tx, offer: typeof sessionOffer.$inferSelect, subjectRow: typeof subject.$inferSelect, data: UpdateOfferType, actorId: string, ctx?: AuditContext,
 ) {
   const offerId = offer.id;
+  if (data.courseFee !== undefined && feeOf(data.courseFee) !== feeOf(offer.courseFee)) await assertNotPricedByRows(tx, offerId, subjectRow.name, 'its course fee');
+  if (data.availability === 'closed' && offer.availability !== 'closed') await assertNotPricedByRows(tx, offerId, subjectRow.name, 'closing it');
+  if (data.availability !== undefined && data.availability !== offer.availability) await assertNotPricedByRows(tx, offerId, subjectRow.name, 'what it offers');
   const current = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
   let teachers = current.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' }));
   if (data.teachers) {
@@ -559,11 +595,18 @@ async function changeOfferInTx(
   assertTeachersFor(availability, teachers.length, subjectRow.name);
   // Checked when the change sets the fee or opens the offer (an offer converted with 0 keeps its other edits).
   if (data.courseFee !== undefined || data.availability !== undefined) {
-    assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name, data.zeroFeeReason,
+    assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee ?? 0, subjectRow.name, data.zeroFeeReason,
       offer.availability === 'self_study_only' && !(Number(offer.courseFee) > 0));
   }
   const { reason, teachers: _t, zeroFeeReason, ...fields } = data;
-  const [updated] = await tx.update(sessionOffer).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOffer.id, offerId)).returning();
+  const [updated] = await tx.update(sessionOffer).set({ ...fields, ...(fields.availability !== undefined ? { accepting: fields.availability !== 'closed' } : {}), updatedAt: new Date() })
+    .where(eq(sessionOffer.id, offerId)).returning();
+  // The coordinator rework: the four cells of its items follow the offer's availability (with each item's own).
+  if (fields.availability !== undefined && fields.availability !== offer.availability) {
+    for (const it of await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offerId))) {
+      await tx.update(sessionOfferItem).set(cellsOfAvailability(fields.availability, it.availability, it.kind, it.needsPriorSeries)).where(eq(sessionOfferItem.id, it.id));
+    }
+  }
   await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offerId,
     { availability: offer.availability, courseFee: offer.courseFee, grade10Core: offer.grade10Core, teachers: current.map((t) => t.teacherId) },
     { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null, ...(zeroFeeReason ? { zeroFeeReason } : {}) }, ctx, tx);
@@ -661,9 +704,26 @@ async function changeItemInTx(
 ) {
   const itemId = item.id;
   const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
+  if (fields.courseFee !== undefined || (fields.availability === 'closed' && item.availability !== 'closed')) {
+    const [s] = await tx.select({ name: subject.name }).from(subject).where(eq(subject.id, offer.subjectId));
+    if (fields.courseFee !== undefined && feeOf(fields.courseFee) !== feeOf(item.courseFee)) await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'its course fee');
+    if (fields.availability === 'closed' && item.availability !== 'closed') await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'closing it');
+  }
+  // The coordinator rework: the four cells follow the availability the deprecated route sets.
+  const cells = fields.availability !== undefined || fields.needsPriorSeries !== undefined
+    ? cellsOfAvailability((await tx.select({ a: sessionOffer.availability }).from(sessionOffer).where(eq(sessionOffer.id, item.offerId)))[0]?.a ?? 'open',
+        fields.availability ?? item.availability, item.kind, fields.needsPriorSeries ?? item.needsPriorSeries)
+    : {};
+  // Any write that rewrites the row's cells (its availability, or whether it carries a sitting forward).
+  const rewritesCells = (fields.availability !== undefined && fields.availability !== item.availability)
+    || (fields.needsPriorSeries !== undefined && fields.needsPriorSeries !== item.needsPriorSeries);
+  if (rewritesCells) {
+    const [s] = await tx.select({ name: subject.name }).from(subject).where(eq(subject.id, offer.subjectId));
+    await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'what it offers');
+  }
   if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
   if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
-  const [updated] = await tx.update(sessionOfferItem).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId)).returning();
+  const [updated] = await tx.update(sessionOfferItem).set({ ...fields, ...cells, updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId)).returning();
   await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', itemId,
     { label: item.label, availability: item.availability, courseFee: item.courseFee, boardSeriesId: item.boardSeriesId, exclusiveGroup: item.exclusiveGroup, requiredInSeries: item.requiredInSeries },
     { ...fields, ...(boardSeriesId ? { boardSeriesId } : {}), ...(feeKeys ? { feeKeys } : {}), ...(teachers !== undefined ? { teachers } : {}), linesMoved, reason: reason ?? null }, ctx, tx);
@@ -694,6 +754,9 @@ async function changeItemsSeries(
   actorId: string | null, reason: string | null, locked: Set<string>, ctx?: AuditContext,
 ) {
   if (!moves.length) return { lines: [] as (typeof registration.$inferSelect)[], repriced: [] as RepricedLine[] };
+  // A row-priced subject's row with reservations keeps its sitting (§6; the subject editor refuses it too).
+  const [withLines] = await tx.select({ id: registration.id }).from(registration).where(inArray(registration.offerItemId, moves.map((m) => m.item.id))).limit(1);
+  if (withLines) await assertNotPricedByRows(tx, moves[0]!.item.offerId, subjectRow.name, 'the sitting of a row with reservations');
   const levels = new Map<string, string>();
   for (const m of moves) {
     levels.set(m.item.id, await levelOf(tx, subjectRow.qualificationLevel, {
@@ -809,7 +872,7 @@ export async function deleteItem(sessionId: string, offerId: string, itemId: str
     const live = liveOf(counts);
     if (live) throw new OfferError(`${item.label} has ${live} live line${live === 1 ? '' : 's'}: move or drop ${live === 1 ? 'it' : 'them'} first`, 409);
     if (counts.length) {
-      await tx.update(sessionOfferItem).set({ availability: 'closed', updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId));
+      await tx.update(sessionOfferItem).set({ availability: 'closed', ...NO_CELLS, updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId));
       await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', itemId, { availability: item.availability }, { availability: 'closed', reason: 'Unticked: kept closed for its history' }, ctx, tx);
       return { closed: itemId };
     }
@@ -977,14 +1040,14 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
         // "All papers" and "Paper N only" are one or the other (withOnePaper's group): a whole item made
         // before the Catalogue gave the subject papers has no group, so it joins the paper's — through
         // updateItem's logic, with its audit row — before the first paper is made.
-        const wholes = items.filter((i) => i.kind === 'whole');
+        const wholes = items.filter((i) => i.kind === 'all_papers');
         const group = wholes.find((w) => w.exclusiveGroup)?.exclusiveGroup ?? 'entry';
         let grouped = false;
         for (const f of papers) {
           const draft = drafts.find((d) => d.enters.kind === 'units' && d.enters.unitIds.length === 1 && d.enters.unitIds[0] === f.paperUnitId);
           if (!draft) throw new OfferError("That paper is not one of this subject's papers on the Catalogue", 404);
           // Already on the sheet (the same form sent twice): nothing to make.
-          const has = items.find((i) => i.kind === 'one_paper' && units.filter((u) => u.itemId === i.id).map((u) => u.unitId).join() === f.paperUnitId);
+          const has = items.find((i) => i.kind === 'paper' && units.filter((u) => u.itemId === i.id).map((u) => u.unitId).join() === f.paperUnitId);
           if (has || f.availability === 'closed') continue;
           if (!grouped) {
             for (const w of wholes.filter((x) => !x.exclusiveGroup)) {
@@ -1177,7 +1240,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
       zeroFeeSelfStudy.push({ subject: s.name, reason: `${closedByConversion(o) ? 'converted' : 'copied'} from ${from.name}; priced at the board fee alone` });
     }
     await tx.insert(sessionOffer).values({
-      id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, courseFee: o.courseFee,
+      id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, accepting: availability !== 'closed', courseFee: o.courseFee,
       grade10Core: o.grade10Core, notes: o.notes, sortOrder: o.sortOrder, createdBy: actorId,
     });
     if (keep.length) await tx.insert(sessionOfferTeacher).values(keep.map((t) => ({ id: randomUUID(), offerId, teacherId: t.teacherId, mode: t.mode, sortOrder: t.sortOrder })));
@@ -1190,10 +1253,12 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
       if (!seriesId) continue;
       await attachSeries(tx, session.id, seriesId, actorId);
       const id = randomUUID();
+      const itemAvailability = closedByConversion(it) ? wanted : it.availability;
       await tx.insert(sessionOfferItem).values({
         id, offerId, sessionId: session.id, label: it.label, kind: it.kind, entersKind: it.entersKind, qualificationId: it.qualificationId,
-        qualificationOptionId: it.qualificationOptionId, boardSeriesId: seriesId, availability: closedByConversion(it) ? wanted : it.availability, courseFee: it.courseFee,
+        qualificationOptionId: it.qualificationOptionId, boardSeriesId: seriesId, availability: itemAvailability, courseFee: it.courseFee,
         needsPriorSeries: it.needsPriorSeries, requiredInSeries: it.requiredInSeries, exclusiveGroup: it.exclusiveGroup, sortOrder: it.sortOrder, createdBy: actorId,
+        ...cellsOfAvailability(availability, itemAvailability, it.kind, it.needsPriorSeries),
       });
       const us = await tx.select().from(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, it.id));
       if (us.length) await tx.insert(sessionOfferItemUnit).values(us.map((u) => ({ itemId: id, unitId: u.unitId })));
@@ -1241,7 +1306,7 @@ export async function resolveItem(executor: Executor, sessionId: string, subject
     throw new OfferError(s ? `${s.name} is not offered in this session` : 'One or more subjects are invalid or inactive');
   }
   const items = await executor.select().from(sessionOfferItem)
-    .where(and(eq(sessionOfferItem.offerId, o.offer.id), eq(sessionOfferItem.kind, 'whole')))
+    .where(and(eq(sessionOfferItem.offerId, o.offer.id), eq(sessionOfferItem.kind, 'all_papers')))
     .orderBy(sql`${sessionOfferItem.availability} = 'closed'`, sql`${sessionOfferItem.boardSeriesId} is null`, sessionOfferItem.id);
   const item = items[0];
   if (!item) throw new OfferError(`${o.subjectName} is reserved by unit or route in this session: choose them on the reservation page`);
@@ -1373,12 +1438,12 @@ export async function findItem(executor: Executor, offerId: string, label: strin
     // A paper named in the label of a one-paper retake ("Paper 4" → "Paper 4 only (retake)").
     const papers = codes.filter((c) => c.startsWith('paper ')).map((c) => c.slice(6));
     if (papers.length === 1) {
-      const byPaper = pick(items.filter((i) => i.item.kind === 'one_paper' && new RegExp(`\\b(?:paper\\s*)?${papers[0]}\\b`).test(words(i.item.label))), 'paper');
+      const byPaper = pick(items.filter((i) => i.item.kind === 'paper' && new RegExp(`\\b(?:paper\\s*)?${papers[0]}\\b`).test(words(i.item.label))), 'paper');
       if (byPaper) return byPaper;
     }
     if (codes.length > 1 || fits.length) return { item: null, how: null, candidates };
   }
-  const whole = pick(items.filter((i) => i.item.kind === 'whole'), 'whole');
+  const whole = pick(items.filter((i) => i.item.kind === 'all_papers'), 'whole');
   return whole ?? { item: null, how: null, candidates };
 }
 
@@ -1472,7 +1537,7 @@ export async function listOffers(sessionId: string) {
   const papersToAdd = new Map<string, { unitId: string; label: string; code: string; shortCode: string | null }[]>();
   for (const { offer, subject: s } of offers.filter((o) => o.subject.qualificationLevel === 'igcse')) {
     const drafts = (await generateItems(db, s.id)).filter((d) => d.kind === 'one_paper' && d.enters.kind === 'units' && d.enters.unitIds.length === 1);
-    const onSheet = new Set(itemUnits.filter((u) => items.some((i) => i.id === u.itemId && i.offerId === offer.id && i.kind === 'one_paper')).map((u) => u.unitId));
+    const onSheet = new Set(itemUnits.filter((u) => items.some((i) => i.id === u.itemId && i.offerId === offer.id && i.kind === 'paper')).map((u) => u.unitId));
     const missing = drafts.filter((d) => d.enters.kind === 'units' && !onSheet.has(d.enters.unitIds[0]!));
     if (!missing.length) continue;
     const units = await db.select({ id: examUnit.id, code: examUnit.code, shortCode: examUnit.shortCode }).from(examUnit)
@@ -1504,7 +1569,7 @@ export async function listOffers(sessionId: string) {
     // nothing the new one could be a choice against, and both could be reserved (the review of 744e553, item 5). The
     // qualifications added already beside the whole item are not the subject's own entry.
     const ownEntry = items.filter((i) => i.offerId === offerId && !(i.kind === 'qualification' && i.qualificationId !== ownId));
-    if (ownEntry.length !== 1 || ownEntry[0]!.kind !== 'whole') return [];
+    if (ownEntry.length !== 1 || ownEntry[0]!.kind !== 'all_papers') return [];
     const entered = new Set(items.filter((i) => i.offerId === offerId && i.qualificationId).map((i) => i.qualificationId));
     return siblings
       .filter((x) => x.id !== q.id && x.boardCode === q.boardCode && x.level === q.level && x.subjectArea === q.subjectArea && (x.suite ?? '') !== (q.suite ?? '') && !entered.has(x.id))

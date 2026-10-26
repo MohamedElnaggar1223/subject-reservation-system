@@ -172,7 +172,9 @@ describe('F0b: board series', () => {
     });
 
     it("the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series", async () => {
-      const che = await subject(adm, 'BS-CHE', 'Chemistry (series)', { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+      // The coordinator rework (P1a): offered the old way (priced from the grid), as a converted row still is — a subject
+      // set up through the subject editor keeps its board (08y). P1b retires this scenario with the machinery.
+      const che = await subject(adm, 'BS-CHE', 'Chemistry (series)', { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
       await fee(oct, che);
       await apiResponse(place(che, oct));
       const z = await family('board');
@@ -255,7 +257,7 @@ describe('F0b: board series', () => {
       const extended = await apiResponse(adm.api.v1.sessions[':id'].$put({
         param: { id: windowId }, json: { endDate: new Date(octDeadline.getTime() + 60 * 1000), reason: 'extend past the October deadline' },
       }));
-      expect(new Date(extended.endDate).getTime()).toBe(octDeadline.getTime() + 60 * 1000);
+      expect(new Date(extended.endDate!).getTime()).toBe(octDeadline.getTime() + 60 * 1000);
       await sql(`update registration_session set end_date = now() + interval '1 minute' where id = $1`, [windowId]);
     });
 

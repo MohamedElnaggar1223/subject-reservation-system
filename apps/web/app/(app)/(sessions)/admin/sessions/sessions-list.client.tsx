@@ -45,8 +45,8 @@ export default function SessionsListClient({ viewerRole }: { viewerRole: string 
   const shown = sessions
     .filter((s) => filter === 'all' || s.sessionType === filter)
     .sort((a, b) => rank(a) - rank(b) || (rank(a) < 2
-      ? +new Date(a.startDate) - +new Date(b.startDate)
-      : +new Date(b.startDate) - +new Date(a.startDate)));
+      ? +new Date(a.startDate ?? a.createdAt) - +new Date(b.startDate ?? b.createdAt)
+      : +new Date(b.startDate ?? b.createdAt) - +new Date(a.startDate ?? a.createdAt)));
   const open = sessions.filter((s) => s.status === 'active').length;
   const drafts = sessions.filter((s) => s.status === 'draft').length;
 

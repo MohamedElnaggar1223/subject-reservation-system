@@ -18,6 +18,11 @@ import {
  * so a family is still offered it and can reserve it.
  *
  * Every session here is a draft (families preregister).
+ *
+ * The coordinator rework (P1a): every subject here is offered the old way (priced from the series' grid,
+ * no exam fee on its row), as converted rows and subjects only in closed sessions still are — the board
+ * change still moves those; one set up through the subject editor is refused (08y). P1b retires this file
+ * with the board-change machinery.
  */
 
 const days = (n: number) => n * 24 * 60 * 60 * 1000;
@@ -63,7 +68,7 @@ describe('F0b: a board change and the entry deadline', () => {
     coordinator = await staff(adm, 'coordinator', 'bc');
     officer = await staff(adm, 'finance_officer', 'bc');
     for (const tag of ['PAS', 'DIF', 'SAM', 'RTE', 'RTD', 'RTN']) {
-      subj[tag] = await subject(adm, `BC-${tag}`, `Board change ${tag}`, { course: 1000, registration: 400 });
+      subj[tag] = await subject(adm, `BC-${tag}`, `Board change ${tag}`, { course: 1000, registration: 400 }, { pricedByGrid: true });
     }
     fam = await onboard(officer, 'bc', 11);
   });
@@ -127,10 +132,10 @@ describe('F0b: a board change and the entry deadline', () => {
     // offered, and a registered subject kept on its board and not offered.
     const w = await window('inferred');
     const pea = await series('pearson_edexcel', w.year, 'BC inferred');
-    const sub = await subject(adm, 'BC-INF', 'Board change inferred', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const sub = await subject(adm, 'BC-INF', 'Board change inferred', { course: 1000, registration: 400 }, { council: 'pearson_edexcel', pricedByGrid: true });
     await place(w.id, sub, pea);
-    const offered = await subject(adm, 'BC-OFF', 'Board change offered only', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
-    const kept = await subject(adm, 'BC-KEPT', 'Board change kept', { course: 1000, registration: 400 }, { council: 'oxford' });
+    const offered = await subject(adm, 'BC-OFF', 'Board change offered only', { course: 1000, registration: 400 }, { council: 'pearson_edexcel', pricedByGrid: true });
+    const kept = await subject(adm, 'BC-KEPT', 'Board change kept', { course: 1000, registration: 400 }, { council: 'oxford', pricedByGrid: true });
     const reg = await prereg(w.id, sub);
     await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
       values (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $1, '{"council":"cambridge"}', '{"council":"pearson_edexcel","windows":["October 2026 AS"],"registered":true}', now()),
@@ -158,8 +163,8 @@ describe('F0b: a board change and the entry deadline', () => {
   });
 
   it("a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not", async () => {
-    const chosen = await subject(adm, 'BC-SFC', 'Board change Subjects form chosen', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
-    const other = await subject(adm, 'BC-SFO', 'Board change Subjects form other', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const chosen = await subject(adm, 'BC-SFC', 'Board change Subjects form chosen', { course: 1000, registration: 400 }, { council: 'pearson_edexcel', pricedByGrid: true });
+    const other = await subject(adm, 'BC-SFO', 'Board change Subjects form other', { course: 1000, registration: 400 }, { council: 'pearson_edexcel', pricedByGrid: true });
     // As migration 0038 writes them (see the test above).
     await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
       values (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $1, '{"council":"cambridge"}', '{"council":"pearson_edexcel","windows":["January 2027 AS"],"registered":false}', now()),

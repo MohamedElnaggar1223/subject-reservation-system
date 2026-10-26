@@ -89,6 +89,9 @@ export const AUDIT_ENTITY_TYPES = [
   'teacher_absence',
   'cover_assignment',
   'calendar_feed',
+  // The coordinator rework: a session's price list, the reference data
+  'price_list',
+  'reference',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -150,6 +153,8 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   teacher_absence: 'Teacher Absence',
   cover_assignment: 'Cover',
   calendar_feed:  'Calendar Feed',
+  price_list:     'Price List',
+  reference:      'Reference Data',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -329,6 +334,13 @@ export const AUDIT_ACTIONS = [
   'LINE_PRICE_KEPT',
   'LINE_DUE_MOVED',
   'GRADE10_BULK_COMMITTED',
+  // The coordinator rework (COORDINATOR_REWORK.md P1a): the session's switch, prices final, price lists,
+  // the re-price of a row's lines, the reference data.
+  'SESSION_REOPENED',
+  'SESSION_PRICES_FINAL',
+  'PRICE_LIST_APPLIED',
+  'ROWS_REPRICED',
+  'REFERENCE_DATA_LOADED',
   // Reservations rework, step C: charges, plans, the registry, board services, the desk-drop
   'CHARGE_CREATED',
   'CHARGE_REQUESTED',
@@ -632,6 +644,11 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   LINE_PRICE_KEPT: 'Line price kept (fee confirmed)',
   LINE_DUE_MOVED:             'Line Due Date Moved',
   GRADE10_BULK_COMMITTED:     'Grade 10 Registered in Bulk',
+  SESSION_REOPENED:           'Session Reopened',
+  SESSION_PRICES_FINAL:       'Session Prices Made Final',
+  PRICE_LIST_APPLIED:         'Price List Applied',
+  ROWS_REPRICED:              'Unpaid Lines Re-priced (Price Changed)',
+  REFERENCE_DATA_LOADED:      'Reference Data Loaded',
   CHARGE_CREATED: 'Charge Added',
   CHARGE_REQUESTED: 'Charge Requested by the Family',
   CHARGE_ACCEPTED: 'Charge Request Accepted',
