@@ -164,7 +164,10 @@ export async function parsePriceList(sessionId: string, board: string, text: str
  * fee typed or read from a list is hers and stays. Returns the rows whose fee changed (the caller
  * re-prices their lines); with `audit`, each change has its OFFER_ITEM_UPDATED row.
  */
-export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { actorId: string; ctx?: AuditContext }, cleared: ReadonlySet<string> = new Set()) {
+/** Source fees a change cleared (a row's fee set to none, or the row removed): by reference key, and whether all papers. */
+export type ClearedSources = { keys: ReadonlySet<string>; allPapers: boolean };
+
+export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { actorId: string; ctx?: AuditContext }, cleared: ClearedSources = { keys: new Set(), allPapers: false }) {
   if (!offerIds.length) return [] as string[];
   const changed: string[] = [];
   const offers = await tx.select({ id: sessionOffer.id, referenceCode: sessionOffer.referenceCode, board: subject.council, feeKey: examBoard.onePaperFeeKey })
@@ -175,10 +178,10 @@ export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { 
     const refs = o.referenceCode
       ? await tx.select().from(referenceRow).where(inArray(referenceRow.id, rows.filter((r) => r.referenceKey).map((r) => `${o.board}:${o.referenceCode}:${r.referenceKey}`).concat('__none__')))
       : [];
-    const set = async (r: ItemRow, fee: number | null, source: 'units_sum' | 'board_rule', sources: (ItemRow | undefined)[]) => {
-      // A source's fee cleared (in this change): a row that follows it loses its own (price not set). A source never
-      // priced leaves the follower as it is; so does a fee typed or read from a list (hers).
-      if (fee === null && (r.examFee === null || r.examFeeSource !== source || !sources.some((x) => x && cleared.has(x.id)))) return;
+    const set = async (r: ItemRow, fee: number | null, source: 'units_sum' | 'board_rule', sourceCleared: boolean) => {
+      // A source's fee cleared, or its row removed (in this change): a row that follows it loses its own (price not set).
+      // A source never priced leaves the follower as it is; so does a fee typed or read from a list (hers).
+      if (fee === null && (r.examFee === null || r.examFeeSource !== source || !sourceCleared)) return;
       if (fee !== null && r.examFee !== null && r.examFeeSource !== source) return;
       if (r.examFee === fee && r.examFeeSource === (fee === null ? null : source)) return;
       await tx.update(sessionOfferItem).set({ examFee: fee, examFeeSource: fee === null ? null : source, priceListRowId: null, updatedAt: new Date() }).where(eq(sessionOfferItem.id, r.id));
@@ -194,13 +197,12 @@ export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { 
     for (const r of rows) {
       const ref = refs.find((x) => x.key === r.referenceKey);
       if (!ref?.sumOfUnits.length) continue;
-      const partRows = ref.sumOfUnits.map((k) => rows.find((x) => x.referenceKey === k));
-      const parts = partRows.map((x) => x?.examFee ?? null);
-      await set(r, parts.every((p): p is number => p !== null) ? round2(parts.reduce((a, b) => a + b, 0)) : null, 'units_sum', partRows);
+      const parts = ref.sumOfUnits.map((k) => rows.find((x) => x.referenceKey === k)?.examFee ?? null);
+      await set(r, parts.every((p): p is number => p !== null) ? round2(parts.reduce((a, b) => a + b, 0)) : null, 'units_sum', ref.sumOfUnits.some((k) => cleared.keys.has(k)));
     }
     if (o.feeKey === 'qualification') {
       const all = rows.find((r) => r.kind === 'all_papers');
-      for (const r of rows.filter((x) => x.kind === 'paper')) await set(r, all?.examFee ?? null, 'board_rule', [all]);
+      for (const r of rows.filter((x) => x.kind === 'paper')) await set(r, all?.examFee ?? null, 'board_rule', cleared.allPapers);
     }
   }
   return changed;

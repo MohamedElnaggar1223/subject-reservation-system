@@ -18,7 +18,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, refundPolicySentence, seriesAcademicYearStart, ROLES, type RefundPolicy } from '@repo/validations';
+import { apiResponse, refundPolicySentence, seriesAcademicYearStart, ROLES, IMPACT_CHANGED_REFUSAL, impactSentence, type RefundPolicy, type ImpactType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
@@ -186,36 +186,69 @@ function EditHeader({ s, onClose }: { s: SessionDetail; onClose: () => void }) {
   const [courseStartsOn, setCourseStartsOn] = useState(s.courseStartsOn);
   const [paymentDueAt, setPaymentDueAt] = useState(toLocalInput(s.paymentDueAt));
   const [reason, setReason] = useState('');
+  // A change that affects families (a payment date moving unpaid reservations' due dates) is answered with its
+  // counts first and saved only when they are sent back (the coordinator rework's impact pattern).
+  const [impact, setImpact] = useState<ImpactType | null>(null);
+  const [countsChanged, setCountsChanged] = useState(false);
+  const edited = <T,>(set: (v: T) => void) => (v: T) => { set(v); setImpact(null); setCountsChanged(false); };
+  const body = () => {
+    const json: { startDate?: string; endDate?: string; courseStartsOn?: string; paymentDueAt?: string; reason?: string } = {};
+    if (draft && startDate !== toLocalInput(s.startDate)) json.startDate = new Date(startDate).toISOString();
+    if (endDate !== toLocalInput(s.endDate)) json.endDate = new Date(endDate).toISOString();
+    if (courseStartsOn !== s.courseStartsOn) json.courseStartsOn = courseStartsOn;
+    if (paymentDueAt !== toLocalInput(s.paymentDueAt)) json.paymentDueAt = new Date(paymentDueAt).toISOString();
+    if (reason.trim()) json.reason = reason.trim();
+    return json;
+  };
+  const send = (expected?: ImpactType) => apiResponse(api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { ...body(), ...(expected ? { expected } : {}) } }));
+  const done = async () => { await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }); onClose(); };
   const save = useMutation({
-    mutationFn: async () => {
-      const json: { startDate?: string; endDate?: string; courseStartsOn?: string; paymentDueAt?: string; reason?: string } = {};
-      if (draft && startDate !== toLocalInput(s.startDate)) json.startDate = new Date(startDate).toISOString();
-      if (endDate !== toLocalInput(s.endDate)) json.endDate = new Date(endDate).toISOString();
-      if (courseStartsOn !== s.courseStartsOn) json.courseStartsOn = courseStartsOn;
-      if (paymentDueAt !== toLocalInput(s.paymentDueAt)) json.paymentDueAt = new Date(paymentDueAt).toISOString();
-      if (reason.trim()) json.reason = reason.trim();
-      return apiResponse(api.v1.sessions[':id'].$put({ param: { id: s.id }, json }));
+    mutationFn: async (expected?: ImpactType) => {
+      try {
+        return { answer: await send(expected), countsChanged: false };
+      } catch (err) {
+        // The counts moved while she was looking (409 IMPACT_CHANGED): ask again with the new ones.
+        if (errorText(err) !== IMPACT_CHANGED_REFUSAL) throw err;
+        return { answer: await send(), countsChanged: true };
+      }
     },
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }); onClose(); },
+    onSuccess: async ({ answer, countsChanged: changed }) => {
+      if (!answer.saved) {
+        setImpact(answer.impact);
+        setCountsChanged(changed);
+        return;
+      }
+      await done();
+    },
   });
   return (
     <Modal title="Edit the session" onClose={onClose}>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(undefined); }}>
         <ErrorLine message={save.error ? errorText(save.error) : null} />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Reserve from" htmlFor="eh-from"><input id="eh-from" className={INPUT_CLASS} type="datetime-local" value={startDate} disabled={!draft} onChange={(e) => setStartDate(e.target.value)} /></Field>
-          <Field label="Reserve to" htmlFor="eh-to"><input id="eh-to" className={INPUT_CLASS} type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
-          <Field label="Course starts" htmlFor="eh-course"><input id="eh-course" className={INPUT_CLASS} type="date" value={courseStartsOn} onChange={(e) => setCourseStartsOn(e.target.value)} /></Field>
-          <Field label="Payment due" htmlFor="eh-due"><input id="eh-due" className={INPUT_CLASS} type="datetime-local" value={paymentDueAt} onChange={(e) => setPaymentDueAt(e.target.value)} /></Field>
+          <Field label="Reserve from" htmlFor="eh-from"><input id="eh-from" className={INPUT_CLASS} type="datetime-local" value={startDate} disabled={!draft} onChange={(e) => edited(setStartDate)(e.target.value)} /></Field>
+          <Field label="Reserve to" htmlFor="eh-to"><input id="eh-to" className={INPUT_CLASS} type="datetime-local" value={endDate} onChange={(e) => edited(setEndDate)(e.target.value)} /></Field>
+          <Field label="Course starts" htmlFor="eh-course"><input id="eh-course" className={INPUT_CLASS} type="date" value={courseStartsOn} onChange={(e) => edited(setCourseStartsOn)(e.target.value)} /></Field>
+          <Field label="Payment due" htmlFor="eh-due"><input id="eh-due" className={INPUT_CLASS} type="datetime-local" value={paymentDueAt} onChange={(e) => edited(setPaymentDueAt)(e.target.value)} /></Field>
         </div>
         <Field label="Why" htmlFor="eh-why" hint="Kept with the change. An open session's end needs one.">
-          <input id="eh-why" className={INPUT_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} />
+          <input id="eh-why" className={INPUT_CLASS} value={reason} onChange={(e) => edited(setReason)(e.target.value)} />
         </Field>
         <p className="text-xs text-muted-foreground">{"Moving the payment date moves the due date of every unpaid line with it (never past its series' deadline)."}</p>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save'}</Button>
-        </div>
+        {impact ? (
+          <Notice tone="warning" title={countsChanged ? 'The counts changed while you were looking' : 'Before this is saved'}>
+            <p>{impactSentence(impact)}</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="button" onClick={() => save.mutate(impact)} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save it'}</Button>
+            </div>
+          </Notice>
+        ) : (
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+          </div>
+        )}
       </form>
     </Modal>
   );

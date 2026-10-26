@@ -721,10 +721,15 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       }
 
       // The fees that follow others (E5): a one-paper retake on the board rule, a row summing its units — cleared
-      // with a source fee this save cleared.
+      // with a source fee this save cleared, or with a source row it removed (a row kept closed for its history
+      // keeps its fee).
       const feesNow = new Map((await tx.select({ id: sessionOfferItem.id, examFee: sessionOfferItem.examFee }).from(sessionOfferItem)
         .where(eq(sessionOfferItem.offerId, offeringId))).map((r) => [r.id, r.examFee]));
-      const cleared = new Set(rows.filter((r) => r.examFee !== null && feesNow.has(r.id) && feesNow.get(r.id) === null).map((r) => r.id));
+      const clearedRows = rows.filter((r) => r.examFee !== null && (!feesNow.has(r.id) || feesNow.get(r.id) === null));
+      const cleared = {
+        keys: new Set(clearedRows.map((r) => r.referenceKey).filter((k): k is string => !!k)),
+        allPapers: clearedRows.some((r) => r.kind === 'all_papers'),
+      };
       for (const id of await deriveFollowingFees(tx, [offeringId], { actorId, ctx }, cleared)) {
         priceRows.add(id);
         changed = true;

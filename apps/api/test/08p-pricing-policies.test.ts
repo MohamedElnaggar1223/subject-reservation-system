@@ -290,13 +290,19 @@ describe('08p: pricing policies on pricing v2', () => {
     expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [line!.id], instrumentUsed: 'cash', escrowAmountToApply: 0 } }))).error).toBe(PROVISIONAL_REFUSAL);
     expect(await sql(`select 1 from payment_registration where registration_id = $1`, [line!.id])).toEqual([]);
 
-    // A line reserved before the rework on a row 0066 gave an exam fee keeps its version-1 basis: the switch reaches it by
-    // its row, not its basis.
+    // A line reserved before the rework from a provisional grid row, on a row 0066 gave an exam fee, keeps its
+    // version-1 basis (its fee row recorded provisional): the switch reaches it by its row, not its basis.
     const g = await onboard(officer, `p08-prov-v1-${RUN}`, 11);
     const [converted] = await reserve(g, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
-    await sql(`update registration set pricing_basis = jsonb_set(pricing_basis, '{v}', '1') where id = $1`, [converted!.id]);
+    await sql(`update registration set pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
+      '[{"id": "a-grid-row-of-the-old-fees-tab", "keyKind": "subject", "keyId": "x", "amount": 9200, "provisional": true}]'::jsonb) where id = $1`, [converted!.id]);
     expect(await priceOf(converted!.id)).toMatchObject({ provisional: true, basis: { v: 1 } });
-    const waiting = Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and status = 'pending_payment'`, [session])).n);
+    // And a legacy line that was never provisional (its grid row confirmed when it was priced), on the same row.
+    const h = await onboard(officer, `p08-prov-v1n-${RUN}`, 11);
+    const [legacy] = await reserve(h, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
+    await sql(`update registration set price_provisional = false, pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
+      '[{"id": "a-confirmed-grid-row", "keyKind": "subject", "keyId": "x", "amount": 9200, "provisional": false}]'::jsonb) where id = $1`, [legacy!.id]);
+    const waiting = Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and status = 'pending_payment' and price_provisional`, [session])).n);
     const dueBefore = new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line!.id])).d).getTime();
     const switchedAt = Date.now();
     const { shown, saved } = await confirmed((expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: session }, json: { final: true, ...(expected ? { expected } : {}) } })));
@@ -318,6 +324,10 @@ describe('08p: pricing policies on pricing v2', () => {
     const { saved: moved } = await confirmed((expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: session }, json: { paymentDueAt: new Date(Date.now() + day), ...(expected ? { expected } : {}) } })));
     expect(moved.saved).toBe(true);
     for (const id of [line!.id, converted!.id]) expect(Math.abs((await dueOf(id)) - (switchedAt + grace * day))).toBeLessThan(10_000);
+    // The legacy line never provisional keeps its own rule through the re-date (due at the payment date), not the switch's
+    // grace: the moment prices became final says nothing about a price that was never provisional (0066 stamps it).
+    const newPaymentDue = new Date((await one<{ d: string }>(`select payment_due_at as d from registration_session where id = $1`, [session])).d).getTime();
+    expect(await dueOf(legacy!.id)).toBe(newPaymentDue);
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [pay!.id!])).amount)).toBe(23200);
   });

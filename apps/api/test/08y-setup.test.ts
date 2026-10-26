@@ -251,23 +251,63 @@ describe('08y: the coordinator sets up a session', () => {
     // The reference loader keeps a deadline the admin entered — a sitting the file first gives none, entered by the
     // admin, then loaded again from a file that now gives another date — and says so (adminDatesKept).
     const { db, loadReference } = await import('@repo/db');
-    const withSitting = (entryDeadline: string | null) => {
+    const withSitting = (entryDeadline: string | null, retakeDeadline: string | null = null) => {
       const data = referenceFixture();
-      data.boards = data.boards.map((b) => b.code !== 'oxford' ? b : { ...b, sittings: [...b.sittings, { ...b.sittings[0]!, month: 11 as const, levels: ['igcse' as const], entryDeadline }] });
+      data.boards = data.boards.map((b) => b.code !== 'oxford' ? b : { ...b, sittings: [...b.sittings, { ...b.sittings[0]!, month: 11 as const, levels: ['igcse' as const], entryDeadline, retakeDeadline }] });
       return data;
     };
     await loadReference(db, withSitting(null));
     const nov = (await one<{ id: string }>(`select id from board_series where board_code = 'oxford' and month = 'november' and year = $1 and label = ''`, [Y + 6])).id;
     const admins = cairoDateIn(100);
     await apiResponse(enter(adm, nov, { entryDeadline: admins }));
-    const reloaded = await loadReference(db, withSitting(`${Y + 6}-06-20`));
+    // The file then gives both: her entry deadline is kept (and warned about, on its own); the retake deadline she left
+    // empty is filled from the file.
+    const reloaded = await loadReference(db, withSitting(`${Y + 6}-06-20`, `${Y + 6}-07-20`));
     expect(reloaded.adminDatesKept).toEqual([`oxford november ${Y + 6}: the file gives the entry deadline ${Y + 6}-06-20, the admin entered ${admins} — the admin's is kept; check which is right`]);
-    expect(await one(`select to_char(entry_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as entry, dates_source as source from board_series where id = $1`, [nov]))
-      .toEqual({ entry: `${admins} 20:59`, source: 'admin' });
+    expect(await one(`select to_char(entry_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as entry, to_char(retake_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as retake, dates_source as source from board_series where id = $1`, [nov]))
+      .toEqual({ entry: `${admins} 20:59`, retake: `${Y + 6}-07-20 20:59`, source: 'admin' });
+    // A later file giving another retake deadline is warned about too, on its own; both of hers stay.
+    const third = await loadReference(db, withSitting(admins, `${Y + 6}-08-01`));
+    expect(third.adminDatesKept).toEqual([`oxford november ${Y + 6}: the file gives the retake deadline ${Y + 6}-08-01, the admin entered ${Y + 6}-07-20 — the admin's is kept; check which is right`]);
     const opened = await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june } }));
     expect(opened.status).toBe('active');
     expect(opened.startDate).not.toBeNull();
     expect(await sql(`select new_data->>'via' as via from audit_log where action = 'SESSION_ACTIVATED' and entity_id = $1`, [june])).toEqual([{ via: 'the Accepting switch' }]);
+  });
+
+  it("the board date re-dates the sitting's waiting lines, and the same dates sent again re-date them again (the way to retry a re-date); another date is refused", async () => {
+    // A sitting with exams but no entry deadline yet (a line can be made there: its cut-off is the exams' start) in an
+    // open session, opened by the admin's old switch, which does not read the check list.
+    const s = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y, label: `${label}-bd` } }));
+    await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { datesConfirmed: true } }));
+    const o = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: s.id }, json: { custom: { board: 'cambridge', name: `Sociology ${RUN}`, level: 'igcse', group: 'O.L.' } } }));
+    const saved = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId: o.id }, json: {
+      courseFee: 1000, teachers: [{ teacherId: teacherA, online: false, external: false }],
+      rows: [{ kind: 'all_papers', referenceCodes: [`SOC-${RUN}`], examFee: 4000, cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false } }],
+    } }));
+    const sittingId = saved.offering.rows[0]!.series!.id;
+    await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: sittingId }, json: { examsStart: `${Y}-06-01` } }));
+    await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: s.id } }));
+    const f = await onboard(officer, `y08-bd-${RUN}`, 11);
+    const [line] = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s.id, studentId: f.studentId, consent: CONSENT,
+      lines: [{ offerItemId: saved.offering.rows[0]!.id, attempt: 'first', mode: 'in_school', teacherId: teacherA }] } }));
+    const dueOf = async () => (await one<{ d: string }>(`select to_char(due_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as d from registration where id = $1`, [line!.id])).d;
+    const dueBefore = await dueOf();
+    // The board's entry deadline, earlier than the line's due date: the line is now due by it.
+    const day1 = cairoDateIn(20);
+    const enter = (entryDeadline: string) => adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: sittingId }, json: { entryDeadline } });
+    expect(await apiResponse(enter(day1))).toMatchObject({ datesSource: 'admin', linesRedated: 1 });
+    expect(await dueOf()).toBe(`${day1} 20:59`);
+    expect(dueBefore).not.toBe(`${day1} 20:59`);
+    // As a failed re-date would have left it: the old due date, put back by hand. The same date sent again re-dates it.
+    await sql(`update registration set due_at = $1::timestamptz where id = $2`, [`${dueBefore}Z`, line!.id]);
+    expect(await dueOf()).toBe(dueBefore);
+    expect(await apiResponse(enter(day1))).toMatchObject({ datesSource: 'admin', linesRedated: 1 });
+    expect(await dueOf()).toBe(`${day1} 20:59`);
+    expect(await sql(`select 1 as one from audit_log where action = 'BOARD_SERIES_DEADLINE_SET' and entity_id = $1`, [sittingId])).toHaveLength(1);
+    // Another date: refused, nothing changed.
+    expect(await refused(enter(cairoDateIn(25)))).toMatchObject({ status: 409, error: expect.stringContaining('has its board entry deadline') });
+    expect(await dueOf()).toBe(`${day1} 20:59`);
   });
 
   it("a subject added while the session takes reservations starts switched off: its default ticks and the fees a rule fills reach no family until she has looked and switched it on", async () => {
@@ -392,10 +432,22 @@ describe('08y: the coordinator sets up a session', () => {
         .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'its course fee') });
       expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { availability: 'closed', reason: 'the old screen' } })))
         .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'closing it') });
-      // An availability that would untick the options its reservations use (first entry in school), on the offer and the item.
-      expect(await refused(oldOffer({ availability: 'retake_only', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'the options reservations use') });
+      // Any availability write rewrites the rows' cells: refused whether it would untick an option reservations use
+      // (first entry in school), re-tick one she unticked (the paper's first entry: open), or switch a switched-off
+      // subject back on — on the offer and the item.
+      expect(await refused(oldOffer({ availability: 'retake_only', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
       expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioAll! }, json: { availability: 'self_study_only', reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'the options reservations use') });
+        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
+      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { availability: 'open', reason: 'the old screen' } })))
+        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
+      // Switched off by her (its reservations counted first), the old route does not switch it back on.
+      const switchBio = (accepting: boolean) => confirmed((expected?: Impact) => apiResponse(put(coordinator, offering.bio!, { accepting, ...(expected ? { expected } : {}) })));
+      await switchBio(false);
+      expect(await refused(oldOffer({ availability: 'retake_only', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
+      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: june, offerId: offering.bio! }, json: { availability: 'open', reason: 'the old screen' } })))
+        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
+      expect(await one(`select accepting, availability from session_offer where id = $1`, [offering.bio!])).toEqual({ accepting: false, availability: 'closed' });
+      await switchBio(true);
       // The item route's series change on a row with reservations (§6: the editor refuses it too).
       const otherJune = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y, label: `${label}-other` } }))).id;
       expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioAll! }, json: { boardSeriesId: otherJune, reason: 'the old screen' } })))

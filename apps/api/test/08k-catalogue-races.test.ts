@@ -185,12 +185,12 @@ describe('F0b: races', () => {
       f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [sub])), studentId: f.studentId } });
     const a = await onboard(officer, 'f0br-board-a', 11);
     const b = await onboard(officer, 'f0br-board-b', 11);
-    const aReg = ((await apiResponse(prereg(a))) as { id: string }[])[0]!.id;
+    const aReg = (await apiResponse(prereg(a)))[0]!.id;
 
     // The board change holds the subject and queues behind A's row; B registers meanwhile.
     const release = await holdRowLock('registration', aReg);
     let change: Promise<Res> | undefined;
-    let registering: Promise<Res> | undefined;
+    let registering: ReturnType<typeof prereg> | undefined;
     try {
       change = adm.api.v1.subjects[':id'].$put({ param: { id: sub }, json: { council: 'pearson_edexcel' } });
       await lockWaiters(1);
@@ -202,7 +202,7 @@ describe('F0b: races', () => {
     const [chg, reg] = await Promise.all([change!, registering!]);
     expect(chg.status).toBe(200);
     expect(reg.status).toBe(201);
-    const bReg = ((await reg.json()) as { data: { id: string }[] }).data[0]!.id;
+    const bReg = (await apiResponse(Promise.resolve(reg)))[0]!.id;
     // Both entered with Pearson: B waited for the change and was routed by the new board.
     expect(await sql(`select id, board_series_id from registration where id in ($1, $2) order by id`, [aReg, bReg]))
       .toEqual([aReg, bReg].sort().map((id) => ({ id, board_series_id: pea })));

@@ -549,45 +549,27 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
 }
 
 /** The refusal of a price or a close the deprecated routes would make on a subject priced by its rows. */
-type PricedByRowsChange = 'its course fee' | 'closing it' | 'the options reservations use' | 'the sitting of a row with reservations';
+type PricedByRowsChange = 'its course fee' | 'closing it' | 'what it offers' | 'the sitting of a row with reservations';
 const PRICED_BY_ROWS_WORDS: Record<PricedByRowsChange, string> = {
   'its course fee': 'its course fee',
   'closing it': 'whether it takes reservations',
-  'the options reservations use': 'the options its reservations use (they stay ticked; close the row instead)',
+  'what it offers': 'what it offers (its rows\' options, and whether it takes reservations)',
   'the sitting of a row with reservations': "a row's sitting (not while reservations use the row: close it and add another)",
 };
 export const PRICED_BY_ROWS_REFUSAL = (name: string, what: PricedByRowsChange) =>
   `${name} is priced by its rows (the coordinator rework): change ${PRICED_BY_ROWS_WORDS[what]} in the subject editor, where what it does to families is counted first`;
 
 /**
- * A subject set up through the subject editor (any row with its own exam fee) is priced, closed, ticked and
- * placed there: the deprecated offer, item and form routes change neither its course fee, nor whether it is
- * open, nor an option its reservations use, nor the sitting of a row with reservations (they would re-price,
- * count and refuse nothing the editor does). Their other edits (teachers, notes, grade 10) still work.
+ * A subject set up through the subject editor (any row with its own exam fee) is priced, opened and closed,
+ * ticked and placed there: the deprecated offer, item and form routes change neither its course fee, nor its
+ * availability or a row's (which would rewrite its cells — untick an option reservations use, re-tick a first
+ * entry, switch a switched-off subject back on), nor the sitting of a row with reservations (they would
+ * re-price, count and refuse nothing the editor does). Their other edits (teachers, notes, grade 10) still work.
  */
 async function assertNotPricedByRows(tx: Tx, offerId: string, name: string, what: PricedByRowsChange) {
   const [v2] = await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem)
     .where(and(eq(sessionOfferItem.offerId, offerId), isNotNull(sessionOfferItem.examFee))).limit(1);
   if (v2) throw new OfferError(PRICED_BY_ROWS_REFUSAL(name, what), 409);
-}
-
-/** A line that stands (the subject editor's LIVE). */
-const LIVE_LINE_STATUSES = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'];
-
-const CELL_OF_OPTION: Record<string, keyof ReturnType<typeof cellsOfAvailability>> = {
-  'first in_school': 'firstInSchool', 'retake in_school': 'retakeInSchool', 'retake self_study': 'retakeSelfStudy', 'first self_study': 'firstSelfStudy',
-};
-
-/** Whether new cells would untick an option live lines of these items use (attempt and mode). */
-async function untickedCellsInUse(tx: Tx, next: { item: typeof sessionOfferItem.$inferSelect; cells: ReturnType<typeof cellsOfAvailability> }[]) {
-  if (!next.length) return false;
-  const used = await tx.select({ itemId: registration.offerItemId, attempt: registration.attempt, mode: registration.mode }).from(registration)
-    .where(and(inArray(registration.offerItemId, next.map((n) => n.item.id)), inArray(registration.status, LIVE_LINE_STATUSES)));
-  return used.some((u) => {
-    const n = next.find((x) => x.item.id === u.itemId)!;
-    const cell = CELL_OF_OPTION[`${u.attempt} ${u.mode}`];
-    return !!cell && n.item[cell] && !n.cells[cell];
-  });
 }
 
 const feeOf = (v: number | string | null) => (v === null ? null : Number(v));
@@ -599,12 +581,7 @@ async function changeOfferInTx(
   const offerId = offer.id;
   if (data.courseFee !== undefined && feeOf(data.courseFee) !== feeOf(offer.courseFee)) await assertNotPricedByRows(tx, offerId, subjectRow.name, 'its course fee');
   if (data.availability === 'closed' && offer.availability !== 'closed') await assertNotPricedByRows(tx, offerId, subjectRow.name, 'closing it');
-  if (data.availability !== undefined && data.availability !== offer.availability) {
-    const items = await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offerId));
-    if (await untickedCellsInUse(tx, items.map((item) => ({ item, cells: cellsOfAvailability(data.availability!, item.availability, item.kind, item.needsPriorSeries) })))) {
-      await assertNotPricedByRows(tx, offerId, subjectRow.name, 'the options reservations use');
-    }
-  }
+  if (data.availability !== undefined && data.availability !== offer.availability) await assertNotPricedByRows(tx, offerId, subjectRow.name, 'what it offers');
   const current = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
   let teachers = current.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' }));
   if (data.teachers) {
@@ -737,9 +714,12 @@ async function changeItemInTx(
     ? cellsOfAvailability((await tx.select({ a: sessionOffer.availability }).from(sessionOffer).where(eq(sessionOffer.id, item.offerId)))[0]?.a ?? 'open',
         fields.availability ?? item.availability, item.kind, fields.needsPriorSeries ?? item.needsPriorSeries)
     : {};
-  if ('firstInSchool' in cells && await untickedCellsInUse(tx, [{ item, cells: cells as ReturnType<typeof cellsOfAvailability> }])) {
+  // Any write that rewrites the row's cells (its availability, or whether it carries a sitting forward).
+  const rewritesCells = (fields.availability !== undefined && fields.availability !== item.availability)
+    || (fields.needsPriorSeries !== undefined && fields.needsPriorSeries !== item.needsPriorSeries);
+  if (rewritesCells) {
     const [s] = await tx.select({ name: subject.name }).from(subject).where(eq(subject.id, offer.subjectId));
-    await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'the options reservations use');
+    await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'what it offers');
   }
   if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
   if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);

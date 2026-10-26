@@ -39,7 +39,10 @@ export type ReferenceLoadResult = {
 
 const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
 
-/** The admin's deadlines (C6) the file disagrees with, as sentences (one per deadline). */
+/**
+ * The admin's deadlines (C6) the file disagrees with, as sentences — each deadline on its own (the entry and the
+ * retake deadline): one she entered and the file gives differently. One she left empty is filled from the file.
+ */
 export function adminDateDisagreements(
   sitting: string, admin: { entry: Date | null; retake: Date | null }, file: { entry: string | null; retake: string | null },
 ): string[] {
@@ -110,10 +113,10 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
           on conflict (board_code, month, year, label) do update set
             levels = excluded.levels,
             -- C6: a deadline the admin entered from the check list (dates_source 'admin') is kept; the file
-            -- fills the rest.
-            entry_deadline = case when board_series.dates_source = 'admin' then board_series.entry_deadline
+            -- fills a date she left empty (her retake deadline when she entered only the entry deadline).
+            entry_deadline = case when board_series.dates_source = 'admin' then coalesce(board_series.entry_deadline, excluded.entry_deadline)
                                   else coalesce(excluded.entry_deadline, board_series.entry_deadline) end,
-            retake_deadline = case when board_series.dates_source = 'admin' then board_series.retake_deadline
+            retake_deadline = case when board_series.dates_source = 'admin' then coalesce(board_series.retake_deadline, excluded.retake_deadline)
                                    else coalesce(excluded.retake_deadline, board_series.retake_deadline) end,
             exams_start = coalesce(excluded.exams_start, board_series.exams_start),
             dates_source = case when board_series.dates_source = 'admin' then 'admin' else excluded.dates_source end,
@@ -123,6 +126,8 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
                                    or board_series.retake_deadline is distinct from coalesce(excluded.retake_deadline, board_series.retake_deadline)
                                    or board_series.dates_source is distinct from excluded.dates_source
                                    or board_series.dates_confirmed is distinct from excluded.dates_confirmed)
+                                 or (board_series.dates_source = 'admin' and board_series.retake_deadline is null and excluded.retake_deadline is not null)
+                                 or (board_series.dates_source = 'admin' and board_series.entry_deadline is null and excluded.entry_deadline is not null)
                                  or board_series.exams_start is distinct from coalesce(excluded.exams_start, board_series.exams_start)
                                  or board_series.levels is distinct from excluded.levels
                               then now() else board_series.updated_at end`);

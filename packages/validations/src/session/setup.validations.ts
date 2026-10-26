@@ -68,6 +68,25 @@ export const ImpactSchema = z.object({
 });
 export type ImpactType = z.infer<typeof ImpactSchema>;
 
+/** IMPACT_CHANGED (409): the counts sent back as `expected` are no longer what the change does. */
+export const IMPACT_CHANGED_REFUSAL = 'What this change does to families changed while you were looking: look at the new counts and save again';
+
+/**
+ * The impact in plain words, before she confirms it: "This re-prices 2 unpaid reservations and moves the due
+ * date of 3 unpaid reservations."
+ */
+export function impactSentence(i: ImpactType): string {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  const parts: string[] = [];
+  if (i.repriced) parts.push(`re-prices ${n(i.repriced, 'unpaid reservation', 'unpaid reservations')} (the families are told)`);
+  if (i.listedForFinance) parts.push(`lists ${n(i.listedForFinance, 'paid reservation', 'paid reservations')} for finance (their price stays)`);
+  if (i.linesAffected) parts.push(`changes ${n(i.linesAffected, 'reservation', 'reservations')} (made payable, or closed to new ones)`);
+  if (i.dueDatesMoved) parts.push(`moves the due date of ${n(i.dueDatesMoved, 'unpaid reservation', 'unpaid reservations')}`);
+  if (!parts.length) return 'This changes nothing for families.';
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `This ${list}.`;
+}
+
 // ─── Questions (D13) ─────────────────────────────────────────────────────────
 
 export const QuestionInput = z.object({

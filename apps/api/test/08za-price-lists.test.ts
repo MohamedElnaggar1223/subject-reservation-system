@@ -301,27 +301,36 @@ describe('08za: price lists', () => {
       expect([f[row.waa01!], f[row.yaa01!]]).toEqual([[9000, 'typed'], [18350, 'units_sum']]);
     });
 
-    it("a source fee cleared clears the fee that follows it: the qualification summing a unit goes to price not set; a paper on the board rule with reservations makes the change refused, as a price not set on a row lines use is (set a price, or close it)", async () => {
-      const units = (waa01Fee: number | null) => ({ rows: [
-        { id: row.yaa01, kind: 'qualification' as const, cells: tick(true) },
-        { id: row.waa01, kind: 'unit' as const, examFee: waa01Fee, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } },
-        { id: row.waa02, kind: 'unit' as const, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } },
-      ] });
-      const saved = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.arabic! }, json: units(null) }));
-      expect(saved.saved).toBe(true);
+    it("a source fee cleared, or its row removed, clears the fee that follows it: the qualification summing a unit goes to price not set; a follower with reservations makes the change refused, as a price not set on a row lines use is (set a price, or close it)", async () => {
+      const none = { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false };
+      const arabicSave = (rows: { id: string; kind: 'qualification' | 'unit'; examFee?: number | null }[]) =>
+        apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.arabic! }, json: {
+          rows: rows.map((r) => ({ ...r, cells: r.kind === 'qualification' ? tick(true) : none })),
+        } }));
+      // A unit's fee cleared: the qualification summing it loses its own.
+      expect((await arabicSave([{ id: row.yaa01!, kind: 'qualification' }, { id: row.waa01!, kind: 'unit', examFee: null }, { id: row.waa02!, kind: 'unit' }])).saved).toBe(true);
       let f = await fees();
       expect([f[row.waa01!], f[row.yaa01!]]).toEqual([[null, null], [null, null]]);
       expect((await apiResponse(coordinator.api.v1.sessions[':id'].prices.$get({ param: { id: june } }))).missing.map((m) => m.rowId)).toContain(row.yaa01);
       expect(await one(`select new_data->>'via' as via, new_data->>'examFee' as fee from audit_log where action = 'OFFER_ITEM_UPDATED' and entity_id = $1 order by created_at desc limit 1`, [row.yaa01!]))
         .toEqual({ via: 'the sum of its units', fee: null });
       // Typed back, the sum follows again.
-      await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.arabic! }, json: units(9000) }));
+      await arabicSave([{ id: row.yaa01!, kind: 'qualification' }, { id: row.waa01!, kind: 'unit', examFee: 9000 }, { id: row.waa02!, kind: 'unit' }]);
+      expect((await fees())[row.yaa01!]).toEqual([18350, 'units_sum']);
+      // A unit's row removed (nothing ever used it): the qualification summing it loses its fee too.
+      expect((await arabicSave([{ id: row.yaa01!, kind: 'qualification' }, { id: row.waa01!, kind: 'unit' }])).saved).toBe(true);
       f = await fees();
-      expect(f[row.yaa01!]).toEqual([18350, 'units_sum']);
-      // All papers cleared while its paper's line stands: the paper would have no price — refused, nothing changed.
+      expect([row.waa02! in f, f[row.yaa01!]]).toEqual([false, [null, null]]);
+
+      // Mathematics' all papers sums its papers and is the only row with a reservation: a paper's fee cleared (the paper has
+      // none) would leave that line with no price — refused, nothing changed.
+      const fam = await onboard(officer, `za08-sum-${RUN}`, 11);
+      await apiResponse(fam.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, studentId: fam.studentId, consent: CONSENT, lines: [{ offerItemId: row.mathsAll!, attempt: 'first', mode: 'in_school' }] } }));
+      expect(await sql(`select offer_item_id as item from registration where offer_item_id in ($1, $2, $3) and status = 'pending_payment'`, [row.mathsAll!, row.maths1h!, row.maths2h!])).toEqual([{ item: row.mathsAll }]);
       const before = await fees();
-      const r = await refused(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.bio! }, json: { rows: [
-        { id: row.bioAll, kind: 'all_papers', examFee: null, cells: tick(true) }, { id: row.bioPaper, kind: 'paper', cells: tick(false) },
+      expect((before[row.mathsAll!] as [number, string])[1]).toBe('units_sum');
+      const r = await refused(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.maths! }, json: { rows: [
+        { id: row.mathsAll, kind: 'all_papers', cells: tick(true) }, { id: row.maths1h, kind: 'paper', examFee: null, cells: tick(false) }, { id: row.maths2h, kind: 'paper', cells: tick(false) },
       ] } }));
       expect(r).toMatchObject({ status: 409, error: expect.stringContaining('and it has reservations: set a price, or close it instead') });
       expect(await fees()).toEqual(before);

@@ -76,8 +76,9 @@ const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-GB', { day: 'numeric',
  * PUT /reference/sittings/:id/board-date — C6's one exception, the admin's alone: a sitting with no board
  * entry deadline (the reference data gives none yet, or a session's own sitting) gets it once, with its
  * retake deadline when the board has one. Marked as the admin's (dates_source 'admin'), so the reference
- * loader keeps it; a sitting that has its deadline is refused (the reference data owns it). Audited; the
- * waiting lines of the sitting are re-dated once it commits.
+ * loader keeps it. Audited; the waiting lines of the sitting are re-dated once it commits. The same dates
+ * sent again answer 200 and re-date the lines again (a failed re-date is retried so); any other date on a
+ * sitting that has its deadline is refused (the reference data owns it).
  */
 export async function enterBoardDate(seriesId: string, data: EnterBoardDateType, actorId: string, ctx?: AuditContext) {
   let out: typeof boardSeries.$inferSelect;
@@ -89,13 +90,17 @@ export async function enterBoardDate(seriesId: string, data: EnterBoardDateType,
         .where(eq(sessionBoardSeries.boardSeriesId, seriesId)).orderBy(registrationSession.id).for('share', { of: registrationSession });
       const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('update');
       if (!s) throw new SetupError('That sitting was not found', 404);
-      if (s.entryDeadline) {
-        throw new SetupError(`This sitting has its board entry deadline (${cairoDay(s.entryDeadline)}): the reference data keeps it`, 409);
-      }
       const now = new Date();
       // The end of the day in Cairo, as the reference data's dates are stored (referenceDeadline).
       const entry = referenceDeadline(data.entryDeadline)!;
       const retake = data.retakeDeadline === undefined ? undefined : referenceDeadline(data.retakeDeadline);
+      if (s.entryDeadline) {
+        // The admin's own dates sent again: nothing to write — the waiting lines are re-dated again below (the way to
+        // retry a re-date that failed). Any other date on a sitting that has its deadline is refused.
+        const same = (a: Date | null, b: Date | null | undefined) => b === undefined || (a?.getTime() ?? null) === (b?.getTime() ?? null);
+        if (s.datesSource === 'admin' && same(s.entryDeadline, entry) && same(s.retakeDeadline, retake)) return s;
+        throw new SetupError(`This sitting has its board entry deadline (${cairoDay(s.entryDeadline)}): the reference data keeps it`, 409);
+      }
       if (entry <= now) throw new SetupError("The board's entry deadline must be in the future");
       if (retake && retake < entry) throw new SetupError('The retake deadline cannot be before the entry deadline');
       const [updated] = await tx.update(boardSeries).set({

@@ -22,7 +22,7 @@
  */
 
 import { db, registration, subject, sql, eq, inArray } from '@repo/db';
-import { formatEgp, type ImpactType, type PricingBasis } from '@repo/validations';
+import { formatEgp, IMPACT_CHANGED_REFUSAL, type ImpactType, type PricingBasis } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from '../audit.services';
 import { paymentHistoryOf, PAYMENT_HISTORY_REASON } from '../line-history.services';
 import { priceLine, PricingError, round2 } from '../pricing.services';
@@ -34,8 +34,8 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type Impact = ImpactType;
 export const NO_IMPACT: Impact = { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0 };
 
-/** IMPACT_CHANGED (Appendix A): the counts the client confirmed are no longer what the change does. */
-export const IMPACT_CHANGED_REFUSAL = 'What this change does to families changed while you were looking: look at the new counts and save again';
+/** IMPACT_CHANGED (Appendix A): the counts the client confirmed are no longer what the change does (one sentence, shared with the screens). */
+export { IMPACT_CHANGED_REFUSAL };
 
 /** The change must be confirmed with these counts (the transaction is rolled back; nothing was written). */
 export class ImpactPending extends Error {
