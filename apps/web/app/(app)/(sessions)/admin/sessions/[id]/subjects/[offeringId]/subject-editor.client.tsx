@@ -36,7 +36,7 @@ import { useI18n } from '~/lib/i18n';
 import { Day, Money, Modal, ErrorLine, INPUT_CLASS, TEXTAREA_CLASS } from '../../../sessions-shared';
 import {
   fetchOffering, fetchSetupSession, fetchTeachers, fetchReferenceBoards, fetchFamilyPreview, offeringKey, setupKey, previewKey,
-  TEACHERS_KEY, REFERENCE_BOARDS_KEY, CELLS, CELL_WORDS, subjectTitle, examMonth, monthIndex, pickerValue, endOfSchoolDay,
+  TEACHERS_KEY, REFERENCE_BOARDS_KEY, CELLS, CELL_WORDS, subjectTitle, ownName, examMonth, monthIndex, pickerValue, endOfSchoolDay,
   useImpactSave, ImpactDialog, CommitSelect, refusalText, type CellKey, type SetupSession,
 } from '../../../setup-shared';
 import { shownCode } from '../../subjects-tab.client';
@@ -804,7 +804,7 @@ function Preview({ o, s, dirty }: { o: OfferingData; s: SetupSession; dirty: boo
         <p className="mt-3 text-sm text-muted-foreground">Nothing to choose: no row is ticked.</p>
       ) : (
         <div className="mt-3 space-y-3">
-          <p className="font-medium text-foreground"><bdi data-i18n-skip="true">{subject.name}</bdi> <span className="text-xs text-muted-foreground">{subject.group}</span></p>
+          <p className="font-medium text-foreground"><bdi data-i18n-skip="true">{ownName(subject.name, subject.group)}</bdi> <span className="text-xs text-muted-foreground">{subject.group}</span></p>
           {subject.note && <p className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{subject.note}</bdi></p>}
           {[...groups.entries()].map(([k, rs]) => {
             const opts = rs.flatMap((r) => r.options.filter((x) => (x.attempt === 'first' ? as === 'first_timer' : showRetakes)).map((x) => ({ r, x })));

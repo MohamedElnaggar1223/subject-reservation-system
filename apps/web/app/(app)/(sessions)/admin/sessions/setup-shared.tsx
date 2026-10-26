@@ -60,8 +60,24 @@ export const TEACHERS_KEY = ['teachers', 'active'] as const;
 
 // ─── Words ───────────────────────────────────────────────────────────────────
 
-/** A subject as she names it on her links sheet: "Arabic O.L.", "Biology A.S./A.L." (two subjects share a name). */
-export const subjectTitle = (o: { subject: { name: string }; group: string }) => `${o.subject.name} ${o.group}`;
+/**
+ * A level at the end of an older subject's own name ("Mathematics A.S./A.L.", "Arabic OL", "Physics (AS/AL)"): the
+ * subjects made before the rework carried it in the name, the reference data's do not.
+ */
+const LEVEL_AT_END: Record<string, RegExp> = {
+  'O.L.': /\s*\(?\bO\.?\s?L\.?\)?\s*$/i,
+  'A.S./A.L.': /\s*\(?\bA\.?\s?S\.?\s*\/\s*A\.?\s?L\.?\)?\s*$/i,
+};
+/**
+ * A subject as she names it on her links sheet: "Arabic O.L.", "Biology A.S./A.L." (two subjects share a name). The
+ * level is said once: a name that already ends with it, in any spelling, ends with it as her screens write it.
+ */
+export const subjectTitle = (o: { subject: { name: string }; group: string }) => `${ownName(o.subject.name, o.group)} ${o.group}`;
+/** A subject's name without the level an older name ends with (shown beside it once). */
+export const ownName = (name: string, group: string) => {
+  const own = LEVEL_AT_END[group];
+  return own ? name.trim().replace(own, '') || name.trim() : name.trim();
+};
 
 /** The four columns of D3, in the grid's order. */
 export const CELLS = ['firstInSchool', 'retakeInSchool', 'retakeSelfStudy', 'firstSelfStudy'] as const;
