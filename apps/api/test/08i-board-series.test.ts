@@ -255,7 +255,7 @@ describe('F0b: board series', () => {
       const extended = await apiResponse(adm.api.v1.sessions[':id'].$put({
         param: { id: windowId }, json: { endDate: new Date(octDeadline.getTime() + 60 * 1000), reason: 'extend past the October deadline' },
       }));
-      expect(new Date(extended.endDate).getTime()).toBe(octDeadline.getTime() + 60 * 1000);
+      expect(new Date(extended.endDate!).getTime()).toBe(octDeadline.getTime() + 60 * 1000);
       await sql(`update registration_session set end_date = now() + interval '1 minute' where id = $1`, [windowId]);
     });
 

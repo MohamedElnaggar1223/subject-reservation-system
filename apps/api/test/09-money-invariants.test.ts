@@ -751,13 +751,21 @@ describe('money invariants over the whole database', () => {
       select distinct jsonb_array_elements_text(a.new_data->'registrationIds') as id from audit_log a where a.action = 'IMPORT_REGISTRATION'`);
     expect(made.length).toBeGreaterThan(0);
     const ids = made.map((m) => m.id);
-    // Each exists, with a pricing basis equal to its price, never priced at 0 for want of a fee row.
-    const lines = await sql<{ id: string; price: string; basis_total: string | null; rows: number }>(`
-      select r.id, r.price_at_registration as price, (r.pricing_basis->>'total') as basis_total,
-        coalesce(jsonb_array_length(r.pricing_basis->'feeRows'), 0) as rows
+    // Each exists, with a pricing basis equal to its price, never priced at 0 for want of a fee: a version-1 basis
+    // read the fee grid (its rows named); a version-2 basis (the coordinator rework) read its row's exam fee and
+    // course fee, and its price is exactly exam fee × its share + course fee × its share (no exception applied here).
+    const lines = await sql<{ id: string; price: string; basis_total: string | null; v: number | null; rows: number; from_fees: string | null; exceptions: number }>(`
+      select r.id, r.price_at_registration as price, (r.pricing_basis->>'total') as basis_total, (r.pricing_basis->>'v')::int as v,
+        coalesce(jsonb_array_length(r.pricing_basis->'feeRows'), 0) as rows,
+        round((r.pricing_basis->>'examFee')::numeric * (r.pricing_basis->>'boardPercent')::numeric / 100, 2)
+          + round((r.pricing_basis->>'courseFeeBase')::numeric * (r.pricing_basis->>'coursePercent')::numeric / 100
+                  * (r.pricing_basis->>'onePaperPercent')::numeric / 100, 2) as from_fees,
+        coalesce(jsonb_array_length(r.pricing_basis->'exceptionIds'), 0) as exceptions
       from registration r where r.id in $1`, [ids]);
     expect(lines.map((l) => l.id).sort()).toEqual([...ids].sort());
-    expect(lines.filter((l) => l.basis_total === null || Number(l.basis_total) !== Number(l.price) || Number(l.rows) === 0)).toEqual([]);
+    expect(lines.filter((l) => l.basis_total === null || Number(l.basis_total) !== Number(l.price))).toEqual([]);
+    expect(lines.filter((l) => l.v !== 2 && Number(l.rows) === 0)).toEqual([]);
+    expect(lines.filter((l) => l.v === 2 && (l.from_fees === null || (Number(l.exceptions) === 0 && Number(l.from_fees) !== Number(l.price))))).toEqual([]);
     // Both consents, on the imported channel (the sheet's "I confirm my registration").
     const unconsented = await sql(`
       select r.id from registration r where r.id in $1

@@ -1150,7 +1150,7 @@ describe('money rules', () => {
           param: { id },
           json: { endDate: later, reason: 'extend past the board deadline' },
         }));
-        expect(new Date(moved.endDate).getTime()).toBe(later.getTime());
+        expect(new Date(moved.endDate!).getTime()).toBe(later.getTime());
       }
     });
 

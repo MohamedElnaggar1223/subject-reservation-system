@@ -1342,7 +1342,7 @@ describe('08t: the rework races — money (step C)', () => {
     expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'EXCEPTION_USED' and entity_id = $1`, [gate.id])).n)).toBe(1);
   });
 
-  it("the desk collects a line and another line's instalment while both lines' board fees are re-priced: every line taken in one id-ordered pass, so the two never deadlock", async () => {
+  it("the desk collects a line and another line's instalment while both lines' rows are re-priced (E7, by row): every line taken in one id-ordered pass, so the two never deadlock", async () => {
     const s = await session(adm, 'June (AS, races desk lines)', 'june', 'as_level', { ...openWindow(), activate: true });
     const f = await onboard(officer, `t08m-dl-${RUN}`, 12);
     const made = (await apiResponse(desk(f.studentId, s, [subj.M1!, subj.M2!]))).registrations.map((r) => r.id).sort();
@@ -1356,9 +1356,17 @@ describe('08t: the rework races — money (step C)', () => {
       },
     }));
     const [i1] = (await sql<{ id: string }>(`select id from charge where plan_exception_id = $1 order by instalment_no`, [plan.id])).map((r) => r.id);
-    const series = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [planLine])).s;
-    const fees = (await sql<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id in ($2, $3) order by id`, [series, subj.M1!, subj.M2!])).map((r) => r.id);
-    await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: series }, json: { rows: fees.map((feeId) => ({ feeId, amount: 650 })), reason: 'race: the board changed its fees' } }));
+    // The coordinator rework: the board changed both fees — one price list, both rows in one batch (§9.2's order:
+    // the offerings and their rows FOR UPDATE, then the lines FOR UPDATE in id order, then their payment history).
+    const codes = await sql<{ code: string }>(`select code from subject where id in ($1, $2) order by code`, [subj.M1!, subj.M2!]);
+    const apply = () => adm.api.v1.sessions[':id']['price-lists'].$post({
+      param: { id: s },
+      json: {
+        board: 'pearson_edexcel', name: `race ${RUN}`, rows: codes.map((c, i) => ({ lineNo: i + 1, code: c.code, name: '', amount: 650 })),
+        // What it will do once the collection has landed: both lines listed for finance, none re-priced.
+        expected: { repriced: 0, listedForFinance: 2, linesAffected: 0, dueDatesMoved: 0 },
+      },
+    });
     // The collection paused at its first audit row, holding the lines it has taken; the re-price
     // then waits on one of them; released, the collection takes the instalment's charge.
     const release = await pauseAtAudit('PAYMENT_INITIATED');
@@ -1367,7 +1375,7 @@ describe('08t: the rework races — money (step C)', () => {
     try {
       collecting = officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [payLine], chargeIds: [i1!], instrumentUsed: 'cash' } });
       await lockWaiters(1);
-      repricing = finadmin.api.v1['board-fees'][':seriesId'].reprice.$post({ param: { seriesId: series }, json: { feeIds: fees, reason: 'race: the board changed its fees' } });
+      repricing = apply();
       await lockWaiters(2);
     } finally {
       await release();
@@ -1377,10 +1385,15 @@ describe('08t: the rework races — money (step C)', () => {
     expect([c.status, collected.error]).toEqual([201, undefined]);
     expect(collected.data!.collected).toBe(2250);
     // Either side refused would name why (a deadlock is "deadlock detected").
-    const repriced = await r.json() as { data?: { repriced: unknown[]; listed: { id: string; reason: string }[] }; error?: string };
+    const repriced = await r.json() as { data?: { saved: boolean; impact: unknown }; error?: string };
     expect([r.status, repriced.error]).toEqual([200, undefined]);
-    expect(repriced.data!.repriced).toEqual([]);
-    expect(repriced.data!.listed.map((x) => [x.id, x.reason]).sort()).toEqual([[planLine, 'is paid by its instalment plan'], [payLine, 'has a payment (open, failed or paid)']].sort());
+    expect(repriced.data).toMatchObject({ saved: true, impact: { repriced: 0, listedForFinance: 2 } });
+    const batch = await one<{ listed: { id: string; reason: string }[]; repriced: unknown[] }>(
+      `select new_data->'listedForFinance' as listed, new_data->'repriced' as repriced from audit_log where action = 'ROWS_REPRICED' and new_data->>'reason' like $1`, [`%race ${RUN}%`]);
+    expect(batch.repriced).toEqual([]);
+    expect(batch.listed.map((x) => [x.id, x.reason]).sort()).toEqual([[planLine, 'is paid by its instalment plan'], [payLine, 'has a payment (open, failed or paid)']].sort());
+    expect(await sql(`select id, price_at_registration::float as p from registration where id in ($1, $2) order by id`, [planLine, payLine]))
+      .toEqual([{ id: planLine, p: 1500 }, { id: payLine, p: 1500 }]);
     expect(await one(`select status from registration where id = $1`, [payLine])).toEqual({ status: 'confirmed' });
     expect(await one(`select status from charge where id = $1`, [i1!])).toEqual({ status: 'paid' });
   });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow,
-  runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, CONSENT, type Client,
+  runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, CONSENT, confirmed, type Client, type Impact,
 } from './helpers';
 
 /**
@@ -1035,21 +1035,23 @@ describe('08q: instalment plans', () => {
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 0 });
   });
 
-  it("a plan line is listed, not re-priced, when its board fee is confirmed at a new amount and re-priced — and its last instalment captures it", async () => {
+  it("a plan line is listed, not re-priced, when its row's exam fee changes (E7, the re-price by row) — and its last instalment captures it", async () => {
     const px = await subject(adm, 'CQP-RP', 'Re-price (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
     const f = await onboard(officer, 'cqp-reprice', 12);
     const [l] = await unpaid(f, [px], s1);
     const p = await plan(f, l!, [750, 750]);
     await payAtDesk(f, [p.i[0]!]);
-    const series = await seriesOfSession(s1, 'pearson_edexcel');
-    const feeId = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id = $2`, [series, px])).id;
-    await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: series }, json: { rows: [{ feeId, amount: 600 }], reason: 'the board raised its fee' } }));
-    // The Fees tab says what the re-price will do (the review of step C, item 6): the plan line is listed, not re-priced.
-    const grid = await apiResponse(finadmin.api.v1['board-fees'].$get({ query: { seriesId: series } }));
-    expect(grid.rows.find((x) => x.id === feeId)).toMatchObject({ lines: 1, toReprice: 0, toList: 1 });
-    const r = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].reprice.$post({ param: { seriesId: series }, json: { feeIds: [feeId], reason: 'the board raised its fee' } }));
-    expect(r.repriced.map((x) => x.id)).not.toContain(l!);
-    expect(r.listed.filter((x) => x.id === l).map((x) => x.reason)).toEqual(['is paid by its instalment plan']);
+    // The coordinator rework (E7): the board raised its fee — the row's exam fee changes through set-up, and the
+    // change says first what it will do: the plan line is listed for finance, not re-priced.
+    const row = (await one<{ id: string }>(`select i.id from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = $1 and o.subject_id = $2`, [s1, px])).id;
+    const setFee = (expected?: Impact) => apiResponse(adm.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: s1, rowId: row }, json: { amount: 600, ...(expected ? { expected } : {}) } }));
+    const { shown, saved } = await confirmed(setFee);
+    expect(shown).toMatchObject({ saved: false, impact: { repriced: 0, listedForFinance: 1, linesAffected: 0, dueDatesMoved: 0 } });
+    expect(saved.examFee).toBe(600);
+    const batch = await one<{ listed: { id: string; reason: string }[]; repriced: { id: string }[] }>(
+      `select new_data->'listedForFinance' as listed, new_data->'repriced' as repriced from audit_log where action = 'ROWS_REPRICED' and entity_id = $1`, [row]);
+    expect(batch.repriced.map((x) => x.id)).not.toContain(l!);
+    expect(batch.listed.filter((x) => x.id === l).map((x) => x.reason)).toEqual(['is paid by its instalment plan']);
     expect(money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [l!])).p)).toBe(1500);
     await payAtDesk(f, [p.i[1]!]);
     expect(await statusOf('registration', l!)).toBe('confirmed');
