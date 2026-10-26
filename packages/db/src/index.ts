@@ -20,6 +20,9 @@ export * from './health'
 // The grade rule in SQL (F0a)
 export * from './academic'
 
+// The reference data's loader (the coordinator rework, §7)
+export * from './reference'
+
 /**
  * Drizzle ORM Query Builders
  *
