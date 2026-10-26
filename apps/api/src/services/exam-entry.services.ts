@@ -59,6 +59,9 @@ import {
 } from './exam-shared';
 import { boardSeriesName } from './series.services';
 
+/** D7 (COORDINATOR_REWORK.md): a declared sitting is entered as declared — the setting verification.unverifiedAtDeadline left with P1b. */
+const UNVERIFIED_AT_DEADLINE = 'enter_as_declared';
+
 type EntryRow = typeof examEntry.$inferSelect;
 
 const MONTH_NUMBER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
@@ -343,7 +346,8 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       from exam_candidate_number n where n.student_id in (${ids})
     `).then((r) => r.rows as { studentId: string; seriesId: string; number: string; centreNumber: string | null }[]),
     getSetting('exams.carryForward', executor),
-    getSetting('verification.unverifiedAtDeadline', executor),
+    // The coordinator rework (D7): a declared sitting is entered as declared (the setting and its hold left with P1b).
+    Promise.resolve('enter_as_declared' as 'enter_as_declared' | 'hold'),
     effectiveDeadlinesOf(executor, regs.map((r) => r.id)),
   ]);
   const existing = inSeries.filter((e) => e.status !== 'withdrawn');
@@ -871,7 +875,7 @@ export async function submitEntries(data: SubmitEntriesType, actorId: string, ct
     const deadlines = await deadlinesOfEntries(tx, drafts, seriesById);
     const late = drafts.find((d) => passed(deadlines.get(d.id)!, at));
     if (late) throw new ExamError(entryStopSentence(seriesById.get(late.boardSeriesId)!.name, deadlines.get(late.id)!), 409);
-    if ((await getSetting('verification.unverifiedAtDeadline', tx)) === 'hold') {
+    if ((UNVERIFIED_AT_DEADLINE as string) === 'hold') {
       const lineIds = [...new Set(drafts.map((d) => d.registrationId).filter((x): x is string => !!x))];
       const held = lineIds.length ? (await tx.execute(sql`
         select r.id from registration r where r.id in (${sql.join(lineIds.map((id) => sql`${id}`), sql`, `)})
@@ -1194,7 +1198,7 @@ async function assess(entries: EntryRow[]) {
         }[]
     : [];
   const enrolmentFor = await enrolmentsOf(db, regs.map((r) => ({ studentId: r.studentId, subjectId: r.subjectId, yearStart: Number(r.yearStart) })));
-  const verification = await getSetting('verification.unverifiedAtDeadline');
+  const verification = UNVERIFIED_AT_DEADLINE as 'enter_as_declared' | 'hold';
   const regById = new Map(regs.map((r) => [r.id, r]));
   /** The line an entry was made from (its own, or its cash-in's) with the enrolment that teaches it. */
   const lineFacts = (e: EntryRow) => {
@@ -1363,7 +1367,7 @@ export async function getEntryList(boardSeriesId: string) {
       registrationId: string; studentId: string; studentName: string; subjectName: string; subjectCode: string; itemLabel: string; itemKind: string;
       mapped: boolean; declaredUnverified: boolean; withdrawnAt: string | null;
     }[];
-  const verification = await getSetting('verification.unverifiedAtDeadline');
+  const verification = UNVERIFIED_AT_DEADLINE as 'enter_as_declared' | 'hold';
   // Paid cash-ins of the series with no live entry: derived when their line says the award, else added by hand.
   const paidCashIns = [...(await chargesOfKind('cash_in', series.id)), ...(await chargesOfKind('late_cash_in', series.id))].filter((c) => c.status === 'paid');
   const enteredCharges = paidCashIns.length

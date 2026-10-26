@@ -15,8 +15,10 @@ export type EligibilityCode =
   | 'left'
   | 'grade_unknown'
   | 'not_started'
+  // Grade 10 refused by the session's grade list (D11; a coordinator's grade-10 exception lifts it).
   | 'grade10_june_only'
-  | 'graduate_retakes_off'
+  // Grade 11, 12 or a graduate not in the session's grade list (D11).
+  | 'grade_not_listed'
   | 'graduated';
 
 export type Eligibility = {
@@ -29,8 +31,8 @@ export type Eligibility = {
   academicYearStart: number;
   academicYear: string;
   series: { sessionType: string; seriesYear: number; label: string };
-  /** Allowed as a graduate retaking (A-12): owes no school fee under A-13. */
+  /** Allowed as a graduate retaking (the session's grade list names graduates, D11): owes no school fee under A-13. */
   graduateRetake: boolean;
-  /** The grade-10 exception that allowed a series other than June. */
+  /** The grade-10 exception that allowed grade 10 where the session's grade list does not. */
   grade10ExceptionId: string | null;
 };

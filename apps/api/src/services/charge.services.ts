@@ -160,11 +160,11 @@ export async function chargeRules(tx: Tx, c: ChargeRow, now: Date = new Date(), 
   }
   if (c.kind === 'school_fee_push' || c.kind === 'instalment') return { amount: c.amount, deadline, exceptionIds: [] as string[] };
   const basis = (c.pricingBasis as ChargeBasis | null) ?? { base: c.amount, exceptionIds: [] };
-  // §3.4's rule for a service's fee: reserved while provisional, paid once finance confirms it
-  // (unless the school lets provisional fees be paid, pricing.payOnProvisionalFee).
+  // §3.4's rule for a service's fee: reserved while provisional, paid once finance confirms it (the setting that
+  // let a provisional fee be paid left with P1b, E6).
   if (opts.forPayment && basis.feeId) {
     const [fee] = await tx.select({ provisional: boardServiceFee.provisional }).from(boardServiceFee).where(eq(boardServiceFee.id, basis.feeId));
-    if (fee?.provisional && !(await getSetting('pricing.payOnProvisionalFee', tx))) {
+    if (fee?.provisional) {
       throw new ChargeError(`${c.description}: the board's fee for it is provisional until finance confirms it on the Board services page — it can be paid once confirmed`, 409);
     }
   }
@@ -261,7 +261,8 @@ export async function createCharge(data: CreateChargeType, actor: { id: string; 
   if ((data.kind === 'price_adjustment' || data.kind === 'custom') && !(FINANCE_DECIDES as readonly string[]).includes(actor.role ?? '')) {
     throw new ChargeError(`Only a finance admin or an admin may add a ${CHARGE_KIND_LABELS[data.kind].toLowerCase()}`, 403);
   }
-  if (data.kind === 'late_entry_fee' && !(await getSetting('exceptions.boardEntryDeadline'))) {
+  if (data.kind === 'late_entry_fee') {
+    // C6: no late entries — the board's deadline is the last money safety net (Q-20's setting left with P1b).
     throw new ChargeError('Late entries are off: the board\'s entry deadline is a hard stop (owner question Q-20)', 409);
   }
   const [student] = await db.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, data.studentId));

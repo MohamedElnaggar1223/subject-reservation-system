@@ -45,26 +45,28 @@ import {
 } from './notification.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, type Eligibility } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
+import { mayReserveSession, mayReserveRow, subjectsOfItems } from './window.services';
 import { reserveLines } from './reservation.services';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
 /**
- * Refuse unless the series is open for this student (window.services.ts):
- * for a line, its own effective deadline decides; for a new reservation (`null`), each new
- * line's deadline is checked when it is made.
+ * Refuse unless the student may start a reservation in the session (window.services mayReserveSession, §6): the
+ * session open, or a G4 later reserve date covering it (with the new lines' subjects, covering each). Each line's
+ * subject, row, cells and board deadline are asked when it is made (insertLines, through the line rules).
  */
-async function assertWindowOpen(
-  studentId: string, sessionId: string,
-  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null; subjectId?: string | null } | null,
-  /** A new reservation's lines: with the session closed, a subject-scoped extension opens its subject alone (step C). */
-  newLines?: readonly { offerItemId: string }[],
-) {
-  const subjectIds = newLines ? await subjectsOfItems(db, newLines.map((l) => l.offerItemId)) : undefined;
-  const w = await sessionWindow(studentId, sessionId, line, db, new Date(), subjectIds);
-  if (w.open) return;
-  throw new Error(windowRefusal(w));
+async function assertMayReserve(studentId: string, sessionId: string, newLines: readonly { offerItemId: string }[]) {
+  const w = await mayReserveSession(db, studentId, sessionId, new Date(), await subjectsOfItems(db, newLines.map((l) => l.offerItemId)));
+  if (!w.allowed) throw new Error(w.message);
+}
+
+/**
+ * Approving a request needs mayReserve (§6): each line's row may still be reserved now — her dates or a G4 later
+ * reserve date, never past its board deadline.
+ */
+async function assertMayReserveLine(line: { studentId: string; offerItemId: string; attempt: string; priorSittingSeriesId: string | null }) {
+  const w = await mayReserveRow(db, line);
+  if (!w.allowed) throw new Error(w.message);
 }
 
 /**
@@ -163,7 +165,7 @@ export async function createRegistrationRequest(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(studentId, sess.id, null, data.lines);
+  await assertMayReserve(studentId, sess.id, data.lines);
   await assertSchoolFeeGate(studentId, eligibility);
 
   // Asked again with the student and window held, so a withdrawal or a
@@ -173,7 +175,7 @@ export async function createRegistrationRequest(
     await assertMayRegisterForInTx(tx, studentId, data.sessionId);
     return reserveLines(tx, {
       studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_approval', requestedBy, eligibility,
-      declaredBy: 'family', channel: 'app',
+      declaredBy: 'family', channel: 'app', answers: data.answers,
     });
   });
 
@@ -226,7 +228,7 @@ export async function createDirectRegistration(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
+  await assertMayReserve(data.studentId, sess.id, data.lines);
   await assertSchoolFeeGate(data.studentId, eligibility);
 
   const now = new Date();
@@ -235,7 +237,7 @@ export async function createDirectRegistration(
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
     return reserveLines(tx, {
       studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment',
-      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility, declaredBy: 'family', channel: 'app',
+      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility, declaredBy: 'family', channel: 'app', answers: data.answers,
     });
   });
 
@@ -293,11 +295,9 @@ export async function approveRegistrationRequest(
     await assertMayRegisterFor(studentId, sessionId);
   }
 
-  // The window must be open for the student — the same rule the request
-  // passed (a deadline extension counts). Checked against the session's
-  // status alone, a request made under an extension after the close could
-  // never be approved (state audit ST-07, MO-20).
-  for (const r of regs) await assertWindowOpen(r.studentId, r.sessionId, r);
+  // Approving needs mayReserve (§6): the same rule the request passed (a G4 later reserve date counts, ST-07,
+  // MO-20), per line — her dates for its subject and row, never past its board deadline.
+  for (const r of regs) await assertMayReserveLine(r);
 
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
   for (const studentId of studentIds) {
@@ -586,7 +586,7 @@ export async function adminOverrideApproval(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
+  await assertMayReserve(data.studentId, sess.id, data.lines);
   // CORE-003: the override bypasses parent approval (REG-007), not the grade-10 core rule:
   // assertLineRules counts the student's live lines with these (gate.grade10Core). The
   // school-fee gate applies too (a fee waiver is the sanctioned way past it).

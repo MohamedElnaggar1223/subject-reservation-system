@@ -21,7 +21,7 @@ import type { PreregisterRegistrationType } from '@repo/validations';
 import { assertSchoolFeeGate } from './registration.services';
 import { reserveLines } from './reservation.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
-import { effectiveDeadlineFor, linesKeptByLateEntry } from './deadline.services';
+import { effectiveDeadlineFor } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
 import { refundFor } from './refund.services';
@@ -43,43 +43,20 @@ async function validateParentStudentLink(parentId: string, studentId: string): P
   return !!link;
 }
 
+/** C4 (COORDINATOR_REWORK.md): a draft is invisible to families — no preregistration; a session takes reservations once it opens. */
+export const PREREGISTRATION_GONE_REFUSAL = 'Reservations open when the session opens: a session that is not open yet takes none';
+
 /**
- * Parent creates preregistrations against a draft session.
+ * Parent creates preregistrations against a draft session — refused since the coordinator rework (C4): a draft is
+ * invisible to families. The rest of this module (capture at opening, the held wallet) stays for preregistrations
+ * made before it, out of the reservation path.
  */
-export async function createPreregistration(parentId: string, data: PreregisterRegistrationType) {
+export async function createPreregistration(parentId: string, data: PreregisterRegistrationType): Promise<Awaited<ReturnType<typeof reserveLines>>> {
   const linked = await validateParentStudentLink(parentId, data.studentId);
   if (!linked) throw new Error('You are not linked to this student');
-
-  // F0a: call site 11 of mayRegisterFor — a preregistration is for a series
-  // the student may sit (a grade-10 student preregisters only for June).
-  const eligibility = await assertMayRegisterFor(data.studentId, data.sessionId);
-
-  const sess = await db.query.registrationSession.findFirst({
-    where: (s, { eq }) => eq(s.id, data.sessionId),
-  });
-  if (!sess) throw new Error('Session not found');
-  if (sess.status !== 'draft') {
-    throw new Error('Preregistration is only available for upcoming (not-yet-open) sessions');
-  }
-
-  // The school-fee gate, then the lines (reservation.services reserveLines, with both consents
-  // on the app channel); past a line's deadline nothing more can be entered (MO-10, per line).
-  // The price locks now (D-E).
-  await assertSchoolFeeGate(data.studentId, eligibility);
-  const now = new Date();
-  // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
-  return db.transaction(async (tx) => {
-    await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return reserveLines(tx, {
-      studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'preregistered',
-      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility, declaredBy: 'family', channel: 'app',
-    });
-  });
+  throw new Error(PREREGISTRATION_GONE_REFUSAL);
 }
 
-/**
- * Is this prereg funded? (a completed payment covers it)
- */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
@@ -215,44 +192,6 @@ async function settlePreregistrationAtDeadline(
   await logAction(null, 'PREREG_REFUNDED_AT_DEADLINE', 'registration', reg.id, { status: 'preregistered' },
     { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: 100, gated: drop.gated }, undefined, tx);
   return { refunded: drop.refundAmount, gated: drop.gated };
-}
-
-/**
- * A session still in draft when a line's deadline passes never opens for it (the scheduler will
- * not open the series' items, and the board takes no more entries), so its preregistrations in
- * that series past their deadline are settled as MO-21 says (settlePreregistrationAtDeadline).
- * Run by the deadline sweep for such a series; idempotent (only rows still preregistered move).
- */
-export async function refundPreregistrationsAtDeadline(sessionId: string, boardSeriesId: string, now: Date = new Date()) {
-  // Only the preregistrations entered in that series whose own deadline has passed (a late board
-  // entry, Q-20, keeps its student's to its own date).
-  const kept = await linesKeptByLateEntry(db, boardSeriesId, now);
-  const preregs = await db.select({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, priceAtRegistration: registration.priceAtRegistration })
-    .from(registration)
-    .where(and(
-      eq(registration.sessionId, sessionId), eq(registration.boardSeriesId, boardSeriesId), eq(registration.status, 'preregistered'),
-      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}, ${registration.declarationRejected}) <= ${now}`,
-      kept.length ? notInArray(registration.id, kept) : undefined,
-    ));
-
-  const outcomes: { studentId: string; subjectId: string; refunded: number; gated: boolean }[] = [];
-  for (const reg of preregs) {
-    try {
-      const outcome = await db.transaction(async (tx) => {
-        // The receipt before the row (MA-16's order): the settlement may drop it on the receipt-gated path.
-        await lockReceiptOf(tx, reg.id);
-        const [row] = await tx.select({ status: registration.status }).from(registration).where(eq(registration.id, reg.id)).for('update');
-        if (row?.status !== 'preregistered') return undefined;
-        const r = await settlePreregistrationAtDeadline(tx, reg);
-        // The sweep closes open payments first; one still open waits for the next tick.
-        return r === 'open' ? undefined : r;
-      });
-      if (outcome) outcomes.push({ studentId: reg.studentId, subjectId: reg.subjectId, ...outcome });
-    } catch (err) {
-      logger.error(`[prereg] Deadline refund failed for registration ${reg.id}:`, err);
-    }
-  }
-  return outcomes;
 }
 
 /**

@@ -39,6 +39,7 @@ import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 import { upsertEnrolments, lineEnrolmentUnits, groupFollowNotices, type EnrolmentRowInput } from './enrolment.services';
 import { cellsOfAvailability, kindOfLegacy, NO_CELLS, LIVE_LINE_STATUSES as LIVE } from './setup/model';
+import { OLD_GRID_SHARES } from './pricing.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -1619,9 +1620,8 @@ export async function listOffers(sessionId: string) {
       warnings,
     };
   });
-  const [selfStudyCoursePercent, retakeTaughtCoursePercent, onePaperCoursePercent] = await Promise.all([
-    getSetting('pricing.selfStudyCoursePercent'), getSetting('pricing.retakeTaughtCoursePercent'), getSetting('pricing.onePaperCoursePercent'),
-  ]);
+  // The old Session screen's shares (its rows priced the old way: the settings' defaults, which left with P1b).
+  const { selfStudyCoursePercent, retakeTaughtCoursePercent, onePaperCoursePercent } = OLD_GRID_SHARES;
   // The deadlines line under the header: every attached series with its dates (§4.2).
   const links = await db.select({ series: boardSeries }).from(sessionBoardSeries).innerJoin(boardSeries, eq(boardSeries.id, sessionBoardSeries.boardSeriesId))
     .where(eq(sessionBoardSeries.sessionId, sessionId));

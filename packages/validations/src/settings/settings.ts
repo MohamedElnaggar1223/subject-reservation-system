@@ -23,6 +23,7 @@ import {
   SelfStudyRuleSchema, SELF_STUDY_RULES, SELF_STUDY_RULE_LABELS, CarryForwardReadingSchema, CARRY_FORWARD_READINGS, CARRY_FORWARD_LABELS,
 } from '../import/import.validations';
 import { RefundPolicySchema, DEFAULT_REFUND_POLICIES } from '../session/session.validations';
+import { DECLARATION_TEXT } from '../registration/reservation.validations';
 
 export type SettingGroup = 'school' | 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification' | 'exams' | 'reminders' | 'import';
 
@@ -68,21 +69,6 @@ export const ExamCentresSchema = z.record(
 );
 export type ExamCentres = z.infer<typeof ExamCentresSchema>;
 
-const percentSetting = (label: string, description: string, def: number, source?: string) =>
-  defineSetting({
-    schema: z.number().min(0).max(100),
-    default: def,
-    group: 'pricing',
-    label,
-    description,
-    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
-    ...(source ? { source } : {}),
-    input: 'number',
-    min: 0,
-    max: 100,
-    unit: 'percent',
-  });
-
 function defineSetting<S extends z.ZodTypeAny>(d: SettingDefinition<S>): SettingDefinition<S> {
   return d;
 }
@@ -105,16 +91,17 @@ export const SETTINGS = {
     editableBy: [ROLES.ADMIN],
     input: 'text',
   }),
-  'eligibility.graduateRetakes': defineSetting({
-    schema: z.boolean(),
-    default: true,
-    group: 'eligibility',
-    label: 'Graduates may retake after grade 12',
+  // The coordinator rework (COORDINATOR_REWORK.md C8): the declaration families tick with the refund policy, one
+  // school-wide text the admin edits; each consent snapshots the text it was given (registration_consent).
+  'reservation.declarationText': defineSetting({
+    schema: z.string().trim().min(10, 'The declaration is a sentence the family agrees to').max(1000),
+    default: DECLARATION_TEXT,
+    group: 'school',
+    label: 'The declaration families agree to',
     description:
-      'A student who has finished grade 12 may still register for the October, November and January series of the academic year right after it (retakes to improve grades), never the June after it. Turning this off expires the waiting registrations graduates already made for those series.',
+      'Ticked by every family, with the refund policy, when they reserve (and read and signed at the desk). Changing it changes what families agree to from then on; a consent already given keeps the text it was given.',
     editableBy: [ROLES.ADMIN],
-    source: 'A-12',
-    input: 'boolean',
+    input: 'text',
   }),
   'schoolFee.graduatesExempt': defineSetting({
     schema: z.boolean(),
@@ -196,75 +183,18 @@ export const SETTINGS = {
     input: 'choice',
     choices: CARRY_FORWARD_READINGS.map((r) => ({ value: r, label: CARRY_FORWARD_LABELS[r] })),
   }),
-  // Reservations rework (RESERVATIONS_REWORK.md §3.4): the pricing policies priceLine reads.
-  // Each can be lifted for one family by an exception (C's registry).
-  'pricing.selfStudyCoursePercent': percentSetting(
-    'Self-study: share of the course fee',
-    'A self-study line pays this share of the school\'s course fee ("Self Study 50% School fees" on every form).',
-    50, 'A-16',
-  ),
-  'pricing.selfStudyBoardPercent': percentSetting(
-    'Self-study: share of the board fee',
-    'A self-study line pays this share of the board\'s fee. The forms halve the "School fees" only, so the board fee is paid in full by default (A-16, question Q-12 to the admin).',
-    100, 'Q-12',
-  ),
-  'pricing.retakeTaughtCoursePercent': percentSetting(
-    'Retake in school: share of the course fee',
-    'A retake taught again in school pays this share of the course fee ("Retake in School 100%").',
-    100,
-  ),
-  'pricing.onePaperCoursePercent': percentSetting(
-    'One-paper retake: share of its own course fee',
-    'Scales the course fee the school sets for a one-paper retake item (Paper 4 only, 1H only…).',
-    100, 'Q-13',
-  ),
-  'pricing.payOnProvisionalFee': defineSetting({
-    schema: z.boolean(),
-    default: false,
-    group: 'pricing',
-    label: 'Take payment while a board fee is provisional',
-    description:
-      'Off: a line whose board fee is still provisional (copied from an earlier series, or typed before the board publishes) can be reserved but not paid; the checkout and the desk say "board fee provisional, confirmed before payment". On: it can be paid at the provisional price, and a later difference is a price adjustment by finance.',
-    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
-    input: 'boolean',
-  }),
   'payment.graceDays': defineSetting({
     schema: z.number().int().min(0).max(60),
     default: 7,
     group: 'payment',
     label: 'Days to pay a line reserved late',
     description:
-      'A line reserved after its session\'s payment due date is due this many days after it is reserved; a line whose board fee is provisional, this many days after the fee is confirmed. Never later than its series\' deadline.',
+      'A line reserved after its session\'s payment due date is due this many days after it is reserved; a line reserved before its session\'s prices were final, this many days after they are. Never later than its board\'s deadline.',
     editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
     input: 'number',
     min: 0,
     max: 60,
     unit: 'days',
-  }),
-  // Reservations rework, step C (RESERVATIONS_REWORK.md §3.1, §3.7).
-  'payment.expireOverdueAfterDays': defineSetting({
-    schema: z.number().int().min(0).max(365),
-    default: 0,
-    group: 'payment',
-    label: 'Expire an unpaid line this many days after it was due',
-    description:
-      'A line still unpaid this many days after its due date expires (reason "overdue"), and an instalment plan on it is settled as a drop that day. 0: never — a due date then drives reminders and the "overdue" list only, and the line waits for its board\'s deadline or the session\'s close.',
-    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
-    input: 'number',
-    min: 0,
-    max: 365,
-    unit: 'days',
-  }),
-  'exceptions.boardEntryDeadline': defineSetting({
-    schema: z.boolean(),
-    default: false,
-    group: 'exceptions',
-    label: 'Allow late board entries by exception',
-    description:
-      'Off: the board\'s entry deadline is a hard stop (owner decision MO-10) and the "Late board entry" exception cannot be granted. On: the admin may grant one student a late entry in one series, with the board\'s late fee charged to the family (question Q-20 to the owner).',
-    editableBy: [ROLES.ADMIN],
-    source: 'Q-20',
-    input: 'boolean',
   }),
   'refund.defaultPolicy.june': defineSetting({
     schema: RefundPolicySchema,
@@ -287,22 +217,6 @@ export const SETTINGS = {
     editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
     source: 'Q-11',
     input: 'refundPolicy',
-  }),
-  // Reservations rework, step B (RESERVATIONS_REWORK.md §3.5; DISCOVERY.md Q-22, default (a)).
-  'verification.unverifiedAtDeadline': defineSetting({
-    schema: z.enum(['enter_as_declared', 'hold']),
-    default: 'enter_as_declared',
-    group: 'verification',
-    label: 'A declared sitting still unverified at its deadline',
-    description:
-      'A family (or the desk) may declare the sitting a retake follows; the coordinator verifies it on the session\'s To verify tab. "Enter as declared": the form trusts the family — the line is entered and the entry check lists it as declared, unverified. "Hold": at the line\'s deadline a line awaiting payment expires, and a paid one is dropped with that day\'s refund (the paper receipt comes back first).',
-    editableBy: [ROLES.ADMIN],
-    source: 'Q-22',
-    input: 'choice',
-    choices: [
-      { value: 'enter_as_declared', label: 'Enter as declared' },
-      { value: 'hold', label: 'Hold: expire or drop at the deadline' },
-    ],
   }),
   // F4: the school as an exam centre.
   'exams.centres': defineSetting({

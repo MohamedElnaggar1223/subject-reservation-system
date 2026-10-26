@@ -842,7 +842,7 @@ export async function notifyPaymentReferenceDue(paymentId: string) {
   const pay = await db.query.payment.findFirst({ where: (p, { eq: eqOp }) => eqOp(p.id, paymentId), columns: { referenceDueAt: true } });
   const due = pay?.referenceDueAt ? schoolDateTime(pay.referenceDueAt) : 'the time allowed';
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_REFERENCE_DUE', 'Submit your InstaPay reference', (c) =>
-    `The registration window for ${c.sessionName} has closed. You started an InstaPay payment of ${c.amount} for ${c.studentName} (${c.subjects}). ` +
+    `The last day to pay for ${c.subjects} (${c.sessionName}) has passed. You started an InstaPay payment of ${c.amount} for ${c.studentName}. ` +
     `If you have transferred the money, submit the transaction reference by ${due}; the subjects stay reserved until then. ` +
     `If no reference arrives by then, the payment is cancelled and the subjects are released.`
   );
@@ -852,7 +852,7 @@ export async function notifyPaymentReferenceDue(paymentId: string) {
 export async function notifyPaymentExpired(paymentId: string, escrowReturned: number) {
   const escrowNote = escrowReturned > 0 ? ` ${formatEgp(escrowReturned)} paid from the balance has been returned to it.` : '';
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'InstaPay payment not completed', (c) =>
-    `No transfer reference was submitted for the InstaPay payment of ${c.amount} for ${c.studentName} (${c.subjects}) in the time allowed after the ${c.sessionName} window closed, ` +
+    `No transfer reference was submitted for the InstaPay payment of ${c.amount} for ${c.studentName} (${c.subjects}) in the time allowed after the last day to pay, ` +
     `so the payment was cancelled and the subjects were released.${escrowNote} If you did transfer, contact the finance desk with your bank receipt.`
   );
 }

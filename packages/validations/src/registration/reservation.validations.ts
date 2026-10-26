@@ -52,6 +52,19 @@ export const ReservationLines = z
   .max(30, 'Cannot reserve more than 30 items at once')
   .refine((ls) => new Set(ls.map((l) => l.offerItemId)).size === ls.length, { message: 'Each item once' });
 
+// ─── Extra questions (the coordinator rework D13) ─────────────────────────────
+
+/**
+ * A family's answers to the session's and the subjects' extra questions (COORDINATOR_REWORK.md D13, Appendix A):
+ * yes/no ('yes' | 'no'), a short text, or one of the choices. They never affect a price or who may reserve; they go
+ * into the reservations read and its spreadsheet. One answer per question per student (a later one replaces it).
+ */
+export const ReservationAnswers = z
+  .array(z.object({ questionId: z.string().min(1), value: z.string().trim().min(1, 'Answer the question').max(500) }))
+  .max(40)
+  .refine((as) => new Set(as.map((a) => a.questionId)).size === as.length, { message: 'Each question once' });
+export type ReservationAnswersType = z.infer<typeof ReservationAnswers>;
+
 // ─── Consent (§3.5, G-20) ────────────────────────────────────────────────────
 
 /**

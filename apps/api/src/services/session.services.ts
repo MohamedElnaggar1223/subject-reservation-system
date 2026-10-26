@@ -298,6 +298,9 @@ export async function createSession(data: LegacyCreateSession, actorId: string, 
           paymentDueAt: data.paymentDueAt,
           refundPolicy,
           status: initialStatus,
+          // A legacy dated session keeps the old eligibility (P1b): grade 10 sat June only, graduates the
+          // winter series after grade 12 (A-12 on) — as the session's grade list (D11).
+          allowedGrades: data.type === 'june' ? ['10', '11', '12'] : ['11', '12', 'graduates'],
           editHistory: [],
         })
         .returning();
@@ -557,230 +560,80 @@ export async function activateSession(id: string) {
 // (series.services.ts updateBoardSeries), no longer on the window.
 
 /**
- * Finalize all pending records when a session closes.
+ * What a session's close does (the coordinator rework, COORDINATOR_REWORK.md §6, §9.2): closing stops new lines,
+ * never payment of a line that is waiting. Called from the manual close (the Accepting switch) and the automatic
+ * one; idempotent, finished by the scheduler's recovery sweep when it fails halfway (ST-06).
  *
- * Called from both manual close and auto-close paths.
- * 1. unpaid checkouts ('pending' payments) on this session → failed, escrow
- *    back — except InstaPay checkouts, which get INSTAPAY_REFERENCE_GRACE_HOURS
- *    (never past the board's entry deadline) to submit their reference: the
- *    family may have transferred just before the close (owner decision MO-10)
- * 2. pending_approval and pending_payment registrations → expired, except those
- *    held by a transfer awaiting verification ('pending_verification') or by an
- *    InstaPay checkout still in its grace period: the family may already have
- *    sent that money, so finance confirms or rejects it after the close
- *    (money audit MA-01)
- * 3. pending_approval change requests for registrations in this session → rejected with system comment
- * 4. any 'pending' payment left on an expired registration (a checkout started
- *    while the close ran) → failed, escrow back
+ * 1. A request awaiting a parent's approval (`pending_approval`) that existed at the close expires
+ *    (`session_closed`): approving it needs mayReserve (§6), which the close takes away.
+ * 2. A pending swap request on a line of this session is rejected: the swap makes a new line, so it needs the
+ *    session to take reservations. A pending drop request stands: a drop stays open after the close until the
+ *    entry is sent (F4).
+ * 3. Each student whose requests expired is told which.
  *
- * A grace period that ends with no reference, and the board's entry deadline,
- * are enforced afterwards by enforcePaymentDeadlines (payment.services.ts).
- *
- * Returns counts of affected records.
+ * Lines waiting for payment, and the checkouts and transfers on them, are left alone: they are payable until
+ * their cut-off, where the cut-off sweep ends an unfinished card or pay-at-school checkout and gives an InstaPay
+ * checkout its time for its reference (overdue.services.ts). Returns counts of affected records.
  */
 export async function finalizePendingRecords(sessionId: string): Promise<{
   expiredRegistrations: number;
   rejectedChangeRequests: number;
 }> {
   const now = new Date();
-  // Only what existed when the window closed. A finalisation that runs late
-  // (the recovery sweep, after a failure) must not expire what a student with
-  // a deadline extension registered or checked out since the close (review of
-  // the state audit, flag 3).
-  // "Existed at the close" is judged in the database, against the stored
-  // closed_at, by the database's own clock (ST-15). A row's created_at comes
-  // from Postgres; compared with a time taken in the API (or read back into
-  // JavaScript, which drops the microseconds), a drifting clock put a checkout
-  // made just before the close after it, and the close then skipped or failed it.
+  // Only what existed when the session closed, judged in the database against the stored closed_at by the
+  // database's own clock (ST-15): a request made since under a G4 later reserve date is not expired.
   const closedAt = sql`coalesce((select ${registrationSession.closedAt} from ${registrationSession} where ${registrationSession.id} = ${sessionId}), now())`;
-  const graceEnds = now.getTime() + env.INSTAPAY_REFERENCE_GRACE_HOURS * 60 * 60 * 1000;
-  // Never past the checkout's deadline — the earliest effective deadline of the lines it
-  // covers (a qualifying retake's is its series' retake deadline; §3.3).
-  const referenceDueFor = async (paymentId: string) => {
-    const [row] = await db.execute(sql`
-      select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)) as deadline
-      from payment_registration pr join registration r on r.id = pr.registration_id
-      where pr.payment_id = ${paymentId}`).then((r) => r.rows as { deadline: string | Date | null }[]);
-    const deadline = row?.deadline ? new Date(row.deadline).getTime() : Infinity;
-    return new Date(Math.min(graceEnds, deadline));
-  };
 
-  // 1. Unpaid checkouts first. An InstaPay one keeps its registrations until
-  //    referenceDueAt (kept even if it already had a due date from another
-  //    session's close). Anything else fails; failPayment moves only 'pending'
-  //    payments, so one whose reference arrives in the meantime is left alone,
-  //    and step 2 then sees it and keeps its registrations.
-  const unpaid = await db
-    .selectDistinct({ id: payment.id, method: payment.paymentMethod })
-    .from(payment)
-    .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
-    .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
-    .where(and(
-      eq(registration.sessionId, sessionId), eq(registration.status, 'pending_payment'), eq(payment.status, 'pending'),
-      lte(payment.createdAt, closedAt),
-    ));
-  const heldForReference: string[] = [];
-  // Registrations a failed checkout expired itself (the window is closed), so
-  // the per-student notice below still names them.
-  const expiredWithPayment: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
-  for (const p of unpaid) {
-    try {
-      const referenceDueAt = await referenceDueFor(p.id);
-      if (p.method === 'instapay' && referenceDueAt > now) {
-        // Kept only while the time it is kept until lies ahead: a due time an
-        // earlier close already set (a checkout spanning two sessions) stays,
-        // and one that has already passed means it fails here instead of
-        // telling the family to submit by a time already gone.
-        const [kept] = await db
-          .update(payment)
-          .set({ referenceDueAt: sql`coalesce(${payment.referenceDueAt}, ${referenceDueAt})`, updatedAt: now })
-          .where(and(
-            eq(payment.id, p.id),
-            eq(payment.status, 'pending'),
-            sql`(${payment.referenceDueAt} is null or ${payment.referenceDueAt} > ${now})`,
-          ))
-          .returning({ id: payment.id });
-        if (kept) {
-          heldForReference.push(kept.id);
-          continue;
-        }
-      }
-      const r = await failPayment(p.id, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
-      expiredWithPayment.push(...(r?.expired ?? []));
-    } catch (err) {
-      console.error(`[session:finalize] Failed to settle payment ${p.id} at close:`, err);
-    }
-  }
-
-  // 2. Expire pending_approval and pending_payment registrations for this session,
-  // except those held by a transfer awaiting verification or by an InstaPay
-  // checkout still inside its grace period.
-  // Return enough data to notify each affected student individually afterward
-  // (SES-004: "Students/parents notified of early closure" and H-16:
-  // students whose swap-generated pending_payment expires must know their
-  // new subject didn't go through — even though they still have the escrow
-  // credit from the original drop).
-  // Each expired row and its audit row commit together (SO-1).
+  // 1. Requests awaiting a parent's approval. Each expired row and its audit row commit together (SO-1).
   const expiredRegs = await db.transaction((tx) => expireWaitingRegistrations(tx,
-    and(
-      eq(registration.sessionId, sessionId),
-      lte(registration.createdAt, closedAt),
-      sql`not exists (
-        select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
-        where pr.registration_id = ${registration.id}
-          and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
-      )`,
-      // A plan line whose last instalment's transfer is being checked is spared too (§3.6).
-      sql`not ${lastInstalmentBeingCheckedSql(registration.id, now)}`,
-    ),
+    and(eq(registration.sessionId, sessionId), eq(registration.status, 'pending_approval'), lte(registration.createdAt, closedAt)),
     'session_closed', now));
 
-  // 3. Reject all pending_approval change requests for registrations in this session
-  // First, get all registration IDs belonging to this session
-  const sessionRegs = await db.query.registration.findMany({
-    where: (r, { eq: eqOp }) => eqOp(r.sessionId, sessionId),
-    columns: { id: true },
+  // 2. Pending swap requests on this session's lines (a drop request stands).
+  const rejectedCRs = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(changeRequest)
+      .set({
+        status: 'rejected',
+        comments: '[SYSTEM] Automatically rejected — the session stopped taking reservations, so the swap cannot be made.',
+        processedAt: now,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(changeRequest.status, 'pending_approval'),
+        eq(changeRequest.type, 'swap'),
+        inArray(changeRequest.registrationId, db.select({ id: registration.id }).from(registration).where(eq(registration.sessionId, sessionId))),
+      ))
+      .returning({ id: changeRequest.id });
+    await logActions(rows.map((r) => ({
+      userId: null, action: 'CHANGE_REQUEST_REJECTED' as const, entityType: 'change_request' as const, entityId: r.id,
+      previousData: { status: 'pending_approval' }, newData: { status: 'rejected', reason: 'session_closed' },
+    })), tx);
+    return rows;
   });
-  const sessionRegIds = sessionRegs.map((r) => r.id);
 
-  let rejectedCRs: { id: string }[] = [];
-  if (sessionRegIds.length > 0) {
-    rejectedCRs = await db.transaction(async (tx) => {
-      const rows = await tx
-        .update(changeRequest)
-        .set({
-          status: 'rejected',
-          comments: '[SYSTEM] Automatically rejected — registration session closed.',
-          processedAt: now,
-          updatedAt: now,
-        })
-        .where(
-          and(
-            inArray(changeRequest.registrationId, sessionRegIds),
-            eq(changeRequest.status, 'pending_approval'),
-          )
-        )
-        .returning({ id: changeRequest.id });
-      await logActions(rows.map((r) => ({
-        userId: null, action: 'CHANGE_REQUEST_REJECTED' as const, entityType: 'change_request' as const, entityId: r.id,
-        previousData: { status: 'pending_approval' }, newData: { status: 'rejected', reason: 'session_closed' },
-      })), tx);
-      return rows;
-    });
-  }
-
-  // 4. A checkout started while the close ran can still be 'pending' on a
-  // now-expired registration; fail it so its escrow comes back.
-  const expiredRegIds = expiredRegs.map((r) => r.id);
-  if (expiredRegIds.length > 0) {
-    const pendingPaymentLinks = await db.query.paymentRegistration.findMany({
-      where: (pr, { inArray: inArr }) => inArr(pr.registrationId, expiredRegIds),
-      with: {
-        payment: { columns: { id: true, status: true } },
-      },
-    });
-
-    const pendingPaymentIds = [
-      ...new Set(pendingPaymentLinks.filter((pl) => pl.payment.status === 'pending').map((pl) => pl.payment.id)),
-    ];
-
-    for (const pid of pendingPaymentIds) {
-      try {
-        const r = await failPayment(pid, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
-        expiredWithPayment.push(...(r?.expired ?? []));
-      } catch (err) {
-        console.error(`[session:finalize] Failed to fail payment ${pid}:`, err);
-      }
-    }
-  }
-
-  // MO-10: a family whose InstaPay checkout survived the close is told how
-  // long they have to submit the transfer reference.
-  for (const paymentId of heldForReference) {
-    await notifyPaymentReferenceDue(paymentId)
-      .catch((err) => console.error(`[session:finalize] Reference-due notice for ${paymentId} failed:`, err));
-  }
-
-  // SES-004 / H-16: Per-student notification for each expired registration.
-  // The existing session-closed blast tells everyone "the window closed";
-  // this focused notification tells each affected student exactly WHICH of
-  // THEIR registrations didn't go through, so a student who swapped then
-  // never paid understands why the new subject is gone (the escrow credit
-  // from the original drop remains on their account).
-  // This session's only: another session's registration a two-session
-  // checkout released is not "pending for" this one.
-  const notifyExpired = [...expiredRegs, ...expiredWithPayment.filter((r) => r.sessionId === sessionId)];
-  if (notifyExpired.length > 0) {
+  // 3. Each student told which of their requests did not go through.
+  if (expiredRegs.length > 0) {
     try {
-      const subjectIds = [...new Set(notifyExpired.map((r) => r.subjectId))];
+      const subjectIds = [...new Set(expiredRegs.map((r) => r.subjectId))];
       const subjects = await db.query.subject.findMany({
         where: (s, { inArray: inArr }) => inArr(s.id, subjectIds),
         columns: { id: true, name: true },
       });
       const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
-
       const sessionRow = await db.query.registrationSession.findFirst({
         where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
         columns: { name: true },
       });
       const sessionName = sessionRow?.name ?? 'the session';
-
-      // Group expired registrations per student so each student gets a
-      // single notification rather than one per subject.
       const byStudent = new Map<string, string[]>();
-      for (const r of notifyExpired) {
-        const name = subjectNameById.get(r.subjectId) ?? 'a subject';
-        const arr = byStudent.get(r.studentId) ?? [];
-        arr.push(name);
-        byStudent.set(r.studentId, arr);
-      }
-
+      for (const r of expiredRegs) byStudent.set(r.studentId, [...(byStudent.get(r.studentId) ?? []), subjectNameById.get(r.subjectId) ?? 'a subject']);
       for (const [studentId, subjectNames] of byStudent) {
         await createNotification(
           studentId,
           'SESSION_CLOSED',
-          `Your pending registrations for ${sessionName} were not completed`,
-          `The registration window for ${sessionName} has closed. The following pending registration(s) were not completed and have been expired: ${subjectNames.join(', ')}. Your balance with the school is unaffected.`,
+          `Your requests for ${sessionName} were not approved in time`,
+          `${sessionName} stopped taking reservations before a parent approved these requests, so they have expired: ${subjectNames.join(', ')}. Subjects already reserved and waiting for payment can still be paid until their last day to pay.`,
           { sessionId, sessionName, subjectNames, reason: 'session_closed' }
         );
       }
@@ -792,10 +645,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   // Finished: the scheduler's recovery sweep leaves this session alone now.
   await db.update(registrationSession).set({ finalizedAt: new Date() }).where(eq(registrationSession.id, sessionId));
 
-  return {
-    expiredRegistrations: notifyExpired.length,
-    rejectedChangeRequests: rejectedCRs.length,
-  };
+  return { expiredRegistrations: expiredRegs.length, rejectedChangeRequests: rejectedCRs.length };
 }
 
 /**
@@ -891,26 +741,18 @@ export async function recoverSessionTransitions() {
 }
 
 /**
- * Auto-close all sessions whose endDate has passed.
+ * Close every open session whose optional close date (`end_date`) has passed (C4: "an optional automatic close
+ * date"). Called by the session-closer job every minute. Nothing opens automatically (C4): a session opens by its
+ * Accepting switch alone.
  *
- * Called by the session-closer job every minute.
- * Also auto-activates draft sessions whose startDate has arrived,
- * as long as no other active session of the same type exists.
- *
- * Returns the number of sessions closed and activated, plus the
- * details of newly-activated sessions so the scheduler can fire
- * NOT-001 (session opened) notifications.
+ * Returns the sessions closed, for their finalisation and the closure notifications.
  */
 export async function autoManageSessions(): Promise<{
   closed: number;
   closedSessions: { id: string; name: string; sessionType: string }[];
-  activated: number;
-  activatedSessions: { id: string; name: string; sessionType: string; endDate: Date | null }[];
 }> {
   const now = new Date();
-
-  // Close expired active sessions (no grade moves at a close since F0a: a grade is derived from
-  // the cohort and the series' academic year).
+  // No grade moves at a close since F0a (a grade is derived from the cohort and the series' academic year).
   const closedResult = await db
     .update(registrationSession)
     .set({ status: 'closed', closedAt: sql`now()`, updatedAt: now })
@@ -921,55 +763,5 @@ export async function autoManageSessions(): Promise<{
       )
     )
     .returning({ id: registrationSession.id, name: registrationSession.name, sessionType: registrationSession.sessionType });
-
-  // Activate draft sessions whose startDate has arrived — never one whose reserving has already
-  // ended: opening it would close it on the next tick. A session whose series' deadline has passed
-  // still opens (the reservations rework, §3.3: the cut-off is per item): capture asks each
-  // preregistration its own deadline first, so nothing is captured for an entry the board no
-  // longer takes (MO-21: a paid one is refunded in full, an unfunded one expires).
-  // One at a time, for the one-active-session rule per (type, year, label).
-  const draftsDue = await db.query.registrationSession.findMany({
-    where: (s, { eq, lte, gt, and }) =>
-      and(eq(s.status, 'draft'), lte(s.startDate, now), gt(s.endDate, now)),
-    // name + endDate included so the scheduler can use them for NOT-001 notifications
-    columns: { id: true, sessionType: true, seriesYear: true, label: true, name: true, endDate: true },
-    orderBy: (s, { asc }) => [asc(s.startDate)],
-  });
-
-  let activatedCount = 0;
-  const activatedSessions: { id: string; name: string; sessionType: string; endDate: Date | null }[] = [];
-
-  for (const draft of draftsDue) {
-    const conflict = await hasActiveSessionOfType(draft.sessionType, draft.seriesYear, draft.label);
-    if (!conflict) {
-      // Only a draft still in draft: an admin may have activated (or
-      // activated and closed) it since the read. A clash with a session
-      // opened meanwhile skips this draft rather than aborting the tick after
-      // the closes above have committed (state audit ST-06).
-      const [opened] = await db
-        .update(registrationSession)
-        .set({ status: 'active', updatedAt: now })
-        .where(and(eq(registrationSession.id, draft.id), eq(registrationSession.status, 'draft')))
-        .returning({ id: registrationSession.id })
-        .catch((err) => {
-          console.error(`[session] Could not open ${draft.id}:`, err);
-          return [];
-        });
-      if (!opened) continue;
-      activatedCount++;
-      activatedSessions.push({
-        id:          draft.id,
-        name:        draft.name,
-        sessionType: draft.sessionType,
-        endDate:     draft.endDate,
-      });
-    }
-  }
-
-  return {
-    closed: closedResult.length,
-    closedSessions: closedResult,
-    activated: activatedCount,
-    activatedSessions,
-  };
+  return { closed: closedResult.length, closedSessions: closedResult };
 }

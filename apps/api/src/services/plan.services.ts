@@ -143,13 +143,13 @@ export async function grantPlanInTx(tx: Tx, a: { planId: string; lineId: string;
   }
   const dayStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   if (rows[0]!.dueAt < dayStart) throw new PlanError('The first instalment is not in the past');
-  const [sess] = await tx.select({ endDate: registrationSession.endDate }).from(registrationSession).where(eq(registrationSession.id, line.sessionId));
-  const deadline = await effectiveDeadlineFor(tx, line);
-  const end = sess?.endDate ?? null;
-  const cap = deadline.at && end && deadline.at < end ? deadline.at : end ?? deadline.at;
+  // The last instalment by the line's cut-off (§9.2, not the session's end): a plan makes the line due on its last
+  // instalment (line-exceptions planDueDate), so the cut-off the plan gives it is the earlier of that date + the
+  // session's unpaid-cancel days and the line's board deadline — the last instalment falls by the board deadline.
+  const cap = (await effectiveDeadlineFor(tx, line)).at;
   const last = rows[rows.length - 1]!.dueAt;
   if (cap && last > cap) {
-    throw new PlanError(`The last instalment is due by ${schoolDate(cap)} at the latest (the earlier of the session's end and the line's deadline)`);
+    throw new PlanError(`The last instalment is due by ${schoolDate(cap)} at the latest (the line's last day to pay: its board's deadline)`);
   }
 
   const name = await subjectNameOf(tx, a.lineId);
