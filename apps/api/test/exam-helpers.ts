@@ -47,7 +47,7 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
   const level = 'as_level' as const;
 
   // ─── The catalogue ────────────────────────────────────────────────────────
-  const cat = coordinator.api.v1.catalogue;
+  const cat = adm.api.v1.catalogue;
   const cSyllabus = await apiResponse(cat.qualifications.$post({ json: {
     boardCode: 'cambridge', code: `${T}97`, title: `Biology ${T}`, level, suite: 'Cambridge International AS & A Level',
     subjectArea: `Biology ${T}`, entryMethod: 'syllabus_option',

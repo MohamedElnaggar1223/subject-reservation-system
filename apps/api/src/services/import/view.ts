@@ -39,8 +39,7 @@ import { schoolFeeGateReason } from '../school-fee.services';
 import { findOffer, findItem, findItemsByCode, namedCodes, findOrCreateSeries, availabilityConstraints, OfferError } from '../offer.services';
 import { priceLine, PricingError } from '../pricing.services';
 import { assertLineRules, LineRuleError, type RuleLine } from '../line-rules.services';
-import { effectiveDeadlineFor, deadlinePassedSentence } from '../deadline.services';
-import { sessionWindow, windowRefusal, schoolDate } from '../window.services';
+import { mayReserveRow, schoolDate } from '../window.services';
 import { lineExceptions } from '../line-exceptions';
 import type { SourceLine, SourceTab } from './source';
 import {
@@ -222,17 +221,16 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   const kind = batch.kind as 'school_sheet' | 'scl_roster' | 'money_record';
   const nowYear = academicYearStartOf();
 
-  const [catalogue, teachers, years, sessions, defaultSelfStudy, defaultCarry, graduateRetakes, reading] = await Promise.all([
+  const [catalogue, teachers, years, sessions, defaultSelfStudy, defaultCarry, reading] = await Promise.all([
     loadCatalogue(),
     db.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(teacher),
     db.select().from(academicYear),
     db.select({
       id: registrationSession.id, name: registrationSession.name, sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear,
-      label: registrationSession.label, status: registrationSession.status,
+      label: registrationSession.label, status: registrationSession.status, allowedGrades: registrationSession.allowedGrades,
     }).from(registrationSession),
     getSetting('import.selfStudyOnTaught'),
     getSetting('import.carryForward'),
-    getSetting('eligibility.graduateRetakes'),
     getSetting('catalogue.levelCodeReading'),
   ]);
   type SessionRow = (typeof sessions)[number];
@@ -956,13 +954,10 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     if (sess.status === 'closed') out.refusals.push(`${sess.name} is closed`);
     else if (!t.seriesId) out.refusals.push(`${t.subjectName} is entered in no board series: it cannot be reserved`);
     else {
-      const win = await sessionWindow(sid ?? NEW_STUDENT, sess.id, { boardSeriesId: t.seriesId, attempt, priorSittingSeriesId: priorId, declarationRejected: false, subjectId: t.subjectId }, db, now, [t.subjectId]);
-      if (!win.open) out.refusals.push(windowRefusal(win, `${sess.name} is not open for reservations`));
-      else {
-        const dl = await effectiveDeadlineFor(db, { boardSeriesId: t.seriesId, attempt, priorSittingSeriesId: priorId, declarationRejected: false, studentId: sid ?? NEW_STUDENT });
-        if (!dl.at) out.refusals.push(`${t.subjectName} is entered in a board series with no entry deadline and no exam dates yet: it opens for reservations once they are set`);
-        else if (dl.at <= now) out.refusals.push(deadlinePassedSentence(dl, schoolDate));
-      }
+      // May reserve (the coordinator rework §6): the session, the subject and the row open (or a G4 later
+      // reserve date), never past the board's deadline.
+      const win = await mayReserveRow(db, { studentId: sid ?? NEW_STUDENT, offerItemId: t.offerItemId, attempt, priorSittingSeriesId: priorId }, now);
+      if (!win.allowed) out.refusals.push(win.message);
     }
     // The price, from the series' fee grid now: a missing row is refused, naming the grid; a provisional one is marked.
     let price: ImportLinePlan['price'] = null;
@@ -1061,8 +1056,8 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
           if (!eligibilityCache.has(eKey)) {
             eligibilityCache.set(eKey, sid ? await mayRegisterFor(sid, sess.id) : judgeEligibility(
               { id: NEW_STUDENT, name: s?.name || 'The student', role: 'student', cohortYear: s?.cohortYear ?? null, leftOn: null, leftKind: null },
-              { id: sess.id, sessionType: sess.sessionType, seriesYear: sess.seriesYear },
-              { graduateRetakes, grade10ExceptionId: null },
+              { id: sess.id, sessionType: sess.sessionType, seriesYear: sess.seriesYear, allowedGrades: sess.allowedGrades },
+              { allowedGrades: sess.allowedGrades, grade10ExceptionId: null },
             ));
           }
           const el = eligibilityCache.get(eKey)!;

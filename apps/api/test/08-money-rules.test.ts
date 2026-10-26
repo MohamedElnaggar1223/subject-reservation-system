@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited, takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler, expireByHand, feedSeries, seriesOfSession, sessionName, runSessionRecovery, type Client, reservationOf, swapTo } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited, takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler, expireByHand, feedSeries, seriesOfSession, sessionName, runSessionRecovery, type Client, reservationOf, swapTo, passCutOff } from './helpers';
+import { schoolDate } from '../src/services/window.services';
 
 /**
  * Money rules (money-correctness audit, MONEY_AUDIT.md, finding ids MA-nn).
@@ -274,7 +275,7 @@ describe('money rules', () => {
       }))).id!;
       await expireByHand(reg);
       const r = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-MR-TOO-LATE' } }));
-      expect(r).toEqual({ status: 400, error: 'The registration window has closed for this payment; it can no longer take a transfer reference.' });
+      expect(r).toEqual({ status: 400, error: 'These subjects are no longer waiting for this payment; it can no longer take a transfer reference.' });
       // Leave nothing open for the invariants: the family cancels it.
       await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
     });
@@ -772,9 +773,13 @@ describe('money rules', () => {
 
   // ─── Closing the window with money in flight ───────────────────────────────
 
-  describe('the registration window closes with money in flight', () => {
+  // The coordinator rework (C10, §6, §10): the close stops new reservations and expires nothing waiting for payment;
+  // an unpaid line expires at its cut-off (its due date + the session's unpaid-cancel days, never past its board
+  // deadline). These cases were "at the close" before P1b; their money outcomes are the same, at the cut-off.
+  describe('the session closes, then the cut-off comes, with money in flight', () => {
     let f: Family, okReg: string, badReg: string, deskReg: string, okPay: string, badPay: string, deskPay: string;
-    let lateRefReg: string, lateRefPay: string, lapseReg: string, lapsePay: string, closedAt: number;
+    let lateRefReg: string, lateRefPay: string, lapseReg: string, lapsePay: string;
+    let cutOffs: Map<string, Date>;
     let artPay: string, musPay: string;
 
     beforeAll(async () => {
@@ -790,36 +795,48 @@ describe('money rules', () => {
       okPay = await init(okReg, 'instapay', 200);
       badPay = await init(badReg, 'instapay', 100);
       deskPay = await init(deskReg, 'in_school', 150);
-      // Two InstaPay checkouts with no reference yet when the window closes.
+      // Two InstaPay checkouts with no reference yet when the cut-off comes.
       lateRefPay = await init(lateRefReg, 'instapay', 0);
       lapsePay = await init(lapseReg, 'instapay', 250);
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: okPay }, json: { reference: 'FT-MR-LASTDAY-1' } }));
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: badPay }, json: { reference: 'FT-MR-LASTDAY-2' } }));
       expect(await escrowOf(f.studentId)).toBe(800);
 
-      closedAt = Date.now();
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: sessionId }, json: { reason: 'money rules: window closes' } }));
     });
 
-    it('an unpaid desk checkout fails at close, its escrow comes back, and the student is told which subject was not completed', async () => {
-      const name = await sessionName(sessionId);
-      expect(await statusOf('payment', deskPay)).toBe('failed');
-      expect(await statusOf('registration', deskReg)).toBe('expired');
-      expect(await escrowOf(f.studentId)).toBe(950);
-      // The checkout expired its own subject; the close's notice still names it (review of fc1a101, flag 3).
-      const notice = await waitFor(async () => (await notificationsFor(f.student.email, 'SESSION_CLOSED'))
-        .find((n) => n.title === `Your pending registrations for ${name} were not completed`) ?? null);
-      expect(notice.body).toContain('Biology (AS, money rules)');
-      expect(notice.body).not.toContain('Physics');
+    it('the close expires nothing waiting for payment: every line and checkout is as it was (C10)', async () => {
+      for (const reg of [okReg, badReg, deskReg, lateRefReg, lapseReg]) expect(await statusOf('registration', reg)).toBe('pending_payment');
+      expect([await statusOf('payment', deskPay), await statusOf('payment', lateRefPay), await statusOf('payment', lapsePay)]).toEqual(['pending', 'pending', 'pending']);
+      expect(await sql(`select 1 from payment where id in ($1, $2) and reference_due_at is not null`, [lateRefPay, lapsePay])).toEqual([]);
+      expect(await escrowOf(f.studentId)).toBe(800);
+      // Nothing is due yet: a sweep before the cut-off changes nothing.
+      const swept = await runPaymentDeadlines();
+      expect(await statusOf('payment', deskPay)).toBe('pending');
+      expect(swept.referencesDueSet).toBe(0);
     });
 
-    it('an InstaPay checkout with no reference yet survives the close for 24 hours, and the family is told (MO-10)', async () => {
+    it('at its cut-off an unpaid desk checkout fails, its escrow comes back, the line expires (cut_off) and the family is told which subject', async () => {
+      cutOffs = await passCutOff([okReg, badReg, deskReg, lateRefReg, lapseReg]);
+      const swept = await runPaymentDeadlines();
+      expect(swept.checkoutsEndedAtCutOff).toBeGreaterThanOrEqual(1);
+      expect(swept.expiredAtCutOff).toBeGreaterThanOrEqual(1);
+      expect(await statusOf('payment', deskPay)).toBe('failed');
+      expect(await statusOf('registration', deskReg)).toBe('expired');
+      expect((await one<{ reason: string }>(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [deskReg])).reason).toBe('cut_off');
+      expect(await escrowOf(f.studentId)).toBe(950);
+      const notice = await waitFor(async () => (await notificationsFor(f.parent.email, 'PAYMENT_EXPIRED'))
+        .find((n) => n.title === 'Biology (AS, money rules) was not paid in time') ?? null);
+      expect(notice.body).toContain('its last day to pay');
+    });
+
+    it('an InstaPay checkout with no reference yet at its cut-off keeps its line for 24 hours more, and the family is told (MO-10)', async () => {
       for (const [pay, reg] of [[lateRefPay, lateRefReg], [lapsePay, lapseReg]] as const) {
         expect(await statusOf('payment', pay)).toBe('pending');
         expect(await statusOf('registration', reg)).toBe('pending_payment');
       }
       const due = new Date((await one<{ due: string }>(`select reference_due_at as due from payment where id = $1`, [lateRefPay])).due).getTime();
-      expect(Math.abs(due - (closedAt + 24 * 60 * 60 * 1000))).toBeLessThan(60 * 1000);
+      expect(Math.abs(due - (cutOffs.get(lateRefReg)!.getTime() + 24 * 60 * 60 * 1000))).toBeLessThan(1000);
       const notices = await notified(f.parent.email, 'PAYMENT_REFERENCE_DUE', 2);
       expect(notices[0]?.body).toContain('submit the transaction reference by');
       await notified(f.student.email, 'PAYMENT_REFERENCE_DUE', 2);
@@ -831,14 +848,14 @@ describe('money rules', () => {
       expect(await statusOf('registration', lateRefReg)).toBe('confirmed');
     });
 
-    it('with no reference by the end of the grace period, the checkout lapses: escrow back, subject released, family told (MO-10)', async () => {
+    it('with no reference by the end of the grace period, the checkout lapses: escrow back, line expired, family told (MO-10)', async () => {
       // An hour before the end nothing happens; after it, the scheduler's sweep lapses it.
       await sql(`update payment set reference_due_at = now() + interval '1 hour' where id = $1`, [lapsePay]);
       await runPaymentDeadlines();
       expect(await statusOf('payment', lapsePay)).toBe('pending');
       await sql(`update payment set reference_due_at = now() - interval '1 minute' where id = $1`, [lapsePay]);
       const late = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: lapsePay }, json: { reference: 'FT-MR-TOO-LATE-2' } }));
-      expect(late.error).toMatch(/^The time to submit a transfer reference after the registration window closed ended on /);
+      expect(late.error).toMatch(/^The time to submit a transfer reference after the last day to pay ended on /);
 
       const swept = await runPaymentDeadlines();
       expect(swept.referencesLapsed).toBeGreaterThanOrEqual(1);
@@ -846,26 +863,29 @@ describe('money rules', () => {
       expect(await statusOf('registration', lapseReg)).toBe('expired');
       expect(await escrowOf(f.studentId)).toBe(1200);
       await audited([lapsePay], ['PAYMENT_FAILED']);
-      const notice = await notified(f.parent.email, 'PAYMENT_EXPIRED', 1);
-      expect(notice[0]?.body).toContain('EGP 250 paid from the balance has been returned to it');
+      const notice = await notified(f.parent.email, 'PAYMENT_EXPIRED', 2);
+      expect(notice.map((n) => n.body).join('\n')).toContain('EGP 250 paid from the balance has been returned to it');
       // Running it again changes nothing.
       expect((await runPaymentDeadlines()).referencesLapsed).toBe(0);
     });
 
-    it('a transfer the family already sent survives the close, waiting for finance (MA-01)', async () => {
+    it('a transfer the family already sent protects its line past the cut-off, waiting for finance (MA-01)', async () => {
       expect(await statusOf('payment', okPay)).toBe('pending_verification');
       expect(await statusOf('registration', okReg)).toBe('pending_payment');
       const queue = await apiResponse(officer.api.v1.payments['pending-manual'].$get());
       expect(queue.map((p) => p.id)).toEqual(expect.arrayContaining([okPay, badPay]));
 
-      // The desk cannot take money for it: the window is closed for this student.
+      // The transfer protects the line, it does not make it payable another way: the desk is refused at the cut-off.
       const desk = await refused(officer.api.v1.registrations.desk.collect.$post({
         json: { studentId: f.studentId, registrationIds: [okReg], instrumentUsed: 'cash' },
       }));
-      expect(desk).toEqual({ status: 422, error: 'Registration window is not open — a finance admin can grant this student a deadline extension' });
+      expect(desk).toEqual({
+        status: 400,
+        error: `Physics (AS, money rules) was not paid by ${schoolDate(cutOffs.get(okReg)!)}, its last day to pay: it can no longer be paid — reserve it again while it is offered`,
+      });
     });
 
-    it('finance confirms it after the close: the subject is confirmed and its receipt is born (MA-01)', async () => {
+    it('finance confirms it after the cut-off, before the board deadline: the subject is confirmed and its receipt is born (MA-01)', async () => {
       await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: okPay }, json: { notes: 'on the statement, sent on the last day' } }));
       expect(await statusOf('payment', okPay)).toBe('completed');
       expect(await statusOf('registration', okReg)).toBe('confirmed');
@@ -873,39 +893,38 @@ describe('money rules', () => {
       expect(await escrowOf(f.studentId)).toBe(1200);
     });
 
-    it('finance rejects the other after the close: escrow back, the subject expires with the window (MA-01, MA-03)', async () => {
+    it('finance rejects the other after the cut-off: escrow back, the line expires at its cut-off (MA-01, MA-03)', async () => {
       const r = await apiResponse(officer.api.v1.payments[':id'].reject.$post({ param: { id: badPay }, json: { reason: 'Reference not found on the statement' } }));
       expect(r).toMatchObject({ status: 'failed', registrationsExpired: 1 });
       expect(await statusOf('registration', badReg)).toBe('expired');
+      expect((await one<{ reason: string }>(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [badReg])).reason).toBe('cut_off');
       expect(await escrowOf(f.studentId)).toBe(1300);
     });
 
-    it('a subject that expired with the window cannot be paid again', async () => {
+    it('a line that expired at its cut-off cannot be paid again', async () => {
       const r = await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [badReg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
       expect(r.status).toBe(400);
     });
 
-    it('a student with a deadline extension can still be registered and paid for, at the desk and in the app (MA-13)', async () => {
+    it('a later reserve date lets the desk and the app reserve after the close, and the line is paid (MA-13; G4)', async () => {
       const other = await family('close-other');
       const refusedDesk = await refused(officer.api.v1.registrations.desk.$post({
         json: { studentId: other.studentId, sessionId, ...(await reservationOf(sessionId, [subj.GEO!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       }));
-      expect(refusedDesk).toEqual({
-        status: 422,
-        error: 'Registration window is not open — a finance admin can grant this student a deadline extension',
-      });
+      expect(refusedDesk.status).toBe(400);
+      expect(refusedDesk.error).toBe(`${await sessionName(sessionId)} is not taking reservations (it closed on ${schoolDate(new Date())})`);
 
       await apiResponse(finadmin.api.v1.exceptions.$post({
         json: { type: 'deadline_extension', studentId: f.studentId, sessionId, validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), reason: 'late family, approved by the head' },
       }));
 
-      // Desk: registered and paid in one action, as before the close.
+      // Desk: reserved and paid in one action, as before the close.
       const desk = await deskCash(f, [subj.GEO!]);
       expect(desk.registrations.map((r) => r.status)).toEqual(['pending_payment']);
       expect(await statusOf('registration', desk.registrations[0]!.id)).toBe('confirmed');
       expect(await statusOf('payment', desk.payment!.id)).toBe('completed');
 
-      // App: the parent registers and checks out; finance confirms at the desk.
+      // App: the parent reserves and checks out; finance confirms at the desk.
       const ger = await direct(f, subj.GER!);
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
         json: { registrationIds: [ger], paymentMethod: 'in_school', escrowAmountToApply: 0 },
@@ -952,18 +971,20 @@ describe('money rules', () => {
       await sql(`update board_series set entry_deadline = (select end_date from registration_session where id = $1) where id = $2`, [sessionId, seriesId]);
       await sql(`update registration_session set end_date = now() - interval '2 days' where id = $1`, [sessionId]);
       await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [seriesId]);
-      const deadlineSentence = /^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/;
+      const deadlineAt = new Date((await one<{ at: string }>(`select entry_deadline as at from board_series where id = $1`, [seriesId])).at);
+      // P1b (mayPay, C6): past the board deadline nothing is paid or confirmed; the sentence names the subject.
+      const deadlineSentence = /: the exam board's entry deadline \(.+\) has passed$/;
 
-      // Until the sweep runs, every way of paying is refused by the window rule.
+      // Until the sweep runs, every way of paying is refused by the board's deadline.
       const confirm = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: artPay }, json: {} }));
       expect(confirm.status).toBe(400);
       expect(confirm.error).toMatch(deadlineSentence);
       const reference = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: musPay }, json: { reference: 'FT-MR-DEADLINE-9' } }));
       expect(reference.error).toMatch(deadlineSentence);
       const checkout = await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [fre], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
-      expect(checkout).toEqual({ status: 422, error: `Registration window is closed for: ${await sessionName(sessionId)}` });
+      expect(checkout.error).toBe(`French (AS, money rules): the exam board's entry deadline (${schoolDate(deadlineAt)}) has passed`);
       const desk = await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [fre], instrumentUsed: 'cash' } }));
-      expect(desk.status).toBe(422);
+      expect(desk.status).toBe(400);
       expect(desk.error).toMatch(deadlineSentence);
       // …and a deadline in the past cannot be set by hand.
       const past = await refused(adm.api.v1['board-series'][':id'].$put({
@@ -971,21 +992,24 @@ describe('money rules', () => {
       }));
       expect(past).toEqual({ status: 400, error: "The board's entry deadline must be in the future" });
 
-      // The scheduler's sweep closes what is left and tells the family.
+      // The scheduler's sweep closes what is left and tells the family: the checkout with no reference ends at the
+      // line's cut-off (the board deadline, the earlier date), the transfer under verification at the board deadline.
       const swept = await runPaymentDeadlines();
-      expect(swept.paymentsClosedAtDeadline).toBeGreaterThanOrEqual(2);
+      expect(swept.paymentsClosedAtDeadline + swept.checkoutsEndedAtCutOff).toBeGreaterThanOrEqual(2);
       expect([await statusOf('payment', artPay), await statusOf('payment', musPay)]).toEqual(['failed', 'failed']);
       for (const reg of [art, mus, fre]) expect(await statusOf('registration', reg)).toBe('expired');
+      const reasons = await sql<{ reason: string }>(
+        `select distinct new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id in ($1, $2, $3)`, [art, mus, fre]);
+      expect(reasons).toEqual([{ reason: 'entry_deadline' }]);
       expect(await escrowOf(f.studentId)).toBe(1300);
       await audited([artPay], ['PAYMENT_FAILED']);
-      const notices = await notified(f.parent.email, 'PAYMENT_EXPIRED', 3);
-      expect(notices.map((n) => n.title)).toContain('Payment closed at the exam board deadline');
-      const notEntered = await waitFor(async () => (await notificationsFor(f.student.email, 'SESSION_CLOSED')).find((n) => n.title.startsWith('Not entered')) ?? null);
-      expect(notEntered.body).toContain('French (AS, money rules)');
+      await waitFor(async () => (await notificationsFor(f.parent.email, 'PAYMENT_EXPIRED')).find((n) => n.title === 'Payment closed at the exam board deadline') ?? null);
+      const notEntered = await waitFor(async () => (await notificationsFor(f.parent.email, 'PAYMENT_EXPIRED')).find((n) => n.title === 'French (AS, money rules) was not paid in time') ?? null);
+      expect(notEntered.body).toContain("still unpaid at the exam board's deadline");
 
-      // After it nothing new is entered or paid, even with the extension.
+      // After it nothing new is reserved or paid, even with the later reserve date (it never passes a board deadline).
       const late = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.ART!])), studentId: f.studentId } }));
-      expect(late.status).toBe(422);
+      expect(late.status).toBe(409);
       expect(late.error).toMatch(deadlineSentence);
     });
 
@@ -1079,172 +1103,22 @@ describe('money rules', () => {
     });
   });
 
-  // ─── Preregistration paid late ─────────────────────────────────────────────
-  // Runs after the close above, which frees the january / as_level slot.
+  // ─── Preregistration paid late: retired ────────────────────────────────────
+  // The coordinator rework (C4) removes preregistration — a draft takes none — so "a preregistration paid after its
+  // session opened" (MA-15, MO-21's refund of a draft that never opened, the per-series close) retires with the held
+  // wallet (trail row "retired 08-money-rules prereg"). Its money outcomes are restated where they now live, in
+  // 08z-reserve-pay: the cut-off per line and a checkout spanning two cut-offs; the time for an InstaPay reference
+  // never past the board deadline; a transfer that arrives after the board deadline credited to the balance in full.
+  // The one case that did not depend on preregistration stays, on a session of its own.
 
-  describe('a preregistration paid after its session opened', () => {
-    let f: Family, early: string, late: string, pay: string, january: string, june: string;
-    // F0b: the board series each window feeds, where its deadline is set.
-    const seriesOf: Record<string, string> = {};
-
-    beforeAll(async () => {
-      f = await family('pre');
-      // Two draft sessions; only the January one opens in this test.
-      january = await session(adm, 'January (AS, money rules, prereg)', 'january', 'as_level', futureWindow());
-      june = await session(adm, 'June (AS, money rules, prereg)', 'june', 'as_level', futureWindow());
-      early = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: january, ...(await reservationOf(january, [subj.PHY!])), studentId: f.studentId },
-      })))[0]!.id;
-      late = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: june, ...(await reservationOf(june, [subj.GEO!])), studentId: f.studentId },
-      })))[0]!.id;
-
-      // One InstaPay transfer for both, referenced, not yet checked by finance.
-      pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
-        json: { registrationIds: [early, late], paymentMethod: 'instapay', escrowAmountToApply: 0 },
-      }))).id!;
-      await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-MR-PRE-1' } }));
-
-      // January opens before finance gets to the transfer: capture finds no
-      // confirmed money and moves that subject to pending payment.
-      await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: january } }));
-      await waitFor(async () => (await statusOf('registration', early)) === 'pending_payment' || null);
-    });
-
-    it('cancelling a preregistration while its transfer is being checked is refused', async () => {
-      const r = await refused(f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: late } }));
-      expect(r.error).toBe('A payment for this subject is in progress — cancel that checkout first, or wait for the finance office to confirm or reject the transfer');
-      expect(await statusOf('registration', late)).toBe('preregistered');
-    });
-
-    it('confirms the opened subject and holds only the one still waiting (MA-15)', async () => {
-      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay }, json: {} }));
-      expect(await statusOf('registration', early)).toBe('confirmed');
-      expect(await statusOf('registration', late)).toBe('preregistered');
-      const w = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
-      expect([money(w.balance), money(w.held)]).toEqual([0, 1500]);
-    });
-
-    it('a preregistration already paid for cannot be paid again', async () => {
-      const r = await refused(f.parent.api.v1.payments.initiate.$post({
-        json: { registrationIds: [late], paymentMethod: 'in_school', escrowAmountToApply: 0 },
-      }));
-      expect(r.error).toBe('One or more of these subjects is already paid for.');
-      const w = await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId]);
-      expect(money(w.held)).toBe(1500);
-    });
-
-    // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.3; trail row "assertion"): the
-    // window-closes-before-the-deadline rule is retired — a session's end is only when new
-    // reservations stop, and each line is cut off at its own series' deadline (MO-10's meaning
-    // kept: nothing is entered, paid or confirmed for a series after it). It was "refused".
-    it("a session may close after one of its series' entry deadlines: the cut-off is per item (MO-10 per line)", async () => {
-      for (const id of [january, june]) {
-        const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [id])).end);
-        const deadline = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-        // F0b: the deadline is set on the board series the session's items are entered in.
-        const seriesId = await feedSeries(adm, id, { label: `money rules prereg ${id === january ? 'January' : 'June'}` });
-        seriesOf[id] = seriesId;
-        await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: seriesId }, json: { entryDeadline: deadline, reason: 'board calendar published' } }));
-        const later = new Date(deadline.getTime() + 60 * 60 * 1000);
-        const moved = await apiResponse(adm.api.v1.sessions[':id'].$put({
-          param: { id },
-          json: { endDate: later, reason: 'extend past the board deadline' },
-        }));
-        expect(new Date(moved.endDate!).getTime()).toBe(later.getTime());
-      }
-    });
-
-    it("past a later series' board deadline a preregistration can no longer be made, paid or confirmed, and what was paid comes back in full (MO-10, MO-21)", async () => {
-      const prereg = async (subjectId: string) => apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: june, ...(await reservationOf(june, [subjectId])), studentId: f.studentId },
-      })).then((r) => r[0]!.id);
-      const checkout = (id: string) => f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'instapay', escrowAmountToApply: 0 } });
-      const his = await prereg(subj.HIS!);
-      const hisPay = (await apiResponse(checkout(his))).id!;
-      await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: hisPay }, json: { reference: 'FT-MR-PRE-2' } }));
-      const eco = await prereg(subj.ECO!);
-      const ecoPay = (await apiResponse(checkout(eco))).id!;
-      const ger = await prereg(subj.GER!);
-
-      // A November series with its deadline still ahead holds a paid preregistration too.
-      const november = await session(adm, 'November (AS, money rules, prereg)', 'november', 'as_level', futureWindow());
-      const nov = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: november, ...(await reservationOf(november, [subj.PHY!])), studentId: f.studentId },
-      })))[0]!.id;
-      const novPay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [nov], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
-      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: novPay }, json: { instrumentUsed: 'cash' } }));
-      const wallet = async () => {
-        const w = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
-        return { free: money(w.balance), held: money(w.held) };
-      };
-      // A second paid June preregistration, and a 50% refund window on June that must not apply.
-      const che = await prereg(subj.CHE!);
-      const chePay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [che], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
-      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: chePay }, json: { instrumentUsed: 'cash' } }));
-      const hour = 60 * 60 * 1000;
-      await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
-        json: { sessionId: june, startsAt: new Date(Date.now() - hour).toISOString(), endsAt: new Date(Date.now() + 24 * hour).toISOString(), percentage: 50, label: 'June: half back' },
-      }));
-      expect(await wallet()).toEqual({ free: 0, held: 4500 });
-
-      // June never opens, and the board's deadline for it passes (F0b: the
-      // deadline of the board series the June window feeds).
-      await sql(`update registration_session set start_date = now() - interval '3 days', end_date = now() - interval '2 days' where id = $1`, [june]);
-      await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [seriesOf[june]]);
-      const sentence = /^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/;
-      const again = await refused(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: june, ...(await reservationOf(june, [subj.BIO!])), studentId: f.studentId } }));
-      expect(again.error).toMatch(sentence);
-      const pay = await refused(checkout(ger));
-      expect(pay.status).toBe(422);
-      expect(pay.error).toMatch(sentence);
-      const reference = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: ecoPay }, json: { reference: 'FT-MR-PRE-3' } }));
-      expect(reference.error).toMatch(sentence);
-      const confirm = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: hisPay }, json: {} }));
-      expect(confirm.error).toMatch(sentence);
-
-      // A parent who cancels before the sweep gets the full price too, not the window's 50%.
-      const cancelled = await apiResponse(f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: che } }));
-      expect(cancelled).toMatchObject({ funded: true, refundPercentage: 100 });
-      expect(await wallet()).toEqual({ free: 1500, held: 3000 });
-
-      // The sweep closes both checkouts, and since June never opened, gives
-      // back what was paid for it in full (MO-21) — not at the refund window's rate.
-      const swept = await runPaymentDeadlines();
-      expect(swept).toMatchObject({ preregistrationsRefundedAtDeadline: 1, preregistrationsExpiredUnopened: 3 });
-      expect([await statusOf('payment', hisPay), await statusOf('payment', ecoPay)]).toEqual(['failed', 'failed']);
-      expect(await statusOf('registration', late)).toBe('dropped');
-      for (const reg of [his, eco, ger]) expect(await statusOf('registration', reg)).toBe('expired');
-      expect(await wallet()).toEqual({ free: 3000, held: 1500 });
-      await audited([late], ['PREREG_REFUNDED_AT_DEADLINE']);
-      const juneName = await sessionName(june);
-      const refundNotice = await waitFor(async () => (await notificationsFor(f.parent.email, 'SESSION_CLOSED'))
-        .find((n) => n.title === `Refunded: ${juneName} did not open`) ?? null);
-      expect(refundNotice.body).toContain('EGP 1,500 paid for Geography (AS, money rules) has been returned to your balance in full');
-      expect(refundNotice.body).toContain('History (AS, money rules)');
-      // Running it again changes nothing; November's preregistration is untouched.
-      expect(await runPaymentDeadlines()).toMatchObject({ preregistrationsRefundedAtDeadline: 0, preregistrationsExpiredUnopened: 0 });
-      expect(await statusOf('registration', nov)).toBe('preregistered');
-
-      // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.3, pre-authorised: MO-21's
-      // scenario; trail row "assertion"): a session may open after one of its series' deadlines —
-      // that series' items are simply closed — and nothing is captured for entries the board
-      // refuses, because the capture asks each row's deadline first (refunds a paid one in full,
-      // expires an unfunded one: 08n). Here the sweep has settled every row already, so opening
-      // June by hand (it was refused) captures nothing and moves no money.
-      const opened = await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: june } }));
-      expect(opened.status).toBe('active');
-      await runSessionRecovery();
-      expect(await wallet()).toEqual({ free: 3000, held: 1500 });
-      expect(await statusOf('registration', late)).toBe('dropped');
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: june }, json: { reason: 'money rules: June was only opened to show nothing is captured' } }));
-    });
-
-    it('a family reference set aside by a transfer found later cannot be submitted again', async () => {
+  describe('a reference set aside by a transfer found later', () => {
+    it('cannot be submitted again', async () => {
       // FT-MR-DEADLINE-1 was the family's reference on the Art payment; finance
       // recorded that transfer under the statement's FT-MR-DEADLINE-1B above.
+      const f = await family('setaside');
+      const june = await session(adm, 'June (AS, money rules, set aside)', 'june', 'as_level', { ...openWindow(), activate: true });
       const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({
-        json: { sessionId: january, ...(await reservationOf(january, [subj.BIO!])), studentId: f.studentId },
+        json: { sessionId: june, ...(await reservationOf(june, [subj.HIS!])), studentId: f.studentId },
       })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
         json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 },
@@ -1253,24 +1127,6 @@ describe('money rules', () => {
       expect(again).toEqual({ status: 409, error: 'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.' });
       expect(await statusOf('payment', pay)).toBe('pending');
       await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
-    });
-
-    it('at the close, the time left to send a reference never runs past the board deadline (MO-10)', async () => {
-      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({
-        json: { sessionId: january, ...(await reservationOf(january, [subj.HIS!])), studentId: f.studentId },
-      })))[0]!.id;
-      const regPay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
-        json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 },
-      }))).id!;
-      // The board's deadline is two hours after the close, well inside the 24-hour grace.
-      await sql(`update registration_session set end_date = now() + interval '30 minutes' where id = $1`, [january]);
-      const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
-      await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: seriesOf[january]! }, json: { entryDeadline: deadline, reason: 'board moved its deadline forward' } }));
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: january }, json: { reason: 'money rules: prereg window closes' } }));
-
-      expect(await statusOf('payment', regPay)).toBe('pending');
-      const due = new Date((await one<{ due: string }>(`select reference_due_at as due from payment where id = $1`, [regPay])).due).getTime();
-      expect(Math.abs(due - deadline.getTime())).toBeLessThan(1000);
     });
   });
 });

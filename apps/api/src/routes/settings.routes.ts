@@ -28,7 +28,8 @@ export const settingsRoutes = new Hono<HonoEnv>()
 
   // Any role that may change at least one key reaches the handler, which
   // checks the key's own list.
-  .put('/:key', requireRole(ROLES.ADMIN, ROLES.FINANCE_ADMIN, ROLES.COORDINATOR),
+  // The coordinator changes no school setting (COORDINATOR_REWORK.md B1, G3: her rules live on the session).
+  .put('/:key', requireRole(ROLES.ADMIN, ROLES.FINANCE_ADMIN),
     zValidator('param', SettingKeyParam), zValidator('json', UpdateSetting), async (c) => {
       const user = c.get('user')!;
       const { value, reason } = c.req.valid('json');

@@ -304,9 +304,8 @@ async function sessionUnpaid(executor: Executor, def: Extract<StoredAudienceDefi
   };
   if (def.include !== 'charges') {
     const money = await getSessionMoney(def.sessionId, { filter: 'unpaid', ...(def.offerId ? { offerId: def.offerId } : {}), ...(def.sectionId ? { sectionId: def.sectionId } : {}) });
-    const payOnProvisional = await getSetting('pricing.payOnProvisionalFee', executor);
     const lines = (money?.lines ?? []).filter((l) => l.unpaid && (!only || only.has(l.student.id)) && wanted(new Date(l.dueAt), l.overdueDays));
-    const payable = await payableLines(executor, lines.map((l) => l.id), now, payOnProvisional);
+    const payable = await payableLines(executor, lines.map((l) => l.id), now);
     for (const l of lines) {
       if (!payable.has(l.id)) continue;
       addOwed(owed, l.student.id, { amount: l.price, dueAt: new Date(l.dueAt), item: l.item.kind === 'all_papers' ? l.subject.name : `${l.subject.name} — ${l.item.label}`, sessionId: session.id, sessionName: session.name, lineId: l.id });

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, money, audited, notified, openWindow, futureWindow, schoolToday, runSessionRecovery, waitFor, notificationsFor, type Client, reservationOf } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, audited, notified, openWindow, futureWindow, schoolToday, type Client, reservationOf } from './helpers';
 
 /**
  * F0a — eligibility can change after a registration exists
@@ -111,98 +111,77 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     expect(await statusOf('payment', pay)).toBe('failed');
   });
 
-  it('a cohort moved back a year: the October registration is now out of reach (grade 10: June only) and expires; its checkout closes; the June registration stays', async () => {
+  // P1b (C7): what a correction makes a student unable to sit still strands nothing unless it is a fact about the
+  // student (left, not started, finished more than a year ago): the session's grade list is asked of new reservations
+  // only, so a line already waiting stays payable. These three cases expired the line before P1b (trail rows).
+  it('a cohort moved back a year: the October line stays payable, its checkout open; a new October reservation is refused (grade list); the June line stays', async () => {
     const f = await family('moved-back');
     const funded = await fund(f, subj.S3!);
     const { reg, pay } = await checkout(f, subj.S4!);
-    // A June registration in the same year: still theirs to sit in grade 10.
-    const june = await session(adm, 'June (IGCSE, F0a changes)', 'june', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('june', thisYear) });
+    // A June reservation in the same year: theirs to sit in grade 10 too.
+    const june = await session(adm, 'June (IGCSE, F0a changes)', 'june', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('june', thisYear), activate: true });
     const igcse = await subject(adm, 'F0E-IG', 'Geography (F0a changes)', { course: 1000, registration: 200 });
-    await extend(f.studentId, june);
     const juneReg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, ...(await reservationOf(june, [igcse])), studentId: f.studentId } })))[0]!.id;
 
     const r = await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { gradeNow: 10, reason: 'repeating grade 10' } }));
-    expect(r).toMatchObject({ grade: 10, registrationsExpired: 1, paymentsClosed: 1 });
+    expect(r).toMatchObject({ grade: 10, registrationsExpired: 0, paymentsClosed: 0 });
 
-    expect(await statusOf('registration', reg)).toBe('expired');
-    expect(await expiryOf(reg)).toEqual({ was: 'pending_payment', reason: 'ineligible', detail: 'cohort_corrected' });
-    expect(await statusOf('payment', pay)).toBe('failed');
-    expect(await escrowOf(f.studentId)).toBe(funded);
-    await audited([pay], ['PAYMENT_FAILED']);
+    expect(await statusOf('registration', reg)).toBe('pending_payment');
+    expect(await statusOf('payment', pay)).toBe('pending');
+    expect(await escrowOf(f.studentId)).toBe(money(funded - 300));
     expect(await statusOf('registration', juneReg)).toBe('pending_payment');
-    const notice = await notified(f.parent.email, 'PAYMENT_EXPIRED', 1);
-    expect(notice[0]?.body).toContain("grade was corrected");
+    const again = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S5!])), studentId: f.studentId } }));
+    expect(again.error).toContain('is in grade 10 in');
     // The family hears the grade changed.
     await notified(f.student.email, 'GRADE_CHANGED', 1);
+    // Leave nothing open: the family cancels the checkout, the 300 comes back.
+    await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
+    expect(await escrowOf(f.studentId)).toBe(funded);
   });
 
-  it('A-12 turned off with graduates\' registrations pending: they expire in the transaction that turns it off; the checkout closes; turning it on again revives nothing', async () => {
+  it("graduates taken off the session's grade list: their waiting lines stay payable and a request awaiting approval can no longer be approved (C7; A-12's switch is gone)", async () => {
     const g = await family('graduate', 12);
-    // Past grade 12 this year: finished grade 12 last year (A-12 lets them sit October).
+    // Past grade 12 this year: finished grade 12 last year.
     await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: g.studentId }, json: { cohortYear: thisYear - 3, reason: 'finished grade 12 last June' } }));
     const funded = await fund(g, subj.S5!);
     const { reg, pay } = await checkout(g, subj.S6!);
     const asked = (await apiResponse(g.student.api.v1.registrations.request.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S7!])) } })))[0]!.id;
-    // A student in grade 12 this year is not touched.
-    const twelve = await family('twelve', 12);
-    const kept = (await apiResponse(twelve.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S7!])), studentId: twelve.studentId } })))[0]!.id;
 
-    // Only the admin may change A-12.
-    expect((await refused(finadmin.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: false, reason: 'not mine to change' } }))).status).toBe(403);
-    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: false, reason: 'the school stops graduate retakes' } }));
-
-    for (const id of [reg, asked]) {
-      expect(await statusOf('registration', id)).toBe('expired');
-      expect((await expiryOf(id) as { detail: string }).detail).toBe('graduate_retakes_off');
+    await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: october }, json: { allowedGrades: ['11', '12'] } }));
+    try {
+      expect(await statusOf('registration', reg)).toBe('pending_payment');
+      expect(await statusOf('registration', asked)).toBe('pending_approval');
+      expect(await statusOf('payment', pay)).toBe('pending');
+      expect(await escrowOf(g.studentId)).toBe(money(funded - 300));
+      const approve = await refused(g.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [asked] } }));
+      expect(approve.error).toContain('finished grade 12');
+      expect(await statusOf('registration', asked)).toBe('pending_approval');
+    } finally {
+      await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: october }, json: { allowedGrades: ['11', '12', 'graduates'] } }));
     }
-    expect(await statusOf('registration', kept)).toBe('pending_payment');
-    expect(await statusOf('payment', pay)).toBe('failed');
+    await apiResponse(g.parent.api.v1.registrations.reject.$put({ json: { registrationIds: [asked], comments: 'not this series' } }));
+    await apiResponse(g.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
     expect(await escrowOf(g.studentId)).toBe(funded);
-    await audited([pay], ['PAYMENT_FAILED']);
-    await audited(['eligibility.graduateRetakes'], ['SETTING_CHANGED']);
-    // The setting and the expiries committed together: same transaction time.
-    const [setAt, expAt] = await Promise.all([
-      one<{ t: string }>(`select created_at::text as t from audit_log where action = 'SETTING_CHANGED' and entity_id = 'eligibility.graduateRetakes' order by created_at desc limit 1`),
-      one<{ t: string }>(`select created_at::text as t from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [asked]),
-    ]);
-    expect(expAt.t).toBe(setAt.t);
-    await notified(g.parent.email, 'PAYMENT_EXPIRED', 1);
-
-    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: true, reason: 'graduate retakes back on' } }));
-    expect(await statusOf('registration', asked)).toBe('expired');
   });
 
-  it("an admin corrects a window's series: registrations students may no longer sit expire, audited with the correction", async () => {
-    const f = await family('series', 12);
-    const nov = await session(adm, 'November (IGCSE, F0a series)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
-    const igcse = await subject(adm, 'F0E-IG2', 'History (F0a series)', { course: 1000, registration: 200 });
-    await extend(f.studentId, nov);
-    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: nov, ...(await reservationOf(nov, [igcse])), studentId: f.studentId } })))[0]!.id;
-    // The window was really for next year's June: past grade 12 by then, and June is not a retake series.
-    const r = await apiResponse(adm.api.v1.sessions[':id'].series.$put({
-      param: { id: nov }, json: { sessionType: 'june', seriesYear: seriesYearInAcademicYear('june', thisYear + 1), reason: 'typed the wrong series' },
-    }));
-    expect(r).toMatchObject({ sessionType: 'june', registrationsExpired: 1 });
-    expect(await statusOf('registration', reg)).toBe('expired');
-    expect((await expiryOf(reg) as { detail: string }).detail).toBe('series_corrected');
-    await audited([nov], ['SESSION_SERIES_CORRECTED']);
-    // The same series again is refused; only the admin corrects a series.
-    expect((await refused(adm.api.v1.sessions[':id'].series.$put({ param: { id: nov }, json: { sessionType: 'june', seriesYear: seriesYearInAcademicYear('june', thisYear + 1), reason: 'no change at all' } }))).status).toBe(409);
-  });
+  // Retired (§12: 08e's series correction leaves; trail row "retired 08e series"): "an admin corrects a window's
+  // series: registrations students may no longer sit expire". A session's type and year come from its reference
+  // sittings now; the correction route is out of the reservation path (code kept, 'a draft session with no
+  // preregistrations' below still drives it). No money moved in it (a waiting line, no checkout).
 
-  it("a grade-10 exception revoked: the registration it allowed expires", async () => {
+  it("a grade-10 exception revoked: the line it allowed stays payable, new reservations are refused again", async () => {
     const f = await family('g10x', 10);
     const grant = await apiResponse(coordinator.api.v1.exceptions.$post({
       json: { type: 'grade10_other_series', studentId: f.studentId, sessionId: october, reason: 'sitting one AS unit early' },
     }));
     const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S8!])), studentId: f.studentId } })))[0]!.id;
     const r = await apiResponse(coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: grant.id } }));
-    expect(r).toMatchObject({ status: 'revoked', registrationsExpired: 1 });
-    expect(await statusOf('registration', reg)).toBe('expired');
-    expect((await expiryOf(reg) as { detail: string }).detail).toBe('exception_revoked');
+    expect(r).toMatchObject({ status: 'revoked', registrationsExpired: 0 });
+    expect(await statusOf('registration', reg)).toBe('pending_payment');
+    expect((await apiResponse(adm.api.v1.registrations.eligibility.$get({ query: { studentId: f.studentId, sessionId: october } }))).code).toBe('grade10_june_only');
   });
 
-  it("a grade-10 exception that runs out: the scheduler lapses it once — its waiting registration expires, the paid one stands", async () => {
+  it("a grade-10 exception that runs out: the scheduler lapses it once — its waiting line stays payable, the paid one stands", async () => {
     const f = await family('g10lapse', 10);
     const grant = await apiResponse(coordinator.api.v1.exceptions.$post({
       json: { type: 'grade10_other_series', studentId: f.studentId, sessionId: october, reason: 'one AS unit early', validUntil: new Date(Date.now() + days(2)).toISOString() },
@@ -224,8 +203,8 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     expect(a.lapsed + b.lapsed).toBe(1);
     expect(await exceptionStatus()).toBe('lapsed');
     expect((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'EXCEPTION_LAPSED' and entity_id = $1`, [grant.id])).n).toBe('1');
-    expect(await statusOf('registration', waiting)).toBe('expired');
-    expect(await expiryOf(waiting)).toEqual({ was: 'pending_payment', reason: 'ineligible', detail: 'exception_lapsed' });
+    expect(await statusOf('registration', waiting)).toBe('pending_payment');
+    expect(await sql(`select 1 from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [waiting])).toEqual([]);
     expect(await statusOf('registration', paid)).toBe('confirmed');
     expect(await apiResponse(adm.api.v1.registrations.eligibility.$get({ query: { studentId: f.studentId, sessionId: october } })))
       .toMatchObject({ allowed: false, code: 'grade10_june_only' });
@@ -233,47 +212,10 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     expect((await lapseGrade10Exceptions()).lapsed).toBe(0);
   });
 
-  it("withdrawn with preregistrations, then the series opens: neither is captured — the paid one keeps its money held, the unpaid one stays unpayable; one audit row each, finance told", async () => {
-    const f = await family('prereg');
-    const ids = await Promise.all(['Physics', 'Chemistry'].map((name, i) =>
-      subject(adm, `F0E-A${i + 1}`, `${name} (A-Level, F0a prereg)`, { course: 1000, registration: 200 }, { qualificationLevel: 'a_level' })));
-    // The October A-Level series of this year, still a draft; closed at the end so 08f can open its own.
-    const oct = await session(adm, 'October (A-Level, F0a prereg)', 'october', 'a_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('october', thisYear) });
-    const pre = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: oct, ...(await reservationOf(oct, ids)), studentId: f.studentId } }));
-    const [paid, unpaid] = [pre.find((r) => r.subjectId === ids[0])!.id, pre.find((r) => r.subjectId === ids[1])!.id];
-    const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [paid], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
-    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
-    const heldOf = async () => money((await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId])).held);
-    expect(await heldOf()).toBe(1200);
-
-    await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'left before the series opened' } }));
-    // The withdrawal leaves preregistrations for the owner (SO-4).
-    expect([await statusOf('registration', paid), await statusOf('registration', unpaid)]).toEqual(['preregistered', 'preregistered']);
-
-    await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: oct } }));
-    const heldRows = () => sql<{ entity_id: string; held: string; code: string }>(
-      `select entity_id, new_data->>'heldAmount' as held, new_data->>'code' as code from audit_log
-       where action = 'PREREG_HELD_INELIGIBLE' and entity_id in ($1, $2) order by new_data->>'heldAmount' desc`, [paid, unpaid]);
-    await waitFor(async () => (await heldRows()).length === 2 || null);
-    expect((await heldRows()).map((r) => [r.entity_id, money(r.held), r.code])).toEqual([[paid, 1200, 'left'], [unpaid, 0, 'left']]);
-    expect([await statusOf('registration', paid), await statusOf('registration', unpaid)]).toEqual(['preregistered', 'preregistered']);
-    expect(await heldOf()).toBe(1200);
-    expect(await sql(`select 1 from escrow_transaction t join escrow e on e.id = t.escrow_id where e.student_id = $1 and t.reason = 'prereg_capture'`, [f.studentId])).toEqual([]);
-    expect(await sql(`select 1 from audit_log where action = 'PREREG_CAPTURED' and entity_id in ($1, $2)`, [paid, unpaid])).toEqual([]);
-    // Finance hears of each, once.
-    await waitFor(async () => (await notificationsFor(officer.email, 'PREREGISTRATION_HELD')).length === 2 || null);
-
-    // The recovery sweep asks again every minute: still held, still one row each, no second notice.
-    await runSessionRecovery();
-    expect((await heldRows()).length).toBe(2);
-    expect([await statusOf('registration', paid), await statusOf('registration', unpaid)]).toEqual(['preregistered', 'preregistered']);
-    expect((await notificationsFor(officer.email, 'PREREGISTRATION_HELD')).length).toBe(2);
-    // The unpaid one cannot be paid for: the student left.
-    expect((await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [unpaid], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).error)
-      .toContain('was withdrawn from the school');
-
-    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: oct }, json: {} }));
-  });
+  // Retired with preregistration (C4; trail row "retired 08e prereg"): "withdrawn with preregistrations, then the
+  // series opens: neither is captured — the paid one keeps its money held". No new held money exists; the capture's
+  // PREREG_HELD_INELIGIBLE path stays for rows made before P1b. A withdrawn student's waiting line expiring, its
+  // checkout closed and escrow back is stated in the first two cases above.
 
   // ─── A draft window's series (reviewer flag 6) ─────────────────────────────
   // Changed by the reservations rework (trail row "assertion"; not money): a session's header
@@ -285,7 +227,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const f = await family('draft-series');
     const draft = await session(adm, 'November (IGCSE, F0a draft edit)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
     const igcse = await subject(adm, 'F0E-IG3', 'Geography (F0a draft edit)', { course: 1000, registration: 200 });
-    await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, ...(await reservationOf(draft, [igcse])), studentId: f.studentId } }));
+    void f; void igcse; // P1b: a draft takes no preregistration (C4); the header's rule needs none.
 
     const r = await refused(adm.api.v1.sessions[':id'].$put({ param: { id: draft }, json: { seriesYear: thisYear + 1, reason: 'next year' } as never }));
     expect(r).toEqual({ status: 400, error: 'Nothing to change' });

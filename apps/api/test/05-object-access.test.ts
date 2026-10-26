@@ -43,7 +43,7 @@ describe('object-level access between families', () => {
   let sessionId: string, draftId: string;
   // Family A's records
   let physA: string, chemA: string, geoA: string, deskPaymentA: string, physReceiptA: string;
-  let bioA: string, instaPaymentA: string, econA: string, preregA: string;
+  let bioA: string, instaPaymentA: string, econA: string;
   let crA: string, remarkStudentA: string, remarkParentA: string, linkA: string, notificationA: string;
   let withdrawalA: string, fileA: string, fileB: string, avatarB: string;
   // Family B's own records, used to test attaching A's file
@@ -107,9 +107,9 @@ describe('object-level access between families', () => {
       json: { registrationIds: [bioA], paymentMethod: 'instapay', escrowAmountToApply: 0 },
     }))).id!;
 
-    // A: a student request waiting for the parent, and a preregistration.
+    // A: a student request waiting for the parent. (No preregistration: a draft takes none since the coordinator
+    // rework, C4; the route refuses everyone, so B's attempts below are refused whatever the ownership check says.)
     econA = (await apiResponse(studentA.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [econ])) } })))[0]!.id;
-    preregA = (await apiResponse(parentA.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [lit])), studentId: studentAId } })))[0]!.id;
 
     // A: a drop request from the student on a confirmed subject.
     const cr = await apiResponse(studentA.api.v1.registrations[':id']['request-drop'].$post({ param: { id: chemA }, json: { reason: 'too much work' } }));
@@ -173,11 +173,10 @@ describe('object-level access between families', () => {
     expect(await statusOf('registration', econA)).toBe('pending_payment');
     await refusedAs('parentB direct-register A', parentB.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [maths])), studentId: studentAId } }));
     await refusedAs('parentB preregister A', parentB.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [maths])), studentId: studentAId } }));
-    await refusedAs('parentB cancel A prereg', parentB.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: preregA } }));
+    await refusedAs('parentB cancel A prereg', parentB.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: bioA } }));
 
     expect(await statusOf('registration', physA)).toBe('confirmed');
     expect(await statusOf('registration', bioA)).toBe('pending_payment');
-    expect(await statusOf('registration', preregA)).toBe('preregistered');
     expect(await sql(`select 1 from registration where student_id = $1 and subject_id = $2`, [studentAId, maths])).toEqual([]);
     expect(await sql(`select 1 from change_request where registration_id = $1 and id <> $2`, [physA, crA])).toEqual([]);
 
@@ -516,7 +515,7 @@ describe('object-level access between families', () => {
 
   // ─── F7 ──────────────────────────────────────────────────────────────────
 
-  it("F7 a staged file is staff-only: the families it names, the desk, a teacher and the gate reach neither the review nor the file", async () => {
+  it("F7 a staged file is the admin's: the families it names, the desk, a teacher and the gate reach neither the review nor the file; the coordinator does not reach the review", async () => {
     const coordinator = await staff(adm, 'coordinator', 'oa-imp');
     const [teacher, gate] = [await staff(adm, 'teacher', 'oa-imp'), await staff(adm, 'gate', 'oa-imp')];
     // SCL's roster naming family A's student and parent (and B's): other families' names, emails and phones.
@@ -525,8 +524,8 @@ describe('object-level access between families', () => {
       `Student oa-a,student.oa-a@test.local,01111111111,,12,,Parent oa-a,parent.oa-a@test.local,01000000000,,,`,
       `Student oa-b,student.oa-b@test.local,01111111111,,12,,Parent oa-b,parent.oa-b@test.local,01000000000,,,`,
     ].join('\n');
-    const f = await apiResponse(coordinator.api.v1.files.upload.$post({ form: { file: new File([new TextEncoder().encode(csv)], 'roster.csv', { type: 'text/csv' }), purpose: 'import_file' } }));
-    const { id } = await apiResponse(coordinator.api.v1.imports.$post({ json: { fileId: f.id, kind: 'scl_roster' } }));
+    const f = await apiResponse(adm.api.v1.files.upload.$post({ form: { file: new File([new TextEncoder().encode(csv)], 'roster.csv', { type: 'text/csv' }), purpose: 'import_file' } }));
+    const { id } = await apiResponse(adm.api.v1.imports.$post({ json: { fileId: f.id, kind: 'scl_roster' } }));
     const rowId = (await one<{ id: string }>(`select id from import_row where batch_id = $1 order by row_number limit 1`, [id])).id;
     const state = () => sql(`select b.status, b.settings, (select json_agg(r.edits order by r.row_number) from import_row r where r.batch_id = b.id) as edits from import_batch b where b.id = $1`, [id]);
     const before = await state();
@@ -541,9 +540,16 @@ describe('object-level access between families', () => {
       expect(await refusedAs(`${label} reads the uploaded file`, who.api.v1.files[':id'].content.$get({ param: { id: f.id }, query: {} }))).toBe(404);
     }
     expect(await state()).toEqual(before);
-    // The school's own staff who import: the admin and any coordinator.
+    // The school's own staff who import: the admin (P1b review, L4: the coordinator reaches no import — the review,
+    // the fixes, the commit — though the import file purpose, shared with F4's results import, stays hers to read).
     expect((await adm.api.v1.imports[':id'].$get({ param: { id } })).status).toBe(200);
-    expect((await (await staff(adm, 'coordinator', 'oa-imp2')).api.v1.imports[':id'].$get({ param: { id } })).status).toBe(200);
+    for (const [label, call] of [
+      ['reads the review', () => coordinator.api.v1.imports[':id'].$get({ param: { id } })],
+      ['lists imports', () => coordinator.api.v1.imports.$get()],
+      ['fixes a row', () => coordinator.api.v1.imports[':id'].rows.$put({ param: { id }, json: { rowIds: [rowId], edits: { studentName: 'changed' } } })],
+      ['commits it', () => coordinator.api.v1.imports[':id'].commit.$post({ param: { id } })],
+    ] as const) expect(await refusedAs(`coordinator ${label}`, call())).toBe(403);
+    expect(await state()).toEqual(before);
   });
 
   it("the reservations rework, step C: B cannot read, ask for, pay or refund A's charges; an exception for B cannot reach A's line", async () => {

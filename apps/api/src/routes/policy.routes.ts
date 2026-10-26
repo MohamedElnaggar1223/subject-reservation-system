@@ -18,14 +18,14 @@ export const policies = new Hono<HonoEnv>()
 
   .get('/', async (c) => {
     const role = c.get('user')!.role;
-    const lateEntriesOn = await getSetting('exceptions.boardEntryDeadline');
     return success(c, {
       groups: POLICY_GROUPS.map((g) => ({ id: g, label: POLICY_GROUP_LABELS[g] })),
       scopeLabels: POLICY_SCOPE_LABELS,
       policies: POLICY_KEYS.map((key) => {
         const p = POLICIES[key];
         const mayGrant = hasRole(role, ...(p.grantRoles as readonly Role[]));
-        const live = p.status === 'live' || (p.status === 'gated' && lateEntriesOn);
+        // No policy is gated since P1b (Q-20's late board entry left with its setting).
+        const live = p.status === 'live';
         return {
           key,
           group: p.group,

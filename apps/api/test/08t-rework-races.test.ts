@@ -221,7 +221,8 @@ describe('08t: the rework races', () => {
       await release();
     }
     expect((await closing2!).status).toBe(200);
-    expect(await reserving2!).toMatchObject({ ok: false, e: expect.stringMatching(/is closed in this session/) });
+    // P1b: the closed row offers no option (line rules v2's cells sentence; it read "is closed in this session").
+    expect(await reserving2!).toMatchObject({ ok: false, e: `Race close (08t ${RUN}) is not offered in this session` });
     expect(await live(g.studentId)).toHaveLength(0);
   });
 
@@ -373,43 +374,8 @@ describe('08t: the rework races', () => {
     expect(await one(`select board_series_id as s from registration where id = $1`, [l1!.id])).toEqual({ s: series });
   });
 
-  it('capture and the deadline sweep on one paid preregistration at once: refunded once', async () => {
-    const sub = await subject(adm, `RWT-K-${RUN}`, `Race capture (08t ${RUN})`, { course: 1000, registration: 500 });
-    const d = (await apiResponse(adm.api.v1.sessions.$post({
-      json: {
-        type: 'june', year: Y + 1, label: `t08c-${RUN}`, startDate: new Date(Date.now() + days(90)).toISOString(), endDate: new Date(Date.now() + days(120)).toISOString(),
-        courseStartsOn: cairoDate(new Date(Date.now() + days(90))), paymentDueAt: new Date(Date.now() + days(120)).toISOString(),
-      },
-    })))!.id;
-    const s = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08-cap-${RUN}`, entryDeadline: new Date(Date.now() + days(150)) } })))!.id;
-    await feeFor(s, sub);
-    await offerOf(d, sub, [whole(s)]);
-    const f = await onboard(officer, `t08-cap-${RUN}`, 11);
-    const reg = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d, ...(await reservationOf(d, [sub])), studentId: f.studentId } })))![0]!.id;
-    const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
-    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));
-    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [s]);
-    await sql(`update registration_session set status = 'active', start_date = now() - interval '1 day' where id = $1`, [d]);
-    const { capturePreregistrationsForSession, refundPreregistrationsAtDeadline } = await import('../src/services/prereg.services');
-    const release = await holdRowLock('registration', reg);
-    let capture: Promise<unknown> | undefined;
-    let sweep: Promise<unknown> | undefined;
-    try {
-      capture = capturePreregistrationsForSession(d);
-      await lockWaiters(1);
-      sweep = refundPreregistrationsAtDeadline(d, s);
-      await lockWaiters(2);
-    } finally {
-      await release();
-    }
-    await Promise.all([capture!, sweep!]);
-    expect((await one<{ status: string }>(`select status from registration where id = $1`, [reg])).status).toBe('dropped');
-    expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_REFUNDED_AT_DEADLINE' and entity_id = $1`, [reg])).n)).toBe(1);
-    const w = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
-    expect([money(w.balance), money(w.held)]).toEqual([1500, 0]);
-  });
-
-  // ─── Step B (docs/features/RESERVATIONS_LINES.md §7) ──────────────────────
+  // 'capture and the deadline sweep on one paid preregistration at once: refunded once' retired with preregistration
+  // and refundPreregistrationsAtDeadline (C4, §4; trail row "retired 08t capture race").
 
   describe('a declared sitting answered while its line is being paid', () => {
     let coordinator: Client;
@@ -638,41 +604,8 @@ describe('08t: the rework races', () => {
       });
     });
 
-    it('the hold step run by two schedulers at once drops a paid unverified line once', async () => {
-      const { holdUnverifiedAtDeadline } = await import('../src/services/verification.services');
-      const holdSeries = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08h-${RUN}`, entryDeadline: new Date(Date.now() + days(30)), retakeDeadline: new Date(Date.now() + days(35)) } })))!.id;
-      const s3 = await mkSession(`t08h-${RUN}`);
-      await feeFor(holdSeries, subA);
-      const item = (await offerOf(s3, subA, [whole(holdSeries)])).items[0]!;
-      const f = await onboard(officer, `t08-hold-${RUN}`, 11);
-      const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
-        json: { studentId: f.studentId, sessionId: s3, lines: [{ offerItemId: item, attempt: 'retake', mode: 'in_school', teacherId, priorSitting: { month: 'november', year: Y } }], consent: CONSENT, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
-      }));
-      const id = desk.registrations[0]!.id;
-      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'verification.unverifiedAtDeadline' }, json: { value: 'hold', reason: 'race: two schedulers' } }));
-      await sql(`update board_series set entry_deadline = now() - interval '2 minutes', retake_deadline = now() - interval '30 seconds' where id = $1`, [holdSeries]);
-      await sql(`update audit_log set created_at = now() - interval '45 seconds' where id = (select id from audit_log where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' order by created_at desc limit 1)`);
-      // The setting row touched since (not a change of its value): hold still counts from when it became hold.
-      await sql(`update school_setting set updated_at = now() where key = 'verification.unverifiedAtDeadline'`);
-      const release = await holdRowLock('registration', id);
-      let a: Promise<{ expired: number; dropped: number }> | undefined;
-      let b: Promise<{ expired: number; dropped: number }> | undefined;
-      try {
-        a = holdUnverifiedAtDeadline();
-        b = holdUnverifiedAtDeadline();
-        await lockWaiters(2);
-      } finally {
-        await release();
-      }
-      const out = await Promise.all([a!, b!]);
-      expect(out.reduce((n, o) => n + o.dropped, 0)).toBe(1);
-      expect((await one<{ status: string }>(`select status from registration where id = $1`, [id])).status).toBe('dropped');
-      expect(Number((await one<{ n: string }>(`select count(*) as n from escrow_transaction where related_registration_id = $1 and reason = 'drop'`, [id])).n)).toBe(1);
-      expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where entity_id = $1 and action = 'LINE_DROPPED_UNVERIFIED'`, [id])).n)).toBe(1);
-      // No refund window on this session (100%): the course part and the board fee, never sent: the whole price.
-      expect(money((await one<{ s: string }>(`select sum(amount) as s from escrow_transaction where related_registration_id = $1 and reason = 'drop'`, [id])).s)).toBe(1500);
-      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'verification.unverifiedAtDeadline' }, json: { value: 'enter_as_declared', reason: 'race done' } }));
-    });
+    // 'the hold step run by two schedulers at once drops a paid unverified line once' retired with
+    // holdUnverifiedAtDeadline and its setting (§4; trail row "retired 08t hold race").
   });
 
   describe("a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line)", () => {

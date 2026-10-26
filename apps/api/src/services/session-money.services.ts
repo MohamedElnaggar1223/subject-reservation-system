@@ -24,7 +24,14 @@ export async function getSessionMoney(sessionId: string, q: SessionMoneyQueryTyp
       u.id as student_id, u.name as student_name, u.student_id as student_number,
       s.id as subject_id, s.name as subject_name, i.id as item_id, i.label as item_label, i.kind as item_kind, o.id as offer_id,
       b.name as board_name, bs.month, bs.year, bs.label as series_label,
-      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as deadline,
+      -- The line's cut-off (the coordinator rework §6, §9.2: the deadline column shows it): its last moment to pay; a
+      -- line covered by a transfer under verification is kept until that transfer ends, the earliest board deadline
+      -- among its lines, when that is later (C10; decision 3 of the P1b review).
+      greatest(line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected),
+        (select min(line_effective_deadline(r2.attempt, r2.prior_sitting_series_id, r2.board_series_id, r2.declaration_rejected))
+          from payment_registration pr join payment p on p.id = pr.payment_id
+          join payment_registration pr2 on pr2.payment_id = p.id join registration r2 on r2.id = pr2.registration_id
+          where pr.registration_id = r.id and p.status = 'pending_verification')) as deadline,
       (select sec.name from section_membership m join section sec on sec.id = m.section_id join academic_year y on y.id = m.academic_year_id
         where m.student_id = u.id and y.start_year = ${ay} and m.ended_on is null limit 1) as section,
       (select sec.id from section_membership m join section sec on sec.id = m.section_id join academic_year y on y.id = m.academic_year_id

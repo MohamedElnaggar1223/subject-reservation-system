@@ -194,7 +194,7 @@ export const setupArabic: Record<string, string> = {
   'Unpaid reservations now:': 'الحجوزات غير المدفوعة الآن:',
   'Closing…': 'جارٍ الإغلاق…',
   'Close it': 'أغلقها',
-  'Today closing also cancels every unpaid reservation and ends its checkout; money held comes back to the family\'s balance.': 'الإغلاق اليوم يلغي أيضًا كل حجز غير مدفوع وينهي عملية الدفع الخاصة به؛ ويعود المال المحجوز إلى رصيد العائلة.',
+  'Reservations already made can still be paid, each until its last day to pay: closing cancels nothing.': 'يمكن دفع الحجوزات القائمة، كلٌّ حتى آخر يوم لدفعه: الإغلاق لا يلغي شيئًا.',
   'Clear': 'مسح',
   'Switches Accepting off at the end of that day.': 'يوقف قبول الحجوزات في نهاية ذلك اليوم.',
   'Unpaid reservations are cancelled': 'تُلغى الحجوزات غير المدفوعة بعد',
@@ -574,18 +574,24 @@ export function translateSetupText(text: string): string | null {
   // The impact before saving (impactSentence, @repo/validations): each part it can say, joined.
   if (text === 'This changes nothing for families.') return 'هذا لا يغيّر شيئًا للعائلات.';
   if ((m = /^This (.+)\.$/.exec(text))) {
-    const parts = m[1]!.split(/(?:, | and )(?=(?:re-prices|lists|changes|moves) )/);
+    const parts = m[1]!.split(/(?:, | and )(?=(?:re-prices|lists|changes|moves|brings) )/);
     const said = parts.map((p) => {
       let x: RegExpExecArray | null;
       if ((x = /^re-prices (\d+) unpaid reservations? \(the families are told\)$/.exec(p))) return `يعيد تسعير ${x[1]} حجز غير مدفوع (تُبلَّغ العائلات)`;
       if ((x = /^lists (\d+) paid reservations? for finance \(their price stays\)$/.exec(p))) return `يدرج ${x[1]} حجز مدفوع للمالية (يبقى سعرها)`;
       if ((x = /^changes (\d+) reservations? \(made payable, or closed to new ones\)$/.exec(p))) return `يغيّر ${x[1]} حجز (يصبح قابلًا للدفع، أو يُغلق أمام الجديد)`;
       if ((x = /^moves the due date of (\d+) unpaid reservations?$/.exec(p))) return `ينقل موعد سداد ${x[1]} حجز غير مدفوع`;
+      if ((x = /^brings forward the last day to pay of (\d+) unpaid reservations?(?: \((\d+) of them past it already: (?:it expires|they expire) at once\))?$/.exec(p))) {
+        return `يقدّم آخر يوم لدفع ${x[1]} حجز غير مدفوع${x[2] ? ` (${x[2]} منها فات موعده بالفعل: ينتهي فورًا)` : ''}`;
+      }
       return null;
     });
     if (said.every((x) => x !== null)) return `هذا ${said.join('، و')}.`;
   }
   // The API's refusals with a name or a count (after herWords).
+  if ((m = /^Set the exam fee of (.+) first: (\d+) unpaid reservations? (?:was|were) priced from a fee that is not confirmed, and could not be paid once the prices are final$/.exec(text))) {
+    return `حدّد رسوم امتحان ${m[1]} أولًا: ${m[2]} حجز غير مدفوع سُعِّر من رسوم غير مؤكدة، ولن يمكن دفعه بعد أن تصبح الأسعار نهائية`;
+  }
   if ((m = /^(.+): (\d+) reservations? use the (first entry in school|retake in school|retake in self study|first entry in self study) option — it stays ticked; close the row to stop new ones$/.exec(text))) {
     const opt: Record<string, string> = { 'first entry in school': 'قيد أول في المدرسة', 'retake in school': 'إعادة في المدرسة', 'retake in self study': 'إعادة دراسة ذاتية', 'first entry in self study': 'قيد أول دراسة ذاتية' };
     return `${m[1]}: ${m[2]} حجز يستخدم خيار «${opt[m[3]!]}» — يبقى محددًا؛ أغلق الصف لإيقاف الحجوزات الجديدة`;

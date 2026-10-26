@@ -17,10 +17,9 @@
  *   entry (MO-10), so the system drops it through the receipt-gated drop with `refundFor`'s refund
  *   (step C, refund.services: the course part by the line's consented policy, its board fee by the
  *   per-line "sent" rule);
- * - still unverified at the line's effective deadline: under `verification.unverifiedAtDeadline`
- *   = `enter_as_declared` (the default) nothing happens (F4 lists it as declared, unverified);
- *   under `hold` the deadline sweep expires a waiting line (`hold_unverified`) and drops a paid
- *   one through the receipt-gated drop with that day's refund, the board fee counted not sent.
+ * - still unverified at the line's effective deadline: nothing happens (F4 lists it as declared,
+ *   unverified). The coordinator rework (D7) trusts a declared sitting as her forms do: the
+ *   setting `verification.unverifiedAtDeadline` and its `hold` at the deadline left with P1b.
  *
  * A waiting line that ends here under a live instalment plan (step C, §3.6) has its plan settled
  * in the same transaction, as every system expiry does (`settlePlansOfExpiredLines`: the school
@@ -361,93 +360,4 @@ export async function verifyPriorSitting(
       .catch((err) => console.error('[verification] Could not tell the family:', err));
   }
   return { ...result, registrationId };
-}
-
-// ─── Unverified at the deadline: `hold` (the sweep step) ─────────────────────
-
-/**
- * Under `verification.unverifiedAtDeadline = hold`, every declared sitting still unverified at
- * its line's effective deadline ends the line: a waiting line expires (`hold_unverified`); a paid
- * one is dropped through the receipt-gated drop with that day's refund, the board fee counted not
- * sent (a held line was never entered). A waiting line with a payment still open is left to the
- * deadline sweep that follows on the same tick (it fails the payment and expires the line, as at
- * any deadline). Only a deadline that passed while `hold` was in force counts (the setting's own
- * time): a line whose deadline passed under `enter_as_declared` was entered then. Claim before acting (ST-06, ST-12): each line is locked and read again in its
- * own transaction, and acted on only while it is still unverified and in the status it was
- * found in — a second scheduler instance finds it done and skips it; a failure is retried next
- * tick. Under `enter_as_declared` nothing happens: F4 lists the line as declared, unverified.
- */
-export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
-  if ((await getSetting('verification.unverifiedAtDeadline')) !== 'hold') return { expired: 0, dropped: 0 };
-  // Only a deadline that passed while `hold` was in force: a line whose deadline passed under
-  // `enter_as_declared` was entered as declared then, and turning `hold` on later does not undo it.
-  // Hold counts from the moment the value became `hold` — its SETTING_CHANGED row — not from the
-  // setting row's own time, which other writes may move. A row set to `hold` with no change on
-  // record (seeded) counts from its own time.
-  const [changed] = await db.execute(sql`
-    select created_at as at from audit_log
-    where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' and new_data->>'value' = 'hold'
-    order by created_at desc limit 1`).then((r) => r.rows as { at: unknown }[]);
-  const [row] = changed ? [] : await db.select({ at: schoolSetting.updatedAt }).from(schoolSetting).where(eq(schoolSetting.key, 'verification.unverifiedAtDeadline'));
-  const sinceAt = changed ? new Date(String(changed.at)) : row?.at ?? null;
-  if (!sinceAt) return { expired: 0, dropped: 0 };
-  const since = { at: sinceAt };
-  const due = await db.execute(sql`
-    select r.id, r.status from registration r
-    where r.prior_sitting_source in ('declared_by_family', 'declared_by_desk') and r.prior_sitting_verified_outcome is null
-      and r.status in ('pending_approval', 'pending_payment', 'confirmed')
-      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) <= ${now}
-      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > ${since.at}
-    order by r.id`).then((x) => x.rows as { id: string; status: string }[]);
-  let expired = 0;
-  let dropped = 0;
-  for (const { id, status: found } of due) {
-    try {
-      const done = await db.transaction(async (tx) => {
-        const line = await lockLine(tx, id);
-        if (!line || line.outcome || !(DECLARED as readonly string[]).includes(line.priorSittingSource ?? '')) return null;
-        const d = await effectiveDeadlineFor(tx, { ...line, studentId: line.studentId });
-        if (!d.at || d.at > now || d.at <= since.at) return null;
-        if (line.status === 'pending_approval' || line.status === 'pending_payment') {
-          if ((await paymentState(tx, id)).open) return null;
-          const [row] = await tx.update(registration).set({ status: 'expired', updatedAt: now })
-            .where(and(eq(registration.id, id), eq(registration.status, line.status))).returning({ id: registration.id });
-          if (!row) return null;
-          await logActions(expiryEntries([{ id, from: line.status }], 'hold_unverified'), tx);
-          // A live instalment plan on it ends with it: settled as a drop that day (step C, §3.6).
-          await settlePlansOfExpiredLines(tx, [id], now, 'hold_unverified');
-          return { line, effect: 'expired' as const, deadline: d.at };
-        }
-        if (line.status !== 'confirmed') return null;
-        // Paid since this tick found it waiting: its receipt was made after lockLine looked for one
-        // (MA-16's order); left to the next tick, which takes the receipt first.
-        if (found !== 'confirmed') return null;
-        // A held line was never entered — its board fee is counted not sent (refundFor's neverSent) —
-        // unless an entry of it had gone to the board under "enter as declared" before the school
-        // turned `hold` on: then its board fee follows the per-line "sent" rule (the review of
-        // 093dbd1, item 5), and the entry is withdrawn with the line (item 1).
-        const sent = await sentEntriesOf(tx, id);
-        const refund = await refundFor(tx, id, now, { neverSent: sent.length === 0 });
-        const drop = await executeReceiptGatedDrop(tx, { registrationId: id, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: line.studentId });
-        const entries = await withdrawEntriesOfLineInTx(tx, id, 'the declared sitting was not verified by its deadline (the school holds such lines)', null);
-        await logAction(null, 'LINE_DROPPED_UNVERIFIED', 'registration', id, { status: 'confirmed' },
-          { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percent, gated: drop.gated,
-            deadline: d.at.toISOString(), setting: 'hold', priorSittingSeriesId: line.priorSittingSeriesId, boardSent: refund.boardSent, entriesWithdrawn: entries.length }, undefined, tx);
-        return { line, effect: 'dropped' as const, deadline: d.at, drop, boardSent: refund.boardSent, entries };
-      });
-      if (!done) continue;
-      if (done.effect === 'expired') expired++;
-      else dropped++;
-      const sitting = done.line.sitting ?? 'the sitting declared';
-      const body = done.effect === 'expired'
-        ? `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so the reservation has ended.`
-        : `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so ${done.boardSent ? 'its entry was withdrawn and it has been dropped' : 'it was not entered and has been dropped'}: ${done.drop.gated ? `bring the paper receipt back to the finance desk to release ${formatEgp(done.drop.refundAmount)} to your balance` : `${formatEgp(done.drop.refundAmount)} was returned to your balance`}${done.boardSent ? ' (the board fee stays with the board: the entry had been sent)' : ''}.`;
-      if (done.effect === 'dropped') await tellWithdrawn(done.entries, 'the declared sitting was not verified by its deadline').catch(() => undefined);
-      await tellFamily(done.line.studentId, 'Declared sitting not confirmed in time', body, { registrationId: id, effect: done.effect })
-        .catch((err) => console.error('[verification] Could not tell the family:', err));
-    } catch (err) {
-      console.error(`[verification] Could not hold line ${id} at its deadline:`, err);
-    }
-  }
-  return { expired, dropped };
 }

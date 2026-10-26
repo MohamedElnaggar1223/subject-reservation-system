@@ -76,7 +76,14 @@ async function linesOf(studentIds: string[]) {
       t.name as teacher, r.teacher_id, r.offer_item_id, r.refund_policy_snapshot as snapshot,
       r.price_at_registration as price, r.course_fee_at_registration as course_fee, r.registration_fee_at_registration as board_fee,
       r.due_at, r.price_provisional as provisional, r.pricing_basis as basis, b.name as board_name, bs.month, bs.year, bs.label as series_label,
-      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as deadline,
+      -- The line's cut-off (the coordinator rework §6, §9.2: the deadline column shows it): its last moment to pay; a
+      -- line covered by a transfer under verification is kept until that transfer ends, the earliest board deadline
+      -- among its lines, when that is later (C10; decision 3 of the P1b review).
+      greatest(line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected),
+        (select min(line_effective_deadline(r2.attempt, r2.prior_sitting_series_id, r2.board_series_id, r2.declaration_rejected))
+          from payment_registration pv join payment p on p.id = pv.payment_id
+          join payment_registration pr2 on pr2.payment_id = p.id join registration r2 on r2.id = pr2.registration_id
+          where pv.registration_id = r.id and p.status = 'pending_verification')) as deadline,
       pb.name as prior_board, ps.month as prior_month, ps.year as prior_year, ps.label as prior_label,
       r.prior_sitting_source as prior_source, r.prior_sitting_verified_outcome as prior_outcome, r.declaration_rejected, r.created_at,
       rc.receipt_number, rc.status as receipt_status, rc.issued_at as receipt_issued_at, rc.created_at as receipt_created_at,
@@ -216,7 +223,12 @@ async function paymentsOf(studentIds: string[]) {
           'receipt', (select rc.receipt_number from receipt rc where rc.registration_id = r.id)) order by s.name)
         from payment_registration pr join registration r on r.id = pr.registration_id join session_offer_item i on i.id = r.offer_item_id
         join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id where pr.payment_id = p.id) as covers,
-      (select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)) from payment_registration pr join registration r on r.id = pr.registration_id where pr.payment_id = p.id) as deadline,
+      -- When it ends (§10): a checkout at the earliest cut-off of the lines it covers; a transfer under verification
+      -- at the earliest board deadline among them (C10: it protects its lines until then; decision 3 of the P1b review).
+      (select min(case when p.status = 'pending_verification'
+          then line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)
+          else line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) end)
+        from payment_registration pr join registration r on r.id = pr.registration_id where pr.payment_id = p.id) as deadline,
       (select array_agg(distinct coalesce(b.name, '') || ' ' || initcap(bs.month) || ' ' || bs.year || case when bs.label <> '' then ' (' || bs.label || ')' else '' end)
         from payment_registration pr join registration r on r.id = pr.registration_id join board_series bs on bs.id = r.board_series_id left join exam_board b on b.code = bs.board_code
         where pr.payment_id = p.id) as series,
@@ -241,7 +253,7 @@ async function paymentsOf(studentIds: string[]) {
     reference: p.reference,
     academicYear: p.academic_year,
     covers: p.covers ?? [],
-    // One entry deadline per registration payment (F0b; 09): the date its lines share.
+    // When it ends: a checkout at its lines' earliest cut-off, a transfer under verification at their earliest board deadline.
     deadline: p.deadline ? new Date(p.deadline) : null,
     series: p.series ?? [],
     remark: p.remark,

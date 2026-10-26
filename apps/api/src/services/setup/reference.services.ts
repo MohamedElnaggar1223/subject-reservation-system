@@ -103,9 +103,11 @@ export async function enterBoardDate(seriesId: string, data: EnterBoardDateType,
       }
       if (entry <= now) throw new SetupError("The board's entry deadline must be in the future");
       if (retake && retake < entry) throw new SetupError('The retake deadline cannot be before the entry deadline');
+      // Which dates are hers (P1b fix 3): the entry deadline, and the retake deadline when she gives one; a retake
+      // deadline she leaves to the file stays the file's to fill and to replace.
       const [updated] = await tx.update(boardSeries).set({
         entryDeadline: entry, ...(retake !== undefined ? { retakeDeadline: retake } : {}),
-        datesSource: 'admin', updatedAt: now,
+        datesSource: 'admin', adminDeadlines: retake ? ['entry', 'retake'] : ['entry'], updatedAt: now,
       }).where(eq(boardSeries.id, seriesId)).returning();
       await logAction(actorId, 'BOARD_SERIES_DEADLINE_SET', 'board_series', seriesId,
         { entryDeadline: null, retakeDeadline: s.retakeDeadline?.toISOString() ?? null, datesSource: s.datesSource },

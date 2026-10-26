@@ -41,6 +41,7 @@ import {
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
+import { codeOf } from '../lib/refusal';
 import {
   requireAuth,
   requireParent,
@@ -207,7 +208,7 @@ export const payments = new Hono<HonoEnv>()
           message.includes('window is closed') ||
           message.includes('window is not open') ||
           message.includes('different entry deadlines') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -261,7 +262,7 @@ export const payments = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to generate receipt');
         logger.error('[receipt] PDF generation failed:', err);
-        return error(c, message, 500);
+        return error(c, message, 500, codeOf(err));
       }
     }
   )
@@ -323,7 +324,7 @@ export const payments = new Hono<HonoEnv>()
           message.includes('not authorized') ? 403 :
           message.includes('already been submitted') ? 409 :
           message.includes('not found') ? 404 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -375,7 +376,7 @@ export const payments = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to confirm payment');
         // A click that lands after another confirmation (or a rejection) has
         // committed is a conflict, the same answer as one that lost the race.
-        return error(c, message, message.includes('already in') ? 409 : 400);
+        return error(c, message, message.includes('already in') ? 409 : 400, codeOf(err));
       }
     }
   )
@@ -405,7 +406,7 @@ export const payments = new Hono<HonoEnv>()
         const status =
           message.includes('handed out') || message.includes('concurrently') || message.includes('already been dropped') ? 409 :
           message.includes('not found') ? 404 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -433,7 +434,7 @@ export const payments = new Hono<HonoEnv>()
         const status =
           message.includes('not found') ? 404 :
           message.includes('already') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -459,7 +460,7 @@ export const payments = new Hono<HonoEnv>()
         const status =
           message.includes('not found') ? 404 :
           message.includes('No transfer') || message.includes('only be undone') || message.includes('already been used') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -488,7 +489,7 @@ export const payments = new Hono<HonoEnv>()
           message.includes('not authorized') ? 403 :
           message.includes('not found') ? 404 :
           message.includes('already in') || message.includes('reference has been submitted') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -519,7 +520,7 @@ export const payments = new Hono<HonoEnv>()
         const status =
           message.includes('not found') ? 404 :
           message.includes('already in') || message.includes('concurrently') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   );

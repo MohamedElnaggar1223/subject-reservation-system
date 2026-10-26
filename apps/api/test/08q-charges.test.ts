@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow,
+  admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow, passCutOff,
   runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, CONSENT, confirmed, type Client, type Impact,
 } from './helpers';
 
@@ -441,24 +441,24 @@ describe('08q: charges', () => {
 
   // ─── The overdue expiry ────────────────────────────────────────────────────
 
-  it('payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run', async () => {
+  // P1b (C10): payment.expireOverdueAfterDays became the session's unpaid-cancel days; the expiry is the cut-off's.
+  it("the cut-off: a line unpaid past its due date + the session's unpaid-cancel days expires (cut_off) once, however many ticks run", async () => {
     const { expireOverdueLines } = await import('../src/services/overdue.services');
     const o = await onboard(officer, 'cq-overdue', 12);
     const [a] = await deskUnpaid(o, [subj.B!]);
-    await sql(`update registration set due_at = now() - interval '10 days' where id = $1`, [a!]);
-    expect((await expireOverdueLines()).expired).toBe(0);
-    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'payment.expireOverdueAfterDays' }, json: { value: 7, reason: 'unpaid a week past due expires' } }));
-    try {
-      // Two scheduler instances on the same tick: the line expires once (every line overdue that
-      // long is expired; the suites may leave others).
-      await Promise.all([expireOverdueLines(), expireOverdueLines()]);
-      expect(await statusOf('registration', a!)).toBe('expired');
-      expect((await sql(`select id from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [a!])).length).toBe(1);
-      expect((await one<{ r: string }>(`select new_data->>'reason' as r from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [a!])).r).toBe('overdue');
-      expect((await notificationsFor(o.parent.email, 'PAYMENT_EXPIRED')).length).toBeGreaterThan(0);
-    } finally {
-      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'payment.expireOverdueAfterDays' }, json: { value: 0, reason: 'back to the default' } }));
-    }
+    const days = (await one<{ d: number }>(`select s.unpaid_cancel_days as d from registration r join registration_session s on s.id = r.session_id where r.id = $1`, [a!])).d;
+    // Due a day less than the session's days ago: still payable.
+    await sql(`update registration set due_at = now() - make_interval(days => $1) + interval '1 day' where id = $2`, [days, a!]);
+    await expireOverdueLines();
+    expect(await statusOf('registration', a!)).toBe('pending_payment');
+    await sql(`update registration set due_at = now() - make_interval(days => $1) - interval '1 day' where id = $2`, [days, a!]);
+    // Two scheduler instances on the same tick: the line expires once (every line past its cut-off is expired; the
+    // suites may leave others).
+    await Promise.all([expireOverdueLines(), expireOverdueLines()]);
+    expect(await statusOf('registration', a!)).toBe('expired');
+    expect((await sql(`select id from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [a!])).length).toBe(1);
+    expect((await one<{ r: string }>(`select new_data->>'reason' as r from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [a!])).r).toBe('cut_off');
+    expect((await notificationsFor(o.parent.email, 'PAYMENT_EXPIRED')).length).toBeGreaterThan(0);
   });
 });
 
@@ -524,7 +524,7 @@ describe('08q: instalment plans', () => {
     for (const s of [s1, s2, s3]) await week3(s);
   });
 
-  it('refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the session\'s end; granted by finance only', async () => {
+  it('refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the line\'s board deadline; granted by finance only', async () => {
     const f = await onboard(officer, 'cqp-refuse', 12);
     // A subject whose board fee in the series is still provisional.
     const prov = await subject(adm, 'CQP-PROV', 'Provisional (A Level, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'a_level', council: 'pearson_edexcel' });
@@ -540,7 +540,8 @@ describe('08q: instalment plans', () => {
     expect((await refused(grant(f, provLine!, [1500]))).error).toContain('provisional');
     const [line, other] = await unpaid(f, [subj.P1!, subj.P2!], s1);
     expect((await refused(grant(f, line!, [500, 500]))).error).toContain('add up to');
-    expect((await refused(grant(f, line!, [500, 500, 500], { firstInDays: 400 }))).error).toContain('at the latest');
+    // P1b: the last instalment by the line's board deadline (here its exams' start, about two years ahead).
+    expect((await refused(grant(f, line!, [500, 500, 500], { firstInDays: 1200 }))).error).toContain('at the latest');
     expect((await refused(officer.api.v1.exceptions.$post({ json: { policyKey: 'plan.instalments', studentId: f.studentId, scope: { registrationId: line! }, value: [{ dueAt: inDays(2).toISOString(), amount: 1500 }], reason: 'an officer may not' } }))).status).toBe(403);
     const checkout = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [other!], paymentMethod: 'in_school' } }));
     expect((await refused(grant(f, other!, [750, 750]))).error).toContain('checkout in progress');
@@ -659,21 +660,17 @@ describe('08q: instalment plans', () => {
     expect(await statusOf('registration', l!)).toBe('confirmed');
   });
 
-  it('ended by an overdue expiry, by the student leaving, and by an instalment payment failing on a line no longer payable — each settled as a drop that day', async () => {
+  it('ended by the cut-off, by the student leaving, and by an instalment payment failing on a line no longer payable — each settled as a drop that day', async () => {
     const { expireOverdueLines } = await import('../src/services/overdue.services');
     const f = await onboard(officer, 'cqp-endings', 12);
     const [lo] = await unpaid(f, [subj.P11!], s1);
     const po = await plan(f, lo!, [500, 500, 500]);
     await payAtDesk(f, [po.i[0]!, po.i[1]!]);
+    // P1b: past its cut-off (its due date, moved to the last instalment by the plan, + the session's days).
     await sql(`update registration set due_at = now() - interval '10 days' where id = $1`, [lo!]);
-    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'payment.expireOverdueAfterDays' }, json: { value: 7, reason: 'unpaid a week past due expires' } }));
-    try {
-      // Every line overdue that long is expired (others the suites left may be too); this one once.
-      expect((await expireOverdueLines()).expired).toBeGreaterThanOrEqual(1);
-    } finally {
-      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'payment.expireOverdueAfterDays' }, json: { value: 0, reason: 'back to the default' } }));
-    }
-    expect(await expiredFor(lo!)).toBe('overdue');
+    // Every line past its cut-off is expired (others the suites left may be too); this one once.
+    expect((await expireOverdueLines()).expired).toBeGreaterThanOrEqual(1);
+    expect(await expiredFor(lo!)).toBe('cut_off');
     expect(await settledOf(lo!)).toMatchObject({ deposits: '1000', kept: '500', released: '500', cause: 'expired' });
     expect(await statusOf('exception', po.id)).toBe('lapsed');
 
@@ -687,7 +684,8 @@ describe('08q: instalment plans', () => {
     expect(await settledOf(lw!)).toMatchObject({ deposits: '500', kept: '500', released: '0' });
   });
 
-  it('the close spares a line whose last instalment is being checked; that instalment rejected after the close ends the plan (plan_ended); a line under a plan not spared is settled at the close', async () => {
+  // P1b (C10): the close expires no plan line; the cut-off does, sparing one whose last instalment is being checked.
+  it('the close ends no plan; at the cut-off a plan line expires and is settled, one whose last instalment is being checked is spared, and that instalment rejected ends the plan (plan_ended)', async () => {
     const f = await onboard(officer, 'cqp-close', 12);
     const [lc, ll] = await unpaid(f, [subj.P13!, subj.P14!], s2);
     const pc = await plan(f, lc!, [500, 500, 500]);
@@ -696,7 +694,10 @@ describe('08q: instalment plans', () => {
     await payAtDesk(f, [pl.i[0]!, pl.i[1]!]);
     const lastTransfer = await payByTransfer(f, pl.i[2]!, `CQP-C-${f.studentId.slice(0, 6)}`);
     await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s2 }, json: { reason: 'the window ended for this cycle' } }));
-    expect(await expiredFor(lc!)).toBe('session_closed');
+    expect([await statusOf('registration', lc!), await statusOf('registration', ll!)]).toEqual(['pending_payment', 'pending_payment']);
+    await passCutOff([lc!, ll!]);
+    await runPaymentDeadlines();
+    expect(await expiredFor(lc!)).toBe('cut_off');
     expect(await settledOf(lc!)).toMatchObject({ deposits: '1000', kept: '500', released: '500' });
     // Spared: its last instalment's transfer is being checked.
     expect(await statusOf('registration', ll!)).toBe('pending_payment');
@@ -836,24 +837,9 @@ describe('08q: instalment plans', () => {
     await apiResponse(grant(f, l!, [750, 750]));
   });
 
-  it("a late board entry (Q-20, the setting on) keeps a plan line's instalments payable after the board's date, and the last captures it", async () => {
-    const s = await session(adm, 'November (AS, plans late entry)', 'november', 'as_level', { ...openWindow(), activate: true });
-    const f = await onboard(officer, 'cqp-late', 12);
-    const [l] = await unpaid(f, [subj.P3!], s);
-    const p = await plan(f, l!, [750, 750]);
-    const series = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [l!])).s;
-    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [series]);
-    const setting = (value: boolean) => apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value, reason: value ? 'a late entry this series' : 'back to the hard stop' } }));
-    await setting(true);
-    try {
-      await apiResponse(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: f.studentId, scope: { boardSeriesId: series }, value: day(10), reason: 'the board accepted a late entry' } }));
-      await payAtDesk(f, [p.i[0]!]);
-      await payAtDesk(f, [p.i[1]!]);
-      expect(await statusOf('registration', l!)).toBe('confirmed');
-    } finally {
-      await setting(false);
-    }
-  });
+  // 'a late board entry (Q-20, the setting on) keeps a plan line's instalments payable after the board's date' retired
+  // with late entries (§9.1; trail row "retired 08q Q-20"). A plan's instalments are capped at its line's cut-off,
+  // which never passes the board deadline (below).
 
   it("a declared retake under a plan, its sitting rejected by the school: refused while an instalment payment is in progress; then the line expires and its plan is settled as a drop that day (step B's expiry, step C's settlement)", async () => {
     const dr = await subject(adm, 'CQP-DR', 'Declared retake (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
@@ -889,126 +875,10 @@ describe('08q: instalment plans', () => {
     expect(await wallet(f.studentId)).toEqual({ free: 250, held: 0 });
   });
 
-  it("a declared retake under a plan still unverified at its deadline under hold: the sweep expires it (hold_unverified) and settles its plan, once", async () => {
-    const s = await session(adm, 'November (AS, plans hold)', 'november', 'as_level', { ...openWindow(), activate: true });
-    await week3(s);
-    const dh = await subject(adm, 'CQP-DH', 'Declared hold (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const f = await onboard(officer, 'cqp-hold', 12);
-    const it = await one<{ id: string; series: string; year: number }>(
-      `select i.id, bs.id as series, bs.year from session_offer_item i join session_offer o on o.id = i.offer_id join board_series bs on bs.id = i.board_series_id
-       where o.session_id = $1 and o.subject_id = $2`, [s, dh]);
-    const [line] = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: {
-      studentId: f.studentId, sessionId: s, consent: CONSENT,
-      lines: [{ offerItemId: it.id, attempt: 'retake', mode: 'in_school', priorSitting: { month: 'june', year: Number(it.year) - 1 } }],
-    } }))).registrations;
-    const l = line!.id;
-    const p = await plan(f, l, [750, 750]);
-    await payAtDesk(f, [p.i[0]!]);
-    const verification = (value: 'hold' | 'enter_as_declared') => apiResponse(adm.api.v1.settings[':key'].$put({
-      param: { key: 'verification.unverifiedAtDeadline' }, json: { value, reason: value === 'hold' ? 'the school holds unverified sittings (Q-22)' : 'back to the default' },
-    }));
-    await verification('hold');
-    try {
-      // Hold on since before the line's deadline passed (45 seconds ago; the deadline, 30).
-      await sql(`update audit_log set created_at = now() - interval '45 seconds' where id = (select id from audit_log where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' order by created_at desc limit 1)`);
-      await sql(`update board_series set entry_deadline = now() - interval '30 seconds', retake_deadline = now() - interval '30 seconds' where id = $1`, [it.series]);
-      expect(await runPaymentDeadlines()).toMatchObject({ unverifiedExpired: 1 });
-      expect(await expiredFor(l)).toBe('hold_unverified');
-      expect(await settledOf(l)).toMatchObject({ deposits: '750', kept: '500', released: '250', cause: 'expired' });
-      expect(await statusOf('exception', p.id)).toBe('lapsed');
-      expect(await statusOf('charge', p.i[1]!)).toBe('cancelled');
-      expect(await wallet(f.studentId)).toEqual({ free: 250, held: 0 });
-      // Once: the next tick finds nothing.
-      expect(await runPaymentDeadlines()).toMatchObject({ unverifiedExpired: 0 });
-      expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'PLAN_SETTLED' and entity_id = $1`, [l])).n)).toBe(1);
-    } finally {
-      await verification('enter_as_declared');
-    }
-  });
+  // 'a declared retake under a plan still unverified at its deadline under hold: the sweep expires it (hold_unverified)'
+  // retired with the hold (§4; trail row "retired 08q hold").
 
-  it("a declared retake rejected while paid stands as a first entry; its payment reversed, a plan on it falls due at the first-entry deadline, not the retake deadline (B's flag in the charge deadlines)", async () => {
-    const s = await session(adm, 'November (AS, plans flag)', 'november', 'as_level', { ...openWindow(), activate: true });
-    const fl = await subject(adm, 'CQP-FL', 'Rejected flag (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const it = await one<{ id: string; series: string; board: string; month: string; year: number }>(
-      `select i.id, bs.id as series, bs.board_code as board, bs.month, bs.year from session_offer_item i join session_offer o on o.id = i.offer_id join board_series bs on bs.id = i.board_series_id
-       where o.session_id = $1 and o.subject_id = $2`, [s, fl]);
-    // The series' entry deadline in 30 days, its retake deadline in 35: a retake of the board's
-    // previous sitting runs to the retake deadline (§3.3).
-    await sql(`update board_series set entry_deadline = now() + interval '30 days', retake_deadline = now() + interval '35 days' where id = $1`, [it.series]);
-    const prev = await one<{ month: 'january' | 'june' | 'october' | 'november'; year: number }>(`select month, year from board_previous_sitting($1, $2, $3)`, [it.board, it.month, it.year]);
-    const f = await onboard(officer, 'cqp-flag', 12);
-    const desk = await apiResponse(officer.api.v1.registrations.desk.$post({ json: {
-      studentId: f.studentId, sessionId: s, consent: CONSENT,
-      lines: [{ offerItemId: it.id, attempt: 'retake', mode: 'in_school', priorSitting: { month: prev.month, year: Number(prev.year) } }],
-      collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 },
-    } }));
-    const l = desk.registrations[0]!.id;
-    // Rejected while paid, before the first-entry deadline: the line stands, a first entry (B, §3.5).
-    expect(await apiResponse(coordinator.api.v1.registrations[':id']['verify-prior'].$post({ param: { id: l }, json: { outcome: 'rejected', reason: 'no result for this candidate' } })))
-      .toMatchObject({ outcome: 'rejected', effect: 'stands' });
-    // Its payment reversed (confirmed by mistake): it waits for payment again, the flag still set.
-    await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: desk.payments[0]!.id }, json: { reason: 'confirmed by mistake', moneyReturned: true } }));
-    expect(await one(`select status, declaration_rejected as rejected from registration where id = $1`, [l])).toEqual({ status: 'pending_payment', rejected: true });
-    // A plan on it: its instalments fall due at the line's deadline — the entry deadline (a first entry).
-    const p = await plan(f, l, [750, 750]);
-    const due = await one<{ charge: string; entry: string; retake: string }>(
-      `select charge_effective_deadline(c.kind, c.registration_id, c.board_series_id, c.board_service_id) as charge, bs.entry_deadline as entry, bs.retake_deadline as retake
-       from charge c join board_series bs on bs.id = c.board_series_id where c.id = $1`, [p.i[0]!]);
-    expect(new Date(due.charge).getTime()).toBe(new Date(due.entry).getTime());
-    expect(new Date(due.charge).getTime()).toBeLessThan(new Date(due.retake).getTime());
-    await payAtDesk(f, [p.i[0]!]);
-    // Between the two deadlines: the second instalment is refused (the retake deadline would still allow it).
-    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [it.series]);
-    const refusedInstalment = await refused(f.parent.api.v1.payments.initiate.$post({ json: { chargeIds: [p.i[1]!], paymentMethod: 'instapay' } }));
-    expect(refusedInstalment.status).toBeGreaterThanOrEqual(400);
-    expect(refusedInstalment.error).toMatch(/^The line's deadline \(.+\) has passed: this instalment can no longer be paid$/);
-    expect(await sql(`select 1 from payment_charge where charge_id = $1`, [p.i[1]!])).toEqual([]);
-  });
-
-  it("the statement, the desk's Owes now and the Money tab agree: a plan line paid = its deposits, owed = the rest, its instalments under it and never in the totals; the charges beside the lines", async () => {
-    const st = await subject(adm, 'CQP-ST', 'Statement (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const f = await onboard(officer, 'cqp-statement', 12);
-    const [l] = await unpaid(f, [st], s1);
-    const p = await plan(f, l!, [750, 750]);
-    await payAtDesk(f, [p.i[0]!]);
-    const custom = (amount: number, description: string) => apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', amount, description, reason: 'the statement case' } }));
-    const card = await custom(250, 'Replacement ID card');
-    const coat = await custom(100, 'Lab coat');
-    await payAtDesk(f, [coat.id]);
-    const gone = await custom(40, 'Locker (not wanted)');
-    await apiResponse(officer.api.v1.charges[':id'].cancel.$post({ param: { id: gone.id }, json: { reason: 'not wanted after all' } }));
-
-    // The statement (B's page; step C's numbers).
-    const stmt = await apiResponse(officer.api.v1.statement.$get({ query: { studentId: f.studentId } }));
-    const me = stmt.students[0]!;
-    const line = me.sessions.flatMap((x) => x.lines).find((x) => x.id === l)!;
-    expect(line).toMatchObject({ price: 1500, paid: 750, outstanding: 750, status: 'pending_payment' });
-    expect(line.plan).toMatchObject({ id: p.id, live: true, deposits: 750 });
-    expect(line.plan!.instalments.map((i) => [i.no, i.amount, i.status])).toEqual([[1, 750, 'paid'], [2, 750, 'pending_payment']]);
-    expect(me.charges.map((c) => [c.label, c.status, c.price, c.paid, c.outstanding])).toEqual([
-      ['Replacement ID card', 'pending_payment', 250, 0, 250],
-      ['Lab coat', 'paid', 100, 100, 0],
-      ['Locker (not wanted)', 'cancelled', 0, 0, 0],
-    ]);
-    // The totals add the line and the charges once — the instalments are the line's own money.
-    const fees = me.schoolFees.reduce((a, x) => ({ price: a.price + (x.waived ? 0 : x.amount), paid: a.paid + x.paid, outstanding: a.outstanding + x.outstanding }), { price: 0, paid: 0, outstanding: 0 });
-    expect(me.totals).toMatchObject({ price: 1500 + 350 + fees.price, paid: 750 + 100 + fees.paid, outstanding: 750 + 250 + fees.outstanding });
-    // The desk's Owes now: the plan line's rest and the charge owed (the school fee is its own badge).
-    expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).owing).toBe(1000);
-    // The Money tab: the line owes its rest, its deposits held.
-    const money = await apiResponse(adm.api.v1.sessions[':id'].money.$get({ param: { id: s1 }, query: { filter: 'all' } }));
-    expect(money.lines.find((x) => x.id === l)).toMatchObject({ price: 1500, deposits: 750, outstanding: 750, unpaid: true });
-    // Paid in full by the last instalment: captured, nothing owed, the instalments still listed under it.
-    await payAtDesk(f, [p.i[1]!]);
-    const after = (await apiResponse(officer.api.v1.statement.$get({ query: { studentId: f.studentId } }))).students[0]!;
-    const captured = after.sessions.flatMap((x) => x.lines).find((x) => x.id === l)!;
-    expect(captured).toMatchObject({ status: 'confirmed', paid: 1500, outstanding: 0 });
-    expect(captured.plan).toMatchObject({ live: false, status: 'used', deposits: 0 });
-    expect(after.totals.paid - me.totals.paid).toBe(750);
-    expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).owing).toBe(250);
-  });
-
-  it("another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling", async () => {
+  it("a plan's deposits are held for its line: never transferred to a sibling, and its last instalment captures it", async () => {
     const f = await onboard(officer, 'cqp-prereg', 12);
     const sibling = await apiResponse(officer.api.v1.links['desk-onboard'].$post({
       json: { parent: { email: f.parent.email }, student: { email: 'student.cqp-prereg-sib@test.local', name: 'Student cqp-prereg-sib', password: 'TestPass1', grade: 11 } },
@@ -1018,16 +888,8 @@ describe('08q: instalment plans', () => {
     await payAtDesk(f, [p.i[0]!]);
     // Held money is not free: not transferred.
     expect((await refused(f.parent.api.v1.escrow.transfer.$post({ json: { fromStudentId: f.studentId, toStudentId: sibling.student.id, amount: 100 } }))).status).toBeGreaterThanOrEqual(400);
-    // A preregistration in a session not open yet, paid: its money is held for it beside the plan's.
-    const draft = await session(adm, 'June (AS, plans prereg)', 'june', 'as_level', futureWindow());
-    const [pre] = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, ...(await reservationOf(draft, [subj.P8!])), studentId: f.studentId } }));
-    const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pre!.id], paymentMethod: 'in_school' } }));
-    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
-    expect(await wallet(f.studentId)).toEqual({ free: 0, held: 2250 });
-    // The session opens: the preregistration is captured from its own held money, never the plan's.
-    const { capturePreregistrationsForSession } = await import('../src/services/prereg.services');
-    await sql(`update registration_session set status = 'active', start_date = now() - interval '1 day' where id = $1`, [draft]);
-    expect((await capturePreregistrationsForSession(draft)).captured).toBe(1);
+    // P1b (C4): the preregistration whose capture ran beside the plan retired (trail row "retired 08q prereg capture");
+    // the plan's deposit stays held for its line alone.
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 750 });
     expect((await ledgerOf(l!)).instalment).toBe(750);
     await payAtDesk(f, [p.i[1]!]);
@@ -1203,16 +1065,6 @@ describe("08q: a board service's provisional fee", () => {
     expect(await statusOf('charge', id)).toBe('paid');
   });
 
-  it('with pricing.payOnProvisionalFee on, the school lets a provisional fee be paid', async () => {
-    await setFee(LCI, 900, true);
-    const id = await ask(LCI, 'late_cash_in');
-    await apiResponse(officer.api.v1.charges[':id'].accept.$post({ param: { id }, json: { reason: 'the family asked at the desk' } }));
-    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'pricing.payOnProvisionalFee' }, json: { value: true, reason: 'the school takes provisional fees this year' } }));
-    try {
-      const paid = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, chargeIds: [id], instrumentUsed: 'cash' } }));
-      expect(paid.collected).toBe(900);
-    } finally {
-      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'pricing.payOnProvisionalFee' }, json: { value: false, reason: 'back to the default' } }));
-    }
-  });
+  // 'with pricing.payOnProvisionalFee on, the school lets a provisional fee be paid' retired with the setting (§4: a
+  // provisional fee is never paid; trail row "retired 08q payOnProvisionalFee"). The refusal is the case above.
 });

@@ -27,12 +27,12 @@ import { randomUUID } from 'crypto';
 import {
   POLICIES, LEGACY_TYPE_TO_POLICY, SCOPE_FIELD, isRegistryPolicyKey, policiesGrantableBy, hasRole,
   academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart, seriesLabel, InstalmentRow,
-  type GrantExceptionType, type ListExceptionsQueryType, type RegistryPolicyKey, type PolicyScopeInputType, type Role, type InstalmentRowType,
+  type GrantExceptionType, type ListExceptionsQueryType, type RegistryPolicyKey, type PolicyScopeInputType, type Role, type InstalmentRowType, type PolicyDefinition,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
 import { expireWaitingRegistrations } from './expiry.services';
-import { windowExtended, schoolFeeWaived } from './exception-registry.services';
+import { schoolFeeWaived } from './exception-registry.services';
 import { grantPlanInTx, settlePlanInTx, PlanError } from './plan.services';
 import { cancelPushesForWaiverInTx } from './school-fee.services';
 import { getSetting } from './settings.services';
@@ -155,7 +155,7 @@ function typedValue(n: Normalised) {
     }
     case 'date':
       if (n.value === null || n.value === undefined) {
-        throw new ExceptionError(n.policyKey === 'deadline.window' ? 'Deadline extensions need an expiry date' : `${p.label} needs a date`);
+        throw new ExceptionError(n.policyKey === 'deadline.reserve' ? 'A later reserve date needs its date' : `${p.label} needs a date`);
       }
       out.valueDate = toDate(n.policyKey, n.value);
       return out;
@@ -261,13 +261,14 @@ async function refuseIdenticalGrant(tx: Tx, n: Normalised, typed: ReturnType<typ
  */
 export async function grantException(data: GrantExceptionType, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext) {
   const n = normalise(data);
-  const p = POLICIES[n.policyKey];
+  const p: PolicyDefinition = POLICIES[n.policyKey];
   assertMayGrant(n.policyKey, actor.role, 'grant');
   if (p.status === 'pending') {
     throw new ExceptionError(`${p.label} is registered but not yet applied by pricing: it cannot be granted yet`, 409);
   }
-  if (p.status === 'gated' && !(await getSetting('exceptions.boardEntryDeadline'))) {
-    throw new ExceptionError('Late board entries are off: the board\'s entry deadline is a hard stop (owner question Q-20; the setting exceptions.boardEntryDeadline)', 409);
+  if (p.status === 'gated') {
+    // No policy is gated since P1b (Q-20's late board entry and its setting left: C6, no late entries).
+    throw new ExceptionError(`${p.label} cannot be granted`, 409);
   }
   const holderStudents = await holderStudentsOf(db, n);
   if (n.policyKey === 'eligibility.grade10OtherSeries') {
@@ -616,22 +617,6 @@ export async function confirmCheckedException(id: string, actor: { id: string; r
 }
 
 // ─── Hooks the V3 services call by name ──────────────────────────────────────
-
-/**
- * Hook 2 — window checks (MA-13): a closed (or not-yet-open) session is treated as open for this
- * student while a deadline.window exception covers it, until its date.
- */
-export async function hasDeadlineExtension(
-  studentId: string,
-  sessionId: string,
-  // A caller inside a transaction passes it, so the lookup does not take a
-  // second pool connection while the transaction holds its locks.
-  executor: Tx | typeof db = db,
-  // The subject asked about: a subject-scoped extension opens the window for it alone.
-  subjectId?: string | null,
-): Promise<boolean> {
-  return windowExtended(executor, studentId, sessionId, new Date(), subjectId);
-}
 
 /** Hook 3 — the school-fee gate's waiver (gate.schoolFee): for that academic year, or every year. */
 export async function hasFeeWaiver(studentId: string, academicYear: string | null = null): Promise<boolean> {

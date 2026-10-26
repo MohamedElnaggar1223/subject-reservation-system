@@ -86,26 +86,23 @@ export type PricingBasis = PricingBasisV1 | PricingBasisV2;
  * exception adapter (C's registry replaces today's).
  */
 export const LINE_POLICY_KEYS = [
-  'gate.availability',
+  // The coordinator rework (P1b, line rules v2): the cells decide what a row offers (no exception: G4), save a
+  // first entry in self-study, which decision 1's exception still lets through; required items, availability and
+  // the grade-10 core left with the old model.
   'gate.selfStudyFirstEntry',
   'gate.retakeDeclared',
   'gate.exclusiveItems',
   'gate.sameEntryOnce',
-  'gate.requiredItems',
   'gate.priorSeries',
-  'gate.grade10Core',
 ] as const;
+// The pricing.* percents left with their settings (§9.1): the session's self-study share and a row's own fee.
 export const PRICE_POLICY_KEYS = [
   'price.custom',
   'price.discountPercent',
   'price.discountFixed',
-  'pricing.selfStudyCoursePercent',
-  'pricing.selfStudyBoardPercent',
-  'pricing.retakeTaughtCoursePercent',
-  'pricing.onePaperCoursePercent',
 ] as const;
-// deadline.boardEntry: Q-20's late board entry (step C's registry; read by effectiveDeadlineFor while its setting is on).
-export const DUE_POLICY_KEYS = ['deadline.payment', 'deadline.boardEntry'] as const;
+// G4's two dates: a later pay date (dueDateFor) and a later reserve date (mayReserve). Q-20's late board entry is gone (no late entries).
+export const DUE_POLICY_KEYS = ['deadline.payment', 'deadline.reserve'] as const;
 export type LinePolicyKey = (typeof LINE_POLICY_KEYS)[number] | (typeof PRICE_POLICY_KEYS)[number] | (typeof DUE_POLICY_KEYS)[number];
 
 /** The family's (and staff's) read of what a student can reserve in a session. */

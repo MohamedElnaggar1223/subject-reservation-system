@@ -322,12 +322,6 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
             {s.input === 'centres' && <CentresInput value={(draft ?? {}) as Centres} onChange={setDraft} />}
           </fieldset>
 
-          {s.key === 'eligibility.graduateRetakes' && s.value === true && draft === false && (
-            <Notice tone="warning">
-              Turning this off expires the waiting registrations graduates already made for the October, November and January series; their open checkouts are closed, any money from the balance put back, and families told.
-            </Notice>
-          )}
-
           <div>
             <label htmlFor={`${s.key}-reason`} className="mb-1 block text-sm font-medium text-foreground">
               Reason <span className="text-destructive">*</span>

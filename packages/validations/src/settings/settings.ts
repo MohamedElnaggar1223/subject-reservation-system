@@ -23,6 +23,7 @@ import {
   SelfStudyRuleSchema, SELF_STUDY_RULES, SELF_STUDY_RULE_LABELS, CarryForwardReadingSchema, CARRY_FORWARD_READINGS, CARRY_FORWARD_LABELS,
 } from '../import/import.validations';
 import { RefundPolicySchema, DEFAULT_REFUND_POLICIES } from '../session/session.validations';
+import { DECLARATION_TEXT } from '../registration/reservation.validations';
 
 export type SettingGroup = 'school' | 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification' | 'exams' | 'reminders' | 'import';
 
@@ -68,21 +69,6 @@ export const ExamCentresSchema = z.record(
 );
 export type ExamCentres = z.infer<typeof ExamCentresSchema>;
 
-const percentSetting = (label: string, description: string, def: number, source?: string) =>
-  defineSetting({
-    schema: z.number().min(0).max(100),
-    default: def,
-    group: 'pricing',
-    label,
-    description,
-    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
-    ...(source ? { source } : {}),
-    input: 'number',
-    min: 0,
-    max: 100,
-    unit: 'percent',
-  });
-
 function defineSetting<S extends z.ZodTypeAny>(d: SettingDefinition<S>): SettingDefinition<S> {
   return d;
 }
@@ -105,16 +91,17 @@ export const SETTINGS = {
     editableBy: [ROLES.ADMIN],
     input: 'text',
   }),
-  'eligibility.graduateRetakes': defineSetting({
-    schema: z.boolean(),
-    default: true,
-    group: 'eligibility',
-    label: 'Graduates may retake after grade 12',
+  // The coordinator rework (COORDINATOR_REWORK.md C8): the declaration families tick with the refund policy, one
+  // school-wide text the admin edits; each consent snapshots the text it was given (registration_consent).
+  'reservation.declarationText': defineSetting({
+    schema: z.string().trim().min(10, 'The declaration is a sentence the family agrees to').max(1000),
+    default: DECLARATION_TEXT,
+    group: 'school',
+    label: 'The declaration families agree to',
     description:
-      'A student who has finished grade 12 may still register for the October, November and January series of the academic year right after it (retakes to improve grades), never the June after it. Turning this off expires the waiting registrations graduates already made for those series.',
+      'Ticked by every family, with the refund policy, when they reserve (and read and signed at the desk). Changing it changes what families agree to from then on; a consent already given keeps the text it was given.',
     editableBy: [ROLES.ADMIN],
-    source: 'A-12',
-    input: 'boolean',
+    input: 'text',
   }),
   'schoolFee.graduatesExempt': defineSetting({
     schema: z.boolean(),
@@ -150,7 +137,7 @@ export const SETTINGS = {
     label: 'School days of the week',
     description:
       'The weekdays the school is open during term. The calendar marks holidays, early dismissals, exam-only days and extra school days on top of these.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'weekdays',
   }),
   // F0b: what the school's "A.S./A.2." marks on a single AS unit — the
@@ -164,7 +151,7 @@ export const SETTINGS = {
     label: 'What "A.S./A.2." marks on a single AS unit',
     description:
       'The school writes "A.S./A.2." on some single AS units such as M1 and S1. An entry that mixes AS and A2 units (Biology Paper 3 & 4) is always "A.S./A.2."; for an AS unit alone, choose what the code means. Nothing stored changes: every screen derives the code from the unit\'s own level, the awards it counts toward and the student\'s year.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-01',
     input: 'choice',
     choices: LEVEL_CODE_READINGS.map((r) => ({ value: r, label: LEVEL_CODE_READING_LABELS[r] })),
@@ -179,7 +166,7 @@ export const SETTINGS = {
     label: 'Self-study on a subject the school teaches',
     description:
       'The school\'s sheet marks some rows self-study on subjects the school also teaches. Today\'s rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-03',
     input: 'choice',
     choices: SELF_STUDY_RULES.map((r) => ({ value: r, label: SELF_STUDY_RULE_LABELS[r] })),
@@ -191,42 +178,10 @@ export const SETTINGS = {
     label: 'What "Carry forward on …" means in the sheet',
     description:
       'Staff wrote "Carry forward on June 2022" on some A2 rows: an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-02',
     input: 'choice',
     choices: CARRY_FORWARD_READINGS.map((r) => ({ value: r, label: CARRY_FORWARD_LABELS[r] })),
-  }),
-  // Reservations rework (RESERVATIONS_REWORK.md §3.4): the pricing policies priceLine reads.
-  // Each can be lifted for one family by an exception (C's registry).
-  'pricing.selfStudyCoursePercent': percentSetting(
-    'Self-study: share of the course fee',
-    'A self-study line pays this share of the school\'s course fee ("Self Study 50% School fees" on every form).',
-    50, 'A-16',
-  ),
-  'pricing.selfStudyBoardPercent': percentSetting(
-    'Self-study: share of the board fee',
-    'A self-study line pays this share of the board\'s fee. The forms halve the "School fees" only, so the board fee is paid in full by default (A-16, question Q-12 to the admin).',
-    100, 'Q-12',
-  ),
-  'pricing.retakeTaughtCoursePercent': percentSetting(
-    'Retake in school: share of the course fee',
-    'A retake taught again in school pays this share of the course fee ("Retake in School 100%").',
-    100,
-  ),
-  'pricing.onePaperCoursePercent': percentSetting(
-    'One-paper retake: share of its own course fee',
-    'Scales the course fee the school sets for a one-paper retake item (Paper 4 only, 1H only…).',
-    100, 'Q-13',
-  ),
-  'pricing.payOnProvisionalFee': defineSetting({
-    schema: z.boolean(),
-    default: false,
-    group: 'pricing',
-    label: 'Take payment while a board fee is provisional',
-    description:
-      'Off: a line whose board fee is still provisional (copied from an earlier series, or typed before the board publishes) can be reserved but not paid; the checkout and the desk say "board fee provisional, confirmed before payment". On: it can be paid at the provisional price, and a later difference is a price adjustment by finance.',
-    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
-    input: 'boolean',
   }),
   'payment.graceDays': defineSetting({
     schema: z.number().int().min(0).max(60),
@@ -234,37 +189,12 @@ export const SETTINGS = {
     group: 'payment',
     label: 'Days to pay a line reserved late',
     description:
-      'A line reserved after its session\'s payment due date is due this many days after it is reserved; a line whose board fee is provisional, this many days after the fee is confirmed. Never later than its series\' deadline.',
+      'A line reserved after its session\'s payment due date is due this many days after it is reserved; a line reserved before its session\'s prices were final, this many days after they are. Never later than its board\'s deadline.',
     editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
     input: 'number',
     min: 0,
     max: 60,
     unit: 'days',
-  }),
-  // Reservations rework, step C (RESERVATIONS_REWORK.md §3.1, §3.7).
-  'payment.expireOverdueAfterDays': defineSetting({
-    schema: z.number().int().min(0).max(365),
-    default: 0,
-    group: 'payment',
-    label: 'Expire an unpaid line this many days after it was due',
-    description:
-      'A line still unpaid this many days after its due date expires (reason "overdue"), and an instalment plan on it is settled as a drop that day. 0: never — a due date then drives reminders and the "overdue" list only, and the line waits for its board\'s deadline or the session\'s close.',
-    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
-    input: 'number',
-    min: 0,
-    max: 365,
-    unit: 'days',
-  }),
-  'exceptions.boardEntryDeadline': defineSetting({
-    schema: z.boolean(),
-    default: false,
-    group: 'exceptions',
-    label: 'Allow late board entries by exception',
-    description:
-      'Off: the board\'s entry deadline is a hard stop (owner decision MO-10) and the "Late board entry" exception cannot be granted. On: the admin may grant one student a late entry in one series, with the board\'s late fee charged to the family (question Q-20 to the owner).',
-    editableBy: [ROLES.ADMIN],
-    source: 'Q-20',
-    input: 'boolean',
   }),
   'refund.defaultPolicy.june': defineSetting({
     schema: RefundPolicySchema,
@@ -288,22 +218,6 @@ export const SETTINGS = {
     source: 'Q-11',
     input: 'refundPolicy',
   }),
-  // Reservations rework, step B (RESERVATIONS_REWORK.md §3.5; DISCOVERY.md Q-22, default (a)).
-  'verification.unverifiedAtDeadline': defineSetting({
-    schema: z.enum(['enter_as_declared', 'hold']),
-    default: 'enter_as_declared',
-    group: 'verification',
-    label: 'A declared sitting still unverified at its deadline',
-    description:
-      'A family (or the desk) may declare the sitting a retake follows; the coordinator verifies it on the session\'s To verify tab. "Enter as declared": the form trusts the family — the line is entered and the entry check lists it as declared, unverified. "Hold": at the line\'s deadline a line awaiting payment expires, and a paid one is dropped with that day\'s refund (the paper receipt comes back first).',
-    editableBy: [ROLES.ADMIN],
-    source: 'Q-22',
-    input: 'choice',
-    choices: [
-      { value: 'enter_as_declared', label: 'Enter as declared' },
-      { value: 'hold', label: 'Hold: expire or drop at the deadline' },
-    ],
-  }),
   // F4: the school as an exam centre.
   'exams.centres': defineSetting({
     schema: ExamCentresSchema,
@@ -312,7 +226,7 @@ export const SETTINGS = {
     label: 'Centre numbers and entry route',
     description:
       "The school's centre number with each exam board, printed on every entry list, statement of entry and candidate number, and whether the school enters directly or through the British Council. An entry list flags every row while its board's centre number is missing.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'Q-05',
     input: 'centres',
   }),
@@ -323,7 +237,7 @@ export const SETTINGS = {
     label: 'Carry forward on A Level entries',
     description:
       "When a candidate's A Level entry follows their AS entry of the same syllabus within the board's carry-forward period (Cambridge: 13 months), suggest carrying the AS result forward and fill in the previous series, centre and candidate number for the coordinator to confirm. Manual: never suggested; staff fill the reference in themselves.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'Q-02',
     input: 'choice',
     choices: [
@@ -338,7 +252,7 @@ export const SETTINGS = {
     label: 'Forecast grades for self-study candidates',
     description:
       'A self-study candidate has no teacher to give the forecast grade the board asks for. The coordinator gives it, or it is not asked for (the entry list does not flag it).',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-03',
     input: 'choice',
     choices: [
@@ -353,7 +267,7 @@ export const SETTINGS = {
     label: 'How long unclaimed certificates are kept',
     description:
       "Certificates not collected this many months after they arrived are listed as unclaimed, to return to the board or destroy with a reason. Cambridge asks centres to keep them at least 12 months.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'number',
     min: 1,
     max: 120,
@@ -366,7 +280,7 @@ export const SETTINGS = {
     label: 'Candidates per invigilator',
     description:
       'An exam room needs one invigilator for every this many candidates (the boards\' guidance is one to 30 for written papers); a room with fewer is flagged on the seating screen.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'number',
     min: 5,
     max: 100,
@@ -379,7 +293,7 @@ export const SETTINGS = {
     label: 'Remind staff of exam deadlines',
     description:
       "The coordinator and the admin are told this many days before each board date that needs the school (entry deadline, forecast grades, access arrangements, coursework marks), and again the day before, with what is still outstanding.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'number',
     min: 1,
     max: 60,

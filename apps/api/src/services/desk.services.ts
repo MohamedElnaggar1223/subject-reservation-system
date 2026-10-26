@@ -25,10 +25,9 @@ import { assertSchoolFeeGate } from './registration.services';
 import { reserveLines, consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { exceptionsOfLines } from './line-exceptions-read.services';
 import { lineDepositsSql } from './escrow.services';
-import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
-import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
-import { getSetting } from './settings.services';
-import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
+import { mayReserveSession, subjectsOfItems, assertMayPay, cutOffsOf, reserveRefusal } from './window.services';
+import { coded } from '../lib/refusal';
+import { PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow, InsufficientBalanceError } from './escrow.services';
 import { confirmPayment, failPayment, assertNoLivePlan, createChargePaymentsInTx } from './payment.services';
@@ -162,9 +161,8 @@ export async function onboardFamily(data: DeskOnboardFamilyType, staffId: string
  * took — one action, receipts born immediately (RESERVATIONS_REWORK.md §4.3: "Reserve only",
  * "Reserve and collect"). The desk's one consent tick ("read and signed by the parent") is
  * recorded on every line on the desk channel; a sitting the officer names that the system does
- * not know is declared by the desk and listed to verify. A line whose board fee is still
- * provisional is reserved and not collected — it is collected once the fee is confirmed (unless
- * the school takes payment at the provisional price, `pricing.payOnProvisionalFee`).
+ * not know is declared by the desk and listed to verify. A line reserved before its session's
+ * prices are final is reserved and not collected — it is collected once they are (E6).
  */
 export async function executeDeskRegistration(staffId: string, data: DeskRegistrationType, auditCtx?: AuditContext) {
   // F0a: call site 5 of mayRegisterFor — the desk registers only for a
@@ -175,11 +173,10 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     where: (s, { eq }) => eq(s.id, data.sessionId),
   });
   if (!sess) throw new Error('Session not found');
-  // The lines' subjects: with the session closed, a subject-scoped extension opens its subject alone.
-  const w = await sessionWindow(data.studentId, sess.id, null, db, new Date(), await subjectsOfItems(db, data.lines.map((l) => l.offerItemId)));
-  if (!w.open) {
-    throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
-  }
+  // May reserve (§6): the session open, or a G4 later reserve date (a subject's covers that subject alone). Each
+  // line's subject, row and board deadline are asked when it is made.
+  const w = await mayReserveSession(db, data.studentId, sess.id, new Date(), await subjectsOfItems(db, data.lines.map((l) => l.offerItemId)));
+  if (!w.allowed) throw reserveRefusal(w);
 
   // The reservations rework (§3.10 item 1): the year's school fee collected in the same action,
   // first — the registration's gate asks for it — in a payment of its own.
@@ -224,7 +221,7 @@ async function registerAtDeskAfterChecks(
   const lineInput = {
     studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment' as const,
     requestedBy: staffId, approvedBy: staffId, approvedAt: now, approvalComments: '[DESK] Registered at the finance desk', eligibility,
-    declaredBy: 'desk' as const, channel: 'desk' as const,
+    declaredBy: 'desk' as const, channel: 'desk' as const, answers: data.answers,
   };
 
   // No money taken → reserve only; the family pays later (app or desk)
@@ -254,49 +251,38 @@ async function registerAtDeskAfterChecks(
   // Only money needs a payer of record; register-only desk actions (family
   // pays later) can proceed for a student who is not linked yet.
   const payerParentId = await resolvePayerParent(data.studentId);
-  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
 
   const made = await db.transaction(async (tx) => {
     // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
     const inserted = await reserveLines(tx, lineInput);
     const totalCost = round2(inserted.reduce((sum, r) => sum + r.priceAtRegistration, 0));
-    // A line whose board fee is still provisional is reserved, not collected (§3.4, §4.3): it is
-    // collected once the fee is confirmed.
-    const payable = payOnProvisional ? inserted : inserted.filter((r) => !r.priceProvisional);
+    // A line whose prices are not final is reserved, not collected (E6): it is collected once they are.
+    const payable = inserted.filter((r) => !r.priceProvisional);
     const held = inserted.filter((r) => !payable.includes(r));
     const payableCost = round2(payable.reduce((sum, r) => sum + r.priceAtRegistration, 0));
     if (escrowToApply > payableCost) {
       throw new Error(held.length
-        ? `The amount from the balance cannot be more than what is collected now (${formatEgp(payableCost)}): the lines on a provisional board fee are collected once it is confirmed`
+        ? `The amount from the balance cannot be more than what is collected now (${formatEgp(payableCost)}): the lines whose prices are not final yet are collected once they are`
         : 'The amount from the balance cannot be more than the total cost');
     }
     if (!payable.length) {
-      // Everything waits for a board fee to be confirmed: reserved, nothing collected.
+      // Everything waits for the prices to be final: reserved, nothing collected.
       await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
         { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0, provisional: held.map((r) => r.id) }, auditCtx, tx);
       return { inserted, payments: [] as DeskPayment[], totalCost, held };
     }
-    // F0b: one payment per entry deadline (the sweep closes a payment at its
-    // series' deadline), each with its own escrow share and audit row.
-    const groups = await seriesDeadlineGroups(tx, payable.map((r) => r.id), true);
-    const payments = await createDeskPayments(tx, {
-      studentId: data.studentId, payerParentId, staffId, escrowToApply, groups,
-      prices: new Map(payable.map((r) => [r.id, r.priceAtRegistration])),
-    });
-    // The registrations, the escrow debits and their audit rows commit together
-    // (MO-1); the confirmations that follow write their own rows. The desk's
-    // row names the first payment (as it always has), and every other payment
-    // has its own PAYMENT_INITIATED row: one creation row per payment.
+    // The coordinator rework (§10): one payment per collection, whatever the lines' sittings or cut-offs.
+    const payments = [await createDeskPayment(tx, {
+      studentId: data.studentId, payerParentId, staffId, escrowToApply,
+      registrationIds: payable.map((r) => r.id), prices: new Map(payable.map((r) => [r.id, r.priceAtRegistration])),
+    })];
+    // The registrations, the escrow debit and their audit row commit together (MO-1); the confirmation that
+    // follows writes its own rows. The desk's row is the payment's creation row.
     await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
       { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), paymentId: payments[0]!.id,
-        ...(payments.length > 1 ? { paymentIds: payments.map((p) => p.id) } : {}),
         ...(held.length ? { provisional: held.map((r) => r.id) } : {}),
         toCollect: Math.max(0, payableCost - escrowToApply), escrowApplied: escrowToApply }, auditCtx, tx);
-    for (const p of payments.slice(1)) {
-      await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
-        { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, series: p.series }, auditCtx, tx);
-    }
     return { inserted, payments, totalCost, held };
   });
   const created = made.inserted;
@@ -319,7 +305,7 @@ async function registerAtDeskAfterChecks(
   return {
     registrations: created,
     payment: { id: first.id, collected: outcome.collected, escrowApplied: outcome.escrowApplied },
-    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
+    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
     notCollected: outcome.notCollected,
     reservedNotCollected,
     totalCost,
@@ -330,8 +316,9 @@ async function registerAtDeskAfterChecks(
 
 type DeskPayment = {
   id: string; amount: number; escrowApplied: number; registrationIds: string[];
-  series: string[]; entryDeadline: Date | null;
-  // The reservations rework (§3.10 item 1): a charge payment's charges (its series: their description).
+  // A charge payment's description (its charges); empty for the lines' payment.
+  series: string[];
+  // The reservations rework (§3.10 item 1): a charge payment's charges.
   chargeIds?: string[];
 };
 
@@ -340,43 +327,36 @@ function round2(n: number) {
 }
 
 /**
- * The desk's payments for subjects just registered or waiting, in the
- * caller's transaction: one per entry-deadline group, the escrow applied to
- * the earliest deadline first, each linked to its registrations and debited
- * in its own name. The caller writes the creation audit rows.
+ * The desk's payment for subjects just registered or waiting, in the caller's transaction: one payment for every
+ * line of the collection (the coordinator rework, §10: no split per deadline), escrow applied as asked, linked to
+ * its registrations and debited in its own name. The caller writes the creation audit row.
  */
-async function createDeskPayments(
+async function createDeskPayment(
   tx: Tx,
-  a: { studentId: string; payerParentId: string; staffId: string; escrowToApply: number; groups: DeadlineGroup[]; prices: Map<string, number> },
-): Promise<DeskPayment[]> {
-  let escrowLeft = a.escrowToApply;
-  const out: DeskPayment[] = [];
-  for (const g of a.groups) {
-    const cost = round2(g.registrationIds.reduce((sum, id) => sum + (a.prices.get(id) ?? 0), 0));
-    const escrowApplied = round2(Math.min(escrowLeft, cost));
-    escrowLeft = round2(escrowLeft - escrowApplied);
-    const id = randomUUID();
-    await tx.insert(payment).values({
-      id,
-      studentId: a.studentId,
-      // Payer of record is the family, not the officer (RF-03): confirmations
-      // go to whoever is here; the staff member stays in confirmedBy/metadata.
-      parentId: a.payerParentId,
-      amount: round2(cost - escrowApplied),
-      escrowAmountApplied: escrowApplied,
-      paymentMethod: 'in_school',
-      purpose: 'registration',
-      status: 'pending',
-      externalReference: `DESK-${id.slice(0, 8).toUpperCase()}`,
-      metadata: { desk: true, staffId: a.staffId, ...(a.groups.length > 1 ? { series: g.series.map((x) => x.name) } : {}) },
-    });
-    if (escrowApplied > 0) {
-      await debitEscrow({ studentId: a.studentId, amount: escrowApplied, reason: 'payment', initiatedBy: a.staffId, relatedPaymentId: id }, tx);
-    }
-    await tx.insert(paymentRegistration).values(g.registrationIds.map((registrationId) => ({ id: randomUUID(), paymentId: id, registrationId })));
-    out.push({ id, amount: round2(cost - escrowApplied), escrowApplied, registrationIds: g.registrationIds, series: g.series.map((x) => x.name), entryDeadline: g.entryDeadline });
+  a: { studentId: string; payerParentId: string; staffId: string; escrowToApply: number; registrationIds: string[]; prices: Map<string, number> },
+): Promise<DeskPayment> {
+  const cost = round2(a.registrationIds.reduce((sum, id) => sum + (a.prices.get(id) ?? 0), 0));
+  const escrowApplied = round2(Math.min(a.escrowToApply, cost));
+  const id = randomUUID();
+  await tx.insert(payment).values({
+    id,
+    studentId: a.studentId,
+    // Payer of record is the family, not the officer (RF-03): confirmations
+    // go to whoever is here; the staff member stays in confirmedBy/metadata.
+    parentId: a.payerParentId,
+    amount: round2(cost - escrowApplied),
+    escrowAmountApplied: escrowApplied,
+    paymentMethod: 'in_school',
+    purpose: 'registration',
+    status: 'pending',
+    externalReference: `DESK-${id.slice(0, 8).toUpperCase()}`,
+    metadata: { desk: true, staffId: a.staffId },
+  });
+  if (escrowApplied > 0) {
+    await debitEscrow({ studentId: a.studentId, amount: escrowApplied, reason: 'payment', initiatedBy: a.staffId, relatedPaymentId: id }, tx);
   }
-  return out;
+  await tx.insert(paymentRegistration).values(a.registrationIds.map((registrationId) => ({ id: randomUUID(), paymentId: id, registrationId })));
+  return { id, amount: round2(cost - escrowApplied), escrowApplied, registrationIds: a.registrationIds, series: [] };
 }
 
 /**
@@ -492,28 +472,19 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
     throw new Error('One or more subjects do not belong to this student');
   }
   if (regs.some((r) => r.status !== 'pending_payment')) {
-    throw new Error('One or more subjects are not waiting for payment');
+    throw coded(new Error('One or more subjects are not waiting for payment'), 'NOT_WAITING');
   }
-  // F0a: call site 6 of mayRegisterFor — no money for a subject the
-  // student may no longer sit (SO-7).
-  for (const sessionId of new Set(regs.map((r) => r.sessionId))) await assertMayRegisterFor(data.studentId, sessionId);
-  // Each line's own deadline decides (MO-10, per line since the rework).
-  for (const r of regs) {
-    const w = await sessionWindow(data.studentId, r.sessionId, r);
-    if (!w.open) {
-      throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
-    }
-  }
-  // A line whose board fee is still provisional is not collected (§3.4).
-  if (regs.some((r) => r.priceProvisional) && !(await getSetting('pricing.payOnProvisionalFee'))) throw new Error(PROVISIONAL_REFUSAL);
+  // May pay (§6), per line: waiting, not past its cut-off, its prices final, the student still at the school (F0a,
+  // SO-7; the session's grade list does not enter). The session's or the subject's close does not stop it.
+  await assertMayPay(db, regs.map((r) => ({ id: r.id, studentId: r.studentId, sessionId: r.sessionId, status: r.status, priceProvisional: r.priceProvisional })));
   // Consent (§3.5): a line nobody consented to is never paid; one the school reserved (grade 10)
   // takes the family's own pair here, "read and signed by the parent".
   const consent = await consentStanding(db, lineIds);
   if (consent.missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
   if (consent.schoolOnly.length && !data.consent) throw new Error(FAMILY_CONSENT_NEEDED);
 
-  // The reservations rework (§3.10 item 1): the student's charges in the same action, each group
-  // its own payment (lines per entry deadline, charges per service deadline or per plan line).
+  // The reservations rework (§3.10 item 1): the student's charges in the same action, each group its own payment
+  // (charges per service deadline or per plan line); the lines in one payment (the coordinator rework, §10).
   const chargeRows = data.chargeIds.length
     ? await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind, registrationId: charge.registrationId }).from(charge).where(inArray(charge.id, data.chargeIds))
     : [];
@@ -539,7 +510,10 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
     const touched = [...new Set([...lineIds, ...planLineIds])].sort();
     const held = touched.length
       ? await tx
-        .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
+        .select({
+          id: registration.id, status: registration.status, price: registration.priceAtRegistration,
+          studentId: registration.studentId, sessionId: registration.sessionId, priceProvisional: registration.priceProvisional,
+        })
         .from(registration)
         .where(inArray(registration.id, touched))
         .orderBy(registration.id)
@@ -550,10 +524,13 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
       // nothing else is already paying for them.
       const locked = held.filter((r) => lineIds.includes(r.id));
       if (locked.length !== lineIds.length || locked.some((r) => r.status !== 'pending_payment')) {
-        throw new Error('One or more subjects are not waiting for payment');
+        throw coded(new Error('One or more subjects are not waiting for payment'), 'NOT_WAITING');
       }
       // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
-      if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
+      if (locked.some((l) => l.price !== prices.get(l.id))) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
+      // May pay, asked again under the lines' locks (L2 of the P1b review): the cut-off may have passed, or the
+      // student left, since the check above.
+      await assertMayPay(tx, locked);
       // A line under a live plan is paid by its instalments only (§3.10 item 7).
       await assertNoLivePlan(tx, lineIds);
       const open = await tx
@@ -567,16 +544,13 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
         );
       }
       if (consent.schoolOnly.length) await writeConsents(tx, consent.schoolOnly, { channel: 'desk', confirmedBy: staffId });
-      // F0b: one payment per entry deadline, each with its own creation audit row.
-      const groups = await seriesDeadlineGroups(tx, lineIds, true);
+      // One payment for the lines (§10), with its creation audit row.
       const lineEscrow = Math.min(escrowLeft, totalCost);
       escrowLeft = Math.round((escrowLeft - lineEscrow) * 100) / 100;
-      const lines = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply: lineEscrow, groups, prices });
-      for (const p of lines) {
-        await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
-          { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, ...(lines.length > 1 ? { series: p.series } : {}) }, auditCtx, tx);
-      }
-      made.push(...lines);
+      const p = await createDeskPayment(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply: lineEscrow, registrationIds: lineIds, prices });
+      await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
+        { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied }, auditCtx, tx);
+      made.push(p);
     }
     if (data.chargeIds.length) {
       const expected = new Map(chargeRows.map((c) => [c.id, c.amount]));
@@ -584,7 +558,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
         studentId: data.studentId, payerParentId, actorId: staffId, chargeIds: data.chargeIds, method: 'in_school', escrowToApply: escrowLeft, desk: true, expected, auditCtx,
         linesHeld: true,
       });
-      made.push(...charges.map((c) => ({ id: c.id, amount: c.amount, escrowApplied: c.escrowApplied, registrationIds: [] as string[], chargeIds: c.chargeIds, series: [c.description], entryDeadline: c.deadline })));
+      made.push(...charges.map((c) => ({ id: c.id, amount: c.amount, escrowApplied: c.escrowApplied, registrationIds: [] as string[], chargeIds: c.chargeIds, series: [c.description] })));
     }
     return made;
   });
@@ -599,7 +573,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
   });
   return {
     paymentId: outcome.confirmed[0]!.id,
-    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds, chargeIds: p.chargeIds ?? [] })),
+    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds, chargeIds: p.chargeIds ?? [] })),
     notCollected: outcome.notCollected,
     collected: outcome.collected,
     escrowApplied: outcome.escrowApplied,
@@ -837,12 +811,13 @@ export async function getStudentSummary(studentId: string) {
     : [];
   const inProgressOf = new Map(underWay.map((u) => [u.registrationId, { paymentId: u.paymentId, status: u.status as 'pending' | 'pending_verification', method: u.method }]));
 
-  // What does the family owe right now? A line on a provisional board fee is reserved, not
-  // payable, until the fee is confirmed (§3.4) — unless the school takes payment at that price.
-  // A line with a payment under way is owed, not collectable now: it is counted apart (owingInProgress).
-  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
+  // What does the family owe right now (mayPay, §6)? A line whose prices are not final is reserved, not payable,
+  // until they are (E6); a line past its cut-off is no longer payable (the sweep expires it). A line with a
+  // payment under way is owed, not collectable now: it is counted apart (owingInProgress).
+  const cutOffs = await cutOffsOf(db, waitingLineIds);
+  const now = new Date();
   const owedNow = (r: (typeof registrations)[number]) =>
-    r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional);
+    r.status === 'pending_payment' && !r.priceProvisional && !((cutOffs.get(r.id)?.cutOff ?? Infinity) <= now);
   const payableNow = (r: (typeof registrations)[number]) => owedNow(r) && !inProgressOf.has(r.id);
   // A line under a live plan owes its price less the deposits held for it (its instalments still
   // to pay); the charges owed (not instalments — the line counts them — nor a pushed school fee,
@@ -900,6 +875,8 @@ export async function getStudentSummary(studentId: string) {
     registrations: registrations.map((r) => ({
       ...r,
       payableNow: payableNow(r),
+      // The last moment it can be paid (§6: due date + the session's days, or the board deadline if earlier); null once paid.
+      cutOff: cutOffs.get(r.id)?.cutOff ?? null,
       paymentInProgress: inProgressOf.get(r.id) ?? null,
       // Under a live instalment plan (§3.6): paid by its instalments, never collected as a line. A
       // plan released in full or ended is not live: the line is collected in full again.

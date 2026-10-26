@@ -32,7 +32,7 @@ import { generateUniqueStudentId } from '../user.services';
 import { addSectionMembersInTx } from '../academic.services';
 import { upsertEnrolments, type EnrolmentRowInput } from '../enrolment.services';
 import { assertMayRegisterForInTx } from '../eligibility.services';
-import { sessionWindow, windowRefusal } from '../window.services';
+import { mayReserveRow } from '../window.services';
 import { assertSchoolFeeGate } from '../registration.services';
 import { insertLines } from '../line.services';
 import { writeConsents } from '../reservation.services';
@@ -531,8 +531,9 @@ async function reserveImportLines(
       priorId = (await findOrCreateSeries(tx, it.boardCode, l.priorSitting.month, l.priorSitting.year, '', actor.id,
         `Created when the day-one import named a sitting not on record (no dates yet): ${batch.fileName} — ${r.tab} row ${r.rowNumber}`)).id;
     }
-    const w = await sessionWindow(studentId, sessionId, { boardSeriesId: it.seriesId, attempt: l.attempt, priorSittingSeriesId: priorId, declarationRejected: false, subjectId: it.subjectId }, tx, now);
-    if (!w.open) throw new ImportError(`${r.tab} row ${r.rowNumber}: ${windowRefusal(w, `${sess.name} is not open for reservations`)}`);
+    // May reserve (the coordinator rework §6), asked again here (insertLines' line rules ask it once more under the locks).
+    const w = await mayReserveRow(tx, { studentId, offerItemId: l.offerItemId, attempt: l.attempt, priorSittingSeriesId: priorId }, now);
+    if (!w.allowed) throw new ImportError(`${r.tab} row ${r.rowNumber}: ${w.message}`);
     lines.push({
       offerItemId: l.offerItemId, attempt: l.attempt, mode: l.mode, teacherId: l.mode === 'in_school' ? l.teacherId : null,
       priorSittingSeriesId: priorId, priorSittingSource: priorId ? l.priorSitting!.source : null,

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { RoleSchema } from '../roles';
 import { EntryGradeSchema } from '../academic/academic-year';
 import { CommonSchemas, isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
-import { ReservationLines, ReservationConsent } from '../registration/reservation.validations';
+import { ReservationLines, ReservationConsent, ReservationAnswers } from '../registration/reservation.validations';
 
 // ─── Team management (G7) ────────────────────────────────────────────────────
 
@@ -91,6 +91,8 @@ export const DeskRegistration = z.object({
   studentId: z.string().min(1, 'Pick a student'),
   sessionId: z.string().min(1, 'Pick a session'),
   lines: ReservationLines,
+  // D13: the extra questions' answers, as the parent gives them at the desk.
+  answers: ReservationAnswers.default([]),
   consent: ReservationConsent,
   collectNow: z
     .object({

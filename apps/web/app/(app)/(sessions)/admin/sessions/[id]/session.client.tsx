@@ -191,8 +191,7 @@ function Header({ s, canSetUp, isAdmin }: { s: SetupSession; canSetUp: boolean; 
         <Modal title={`Close ${s.name}`} onClose={() => setClosing(false)}>
           <div className="space-y-3 text-sm text-foreground">
             <p>Families can no longer reserve here. You can open it again later.</p>
-            {/* Until P1b: today's close still cancels unpaid reservations (C10 replaces it with the cut-off). Drop this line when it lands. */}
-            <p className="font-medium text-amber-700 dark:text-amber-400">{CLOSE_CANCELS_UNPAID}</p>
+            <p>{CLOSE_KEEPS_WAITING}</p>
             {s.counts.unpaid > 0 && <p><span>Unpaid reservations now:</span> <span className="tabular-nums">{s.counts.unpaid}</span></p>}
             <ErrorLine message={accepting.error ? refusalText(accepting.error) : null} />
             <div className="flex justify-end gap-2">
@@ -206,11 +205,8 @@ function Header({ s, canSetUp, isAdmin }: { s: SetupSession; canSetUp: boolean; 
   );
 }
 
-/**
- * Until P1b removes the expiry at the close (the owner's decision of 26 Oct; C10): what closing does today
- * to waiting reservations, said before she confirms. One constant, so it leaves in one line.
- */
-export const CLOSE_CANCELS_UNPAID = 'Today closing also cancels every unpaid reservation and ends its checkout; money held comes back to the family\'s balance.';
+/** What closing does to waiting reservations (C10): nothing; they stay payable until their own cut-off. Said under the switch and the close date. */
+export const CLOSE_KEEPS_WAITING = 'Reservations already made can still be paid, each until its last day to pay: closing cancels nothing.';
 
 /** C5: the three dates, each a date picker, saved when she leaves the field (a payment date that moves due dates asks first). */
 function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
@@ -260,8 +256,7 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
           )}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">Switches Accepting off at the end of that day.</p>
-        {/* Until P1b: closing on this date does what the switch does (CLOSE_CANCELS_UNPAID). Drop this line with it. */}
-        {s.status !== 'closed' && <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">{CLOSE_CANCELS_UNPAID}</p>}
+        {s.status !== 'closed' && <p className="mt-1 text-xs text-muted-foreground">{CLOSE_KEEPS_WAITING}</p>}
       </div>
       <div>
         <label htmlFor="sess-due" className="block text-sm font-medium text-foreground">Payment due</label>

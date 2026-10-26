@@ -4,11 +4,12 @@
  * a session's unpaid families, the holders of an unpaid charge), so "Remind" never asks a family to
  * pay what the step would not remind it of (the review of 5c2f2bf, item 1).
  *
- * A line (alias `r`) is owed and payable now when: it waits for payment (or is a preregistration
- * nobody has paid); its board fee is confirmed, unless the school takes payment on a provisional one;
- * no payment of it is open (a checkout, an InstaPay transfer being checked); it is not paid by an
- * instalment plan (its instalments are what is owed); its effective deadline has not passed; its
- * student is still at the school and not barred. A charge (alias `c`) when: it awaits payment; no
+ * A line (alias `r`) is owed and payable now when (mayPay, COORDINATOR_REWORK.md §6): it waits for
+ * payment (or is a preregistration nobody has paid); its prices are final (E6); no payment of it is
+ * open (a checkout, an InstaPay transfer being checked); it is not paid by an instalment plan (its
+ * instalments are what is owed); its cut-off has not passed (due date + the session's days, or its
+ * board deadline if earlier: closing the session or its subject does not stop it); its student is
+ * still at the school and not barred. A charge (alias `c`) when: it awaits payment; no
  * payment of it is open (for a pushed school fee: no school-fee payment of that year is open); C's
  * rules let it be paid now (`chargeRules` with `forPayment`); its student is still at the school.
  */
@@ -32,13 +33,15 @@ export const SCHOOL_FEE_PAYMENT_OPEN = sql`exists (select 1 from payment p where
   and p.academic_year = c.academic_year and p.status in ('pending', 'pending_verification'))`;
 /** A line's effective deadline (A's `line_effective_deadline`, a rejected declaration read as a first entry). */
 export const LINE_DEADLINE = sql.raw('line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)');
+/** A line's cut-off (migration 0068's `line_cut_off`): the last moment it can be paid. */
+export const LINE_CUT_OFF = sql.raw('line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)');
 /** A student (by a column or alias) still at the school and not barred: a leaver's family is not chased (F0a). */
 export const studentPresent = (column: string) => sql.raw(`exists (select 1 from "user" su where su.id = ${column} and su.left_on is null and coalesce(su.banned, false) = false)`);
 
-/** The line predicate as one SQL fragment, for a query over `registration r`. */
-export function linePayableNowSql(now: Date, payOnProvisional: boolean) {
-  return sql`${OWED_LINE} and (not r.price_provisional or ${payOnProvisional}) and ${NO_OPEN_LINE_PAYMENT} and ${NO_LIVE_PLAN}
-    and (${LINE_DEADLINE} is null or ${LINE_DEADLINE} > ${now}) and ${studentPresent('r.student_id')}`;
+/** The line predicate as one SQL fragment, for a query over `registration r` (mayPay). */
+export function linePayableNowSql(now: Date) {
+  return sql`${OWED_LINE} and not r.price_provisional and ${NO_OPEN_LINE_PAYMENT} and ${NO_LIVE_PLAN}
+    and ${LINE_CUT_OFF} > ${now} and ${studentPresent('r.student_id')}`;
 }
 
 /** The charge predicate as one SQL fragment, for a query over `charge c` (C's rules asked after it). */
@@ -48,9 +51,9 @@ export const chargeOpenSql = sql`c.status = 'pending_payment' and ${NO_OPEN_CHAR
 const list = (ids: string[]) => sql.join(ids.map((x) => sql`${x}`), sql`, `);
 
 /** Of these lines, those owed and payable now. */
-export async function payableLines(executor: Executor, lineIds: string[], now: Date, payOnProvisional: boolean): Promise<Set<string>> {
+export async function payableLines(executor: Executor, lineIds: string[], now: Date): Promise<Set<string>> {
   if (!lineIds.length) return new Set();
-  const r = await executor.execute(sql`select r.id from registration r where r.id in (${list(lineIds)}) and ${linePayableNowSql(now, payOnProvisional)}`);
+  const r = await executor.execute(sql`select r.id from registration r where r.id in (${list(lineIds)}) and ${linePayableNowSql(now)}`);
   return new Set((r.rows as { id: string }[]).map((x) => x.id));
 }
 

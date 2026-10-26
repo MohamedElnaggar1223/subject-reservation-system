@@ -122,8 +122,11 @@ export type ExpiryReason =
   | 'session_closed' | 'entry_deadline' | 'graduated' | 'payment_closed' | 'preregistration_unfunded_at_deadline'
   | 'ineligible' | 'overdue' | 'plan_revoked' | 'plan_lapsed' | 'plan_ended'
   // Step B (RESERVATIONS_REWORK.md §3.5): a declared sitting rejected on a waiting line; one still
-  // unverified at its deadline under `verification.unverifiedAtDeadline = hold`.
-  | 'declaration_rejected' | 'hold_unverified';
+  // unverified at its deadline under the old `verification.unverifiedAtDeadline = hold` (gone with P1b).
+  | 'declaration_rejected' | 'hold_unverified'
+  // The coordinator rework (C10): unpaid at its cut-off (the session's own date was the earlier); a request
+  // awaiting approval whose subject or row closed (§6).
+  | 'cut_off' | 'subject_closed';
 
 /**
  * One REGISTRATION_EXPIRED row per registration the system expired, with the

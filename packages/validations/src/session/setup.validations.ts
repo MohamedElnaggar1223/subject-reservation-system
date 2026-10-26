@@ -65,6 +65,13 @@ export const ImpactSchema = z.object({
   listedForFinance: z.number().int().min(0),
   linesAffected: z.number().int().min(0),
   dueDatesMoved: z.number().int().min(0),
+  /**
+   * Unpaid reservations whose last day to pay (the cut-off) moves earlier — the unpaid-cancel days cut, or the
+   * payment due date moved — and, of those, the ones it puts in the past (they expire at the next check).
+   * Optional on input (a client that predates them sends none: 0).
+   */
+  cutOffsEarlier: z.number().int().min(0).default(0),
+  cutOffsPassed: z.number().int().min(0).default(0),
 });
 export type ImpactType = z.infer<typeof ImpactSchema>;
 
@@ -82,6 +89,10 @@ export function impactSentence(i: ImpactType): string {
   if (i.listedForFinance) parts.push(`lists ${n(i.listedForFinance, 'paid reservation', 'paid reservations')} for finance (their price stays)`);
   if (i.linesAffected) parts.push(`changes ${n(i.linesAffected, 'reservation', 'reservations')} (made payable, or closed to new ones)`);
   if (i.dueDatesMoved) parts.push(`moves the due date of ${n(i.dueDatesMoved, 'unpaid reservation', 'unpaid reservations')}`);
+  if (i.cutOffsEarlier) {
+    parts.push(`brings forward the last day to pay of ${n(i.cutOffsEarlier, 'unpaid reservation', 'unpaid reservations')}${i.cutOffsPassed
+      ? ` (${i.cutOffsPassed} of them past it already: ${i.cutOffsPassed === 1 ? 'it expires' : 'they expire'} at once)` : ''}`);
+  }
   if (!parts.length) return 'This changes nothing for families.';
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
   return `This ${list}.`;

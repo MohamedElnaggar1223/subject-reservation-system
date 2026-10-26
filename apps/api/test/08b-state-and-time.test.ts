@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, schoolToday, runSessionRecovery, runSessionScheduler, holdRowLock, lockWaiters, notified, expireByHand, type Client, reservationOf, swapTo } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, schoolToday, runSessionRecovery, runSessionScheduler, holdRowLock, lockWaiters, notified, expireByHand, type Client, reservationOf, swapTo, passCutOff, runPaymentDeadlines } from './helpers';
 
 /**
  * State and time (state-and-time audit, STATE_AUDIT.md, finding ids ST-nn).
@@ -378,45 +378,39 @@ describe('state and time', () => {
     });
 
     it('a close interrupted before its finalisation is finished on the next tick, and only once', async () => {
+      // P1b (C10): the finalisation expires only requests still awaiting a parent (pending_approval); a line waiting
+      // for payment stays payable until its cut-off.
       const s = await session(adm, 'January (AS, state and time, recovery)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('rc1');
+      const [asked] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S2!])) } }))).map((r) => r.id) as [string];
       const waiting = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S3!])), studentId: f.studentId } })))[0]!.id;
       // The window closes, but the process stops before it is finalised.
       await sql(`update registration_session set status = 'closed', closed_at = now() where id = $1`, [s]);
-      expect(await statusOf('registration', waiting)).toBe('pending_payment');
+      expect(await statusOf('registration', asked)).toBe('pending_approval');
 
-      // Before the late finalisation, a student with a deadline extension registers and checks out.
+      // Before the late finalisation, a student with a later reserve date reserves and checks out.
       const late = await family('rc2');
       await extend(late.studentId, s);
       const lateReg = (await apiResponse(late.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S4!])), studentId: late.studentId } })))[0]!.id;
       const latePay = (await apiResponse(late.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [lateReg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
 
       expect((await runSessionRecovery()).finalized).toBeGreaterThanOrEqual(1);
-      expect(await statusOf('registration', waiting)).toBe('expired');
-      // Only what existed at the close is finalised: the extension student's rows stand.
+      expect(await statusOf('registration', asked)).toBe('expired');
+      await audited([asked], ['REGISTRATION_EXPIRED']);
+      expect(await statusOf('registration', waiting)).toBe('pending_payment');
+      // Only what existed at the close is finalised: the later student's rows stand.
       expect(await statusOf('registration', lateReg)).toBe('pending_payment');
       expect(await statusOf('payment', latePay)).toBe('pending');
       await runSessionRecovery();
       expect(await statusOf('registration', lateReg)).toBe('pending_payment');
+      expect(await sql(`select 1 from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [asked])).toHaveLength(1);
+      await apiResponse(late.parent.api.v1.payments[':id'].cancel.$post({ param: { id: latePay } }));
     });
 
-    it('preregistrations an opening did not capture are captured on the next tick', async () => {
-      const s = await session(adm, 'January (AS, state and time, capture)', 'january', 'as_level', futureWindow());
-      const f = await family('rc3');
-      const pre = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S5!])), studentId: f.studentId } })))[0]!.id;
-      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pre], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
-      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay }, json: { instrumentUsed: 'cash' } }));
-      const held = async () => money((await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId])).held);
-      expect(await held()).toBe(1500);
-      // The series opens, but its capture never runs.
-      await sql(`update registration_session set status = 'active', start_date = now() - interval '1 hour' where id = $1`, [s]);
-      expect(await statusOf('registration', pre)).toBe('preregistered');
-
-      expect((await runSessionRecovery()).captured).toBeGreaterThanOrEqual(1);
-      expect(await statusOf('registration', pre)).toBe('confirmed');
-      expect(await held()).toBe(0);
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: capture done' } }));
-    });
+    // Retired with preregistration (C4; trail row "retired 08b capture"): "preregistrations an opening did not capture
+    // are captured on the next tick". A draft takes no preregistration, so no new held money waits for an opening; the
+    // recovery's capture stays for rows made before P1b. The money outcome — a line paid in full is confirmed with its
+    // receipt — is stated on an open session in 03-v3-flows.
 
     it('a payment left open on registrations that have all expired is closed on the next tick, escrow back', async () => {
       const s = await session(adm, 'January (AS, state and time, stranded)', 'january', 'as_level', { ...openWindow(), activate: true });
@@ -440,7 +434,7 @@ describe('state and time', () => {
   });
 
   describe('a close judges "before the close" by one clock (ST-15)', () => {
-    it("a checkout made just before the close is kept for its reference even when the API's clock runs behind the database's", async () => {
+    it("a checkout made just before the close is left as it was, even when the API's clock runs behind the database's", async () => {
       const s = await session(adm, 'January (AS, state and time, clock)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('clock');
       const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S8!])), studentId: f.studentId } })))[0]!.id;
@@ -456,12 +450,14 @@ describe('state and time', () => {
       }
       expect(await statusOf('payment', pay)).toBe('pending');
       expect(await statusOf('registration', reg)).toBe('pending_payment');
-      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).not.toBeNull();
+      // P1b (C10): the close sets nothing on a checkout; its time for a reference is given at the line's cut-off
+      // (08-money-rules), so no clock can make the close end it.
+      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).toBeNull();
       // Leave nothing open for the invariants.
       await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
     });
 
-    it("the scheduler's close stamps the same clock: a checkout made just before it is kept for its reference", async () => {
+    it("the scheduler's close stamps the same clock: a checkout made just before it is left as it was", async () => {
       const s = await session(adm, 'January (AS, state and time, clock scheduler)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('clock-sched');
       const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S9!])), studentId: f.studentId } })))[0]!.id;
@@ -479,11 +475,12 @@ describe('state and time', () => {
       expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [s])).status).toBe('closed');
       await runSessionRecovery();
       expect(await statusOf('payment', pay)).toBe('pending');
-      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).not.toBeNull();
+      expect(await statusOf('registration', reg)).toBe('pending_payment');
+      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).toBeNull();
       await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
     });
 
-    it("a subject swapped in just before the close expires with the window, even when the API's clock runs ahead of the database's", async () => {
+    it("a subject swapped in just before the close stays payable until its cut-off, even when the API's clock runs ahead of the database's", async () => {
       const s = await session(adm, 'January (AS, state and time, clock swap)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('clock-swap');
       const paid = (await apiResponse(officer.api.v1.registrations.desk.$post({
@@ -502,8 +499,12 @@ describe('state and time', () => {
         vi.useRealTimers();
       }
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: clock swap' } }));
+      // P1b (C10): the close leaves it payable; it expires at its cut-off, judged by the database's clock.
+      expect(await statusOf('registration', swappedIn)).toBe('pending_payment');
+      await passCutOff([swappedIn]);
+      await runPaymentDeadlines();
       expect(await statusOf('registration', swappedIn)).toBe('expired');
-      await audited([swappedIn], ['REGISTRATION_EXPIRED']);
+      expect((await one<{ reason: string }>(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [swappedIn])).reason).toBe('cut_off');
     });
   });
 });

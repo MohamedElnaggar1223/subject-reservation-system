@@ -357,41 +357,24 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
     }
   });
 
-  // ─── Preregistration, the close, and the opening ───────────────────────────
+  // ─── The close and the scheduler ───────────────────────────────────────────
+  // P1b: the two preregistration cases retired with preregistration (C4; trail rows "retired 08c prereg cancel" and
+  // "retired 08c capture"): a draft takes none, so no held money is cancelled or captured for a new row.
 
-  describe('preregistration and the scheduler', () => {
-    let f: Family, cancelled: string, captured: string, unpaid: string, request: string;
-    const fund = async (reg: string) => {
-      const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
-      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
-    };
+  describe('the close and the scheduler', () => {
+    let f: Family, asked: string, unpaid: string, request: string;
 
     beforeAll(async () => {
       f = await family('prereg');
-      [cancelled, captured] = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: draftId, ...(await reservationOf(draftId, [subj.S14!, subj.S15!])), studentId: f.studentId },
-      }))).map((r) => r.id) as [string, string];
-      await fund(cancelled);
-      await fund(captured);
-      expect((await escrowOf(f.studentId)).held).toBe(3000);
-    });
-
-    it('a funded preregistration cancelled: refused audit, still held', async () => {
-      const cancel = () => f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: cancelled } });
-      expect((await withAuditRefused('PREREG_CANCELLED', cancel)).status).toBeGreaterThanOrEqual(400);
-      expect(await statusOf('registration', cancelled)).toBe('preregistered');
-      expect((await escrowOf(f.studentId)).held).toBe(3000);
-
-      await apiResponse(cancel());
-      expect(await statusOf('registration', cancelled)).not.toBe('preregistered');
-      expect((await escrowOf(f.studentId)).held).toBe(1500);
-      expect(await auditRows(cancelled, 'PREREG_CANCELLED')).toBe(1);
     });
 
     it('a close that cannot write its expiry rows expires nothing; the recovery sweep finishes it, with the rows', async () => {
+      // P1b (C10): the close's finalisation expires a request still awaiting its parent and rejects a swap request;
+      // a line waiting for payment stays payable until its cut-off.
+      [asked] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S15!])) } }))).map((r) => r.id) as [string];
       unpaid = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S16!])), studentId: f.studentId } })))[0]!.id;
       const kept = (await deskCash(f, [subj.S17!])).registrations[0]!.id;
-      request = (await apiResponse(f.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: kept }, json: { reason: 'not this one' } }))).id;
+      request = (await apiResponse(f.student.api.v1.registrations[':id']['request-swap'].$post({ param: { id: kept }, json: { line: await swapTo(kept, subj.S14!), reason: 'not this one' } }))).id;
 
       const release = await refuseAudit('REGISTRATION_EXPIRED');
       try {
@@ -400,35 +383,19 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
       } finally {
         await release();
       }
-      expect(await statusOf('registration', unpaid)).toBe('pending_payment');
+      expect(await statusOf('registration', asked)).toBe('pending_approval');
       expect((await one<{ finalized_at: string | null }>(`select finalized_at from registration_session where id = $1`, [sessionId])).finalized_at).toBeNull();
 
       await runSessionRecovery();
-      expect(await statusOf('registration', unpaid)).toBe('expired');
-      expect(await auditRows(unpaid, 'REGISTRATION_EXPIRED')).toBe(1);
-      expect(await one(`select previous_data, new_data from audit_log where entity_id = $1 and action = 'REGISTRATION_EXPIRED'`, [unpaid]))
-        .toEqual({ previous_data: { status: 'pending_payment' }, new_data: { status: 'expired', reason: 'session_closed' } });
+      expect(await statusOf('registration', asked)).toBe('expired');
+      expect(await auditRows(asked, 'REGISTRATION_EXPIRED')).toBe(1);
+      expect(await one(`select previous_data, new_data from audit_log where entity_id = $1 and action = 'REGISTRATION_EXPIRED'`, [asked]))
+        .toEqual({ previous_data: { status: 'pending_approval' }, new_data: { status: 'expired', reason: 'session_closed' } });
+      expect(await statusOf('registration', unpaid)).toBe('pending_payment');
+      expect(await auditRows(unpaid, 'REGISTRATION_EXPIRED')).toBe(0);
       expect(await statusOf('change_request', request)).toBe('rejected');
       expect(await auditRows(request, 'CHANGE_REQUEST_REJECTED')).toBe(1);
       expect((await one<{ finalized_at: string | null }>(`select finalized_at from registration_session where id = $1`, [sessionId])).finalized_at).not.toBeNull();
-    });
-
-    it('an opening that cannot write its capture row takes no held money; the next sweep captures it, with the row', async () => {
-      const release = await refuseAudit('PREREG_CAPTURED');
-      try {
-        await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: draftId } }));
-        await runSessionRecovery();
-        expect(await statusOf('registration', captured)).toBe('preregistered');
-        expect((await escrowOf(f.studentId)).held).toBe(1500);
-      } finally {
-        await release();
-      }
-
-      await runSessionRecovery();
-      expect(await statusOf('registration', captured)).toBe('confirmed');
-      expect((await escrowOf(f.studentId)).held).toBe(0);
-      expect(await auditRows(captured, 'PREREG_CAPTURED')).toBe(1);
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: draftId }, json: { reason: 'audit in transaction: done' } }));
     });
   });
 });

@@ -155,9 +155,10 @@ export function validationsImportsOf(file) {
  */
 export const SENTENCE_SAMPLES = {
   impactSentence: [
-    { repriced: 2, listedForFinance: 3, linesAffected: 4, dueDatesMoved: 5 },
-    { repriced: 1, listedForFinance: 1, linesAffected: 1, dueDatesMoved: 1 },
-    { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0 },
+    { repriced: 2, listedForFinance: 3, linesAffected: 4, dueDatesMoved: 5, cutOffsEarlier: 6, cutOffsPassed: 2 },
+    { repriced: 1, listedForFinance: 1, linesAffected: 1, dueDatesMoved: 1, cutOffsEarlier: 1, cutOffsPassed: 1 },
+    { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0, cutOffsEarlier: 3, cutOffsPassed: 0 },
+    { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0, cutOffsEarlier: 0, cutOffsPassed: 0 },
   ].map((i) => [i]),
   refundPolicySentence: [[{ steps: [{ throughWeek: 2, percent: 100 }, { throughWeek: 3, percent: 50 }, { throughWeek: 6, percent: 25 }, { throughWeek: null, percent: 0 }] }]],
   deriveSessionName: [['june', 2027], ['winter', 2026]],

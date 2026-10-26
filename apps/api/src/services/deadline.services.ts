@@ -11,8 +11,9 @@
  * A line's **due date** is when the school expects the money (`due_at`): the session's payment
  * due date; a line reserved after it, the reservation plus `payment.graceDays`; a line whose
  * board fee is provisional, no earlier than the fee's confirmation plus the grace; a
- * `deadline.payment` exception replaces it; never later than the effective deadline. It drives
- * reminders, "overdue" and the statement; it expires nothing by itself.
+ * `deadline.payment` exception (G4's later pay date) replaces it; never later than the effective
+ * deadline. It drives reminders, "overdue" and the statement, and with the session's unpaid-cancel
+ * days it makes the line's cut-off (window.services.ts, the cut-off sweep in overdue.services.ts).
  */
 
 import { db, registration, registrationSession, sessionOfferItem, boardFee, sql, eq, and, inArray } from '@repo/db';
@@ -32,7 +33,7 @@ export type LineDeadlineKey = {
    * rejected is a first entry for the board — its deadline is the entry deadline (§3.5).
    */
   declarationRejected: boolean | null;
-  /** The line's student: a late board entry granted to them (Q-20) is read when given. */
+  /** The line's student (kept for the callers; Q-20's late board entry is gone — no late entries, C6). */
   studentId?: string | null;
 };
 export type DeadlineKind = 'retake' | 'entry' | 'exams_start';
@@ -49,22 +50,8 @@ export function lineDeadlineSql(alias = 'r') {
 }
 
 /**
- * Q-20: a late board entry granted to one student in one series (`deadline.boardEntry`, step C's
- * registry, its `value_date`) is that student's entry deadline there — read only while the setting
- * `exceptions.boardEntryDeadline` is on; off, the board's deadline is a hard stop (MO-10) and a
- * grant made while it was on changes nothing.
- */
-export async function lateEntryUntil(executor: Executor, studentId: string, boardSeriesId: string): Promise<Date | null> {
-  if (!(await getSetting('exceptions.boardEntryDeadline', executor))) return null;
-  const granted = await lineExceptions.active(executor, studentId, ['deadline.boardEntry'], { boardSeriesId });
-  const dates = granted.filter((e) => e.valueDate && e.scope.boardSeriesId === boardSeriesId).map((e) => e.valueDate!.getTime());
-  return dates.length ? new Date(Math.max(...dates)) : null;
-}
-
-/**
  * One line's effective deadline and which date it is: a rejected declaration reads as a first
- * entry; with the student given, a late board entry (Q-20, while its setting is on) moves an
- * entry or retake deadline later to its date.
+ * entry. Nothing moves it later (C6: no late entries; Q-20's late board entry left with P1b).
  */
 export async function effectiveDeadlineFor(executor: Executor, line: LineDeadlineKey): Promise<EffectiveDeadline> {
   if (!line.boardSeriesId) return { at: null, kind: null };
@@ -73,61 +60,24 @@ export async function effectiveDeadlineFor(executor: Executor, line: LineDeadlin
     select line_effective_deadline(${line.attempt}, ${line.priorSittingSeriesId}, ${line.boardSeriesId}, ${rejected}) as at,
            line_effective_deadline_kind(${line.attempt}, ${line.priorSittingSeriesId}, ${line.boardSeriesId}, ${rejected}) as kind`);
   const row = r.rows[0] as { at: unknown; kind: DeadlineKind | null } | undefined;
-  const base = { at: asDate(row?.at), kind: row?.kind ?? null };
-  if (line.studentId && base.at && base.kind !== 'exams_start') {
-    const late = await lateEntryUntil(executor, line.studentId, line.boardSeriesId);
-    if (late && late > base.at) return { at: late, kind: 'entry' };
-  }
-  return base;
+  return { at: asDate(row?.at), kind: row?.kind ?? null };
 }
 
-/**
- * The deadline sweep's exemption (Q-20): of a series' live lines, those whose student holds a late
- * entry there still ahead of `now` — none while the setting is off.
- */
-export async function linesKeptByLateEntry(executor: Executor, boardSeriesId: string, now: Date): Promise<string[]> {
-  if (!(await getSetting('exceptions.boardEntryDeadline', executor))) return [];
-  const rows = await executor.select({ id: registration.id, studentId: registration.studentId }).from(registration)
-    .where(and(eq(registration.boardSeriesId, boardSeriesId), sql`${registration.status} not in ('rejected', 'expired', 'dropped')`));
-  const until = new Map<string, Date | null>();
-  const kept: string[] = [];
-  for (const r of rows) {
-    if (!until.has(r.studentId)) until.set(r.studentId, await lateEntryUntil(executor, r.studentId, boardSeriesId));
-    const d = until.get(r.studentId);
-    if (d && d > now) kept.push(r.id);
-  }
-  return kept;
-}
-
-/**
- * The effective deadlines of stored lines, by id — each line's student's late board entry (Q-20)
- * read as effectiveDeadlineFor reads it, while the setting is on (the review of 40c1447..af33662:
- * the InstaPay reference check and the moves read deadlines here).
- */
+/** The effective deadlines of stored lines, by id (as effectiveDeadlineFor reads them). */
 export async function effectiveDeadlinesOf(executor: Executor, registrationIds: string[]): Promise<Map<string, EffectiveDeadline>> {
   const out = new Map<string, EffectiveDeadline>();
   if (!registrationIds.length) return out;
   const r = await executor.execute(sql`
-    select r.id, r.student_id as "studentId", r.board_series_id as "seriesId",
+    select r.id,
       line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as at,
       line_effective_deadline_kind(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as kind
     from registration r where r.id in (${sql.join(registrationIds.map((id) => sql`${id}`), sql`, `)})`);
-  const lateOn = await getSetting('exceptions.boardEntryDeadline', executor);
-  const late = new Map<string, Date | null>();
-  for (const row of r.rows as { id: string; studentId: string; seriesId: string | null; at: unknown; kind: DeadlineKind | null }[]) {
-    let d: EffectiveDeadline = { at: asDate(row.at), kind: row.kind };
-    if (lateOn && d.at && d.kind !== 'exams_start' && row.seriesId) {
-      const key = `${row.studentId}|${row.seriesId}`;
-      if (!late.has(key)) late.set(key, await lateEntryUntil(executor, row.studentId, row.seriesId));
-      const until = late.get(key);
-      if (until && until > d.at) d = { at: until, kind: 'entry' };
-    }
-    out.set(row.id, d);
-  }
+  for (const row of r.rows as { id: string; at: unknown; kind: DeadlineKind | null }[]) out.set(row.id, { at: asDate(row.at), kind: row.kind });
   return out;
 }
 
-/** The sentence a refusal gives once a line's deadline has passed. */
+
+/** The sentence a refusal gives once a line's deadline has passed (the parked series moves and import read it). */
 export function deadlinePassedSentence(d: EffectiveDeadline, schoolDate: (d: Date) => string): string {
   const when = d.at ? schoolDate(d.at) : '';
   if (d.kind === 'retake') return `The registration window is not open: the exam board's retake deadline for this series (${when}) has passed`;
@@ -193,24 +143,30 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
   if (!line) throw new Error('Registration not found');
   // When the price stopped being provisional: a v2 line (the coordinator rework) when its session's
   // prices were switched final (§6: switching them final re-dates every waiting line from prices_final_at);
-  // a v1 line when the last fee row its basis read was confirmed — or, for a v1 line priced from a fee its
-  // basis recorded as provisional, on a row now priced by its own exam fee (a converted line the switch made
-  // payable), the later of that and prices_final_at, so every later re-date keeps the grace the switch gave
-  // it. A line that was never provisional keeps its own rule (0066 stamped legacy sessions prices-final at
-  // the migration: that moment says nothing about its price).
+  // a v1 line when the last fee row its basis read was confirmed. A v1 line priced from a fee its basis
+  // recorded as provisional, on a row now priced by its own exam fee, was made payable by one of two acts,
+  // told apart by the old Confirm's own condition (board-fee.services settleLinesOfConfirmed): every row its
+  // basis recorded confirmed at the amount it recorded — the Confirm cleared it, at its confirmation time;
+  // otherwise the prices-final switch did (a converted line, M3b), at prices_final_at, so every later re-date
+  // keeps the grace the switch gave it. A line that was never provisional keeps its own rule, and so does one
+  // the Confirm cleared (0066 stamped legacy sessions prices-final at the migration: that moment says nothing
+  // about their price — P1b fix 1).
   let feeConfirmedAt: Date | null = null;
   if ((line.pricingBasis as { v?: number } | null)?.v === 2) {
     feeConfirmedAt = !line.priceProvisional ? line.pricesFinalAt : null;
   } else {
-    const basisRows = (line.pricingBasis as { feeRows?: { id: string; provisional?: boolean }[] } | null)?.feeRows ?? [];
+    const basisRows = (line.pricingBasis as { feeRows?: { id: string; amount?: number; provisional?: boolean }[] } | null)?.feeRows ?? [];
     const feeIds = basisRows.map((f) => f.id);
     const rows = feeIds.length
-      ? await executor.select({ confirmedAt: boardFee.confirmedAt }).from(boardFee).where(inArray(boardFee.id, feeIds))
+      ? await executor.select({ id: boardFee.id, amount: boardFee.amount, provisional: boardFee.provisional, confirmedAt: boardFee.confirmedAt })
+        .from(boardFee).where(inArray(boardFee.id, feeIds))
       : [];
     const confirmed = rows.map((r) => r.confirmedAt).filter((d): d is Date => !!d);
     feeConfirmedAt = !line.priceProvisional && confirmed.length ? new Date(Math.max(...confirmed.map((d) => d.getTime()))) : null;
     const pricedProvisional = basisRows.some((f) => f.provisional);
-    if (!line.priceProvisional && pricedProvisional && line.rowExamFee !== null && line.pricesFinalAt && (!feeConfirmedAt || line.pricesFinalAt > feeConfirmedAt)) {
+    const confirmedAsRecorded = basisRows.length > 0
+      && basisRows.every((f) => rows.some((r) => r.id === f.id && !r.provisional && r.amount === f.amount));
+    if (!line.priceProvisional && pricedProvisional && line.rowExamFee !== null && line.pricesFinalAt && !confirmedAsRecorded) {
       feeConfirmedAt = line.pricesFinalAt;
     }
   }
