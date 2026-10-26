@@ -15,18 +15,24 @@
  * - the dates (C5): "Keep them" (`datesConfirmed`) or set them in the header;
  * - a board date the reference lacks (C6): the coordinator reads "Waiting for the admin", with no
  *   button (the lead's decision on the mock); the admin enters it here, once;
- * - every other item: its sentence and the subject or tab that fixes it.
+ * - the subjects not on the board's list we hold: one line naming them (the admin is told);
+ * - every other item: its sentence and the subject or tab that fixes it; an item this screen does not
+ *   know yet shows the API's own sentence, so nothing the API says is dropped.
+ *
+ * A button that saves for several subjects tries every one, says which were not saved and why, and the
+ * list is read again whatever happened.
  */
 
 import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, impactSentence, ROLES } from '@repo/validations';
+import { apiResponse, impactSentence, ROLES, type ImpactType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { useI18n } from '~/lib/i18n';
+import { herWords } from '~/lib/i18n-setup';
 import { Day, INPUT_CLASS } from './sessions-shared';
 import {
   CELL_SHORT, examMonth, refusalText, subjectTitle,
@@ -51,6 +57,19 @@ type Entry = {
   forHome: boolean;
 };
 
+/** A subject a check-list button could not save: what it would do to families (saved: false), or the API's refusal. */
+type NotSaved = { offeringId: string; name: string; impact?: ImpactType; refusal?: string };
+class NotSavedError extends Error {
+  constructor(readonly notSaved: NotSaved[]) { super('Not saved'); }
+}
+
+/** The codes this screen words itself; any other is shown with the API's own sentence. */
+const KNOWN = new Set<CheckItem['code']>([
+  'sitting_no_board_date', 'dates_to_check', 'price_not_set', 'last_years_prices', 'payment_date_passed', 'ticked_by_default',
+  'review_note', 'switched_off', 'nothing_ticked', 'no_teacher', 'teacher_tbc', 'not_on_the_list', 'carried_from_too_old',
+  'date_after_board_deadline', 'teacher_name_doubt',
+]);
+
 const DAY = 24 * 60 * 60 * 1000;
 /** A deadline as the school reads it, in one piece for a sentence ("21 March 2027", Cairo). */
 const longDay = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' }).format(new Date(iso));
@@ -66,19 +85,33 @@ function sittingOf(s: SetupSession, seriesId: string) {
   return null;
 }
 
-/** What is after a board's entry deadline for a row (the API's rule for date_after_board_deadline). */
-function lateReasons(s: SetupSession, row: Offering['rows'][number], deadline: Date): string[] {
-  const late: string[] = [];
+/** What can fall after a board's entry deadline: her words, and the API's (date_after_board_deadline's message). */
+const LATE = {
+  closes: { her: 'reservations close', api: 'the session closes' },
+  due: { her: 'payment is due', api: 'payment is due' },
+  cancel: { her: 'unpaid reservations are cancelled', api: 'unpaid reservations are cancelled' },
+  rowCloses: { her: 'the row closes', api: 'the row closes' },
+  rowDue: { her: 'the row is due', api: 'the row is due' },
+} as const;
+type Late = keyof typeof LATE;
+
+/** What is after a board's entry deadline for a row (the API's rule for date_after_board_deadline, in its order). */
+function lateReasons(s: SetupSession, row: Offering['rows'][number], deadline: Date): Late[] {
+  const late: Late[] = [];
   const closes = s.closesAt ? new Date(s.closesAt) : null;
   const due = new Date(s.paymentDueAt);
   const cancel = new Date(due.getTime() + s.unpaidCancelDays * DAY);
-  if (closes && closes > deadline) late.push('reservations close');
-  if (due > deadline && !row.payBy) late.push('payment is due');
-  if (cancel > deadline && !row.payBy) late.push('unpaid reservations are cancelled');
-  if (row.closesAt && new Date(row.closesAt) > deadline) late.push('the row closes');
-  if (row.payBy && new Date(row.payBy) > deadline) late.push('the row is due');
+  if (closes && closes > deadline) late.push('closes');
+  if (due > deadline && !row.payBy) late.push('due');
+  if (cancel > deadline && !row.payBy) late.push('cancel');
+  if (row.closesAt && new Date(row.closesAt) > deadline) late.push('rowCloses');
+  if (row.payBy && new Date(row.payBy) > deadline) late.push('rowDue');
   return late;
 }
+
+/** A teacher-name doubt (Q15) as the API words it: "A" looks like "B" (why): one person or two? */
+const DOUBT = /^"(.+)" looks like "(.+)" \((same name|spelling|initials)\): one person or two\?$/;
+const DOUBT_WHY: Record<string, string> = { 'same name': '(the same name)', spelling: '(spelt differently)', initials: '(initials for a name)' };
 
 export function useCheckEntries(s: SetupSession, viewerRole: string) {
   const queryClient = useQueryClient();
@@ -88,12 +121,22 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
   const subjectHref = (offeringId: string) => `/admin/sessions/${s.id}/subjects/${offeringId}`;
   const byId = new Map(s.offerings.map((o) => [o.id, o]));
-  // A check-list button saves nothing families would feel; if the save answers that it would (a fee that follows
-  // another re-derived, closing with reservations), nothing is saved and she is sent to the subject to see it.
-  const putOffering = async (offeringId: string, json: { notesReviewed?: true; defaultsReviewed?: true; accepting?: boolean }) => {
-    const r = await apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId }, json }));
-    if (!r.saved) throw new Error(`${impactSentence(r.impact)} Open the subject to see it and save it there.`);
-    return r;
+  // A check-list button saves nothing families would feel: a subject whose save answers that it would (a fee that
+  // follows another re-derived, closing with reservations) is not saved, and she is sent to the subject to see it.
+  // Every subject is tried; the ones not saved are named with the reason, and the list is read again either way.
+  const putOfferings = async (ids: string[], json: { notesReviewed?: true; defaultsReviewed?: true; accepting?: boolean }) => {
+    const notSaved: NotSaved[] = [];
+    for (const offeringId of ids) {
+      const o = byId.get(offeringId);
+      const name = o ? subjectTitle(o) : '';
+      try {
+        const r = await apiResponse(api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: s.id, offeringId }, json }));
+        if (!r.saved) notSaved.push({ offeringId, name, impact: r.impact });
+      } catch (err) {
+        notSaved.push({ offeringId, name, refusal: refusalText(err) });
+      }
+    }
+    if (notSaved.length) throw new NotSavedError(notSaved);
   };
 
   const items = s.checkList;
@@ -178,7 +221,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
           ))}</>,
         };
       }),
-      actions: [{ kind: 'run', label: 'Looks right', primary: true, run: async () => { for (const id of subjects) await putOffering(id, { defaultsReviewed: true }); } }],
+      actions: [{ kind: 'run', label: 'Looks right', primary: true, run: () => putOfferings(subjects, { defaultsReviewed: true }) }],
     });
   }
 
@@ -191,7 +234,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       key: `notes-${id}`, severity: 'look', forHome: true,
       body: <><Name>{subjectTitle(o)}</Name><span>:</span> {o.checkNotes.map((n, i) => <span key={i} className="block" lang="en" dir="ltr" data-i18n-skip="true">{n}</span>)}</>,
       actions: [
-        { kind: 'run', label: 'Looks right', primary: true, run: () => putOffering(id, { notesReviewed: true }) },
+        { kind: 'run', label: 'Looks right', primary: true, run: () => putOfferings([id], { notesReviewed: true }) },
         { kind: 'link', label: 'Open the subject', href: subjectHref(id) },
       ],
     });
@@ -203,7 +246,6 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     { code: 'nothing_ticked', words: 'nothing ticked — not offered to families.' },
     { code: 'no_teacher', words: 'taught in school, but no teacher is named.' },
     { code: 'teacher_tbc', words: 'teacher to be confirmed. Families read “teacher to be announced”.' },
-    { code: 'not_on_the_list', words: 'not on our list: families read its name as you typed it, and we are told to add it.' },
   ];
   for (const p of perSubject) {
     for (const c of of(p.code)) {
@@ -213,11 +255,26 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
         key: `${p.code}-${o.id}`, severity: 'look', forHome: true,
         body: <><Name>{subjectTitle(o)}</Name><span>:</span> <span>{p.words}</span></>,
         actions: [
-          ...(p.action === 'switch-on' ? [{ kind: 'run' as const, label: 'Switch it on', primary: true, run: () => putOffering(o.id, { accepting: true }) }] : []),
+          ...(p.action === 'switch-on' ? [{ kind: 'run' as const, label: 'Switch it on', primary: true, run: () => putOfferings([o.id], { accepting: true }) }] : []),
           { kind: 'link', label: 'Open the subject', href: subjectHref(o.id) },
         ],
       });
     }
+  }
+
+  // D1: the subjects not on the board's list we hold — one line naming them; nothing for her to do (the admin is told).
+  const notListed = of('not_on_the_list').map((c) => byId.get(c.offeringId ?? '')).filter((o): o is Offering => !!o);
+  if (notListed.length) {
+    entries.push({
+      key: 'not-on-the-list', severity: 'look', forHome: true, waiting: true,
+      body: (
+        <>
+          <span>Not on the board&apos;s list we hold:</span> {notListed.map((o, i) => <span key={o.id}>{i > 0 && ', '}<Name>{subjectTitle(o)}</Name></span>)}{!subjectTitle(notListed[notListed.length - 1]!).endsWith('.') && '.'}{' '}
+          <span>{notListed.length === 1 ? 'Families see its name as you typed it, and the admin is told to add it.' : 'Families see the names as you typed them, and the admin is told to add them.'}</span>
+        </>
+      ),
+      actions: [],
+    });
   }
 
   // D6: an earlier exam older than the board carries a result forward — kept (her list wins), warned.
@@ -239,14 +296,20 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     }
   }
 
-  // A date after a board's deadline: one line per deadline and what is late.
-  const late = new Map<string, { board: string; deadline: string; reasons: string[]; rows: { id: string; offeringId: string; text: React.ReactNode }[] }>();
+  // A date after a board's deadline: one line per deadline and what is late. Where the browser's reading of the
+  // dates does not give the API's reasons (a date it reads differently), the API's own sentence is shown instead.
+  const late = new Map<string, { board: string; deadline: string; reasons: Late[]; rows: { id: string; offeringId: string; text: React.ReactNode }[] }>();
   for (const c of of('date_after_board_deadline')) {
     const o = byId.get(c.offeringId ?? '');
     const r = o?.rows.find((x) => x.id === c.rowId);
-    if (!o || !r || !r.series?.entryDeadline) continue;
-    const reasons = lateReasons(s, r, new Date(r.series.entryDeadline));
-    if (!reasons.length) continue;
+    const reasons = o && r?.series?.entryDeadline ? lateReasons(s, r, new Date(r.series.entryDeadline)) : [];
+    if (!o || !r?.series?.entryDeadline || !reasons.length || !c.message.includes(`: ${reasons.map((k) => LATE[k].api).join(', ')} after the board's deadline`)) {
+      entries.push({
+        key: `late-api-${c.rowId ?? c.message}`, severity: c.severity, forHome: true, body: <span lang="en" dir="ltr">{herWords(c.message)}</span>,
+        actions: [{ kind: 'link', label: 'Set the dates', href: `/admin/sessions/${s.id}#dates` }, ...(o ? [{ kind: 'link' as const, label: 'Open the subject', href: subjectHref(o.id) }] : [])],
+      });
+      continue;
+    }
     const key = `${o.board.name}|${r.series.entryDeadline}|${reasons.join(',')}`;
     const g = late.get(key) ?? { board: o.board.name, deadline: r.series.entryDeadline, reasons, rows: [] };
     g.rows.push({ id: r.id, offeringId: o.id, text: <><Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{label(r)}</span></> });
@@ -257,7 +320,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       key: `late-${key}`, severity: 'look', forHome: true,
       body: (
         <>
-          <span>{`${g.reasons.join(', ').replace(/, ([^,]*)$/, ' and $1')} after ${g.board}'s entry deadline (${longDay(g.deadline)}): ${g.rows.length} ${g.rows.length === 1 ? 'row' : 'rows'}.`}</span>{' '}
+          <span>{`${g.reasons.map((k) => LATE[k].her).join(', ').replace(/, ([^,]*)$/, ' and $1')} after ${g.board}'s entry deadline (${longDay(g.deadline)}): ${g.rows.length} ${g.rows.length === 1 ? 'row' : 'rows'}.`}</span>{' '}
           <span>The board&apos;s deadline cancels unpaid reservations first. Move your dates earlier?</span>
         </>
       ),
@@ -268,7 +331,21 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
 
   // Q15: two names on the school's list that look like one person — fixed on the subject, no button here.
   for (const [i, c] of of('teacher_name_doubt').entries()) {
-    entries.push({ key: `doubt-${i}`, severity: 'look', forHome: false, body: <span data-i18n-skip="true">{c.message}</span>, actions: [] });
+    const m = DOUBT.exec(c.message);
+    entries.push({
+      key: `doubt-${i}`, severity: 'look', forHome: false, actions: [],
+      body: m
+        ? <><Name>{m[1]}</Name> <span>looks like</span> <Name>{m[2]}</Name> <span>{DOUBT_WHY[m[3]!]}</span><span>:</span> <span>one person or two?</span></>
+        : <span lang="en" dir="ltr" data-i18n-skip="true">{c.message}</span>,
+    });
+  }
+
+  // An item this screen does not word yet: the API's own sentence, never dropped.
+  for (const [i, c] of items.filter((x) => !KNOWN.has(x.code)).entries()) {
+    entries.push({
+      key: `other-${i}`, severity: c.severity, forHome: true, body: <span lang="en" dir="ltr">{herWords(c.message)}</span>,
+      actions: c.offeringId ? [{ kind: 'link', label: 'Open the subject', href: subjectHref(c.offeringId) }] : [],
+    });
   }
 
   entries.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'blocks' ? -1 : 1));
@@ -295,17 +372,18 @@ export function CheckList({ s, viewerRole, place, headingLevel = 'h2' }: { s: Se
         )}
       </div>
       {hidden ? null : shown.length
-        ? <ul className="mt-2 divide-y divide-border">{shown.map((e) => <CheckLine key={e.key} e={e} refresh={refresh} />)}</ul>
+        ? <ul className="mt-2 divide-y divide-border">{shown.map((e) => <CheckLine key={e.key} e={e} refresh={refresh} sessionId={s.id} />)}</ul>
         : <p className="mt-2 text-sm text-muted-foreground">{s.status === 'draft' ? 'Nothing left: the session can open.' : 'Nothing needs a look.'}</p>}
     </>
   );
 }
 
-function CheckLine({ e, refresh }: { e: Entry; refresh: () => Promise<unknown> }) {
+function CheckLine({ e, refresh, sessionId }: { e: Entry; refresh: () => Promise<unknown>; sessionId: string }) {
   const [open, setOpen] = useState(false);
-  // The line stays busy until the list is read again, so a second click never lands on the line below it.
+  // The line stays busy until the list is read again, so a second click never lands on the line below it; the list
+  // is read again whether or not every subject was saved.
   const run = useMutation({
-    mutationFn: async (a: Extract<Action, { kind: 'run' }>) => { await a.run(); await refresh(); },
+    mutationFn: async (a: Extract<Action, { kind: 'run' }>) => { try { await a.run(); } finally { await refresh(); } },
   });
   return (
     <li className="flex flex-wrap items-start gap-3 py-3">
@@ -330,7 +408,7 @@ function CheckLine({ e, refresh }: { e: Entry; refresh: () => Promise<unknown> }
             )}
           </div>
         )}
-        {run.error && <p role="alert" className="mt-1 text-xs text-destructive">{refusalText(run.error)}</p>}
+        {run.error && <NotSavedLines err={run.error} sessionId={sessionId} />}
         {e.boardDate && <BoardDateForm seriesId={e.boardDate.seriesId} refresh={refresh} />}
       </div>
       {e.actions.length > 0 && (
@@ -341,6 +419,25 @@ function CheckLine({ e, refresh }: { e: Entry; refresh: () => Promise<unknown> }
         </div>
       )}
     </li>
+  );
+}
+
+/** What a check-list button did not save, subject by subject: what it would do to families, or why it was refused. */
+function NotSavedLines({ err, sessionId }: { err: unknown; sessionId: string }) {
+  if (!(err instanceof NotSavedError)) return <p role="alert" className="mt-1 text-xs text-destructive">{refusalText(err)}</p>;
+  return (
+    <div role="alert" className="mt-1 text-xs text-destructive">
+      <p className="font-medium">{err.notSaved.length === 1 ? 'Not saved:' : 'These were not saved:'}</p>
+      <ul className="mt-0.5 space-y-0.5">
+        {err.notSaved.map((x) => (
+          <li key={x.offeringId}>
+            <Name>{x.name}</Name><span>:</span>{' '}
+            {x.impact ? <><span>{impactSentence(x.impact)}</span> <span>Open the subject to see it and save it there.</span></> : <span>{x.refusal}</span>}{' '}
+            <Link href={`/admin/sessions/${sessionId}/subjects/${x.offeringId}` as never} className="font-medium text-primary hover:underline">Open the subject</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -385,7 +482,7 @@ export function openWaitsFor(s: SetupSession): string[] {
     else if (c.code === 'sitting_no_board_date') {
       const at = c.seriesId ? sittingOf(s, c.seriesId) : null;
       out.push(at ? `${at.board}'s entry deadline (the admin)` : 'a board date (the admin)');
-    } else out.push(c.message);
+    } else out.push(herWords(c.message));
   }
   return [...new Set(out)];
 }

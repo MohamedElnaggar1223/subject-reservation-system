@@ -236,7 +236,7 @@ function Editor({ o, s, canEdit, saved }: { o: OfferingData; s: SetupSession; ca
           <h1 className="font-display text-2xl font-bold text-foreground"><bdi data-i18n-skip="true">{subjectTitle(o)}</bdi></h1>
           <p className="mt-1 text-sm text-muted-foreground">
             <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr" data-i18n-skip="true">{code}</span></>} · <span data-i18n-skip="true">{o.group}</span> · <bdi>{s.name}</bdi>
-            {o.notOnTheList && <> · <span>not on the list (flagged to us)</span></>}
+            {o.notOnTheList && <> · <span>not on the board&apos;s list we hold</span></>}
           </p>
         </div>
         <div className="w-full rounded-xl border border-border bg-card p-4 shadow-sm sm:w-auto sm:min-w-80">

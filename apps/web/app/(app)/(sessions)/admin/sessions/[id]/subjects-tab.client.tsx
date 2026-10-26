@@ -137,7 +137,7 @@ function Tile({ s, o }: { s: SetupSession; o: Offering }) {
         </span>
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr" data-i18n-skip="true">{code}</span></>}{o.notOnTheList && <> · <span>not on the list (flagged to us)</span></>}
+        <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr" data-i18n-skip="true">{code}</span></>}{o.notOnTheList && <> · <span>not on the board&apos;s list we hold</span></>}
       </p>
       <p className="mt-2 text-sm text-foreground">
         {o.teacherTbc
@@ -229,7 +229,7 @@ function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) 
   return (
     <Modal title="A subject not on the list" onClose={onClose}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) add.mutate(); }}>
-        <p className="text-sm text-muted-foreground">Families read its name as you type it. We are told, and add it to the list.</p>
+        <p className="text-sm text-muted-foreground">Families see its name as you type it, and the admin is told to add it to the board&apos;s list we hold.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Board" htmlFor="nl-board">
             <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(e.target.value as ParsePriceListType['board'])}>
