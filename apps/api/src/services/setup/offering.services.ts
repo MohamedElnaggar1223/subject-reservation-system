@@ -484,8 +484,10 @@ export async function addOffering(sessionId: string, input: AddOfferingType, act
       const board = await boardRules(tx, subjectRow.council);
       const c: RowContext = { session, offer: offer!, subjectRow, board, actorId };
       // A row the reference says is not sat in winter is not suggested in a winter session; each row sits
-      // in its own winter sitting where the reference gives one, else the subject's (D12).
-      const suggested = refRows.filter((r) => !(session.sessionType === 'winter' && r.winterSitting === 'none'));
+      // in its own winter sitting where the reference gives one, else the subject's (D12). In D10's order, as
+      // every save orders them (all papers, one-paper rows, units, A.S., A.2., A.L., then the rest).
+      const suggested = refRows.filter((r) => !(session.sessionType === 'winter' && r.winterSitting === 'none'))
+        .map((r, i) => ({ r, i })).sort((a, b) => (KIND_ORDER[a.r.kind] ?? 9) - (KIND_ORDER[b.r.kind] ?? 9) || a.i - b.i).map((x) => x.r);
       for (const [i, r] of suggested.entries()) {
         const sitting = defaultSitting(session.sessionType, r.winterSitting && r.winterSitting !== 'none' ? r.winterSitting : winter);
         await writeRow(tx, c, { kind: r.kind as OfferingRowInputType['kind'], referenceKey: r.key, sitting, cells: { ...NO_CELLS } }, null, i, []);
@@ -538,9 +540,10 @@ export async function copyOfferingInto(tx: Tx, session: SessionRow, src: OfferRo
     if (!(r.firstInSchool || r.retakeInSchool || r.retakeSelfStudy || r.firstSelfStudy)) continue;
     const [here] = r.boardSeriesId ? await tx.select({ month: boardSeries.month }).from(boardSeries).where(eq(boardSeries.id, r.boardSeriesId)) : [];
     const sitting = sittingOfSeries(srcSession.sessionType, here?.month ?? null) ?? defaultSitting(session.sessionType, null);
-    const priors = r.allowedPriorSeriesIds.length
-      ? await tx.select({ month: boardSeries.month, year: boardSeries.year }).from(boardSeries).where(inArray(boardSeries.id, r.allowedPriorSeriesIds))
-      : [];
+    // Her list in her order (the database returns a set).
+    const priors = (r.allowedPriorSeriesIds.length
+      ? await tx.select({ id: boardSeries.id, month: boardSeries.month, year: boardSeries.year }).from(boardSeries).where(inArray(boardSeries.id, r.allowedPriorSeriesIds))
+      : []).sort((a, b) => r.allowedPriorSeriesIds.indexOf(a.id) - r.allowedPriorSeriesIds.indexOf(b.id));
     const ownTeachers = await tx.select({ teacherId: sessionOfferItemTeacher.teacherId, mode: sessionOfferItemTeacher.mode })
       .from(sessionOfferItemTeacher).innerJoin(teacher, eq(teacher.id, sessionOfferItemTeacher.teacherId))
       .where(and(eq(sessionOfferItemTeacher.itemId, r.id), eq(teacher.isActive, true))).orderBy(asc(sessionOfferItemTeacher.sortOrder));
@@ -635,7 +638,30 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         if (new Set(ids).size !== ids.length) throw new SetupError('A row is sent twice');
         const byId = new Map(rows.map((r) => [r.id, r]));
         for (const id of ids) if (!byId.has(id)) throw new SetupError('That row is not under this subject', 404);
-        const ordered = [...data.rows].map((r, i) => ({ r, i })).sort((a, b) => (KIND_ORDER[a.r.kind] ?? 9) - (KIND_ORDER[b.r.kind] ?? 9) || a.i - b.i);
+        // A new row like one the subject has (the same reference row, the same codes, the same name): one the
+        // body leaves out is that row, kept (a save sent twice — a double click — changes nothing the second
+        // time); one the body keeps, or a second new one, is refused.
+        const identity = (r: { kind: string; referenceKey?: string | null; referenceCodes?: string[]; name?: string | null }) =>
+          r.referenceKey ? `ref:${r.referenceKey}` : r.referenceCodes?.length ? `codes:${r.kind}:${[...r.referenceCodes].sort().join('|')}` : `name:${r.kind}:${(r.name ?? '').trim().toLowerCase()}`;
+        // Named as screens name it (an all-papers row stores "Whole subject" and reads "All papers").
+        const shown = (r: ItemRow) => (r.kind === 'all_papers' ? 'All papers' : r.label);
+        const kept = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [identity({ ...r, name: r.label }), shown(r)]));
+        const omitted = new Map(rows.filter((r) => !ids.includes(r.id)).map((r) => [identity({ ...r, name: r.label }), r]));
+        const sent = data.rows.map((r) => {
+          if (r.id) return r;
+          const key = identity(r);
+          const twin = kept.get(key);
+          if (twin) throw new SetupError(`${twin} is already under ${subjectRow.name}: a row is added once`, 409);
+          const same = omitted.get(key);
+          kept.set(key, same ? shown(same) : r.name ?? r.referenceKey ?? r.kind);
+          if (same) {
+            omitted.delete(key);
+            ids.push(same.id);
+            return { ...r, id: same.id };
+          }
+          return r;
+        });
+        const ordered = sent.map((r, i) => ({ r, i })).sort((a, b) => (KIND_ORDER[a.r.kind] ?? 9) - (KIND_ORDER[b.r.kind] ?? 9) || a.i - b.i);
         for (const [pos, { r }] of ordered.entries()) {
           const w = await writeRow(tx, c, r, r.id ? byId.get(r.id)! : null, pos, lines);
           if (w.changed) changed = true;
