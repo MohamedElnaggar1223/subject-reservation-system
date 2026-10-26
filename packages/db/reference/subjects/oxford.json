@@ -1,0 +1,48 @@
+[
+  {
+    "code": "9280",
+    "name": "English as a Second Language",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": false,
+    "note": "Code not on any of the school's fee lists, forms or links sheets. OxfordAQA International GCSE English as a Second Language is 9280 (papers 9280/L, R, W, S on OxfordAQA's November 2026 timetable). To confirm; no OxfordAQA fee list.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "9280"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "9218",
+    "name": "Psychology",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": false,
+    "note": "Code not on any of the school's fee lists, forms or links sheets. OxfordAQA International GCSE Psychology is 9218 (papers 9218/1, 9218/2 on OxfordAQA's November 2026 timetable). To confirm; no OxfordAQA fee list.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "9218"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  }
+]

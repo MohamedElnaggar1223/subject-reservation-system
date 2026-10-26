@@ -1,0 +1,408 @@
+[
+  {
+    "code": "4AA1",
+    "name": "Arabic",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": false,
+    "note": "The November 2026 / January 2027 links sheet prints 'Edexcel' on one Arabic O.L. teacher's line; Pearson Edexcel International GCSE Arabic is 4AA1 (Pearson's November 2026 timetable). Whether the school enters it is not known; on no fee list or form.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "4AA1"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "4HB1",
+    "name": "Human Biology",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Pearson Edexcel International GCSE; on the Edexcel November 2026 fee list.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "4HB1"
+        ],
+        "priceCodes": [
+          "4HB1"
+        ],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        }
+      }
+    ]
+  },
+  {
+    "code": "4MA1",
+    "name": "Mathematics",
+    "group": "O.L.",
+    "level": "igcse",
+    "confirmed": true,
+    "note": "Pearson Edexcel International GCSE Mathematics A, Higher tier papers 1H and 2H.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "all-papers",
+        "kind": "all_papers",
+        "codes": [
+          "4MA1"
+        ],
+        "priceCodes": [],
+        "label": {
+          "en": "all papers",
+          "ar": "كل الأوراق"
+        },
+        "sumOfUnits": [
+          "paper-1h",
+          "paper-2h"
+        ],
+        "note": "The fee lists price the papers, not the qualification: all papers is the sum of 1H and 2H."
+      },
+      {
+        "key": "paper-1h",
+        "kind": "paper",
+        "codes": [
+          "4MA1/1H"
+        ],
+        "priceCodes": [
+          "4MA1/1H",
+          "4MA1 1H"
+        ],
+        "short": "Paper 1H",
+        "label": {
+          "en": "Paper 1H only",
+          "ar": "الورقة 1H فقط"
+        }
+      },
+      {
+        "key": "paper-2h",
+        "kind": "paper",
+        "codes": [
+          "4MA1/2H"
+        ],
+        "priceCodes": [
+          "4MA1/2H",
+          "4MA1 2H"
+        ],
+        "short": "Paper 2H",
+        "label": {
+          "en": "Paper 2H only",
+          "ar": "الورقة 2H فقط"
+        }
+      }
+    ]
+  },
+  {
+    "code": "YAA01",
+    "name": "Arabic",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "note": "The school's Arabic A.L. holds two A Levels, chosen with the teacher: Pearson's International A Level (YAA01 = units WAA01 + WAA02) and the GCE A Level (9AA0). The winter form is 'January 2027 ONLY'.",
+    "winterSitting": "january",
+    "rows": [
+      {
+        "key": "waa01",
+        "kind": "unit",
+        "codes": [
+          "WAA01"
+        ],
+        "priceCodes": [
+          "WAA01"
+        ],
+        "short": "Unit 1",
+        "label": {
+          "en": "Unit 1 (WAA01)",
+          "ar": "الوحدة 1 (WAA01)"
+        }
+      },
+      {
+        "key": "waa02",
+        "kind": "unit",
+        "codes": [
+          "WAA02"
+        ],
+        "priceCodes": [
+          "WAA02"
+        ],
+        "short": "Unit 2",
+        "label": {
+          "en": "Unit 2 (WAA02)",
+          "ar": "الوحدة 2 (WAA02)"
+        }
+      },
+      {
+        "key": "yaa01",
+        "kind": "qualification",
+        "codes": [
+          "YAA01"
+        ],
+        "priceCodes": [
+          "YAA01"
+        ],
+        "short": "International A Level",
+        "label": {
+          "en": "International A Level (YAA01)",
+          "ar": "المستوى A الدولي (YAA01)"
+        },
+        "sumOfUnits": [
+          "waa01",
+          "waa02"
+        ]
+      },
+      {
+        "key": "9aa0",
+        "kind": "qualification",
+        "codes": [
+          "9AA0"
+        ],
+        "priceCodes": [
+          "9AA0"
+        ],
+        "short": "GCE A Level",
+        "label": {
+          "en": "GCE A Level (9AA0)",
+          "ar": "المستوى A البريطاني (9AA0)"
+        },
+        "winterSitting": null,
+        "note": "Pearson Edexcel GCE A Level Arabic (9AA0, papers 9AA0/01–03 on Pearson's GCE June 2027 timetable); sat in June only. The form prints '9AA01', the links sheet '9AA1': board aliases."
+      }
+    ]
+  },
+  {
+    "code": "YBI11",
+    "name": "Biology",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "note": "Pearson Edexcel International Advanced Level Biology (XBI11 AS, YBI11 A Level), entered unit by unit. The school's winter form sits units 1–2 in November (Pearson's October sitting) and 3–4 in January.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "wbi11",
+        "kind": "unit",
+        "codes": [
+          "WBI11"
+        ],
+        "priceCodes": [
+          "WBI11"
+        ],
+        "short": "Unit 1",
+        "label": {
+          "en": "Unit 1 (WBI11)",
+          "ar": "الوحدة 1 (WBI11)"
+        }
+      },
+      {
+        "key": "wbi12",
+        "kind": "unit",
+        "codes": [
+          "WBI12"
+        ],
+        "priceCodes": [
+          "WBI12"
+        ],
+        "short": "Unit 2",
+        "label": {
+          "en": "Unit 2 (WBI12)",
+          "ar": "الوحدة 2 (WBI12)"
+        }
+      },
+      {
+        "key": "wbi13",
+        "kind": "unit",
+        "codes": [
+          "WBI13"
+        ],
+        "priceCodes": [
+          "WBI13"
+        ],
+        "short": "Unit 3",
+        "label": {
+          "en": "Unit 3 (WBI13)",
+          "ar": "الوحدة 3 (WBI13)"
+        },
+        "winterSitting": "january"
+      },
+      {
+        "key": "wbi14",
+        "kind": "unit",
+        "codes": [
+          "WBI14"
+        ],
+        "priceCodes": [
+          "WBI14"
+        ],
+        "short": "Unit 4",
+        "label": {
+          "en": "Unit 4 (WBI14)",
+          "ar": "الوحدة 4 (WBI14)"
+        },
+        "winterSitting": "january"
+      },
+      {
+        "key": "wbi15",
+        "kind": "unit",
+        "codes": [
+          "WBI15"
+        ],
+        "priceCodes": [
+          "WBI15"
+        ],
+        "short": "Unit 5",
+        "label": {
+          "en": "Unit 5 (WBI15)",
+          "ar": "الوحدة 5 (WBI15)"
+        },
+        "winterSitting": "january"
+      },
+      {
+        "key": "wbi16",
+        "kind": "unit",
+        "codes": [
+          "WBI16"
+        ],
+        "priceCodes": [
+          "WBI16"
+        ],
+        "short": "Unit 6",
+        "label": {
+          "en": "Unit 6 (WBI16)",
+          "ar": "الوحدة 6 (WBI16)"
+        },
+        "winterSitting": "january"
+      }
+    ]
+  },
+  {
+    "code": "YMA01",
+    "name": "Mathematics",
+    "group": "A.S./A.L.",
+    "level": "as_al",
+    "confirmed": true,
+    "note": "Pearson Edexcel International Advanced Level Mathematics (XMA01 AS, YMA01 A Level), entered unit by unit.",
+    "winterSitting": "november",
+    "rows": [
+      {
+        "key": "wma11",
+        "kind": "unit",
+        "codes": [
+          "WMA11"
+        ],
+        "priceCodes": [
+          "WMA11"
+        ],
+        "short": "P1",
+        "label": {
+          "en": "P1 (WMA11)",
+          "ar": "P1 (WMA11)"
+        }
+      },
+      {
+        "key": "wma12",
+        "kind": "unit",
+        "codes": [
+          "WMA12"
+        ],
+        "priceCodes": [
+          "WMA12"
+        ],
+        "short": "P2",
+        "label": {
+          "en": "P2 (WMA12)",
+          "ar": "P2 (WMA12)"
+        }
+      },
+      {
+        "key": "wma13",
+        "kind": "unit",
+        "codes": [
+          "WMA13"
+        ],
+        "priceCodes": [
+          "WMA13"
+        ],
+        "short": "P3",
+        "label": {
+          "en": "P3 (WMA13)",
+          "ar": "P3 (WMA13)"
+        }
+      },
+      {
+        "key": "wma14",
+        "kind": "unit",
+        "codes": [
+          "WMA14"
+        ],
+        "priceCodes": [
+          "WMA14"
+        ],
+        "short": "P4",
+        "label": {
+          "en": "P4 (WMA14)",
+          "ar": "P4 (WMA14)"
+        }
+      },
+      {
+        "key": "wme01",
+        "kind": "unit",
+        "codes": [
+          "WME01"
+        ],
+        "priceCodes": [
+          "WME01"
+        ],
+        "short": "M1",
+        "label": {
+          "en": "M1 (WME01)",
+          "ar": "M1 (WME01)"
+        }
+      },
+      {
+        "key": "wme02",
+        "kind": "unit",
+        "codes": [
+          "WME02"
+        ],
+        "priceCodes": [
+          "WME02"
+        ],
+        "short": "M2",
+        "label": {
+          "en": "M2 (WME02)",
+          "ar": "M2 (WME02)"
+        }
+      },
+      {
+        "key": "wst01",
+        "kind": "unit",
+        "codes": [
+          "WST01"
+        ],
+        "priceCodes": [
+          "WST01"
+        ],
+        "short": "S1",
+        "label": {
+          "en": "S1 (WST01)",
+          "ar": "S1 (WST01)"
+        }
+      }
+    ]
+  }
+]
