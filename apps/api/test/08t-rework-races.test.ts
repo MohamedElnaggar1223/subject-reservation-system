@@ -1614,11 +1614,15 @@ describe('08t: the rework races — reminders (step D)', () => {
     const rule = await apiResponse(adm.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId, offsetsDays: [-7], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: 'this session, seven days ahead' } }));
     const release = await holdRowLock('reminder_rule', rule.id);
     const moved = new Date(new Date(`${dueDay}T10:00:00Z`).getTime() + 5 * DAY);
+    // The coordinator rework (P1a): a payment date change answers the due dates it moves first; the change raced
+    // here is the one sent back with them.
+    const shown = await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { paymentDueAt: moved, reason: 'the payment date moves five days' } }));
+    expect(shown).toMatchObject({ saved: false });
     let put: { status: number; body: string } | null = null;
     try {
       const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
       await lockWaiters(1);
-      const changing = adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { paymentDueAt: moved, reason: 'the payment date moves five days' } })
+      const changing = adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { paymentDueAt: moved, reason: 'the payment date moves five days', expected: shown.impact } })
         .then(async (r) => ({ status: r.status, body: await r.text() }));
       // The change queues behind the step (on the session), or — the order before the fix — takes the
       // session and queues on the line the step holds.

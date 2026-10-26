@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import {
   admin, staff, onboard, subject, refused, one, sql, audited, money, futureWindow, runPaymentDeadlines, runSessionRecovery,
-  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf, pauseAtAudits, lockWaiters,
+  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf, pauseAtAudits, lockWaiters, cairoDateIn, confirmed, type Impact,
 } from './helpers';
 
 /**
@@ -123,7 +123,7 @@ describe('08n: sessions and offerings, set up as the coordinator sets them up', 
     expect(s1.checkList.filter((c) => c.code === 'sitting_no_board_date').map((c) => c.seriesId)).toContain(oxRow.series!.id);
     expect((await refused(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june1 } }))).status).toBe(409);
     for (const c of s1.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
-      await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: new Date(Date.now() + 120 * day) } }));
+      await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: cairoDateIn(120) } }));
     }
     // The default dates block too until she sets them or keeps them (C5).
     expect((await sessionOf(june1)).checkList.filter((c) => c.severity === 'blocks').map((c) => c.code)).toEqual(['dates_to_check']);
@@ -763,7 +763,12 @@ describe('08n: grade 10 in bulk (A-15) and due dates (§3.1)', () => {
     expect(new Date((await lineOf(capped!.id)).due_at).getTime()).toBe(earlyDeadline.getTime());
 
     // The payment date moves into the past: a line reserved now is due a grace after it is made.
-    await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { paymentDueAt: new Date(Date.now() + 60_000), reason: 'payment date moved' } }));
+    // (A payment date change answers the due dates it moves first: sent again with them.)
+    const moving = new Date(Date.now() + 60_000);
+    const { shown } = await confirmed((expected?: Impact) => apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { paymentDueAt: moving, reason: 'payment date moved', ...(expected ? { expected } : {}) } })));
+    // Answered first, nothing written; then saved with the same counts.
+    expect(shown).toMatchObject({ saved: false, impact: { dueDatesMoved: 2 } });
+    expect(new Date((await lineOf(onTime!.id)).due_at).getTime()).toBe(moving.getTime());
     await sql(`update registration_session set payment_due_at = now() - interval '1 day' where id = $1`, [s.id]);
     const g = await onboard(officer, `n08d-grace-${RUN}`, 11);
     const before = Date.now();

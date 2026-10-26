@@ -164,7 +164,7 @@ export async function parsePriceList(sessionId: string, board: string, text: str
  * fee typed or read from a list is hers and stays. Returns the rows whose fee changed (the caller
  * re-prices their lines); with `audit`, each change has its OFFER_ITEM_UPDATED row.
  */
-export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { actorId: string; ctx?: AuditContext }) {
+export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { actorId: string; ctx?: AuditContext }, cleared: ReadonlySet<string> = new Set()) {
   if (!offerIds.length) return [] as string[];
   const changed: string[] = [];
   const offers = await tx.select({ id: sessionOffer.id, referenceCode: sessionOffer.referenceCode, board: subject.council, feeKey: examBoard.onePaperFeeKey })
@@ -175,29 +175,32 @@ export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { 
     const refs = o.referenceCode
       ? await tx.select().from(referenceRow).where(inArray(referenceRow.id, rows.filter((r) => r.referenceKey).map((r) => `${o.board}:${o.referenceCode}:${r.referenceKey}`).concat('__none__')))
       : [];
-    const set = async (r: ItemRow, fee: number | null, source: 'units_sum' | 'board_rule') => {
-      if (fee === null) return;
-      if (r.examFee !== null && r.examFeeSource !== source) return;
-      if (r.examFee === fee && r.examFeeSource === source) return;
-      await tx.update(sessionOfferItem).set({ examFee: fee, examFeeSource: source, priceListRowId: null, updatedAt: new Date() }).where(eq(sessionOfferItem.id, r.id));
+    const set = async (r: ItemRow, fee: number | null, source: 'units_sum' | 'board_rule', sources: (ItemRow | undefined)[]) => {
+      // A source's fee cleared (in this change): a row that follows it loses its own (price not set). A source never
+      // priced leaves the follower as it is; so does a fee typed or read from a list (hers).
+      if (fee === null && (r.examFee === null || r.examFeeSource !== source || !sources.some((x) => x && cleared.has(x.id)))) return;
+      if (fee !== null && r.examFee !== null && r.examFeeSource !== source) return;
+      if (r.examFee === fee && r.examFeeSource === (fee === null ? null : source)) return;
+      await tx.update(sessionOfferItem).set({ examFee: fee, examFeeSource: fee === null ? null : source, priceListRowId: null, updatedAt: new Date() }).where(eq(sessionOfferItem.id, r.id));
       if (audit) {
         await logAction(audit.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', r.id, { examFee: r.examFee, examFeeSource: r.examFeeSource },
-          { examFee: fee, examFeeSource: source, via: source === 'board_rule' ? 'the board rule' : 'the sum of its units' }, audit.ctx, tx);
+          { examFee: fee, examFeeSource: fee === null ? null : source, via: source === 'board_rule' ? 'the board rule' : 'the sum of its units' }, audit.ctx, tx);
       }
       r.examFee = fee;
-      r.examFeeSource = source;
+      r.examFeeSource = fee === null ? null : source;
       changed.push(r.id);
     };
     // The sum of units first (an all-papers row may be the sum of its papers), then the board rule on its papers.
     for (const r of rows) {
       const ref = refs.find((x) => x.key === r.referenceKey);
       if (!ref?.sumOfUnits.length) continue;
-      const parts = ref.sumOfUnits.map((k) => rows.find((x) => x.referenceKey === k)?.examFee ?? null);
-      await set(r, parts.every((p): p is number => p !== null) ? round2(parts.reduce((a, b) => a + b, 0)) : null, 'units_sum');
+      const partRows = ref.sumOfUnits.map((k) => rows.find((x) => x.referenceKey === k));
+      const parts = partRows.map((x) => x?.examFee ?? null);
+      await set(r, parts.every((p): p is number => p !== null) ? round2(parts.reduce((a, b) => a + b, 0)) : null, 'units_sum', partRows);
     }
     if (o.feeKey === 'qualification') {
       const all = rows.find((r) => r.kind === 'all_papers');
-      for (const r of rows.filter((x) => x.kind === 'paper')) await set(r, all?.examFee ?? null, 'board_rule');
+      for (const r of rows.filter((x) => x.kind === 'paper')) await set(r, all?.examFee ?? null, 'board_rule', [all]);
     }
   }
   return changed;

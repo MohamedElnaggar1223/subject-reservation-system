@@ -16,5 +16,7 @@ const { loadReferenceFiles } = await import('./scripts/reference-files');
 const files = loadReferenceFiles();
 const { db, loadReference } = await import('./src/index');
 const result = await loadReference(db, { boards: files.boards, subjects: files.subjects });
-console.log(`[reference] loaded: ${JSON.stringify(result)}`);
+const { adminDatesKept, ...counts } = result;
+console.log(`[reference] loaded: ${JSON.stringify(counts)}`);
+for (const w of adminDatesKept) console.log(`[reference] warning: ${w}`);
 await (db as unknown as { $client: { end(): Promise<void> } }).$client.end();

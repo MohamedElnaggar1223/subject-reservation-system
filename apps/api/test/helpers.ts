@@ -175,7 +175,11 @@ type Sitting = 'june' | 'november' | 'january';
  * entry deadline until a test sets one) — the board dates a real session reads from the reference
  * data. The deprecated routes (feedSeries, placeItemsIn, subjectFeeIn) stay for the scenarios P1b adapts.
  */
-type SubjectMeta = { id: string; code: string; name: string; level: Level; council: Board; courseFee: number; registrationFee: number; isOfferedAtSchool: boolean; isCore: boolean };
+type SubjectMeta = {
+  id: string; code: string; name: string; level: Level; council: Board; courseFee: number; registrationFee: number; isOfferedAtSchool: boolean; isCore: boolean;
+  // Offered the old way (the deprecated offers route, its fee read from the series' fee grid; no exam fee on its row).
+  pricedByGrid: boolean;
+};
 type SessionMeta = { id: string; oldType: OldType; level: Level; type: 'june' | 'winter'; year: number; oldYear: number; label: string; adm: Client };
 const SUBJECTS: SubjectMeta[] = [];
 const SESSIONS: SessionMeta[] = [];
@@ -197,19 +201,26 @@ export async function subject(
   extra: {
     qualificationLevel?: 'igcse' | 'as_level' | 'a_level'; isOfferedAtSchool?: boolean; isCore?: boolean;
     council?: 'cambridge' | 'pearson_edexcel' | 'oxford';
+    /**
+     * Offered the old way in the file's windows: the deprecated offers route with a whole-subject item in the
+     * suite's series and its fee on the series' grid — a subject priced from the grid, as converted data and a
+     * subject only in closed sessions still are (the board-change scenarios P1b retires with that machinery).
+     */
+    pricedByGrid?: boolean;
   } = {}
 ): Promise<string> {
+  const { pricedByGrid, ...fields } = extra;
   const r = await apiResponse(
     adm.api.v1.subjects.$post({
       json: {
         name, code, council: extra.council ?? 'cambridge', courseFee: fees.course, registrationFee: fees.registration,
-        isOfferedAtSchool: true, isCore: false, ...extra,
+        isOfferedAtSchool: true, isCore: false, ...fields,
       },
     })
   );
   const meta: SubjectMeta = {
     id: r.id, code, name, level: extra.qualificationLevel ?? 'igcse', council: extra.council ?? 'cambridge', courseFee: fees.course,
-    registrationFee: fees.registration, isOfferedAtSchool: extra.isOfferedAtSchool ?? true, isCore: extra.isCore ?? false,
+    registrationFee: fees.registration, isOfferedAtSchool: extra.isOfferedAtSchool ?? true, isCore: extra.isCore ?? false, pricedByGrid: !!pricedByGrid,
   };
   SUBJECTS.push(meta);
   // Offered in the file's open and draft windows of its level, as the conversion offers it.
@@ -271,6 +282,21 @@ async function offerInSession(adm: Client, s: SessionMeta, sub: SubjectMeta) {
   // A subject's board may have changed since it was made (a board-change test): read it again.
   const [now] = await sql<{ council: Board; name: string; code: string }>(`select council, name, code from subject where id = $1`, [sub.id]);
   if (now) { sub.council = now.council; sub.name = now.name; sub.code = now.code; }
+  if (sub.pricedByGrid) {
+    // The old way (the deprecated offers route; its fee on the series' grid).
+    const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
+    const teacherId = await teacherOfTheSuite(adm);
+    await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: s.id },
+      json: {
+        subjectId: sub.id, availability: sub.isOfferedAtSchool ? 'open' : 'self_study_only', courseFee: sub.courseFee, grade10Core: sub.isCore,
+        teachers: sub.isOfferedAtSchool ? [{ teacherId, mode: 'in_school' }] : [],
+        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
+      },
+    }));
+    await setSuiteFee(adm, seriesId, sub);
+    return;
+  }
   await suiteSeries(adm, s, sub.council, sub.level);
   const { sitting } = sittingFor(s, sub.council, sub.level);
   const teacherId = await teacherOfTheSuite(adm);
@@ -281,6 +307,8 @@ async function offerInSession(adm: Client, s: SessionMeta, sub: SubjectMeta) {
   await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
     param: { id: s.id, offeringId: made.id },
     json: {
+      // Added to an open session it starts switched off until reviewed: the suite's subjects are offered at once.
+      accepting: true,
       courseFee: sub.courseFee,
       teachers: sub.isOfferedAtSchool ? [{ teacherId, online: false, external: false }] : [],
       rows: [{
@@ -519,8 +547,13 @@ export async function confirmed<T extends { saved: boolean; impact: Impact }>(se
  * C6's one exception, as the admin makes it from the check list (PUT /reference/sittings/:id/board-date): a
  * sitting the reference data gives no board entry deadline gets one (and its retake deadline), once.
  */
-export async function boardDate(adm: Client, seriesId: string, d: { entryDeadline: Date; retakeDeadline?: Date | null }) {
+export async function boardDate(adm: Client, seriesId: string, d: { entryDeadline: string; retakeDeadline?: string | null }) {
   return apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: seriesId }, json: d }));
+}
+
+/** The school's date (Cairo) `days` from now, as a board prints a date ('YYYY-MM-DD'). */
+export function cairoDateIn(days: number): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() + days * 86_400_000));
 }
 
 // ─── Observation ─────────────────────────────────────────────────────────────

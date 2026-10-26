@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import { admin, staff, onboard, refused, one, sql, refuseAudit, money, lockWaiters, CONSENT, type Client } from './helpers';
+import { admin, staff, onboard, refused, one, sql, refuseAudit, money, lockWaiters, CONSENT, type Client, cairoDateIn } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
 /**
@@ -69,7 +69,7 @@ describe("08u: the school's forms in the subject editor", () => {
   async function open(sessionId: string) {
     const s = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: sessionId } }));
     for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
-      await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: new Date(Date.now() + 60 * day) } }));
+      await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: cairoDateIn(60) } }));
     }
     expect((await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: sessionId } }))).status).toBe('active');
   }

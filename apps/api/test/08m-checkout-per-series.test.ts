@@ -280,8 +280,9 @@ describe("F0b: an item's series change may not split an open checkout across dea
     const adm = await admin('ckw');
     const officer = await staff(adm, 'finance_officer', 'ckw');
     const Y = academicYearStartOf();
-    const one1 = await subject(adm, 'CKW-1', 'Window guard 1', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const two = await subject(adm, 'CKW-2', 'Window guard 2', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    // Offered the old way (priced from the grid): the item route moves a row with lines only on such a subject (§6).
+    const one1 = await subject(adm, 'CKW-1', 'Window guard 1', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
+    const two = await subject(adm, 'CKW-2', 'Window guard 2', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
     const w = await session(adm, 'October (AS, window guard)', 'october', 'as_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('october', Y) });
     const end = new Date((await one<{ end: string }>(`select end_date as "end" from registration_session where id = $1`, [w])).end);
     const f = await onboard(officer, 'ckw-1', 12);

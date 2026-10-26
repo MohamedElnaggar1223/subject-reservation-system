@@ -11,6 +11,7 @@
 
 import { z } from 'zod';
 import { SeriesMonthSchema } from './session.validations';
+import { DateOnlySchema } from '../academic/structure.validations';
 
 // ─── Closed lists (A3: pick rather than type) ────────────────────────────────
 
@@ -234,10 +235,12 @@ export type SetRowExamFeeType = z.infer<typeof SetRowExamFee>;
 /**
  * PUT /reference/sittings/:id/board-date — C6's one exception: the admin enters, once, the board's entry
  * deadline of a sitting the reference data gives none (and its retake deadline, when the board has one).
+ * Dates as the board prints them ('YYYY-MM-DD'): each is the end of that day in Cairo, as the reference
+ * data's own dates are.
  */
 export const EnterBoardDate = z.object({
-  entryDeadline: z.coerce.date(),
-  retakeDeadline: z.coerce.date().nullable().optional(),
+  entryDeadline: DateOnlySchema,
+  retakeDeadline: DateOnlySchema.nullable().optional(),
 });
 export type EnterBoardDateType = z.infer<typeof EnterBoardDate>;
 export const SittingParam = z.object({ id: z.string().min(1) });

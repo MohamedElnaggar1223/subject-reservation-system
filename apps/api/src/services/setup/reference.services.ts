@@ -5,11 +5,12 @@
  * (`loadReference`, @repo/db), never edited by staff.
  */
 
-import { db, examBoard, boardSeries, referenceSubject, referenceRow, sessionBoardSeries, registrationSession, and, eq, inArray, asc, sql } from '@repo/db';
+import { db, examBoard, boardSeries, referenceSubject, referenceRow, sessionBoardSeries, registrationSession, referenceDeadline, and, eq, inArray, asc, sql } from '@repo/db';
 import type { EnterBoardDateType } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
 import { redateSeriesLines } from '../deadline.services';
 import { SetupError, setupRethrow } from './offering.services';
+import { logger } from '../../lib/logger';
 
 type Executor = Pick<typeof db, 'select'>;
 
@@ -79,8 +80,9 @@ const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-GB', { day: 'numeric',
  * waiting lines of the sitting are re-dated once it commits.
  */
 export async function enterBoardDate(seriesId: string, data: EnterBoardDateType, actorId: string, ctx?: AuditContext) {
+  let out: typeof boardSeries.$inferSelect;
   try {
-    const out = await db.transaction(async (tx) => {
+    out = await db.transaction(async (tx) => {
       // As every series writer: the sessions it is attached to (FOR SHARE), then the series.
       await tx.select({ id: registrationSession.id }).from(sessionBoardSeries)
         .innerJoin(registrationSession, eq(registrationSession.id, sessionBoardSeries.sessionId))
@@ -91,24 +93,37 @@ export async function enterBoardDate(seriesId: string, data: EnterBoardDateType,
         throw new SetupError(`This sitting has its board entry deadline (${cairoDay(s.entryDeadline)}): the reference data keeps it`, 409);
       }
       const now = new Date();
-      if (data.entryDeadline <= now) throw new SetupError("The board's entry deadline must be in the future");
-      if (data.retakeDeadline && data.retakeDeadline < data.entryDeadline) throw new SetupError('The retake deadline cannot be before the entry deadline');
+      // The end of the day in Cairo, as the reference data's dates are stored (referenceDeadline).
+      const entry = referenceDeadline(data.entryDeadline)!;
+      const retake = data.retakeDeadline === undefined ? undefined : referenceDeadline(data.retakeDeadline);
+      if (entry <= now) throw new SetupError("The board's entry deadline must be in the future");
+      if (retake && retake < entry) throw new SetupError('The retake deadline cannot be before the entry deadline');
       const [updated] = await tx.update(boardSeries).set({
-        entryDeadline: data.entryDeadline, ...(data.retakeDeadline !== undefined ? { retakeDeadline: data.retakeDeadline } : {}),
+        entryDeadline: entry, ...(retake !== undefined ? { retakeDeadline: retake } : {}),
         datesSource: 'admin', updatedAt: now,
       }).where(eq(boardSeries.id, seriesId)).returning();
       await logAction(actorId, 'BOARD_SERIES_DEADLINE_SET', 'board_series', seriesId,
         { entryDeadline: null, retakeDeadline: s.retakeDeadline?.toISOString() ?? null, datesSource: s.datesSource },
-        { entryDeadline: data.entryDeadline.toISOString(), retakeDeadline: (data.retakeDeadline ?? s.retakeDeadline)?.toISOString() ?? null, datesSource: 'admin',
+        { entryDeadline: entry.toISOString(), retakeDeadline: (retake !== undefined ? retake : s.retakeDeadline)?.toISOString() ?? null, datesSource: 'admin',
           via: 'the check list (C6: the admin enters a missing board date once)' }, ctx, tx);
       return updated!;
     });
-    await redateSeriesLines(seriesId, actorId, 'the admin entered the board\'s entry deadline');
-    return {
-      id: out.id, boardCode: out.boardCode, month: out.month, year: out.year, label: out.label,
-      entryDeadline: out.entryDeadline, retakeDeadline: out.retakeDeadline, examsStart: out.examsStart, datesSource: out.datesSource,
-    };
   } catch (err) {
     setupRethrow(err);
   }
+  // The waiting lines' due dates follow, once the deadline has committed: a series' writer may not lock lines
+  // after the series (a checkout locks its lines before their series, MA-06 — redateSeriesLines' own
+  // transaction). The deadline is saved whatever happens here: a failure is logged and reported (null), and
+  // running the re-date again changes nothing it already did.
+  let linesRedated: number | null;
+  try {
+    linesRedated = await redateSeriesLines(seriesId, actorId, 'the admin entered the board\'s entry deadline');
+  } catch (err) {
+    logger.error(`[board-date] the waiting lines of sitting ${seriesId} were not re-dated:`, err);
+    linesRedated = null;
+  }
+  return {
+    id: out.id, boardCode: out.boardCode, month: out.month, year: out.year, label: out.label,
+    entryDeadline: out.entryDeadline, retakeDeadline: out.retakeDeadline, examsStart: out.examsStart, datesSource: out.datesSource, linesRedated,
+  };
 }

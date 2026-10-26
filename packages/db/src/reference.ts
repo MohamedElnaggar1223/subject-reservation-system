@@ -28,7 +28,27 @@ export type ReferenceData = {
   subjects: Partial<Record<ReferenceBoardCode, SubjectsFile>>;
 };
 
-export type ReferenceLoadResult = { boards: number; sittings: number; subjects: number; rows: number; removedSubjects: number; removedRows: number };
+/**
+ * `adminDatesKept`: a sitting whose deadline the admin entered from the check list (dates_source 'admin', C6)
+ * and that the file now gives a different date for — the admin's is kept; someone checks which is right.
+ */
+export type ReferenceLoadResult = {
+  boards: number; sittings: number; subjects: number; rows: number; removedSubjects: number; removedRows: number;
+  adminDatesKept: string[];
+};
+
+const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+
+/** The admin's deadlines (C6) the file disagrees with, as sentences (one per deadline). */
+export function adminDateDisagreements(
+  sitting: string, admin: { entry: Date | null; retake: Date | null }, file: { entry: string | null; retake: string | null },
+): string[] {
+  const out: string[] = [];
+  for (const [which, mine, theirs] of [['entry', admin.entry, file.entry], ['retake', admin.retake, file.retake]] as const) {
+    if (mine && theirs && cairoDay(mine) !== theirs) out.push(`${sitting}: the file gives the ${which} deadline ${theirs}, the admin entered ${cairoDay(mine)} — the admin's is kept; check which is right`);
+  }
+  return out;
+}
 
 const MONTHS: Record<number, string> = { 1: 'january', 6: 'june', 10: 'october', 11: 'november' };
 const MONTH_ORDER = ['january', 'june', 'october', 'november'];
@@ -53,7 +73,7 @@ export function referenceDeadline(d: string | null): Date | null {
 /** Load the reference data into the database (see the header). Runs in its own transaction, or the caller's. */
 export async function loadReference(executor: Db | Tx, data: ReferenceData, opts: { actorId?: string | null } = {}): Promise<ReferenceLoadResult> {
   const run = async (tx: Tx | Db) => {
-    const out: ReferenceLoadResult = { boards: 0, sittings: 0, subjects: 0, rows: 0, removedSubjects: 0, removedRows: 0 };
+    const out: ReferenceLoadResult = { boards: 0, sittings: 0, subjects: 0, rows: 0, removedSubjects: 0, removedRows: 0, adminDatesKept: [] };
     for (const b of data.boards) {
       const months = [...new Set(b.sittings.map((s) => MONTHS[s.month]!))];
       await tx.execute(sql`
@@ -77,6 +97,13 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
         const month = MONTHS[s.month]!;
         const entry = referenceDeadline(s.entryDeadline);
         const retake = referenceDeadline(s.retakeDeadline);
+        const [kept] = (await tx.execute(sql`
+          select entry_deadline as entry, retake_deadline as retake from board_series
+          where board_code = ${b.code} and month = ${month} and year = ${s.year} and label = '' and dates_source = 'admin'`)).rows as { entry: string | Date | null; retake: string | Date | null }[];
+        if (kept) {
+          const asDate = (v: string | Date | null) => (v === null ? null : new Date(v));
+          out.adminDatesKept.push(...adminDateDisagreements(`${b.code} ${month} ${s.year}`, { entry: asDate(kept.entry), retake: asDate(kept.retake) }, { entry: s.entryDeadline, retake: s.retakeDeadline }));
+        }
         await tx.execute(sql`
           insert into board_series (id, board_code, month, year, label, entry_deadline, retake_deadline, exams_start, dates_source, dates_confirmed, levels)
           values (${randomUUID()}, ${b.code}, ${month}, ${s.year}, '', ${entry}, ${retake}, ${s.examsStart}, ${s.source}, ${s.confirmed}, ${textArray(s.levels)})

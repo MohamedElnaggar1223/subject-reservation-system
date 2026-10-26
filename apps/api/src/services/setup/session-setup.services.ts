@@ -39,7 +39,7 @@ import { sameTeacherReason } from './teacher-names';
 import { copyOfferingInto, offeringsView, writeQuestions, SetupError, setupRethrow } from './offering.services';
 import { defaultSessionDates, rollDateOnly, rollYears } from './model';
 import {
-  planReprice, applyReprice, settleImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact,
+  planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact,
 } from './reprice.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -121,8 +121,11 @@ export const START_DATE_REFUSAL = 'This draft opens with the Accepting switch on
 
 /**
  * PUT /sessions/:id — the header and what families agree to (both contracts; see the header). A share
- * change re-prices the session's unpaid self-study lines and lists the rest for finance: it answers
- * its impact first (`expected`). A payment date change re-dates the waiting lines (reported, as before).
+ * change re-prices the session's unpaid self-study lines and lists the rest for finance; a payment due
+ * date change re-dates the waiting lines: both answer their impact first (`expected`; dueDatesMoved).
+ * The coordinator sets and clears the close date (owner decision 26 Oct; C4): the scheduler closes the
+ * session at it, and that close, like the switch's, still expires the waiting lines (finalizePendingRecords)
+ * until P1b replaces the expiry with the cut-off sweep (C10).
  */
 export async function updateSetupSession(id: string, data: UpdateSessionType, actorId: string, ctx?: AuditContext): Promise<SessionSave> {
   try {
@@ -171,7 +174,11 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
       const questionsChanged = data.questions ? await writeQuestions(tx, id, null, data.questions as QuestionInputType[], actorId) : false;
       // C5: the two dates kept as they stand, said so (recorded in the edit history the check list reads).
       const datesConfirmed = !!data.datesConfirmed && datesToCheck(current) && !('paymentDueAt' in next) && !('courseStartsOn' in next);
-      if (!Object.keys(next).length && !questionsChanged && !datesConfirmed) throw new SessionError('Nothing to change');
+      if (!Object.keys(next).length && !questionsChanged && !datesConfirmed) {
+        // The dates said kept again (a second click): already so — nothing to write, nothing to refuse.
+        if (data.datesConfirmed) return { impact: NO_IMPACT, repriced: [], dueMoved: 0, name: current.name };
+        throw new SessionError('Nothing to change');
+      }
       const history = Object.entries(next)
         .filter(([k]) => k !== 'reminderSentAt')
         .map(([field, v]) => ({
@@ -194,15 +201,16 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
       // The share changed: the session's self-study lines priced again (its rows' FOR SHARE in insertLines
       // waits behind this session's FOR UPDATE, so no line is made at the old share meanwhile).
       const plan = 'selfStudyPercent' in next ? await planReprice(tx, { selfStudyOfSession: id }) : { repriced: [], listed: [] };
-      const { told: repriced, impact } = await applyReprice(tx, plan, { actorId, reason: `the self-study share of ${current.name} changed to ${next.selfStudyPercent}%`, entity: { type: 'session', id }, ctx });
-      settleImpact(impact, data.expected);
-      // The payment due date moved: the waiting lines' due dates follow.
+      const { told: repriced, impact: priced } = await applyReprice(tx, plan, { actorId, reason: `the self-study share of ${current.name} changed to ${next.selfStudyPercent}%`, entity: { type: 'session', id }, ctx });
+      // The payment due date moved: the waiting lines' due dates follow — counted with the rest, answered first.
       let dueMoved = 0;
       if (next.paymentDueAt) {
         const waiting = await tx.select({ id: registration.id }).from(registration)
           .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING))).orderBy(registration.id).for('update');
         dueMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s payment due date changed');
       }
+      const impact = addImpact(priced, { dueDatesMoved: dueMoved });
+      settleImpact(impact, data.expected);
       await logAction(actorId, 'SESSION_UPDATED', 'session', id,
         Object.fromEntries(Object.keys(next).map((k) => [k, (current as Record<string, unknown>)[k] ?? null])),
         { ...next, ...(questionsChanged ? { questions: data.questions!.map((q) => q.prompt) } : {}), ...(datesConfirmed ? { datesConfirmed: true } : {}), reason: data.reason ?? null, dueDatesMoved: dueMoved, repriced: repriced.length }, ctx, tx);
@@ -305,7 +313,7 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
         .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING), eq(registration.priceProvisional, true), isNotNull(sessionOfferItem.examFee)))
         .orderBy(registration.id).for('update', { of: registration });
       if (waiting.length) await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(inArray(registration.id, waiting.map((w) => w.id)));
-      const moved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s prices were made final', { feeConfirmedAt: now });
+      const moved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s prices were made final');
       const impact: Impact = { repriced: 0, listedForFinance: 0, linesAffected: waiting.length, dueDatesMoved: moved };
       settleImpact(impact, data.expected);
       await logAction(actorId, 'SESSION_PRICES_FINAL', 'session', id, { pricesFinal: false }, { pricesFinal: true, pricesFinalAt: now.toISOString(), linesMadePayable: waiting.length, dueDatesMoved: moved }, ctx, tx);
@@ -321,7 +329,8 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
 
 export type CheckItem = {
   code: 'price_not_set' | 'teacher_tbc' | 'no_teacher' | 'nothing_ticked' | 'not_on_the_list' | 'sitting_no_board_date' | 'date_after_board_deadline'
-    | 'payment_date_passed' | 'teacher_name_doubt' | 'last_years_prices' | 'dates_to_check' | 'carried_from_too_old' | 'ticked_by_default' | 'review_note';
+    | 'payment_date_passed' | 'teacher_name_doubt' | 'last_years_prices' | 'dates_to_check' | 'carried_from_too_old' | 'ticked_by_default' | 'review_note'
+    | 'switched_off';
   severity: 'blocks' | 'look';
   message: string;
   offeringId?: string;
@@ -355,6 +364,8 @@ export async function checkListOf(executor: Executor, s: SessionRow): Promise<Ch
     const name = o.subject.name;
     const ticked = o.rows.filter((r) => r.cells.firstInSchool || r.cells.retakeInSchool || r.cells.retakeSelfStudy || r.cells.firstSelfStudy);
     if (!ticked.length) items.push({ code: 'nothing_ticked', severity: 'look', message: `${name}: nothing ticked — not offered to families`, offeringId: o.id });
+    // Added while the session takes reservations (it starts switched off), or switched off by her.
+    if (!o.accepting) items.push({ code: 'switched_off', severity: 'look', message: `${name}: switched off — not offered to families until you switch it on`, offeringId: o.id });
     if (o.priceNotSet.length) {
       items.push({ code: 'price_not_set', severity: 'look', message: `${name}: ${o.priceNotSet.length === 1 ? 'a price' : `${o.priceNotSet.length} prices`} not set — not offered to families until set`, offeringId: o.id });
     }

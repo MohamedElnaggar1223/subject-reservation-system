@@ -58,8 +58,9 @@ describe('money rules', () => {
     ] as const) {
       // Entered with Pearson Edexcel (F0b): its IAL sits January, June and
       // October, so the January and June windows below can feed a real board
-      // series (Cambridge sits no January series).
-      subj[code] = await subject(adm, `MR-${code}`, `${name} (AS, money rules)`, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+      // series (Cambridge sits no January series). Offered the old way (priced from the grid): feeding a series
+      // moves rows with their lines, which a subject set up through the subject editor refuses (§6; P1b retires it).
+      subj[code] = await subject(adm, `MR-${code}`, `${name} (AS, money rules)`, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
     }
     sessionId = await session(adm, 'January (AS, money rules)', 'january', 'as_level', { ...openWindow(), activate: true });
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, refused, one, sql, confirmed, boardDate, lockWaiters, pauseAtAudit, CONSENT, type Client, type Impact,
+  admin, staff, onboard, refused, one, sql, confirmed, boardDate, lockWaiters, pauseAtAudit, CONSENT, type Client, type Impact, cairoDateIn,
 } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
@@ -195,7 +195,7 @@ describe('08za: price lists', () => {
     beforeAll(async () => {
       // C6: the admin gives the scenario's sittings their board dates; prices final; open.
       const s = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: june } }));
-      for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) await boardDate(adm, c.seriesId!, { entryDeadline: new Date(Date.now() + 120 * day) });
+      for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) await boardDate(adm, c.seriesId!, { entryDeadline: cairoDateIn(120) });
       await apiResponse(coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: june }, json: { final: true } }));
       await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june } }));
       fam = await onboard(officer, `za08-a-${RUN}`, 11);
@@ -239,7 +239,7 @@ describe('08za: price lists', () => {
       const [a, r] = await Promise.all([applying!, reserving!]);
       expect(a.status).toBe(200);
       expect(r.status).toBe(201);
-      const raced = ((await r.json()) as { data: { id: string }[] }).data[0]!.id;
+      const raced = (await apiResponse(Promise.resolve(r)))[0]!.id;
       expect(await priceOf(raced)).toBe(15000);
       expect([await priceOf(unpaid), await priceOf(paid)]).toEqual([15000, 13850]);
 
@@ -299,6 +299,32 @@ describe('08za: price lists', () => {
       expect(r.saved).toBe(true);
       const f = await fees();
       expect([f[row.waa01!], f[row.yaa01!]]).toEqual([[9000, 'typed'], [18350, 'units_sum']]);
+    });
+
+    it("a source fee cleared clears the fee that follows it: the qualification summing a unit goes to price not set; a paper on the board rule with reservations makes the change refused, as a price not set on a row lines use is (set a price, or close it)", async () => {
+      const units = (waa01Fee: number | null) => ({ rows: [
+        { id: row.yaa01, kind: 'qualification' as const, cells: tick(true) },
+        { id: row.waa01, kind: 'unit' as const, examFee: waa01Fee, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } },
+        { id: row.waa02, kind: 'unit' as const, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } },
+      ] });
+      const saved = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.arabic! }, json: units(null) }));
+      expect(saved.saved).toBe(true);
+      let f = await fees();
+      expect([f[row.waa01!], f[row.yaa01!]]).toEqual([[null, null], [null, null]]);
+      expect((await apiResponse(coordinator.api.v1.sessions[':id'].prices.$get({ param: { id: june } }))).missing.map((m) => m.rowId)).toContain(row.yaa01);
+      expect(await one(`select new_data->>'via' as via, new_data->>'examFee' as fee from audit_log where action = 'OFFER_ITEM_UPDATED' and entity_id = $1 order by created_at desc limit 1`, [row.yaa01!]))
+        .toEqual({ via: 'the sum of its units', fee: null });
+      // Typed back, the sum follows again.
+      await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.arabic! }, json: units(9000) }));
+      f = await fees();
+      expect(f[row.yaa01!]).toEqual([18350, 'units_sum']);
+      // All papers cleared while its paper's line stands: the paper would have no price — refused, nothing changed.
+      const before = await fees();
+      const r = await refused(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId: offering.bio! }, json: { rows: [
+        { id: row.bioAll, kind: 'all_papers', examFee: null, cells: tick(true) }, { id: row.bioPaper, kind: 'paper', cells: tick(false) },
+      ] } }));
+      expect(r).toMatchObject({ status: 409, error: expect.stringContaining('and it has reservations: set a price, or close it instead') });
+      expect(await fees()).toEqual(before);
     });
   });
 });

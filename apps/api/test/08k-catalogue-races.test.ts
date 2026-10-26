@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import { admin, staff, onboard, subject, session, one, sql, futureWindow, lockWaiters, holdRowLock, feedSeries, audited, wholeItemSql, type Client, reservationOf } from './helpers';
+import { admin, staff, onboard, subject, session, one, sql, futureWindow, lockWaiters, holdRowLock, feedSeries, audited, wholeItemSql, seriesOfSession, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — races (FEATURES_PLAN.md §5: anything two people can act on at once
@@ -52,8 +52,10 @@ describe('F0b: races', () => {
     finadmin = await staff(adm, 'finance_admin', 'f0br');
     coordinator = await staff(adm, 'coordinator', 'f0br');
     coordinator2 = await staff(adm, 'coordinator', 'f0br2');
+    // Offered the old way (priced from the grid): the item route moves a row with lines only on such a subject — one set
+    // up through the subject editor keeps a row's sitting while reservations use it (§6; 08y).
     for (const [i, name] of ['History', 'Geography'].entries()) {
-      subj.push(await subject(adm, `F0BR-${i + 1}`, `${name} (F0b races)`, { course: 1000, registration: 200 }, { council: 'pearson_edexcel' }));
+      subj.push(await subject(adm, `F0BR-${i + 1}`, `${name} (F0b races)`, { course: 1000, registration: 200 }, { council: 'pearson_edexcel', pricedByGrid: true }));
     }
   });
 
@@ -168,9 +170,48 @@ describe('F0b: races', () => {
     });
   });
 
-  // Retired with the coordinator rework (P1a; .audit/coordinator-p1a.tsv): "a registration racing its subject's board change
-  // is entered with the new board (review flag 4)" — a subject set up through the subject editor is priced by its board's
-  // rows and its board change is refused, nothing moved (08y 'reservations are protected'): no change to race.
+  it('a registration racing its subject\'s board change is entered with the new board (review flag 4)', async () => {
+    // The coordinator rework (P1a): the subject is offered the old way (priced from the grid), as a converted row or a
+    // subject only in closed sessions still is: the board change moves it (one priced by its own rows is refused,
+    // 08y). P1b retires this scenario with the board-change machinery.
+    const sub = await subject(adm, 'F0BR-BRD', 'Board race (F0b races)', { course: 1000, registration: 200 }, { pricedByGrid: true });
+    const w = await session(adm, 'November (IGCSE, F0b races, board)', 'november', 'igcse', futureWindow());
+    // The session's Cambridge item of the subject, and its Pearson series (the file's Pearson
+    // subjects' items are in it): the board change carries the item there.
+    const cam = await seriesOfSession(w, 'cambridge');
+    const pea = await seriesOfSession(w, 'pearson_edexcel');
+    expect(cam).not.toBe(pea);
+    const prereg = async (f: { parent: Client; studentId: string }) =>
+      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [sub])), studentId: f.studentId } });
+    const a = await onboard(officer, 'f0br-board-a', 11);
+    const b = await onboard(officer, 'f0br-board-b', 11);
+    const aReg = ((await apiResponse(prereg(a))) as { id: string }[])[0]!.id;
+
+    // The board change holds the subject and queues behind A's row; B registers meanwhile.
+    const release = await holdRowLock('registration', aReg);
+    let change: Promise<Res> | undefined;
+    let registering: Promise<Res> | undefined;
+    try {
+      change = adm.api.v1.subjects[':id'].$put({ param: { id: sub }, json: { council: 'pearson_edexcel' } });
+      await lockWaiters(1);
+      registering = prereg(b);
+      await Promise.race([registering, lockWaiters(2)]);
+    } finally {
+      await release();
+    }
+    const [chg, reg] = await Promise.all([change!, registering!]);
+    expect(chg.status).toBe(200);
+    expect(reg.status).toBe(201);
+    const bReg = ((await reg.json()) as { data: { id: string }[] }).data[0]!.id;
+    // Both entered with Pearson: B waited for the change and was routed by the new board.
+    expect(await sql(`select id, board_series_id from registration where id in ($1, $2) order by id`, [aReg, bReg]))
+      .toEqual([aReg, bReg].sort().map((id) => ({ id, board_series_id: pea })));
+    // The reservations rework: both read Pearson's grid now — the fee the change carried into
+    // Pearson's series (the old board's amount, provisional until finance confirms it). A, unpaid,
+    // was re-priced from it when it moved (the review of 977848d, flag 2); B was priced from it.
+    expect(await sql(`select id, price_at_registration::float as price, price_provisional as provisional from registration where id in ($1, $2) order by id`, [aReg, bReg]))
+      .toEqual([{ id: aReg, price: 1200, provisional: true }, { id: bReg, price: 1200, provisional: true }].sort((x, y) => x.id.localeCompare(y.id)));
+  });
 
   it("two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix", async () => {
     const q = await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({

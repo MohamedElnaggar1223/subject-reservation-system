@@ -1058,7 +1058,8 @@ describe('08q: instalment plans', () => {
   });
 
   it("a plan line moved to another series with its item keeps its price there — and its last instalment captures it", async () => {
-    const py = await subject(adm, 'CQP-MV', 'Move (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    // Offered the old way (priced from the grid): the item route moves a row with lines only on such a subject (§6).
+    const py = await subject(adm, 'CQP-MV', 'Move (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
     const f = await onboard(officer, 'cqp-move', 12);
     const [l] = await unpaid(f, [py], s1);
     const p = await plan(f, l!, [750, 750]);

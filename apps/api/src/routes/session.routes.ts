@@ -10,8 +10,8 @@
  * - POST /sessions                     — a type and a year, empty or copied with the years moved forward
  *                                        (the deprecated legacy contract: with its dates)
  * - PUT  /sessions/:id                 — the header and what families agree to (a share change answers its impact)
- * - POST /sessions/:id/open, /reopen    — the Accepting switch (its close is the admin's until P1b:
- *                                        today's close still expires waiting lines)
+ * - POST /sessions/:id/open, /close, /reopen — the Accepting switch (the close still expires waiting
+ *                                        lines until P1b)
  * - PUT  /sessions/:id/prices-final    — one-way once a line exists (impact first)
  *   (offerings, price lists, prices, the preview, the reservations: setup.routes.ts)
  * Admin:
@@ -72,6 +72,9 @@ import { SetupError } from '../services/setup/offering.services';
 import { ImpactChanged } from '../services/setup/reprice.services';
 
 /** The status a refusal answers with, from the error the service threw. */
+/** POST /sessions with the deprecated dated contract (start and end dates) from anyone but the admin. */
+export const LEGACY_CREATE_REFUSAL = 'A session is made from its type and year (or copied from an earlier one); a session with its own start and end dates is the admin\'s';
+
 function failure(err: unknown, fallback: string) {
   const message = clientMessage(err, fallback);
   const status = err instanceof sessionService.SessionError || err instanceof seriesService.SeriesError
@@ -140,11 +143,15 @@ export const sessions = new Hono<HonoEnv>()
     async (c) => {
       try {
         const body = c.req.valid('json');
+        const user = c.get('user')!;
         if (body.startDate) {
-          const created = await sessionService.createSession(body as sessionService.LegacyCreateSession, c.get('user')!.id, extractAuditContext(c));
+          // The legacy dated contract is the admin's: its start date would let the scheduler open the session past
+          // the check list, and its end date close it (expiring waiting lines) — the coordinator uses type, year and copy.
+          if (user.role !== ROLES.ADMIN) return error(c, LEGACY_CREATE_REFUSAL, 403);
+          const created = await sessionService.createSession(body as sessionService.LegacyCreateSession, user.id, extractAuditContext(c));
           return success(c, { ...created, copy: null }, 201);
         }
-        const created = await setup.createSetupSession({ type: body.type, year: body.year, label: body.label, copyFromSessionId: body.copyFromSessionId }, c.get('user')!.id, extractAuditContext(c));
+        const created = await setup.createSetupSession({ type: body.type, year: body.year, label: body.label, copyFromSessionId: body.copyFromSessionId }, user.id, extractAuditContext(c));
         return success(c, created, 201);
       } catch (err) {
         const f = failure(err, 'Failed to create session');
@@ -305,9 +312,10 @@ export const sessions = new Hono<HonoEnv>()
   )
 
   /** CLOSE A SESSION — the Accepting switch off (C4); the coordinator's and the admin's. */
-  // The admin's alone until P1b: today's close still expires the waiting lines (C10 moves that to the cut-off).
+  // The coordinator's and the admin's (owner decision 26 Oct; C4). Today's close still expires the waiting
+  // lines (finalizePendingRecords) until P1b replaces that with the cut-off sweep (C10).
   .post('/:id/close',
-    requireAdmin(),
+    requireRole(...SET_UP),
     zValidator('param', SessionId),
     zValidator('json', CloseSession),
     async (c) => {

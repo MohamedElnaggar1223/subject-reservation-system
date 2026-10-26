@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import { admin, staff, onboard, refused, one, sql, audited, money, notified, confirmed, boardDate, CONSENT, type Client, type Impact } from './helpers';
+import { admin, staff, onboard, refused, one, sql, audited, money, notified, confirmed, boardDate, CONSENT, type Client, type Impact, cairoDateIn } from './helpers';
 
 /**
  * 08p — what a line costs, on pricing v2 (COORDINATOR_REWORK.md §6, E1–E7, §9.2; rewritten for P1a from
@@ -51,10 +51,13 @@ describe('08p: pricing policies on pricing v2', () => {
   let taughtAll: string, taughtPaper: string, untaught: string;
 
   type Body = Parameters<Client['api']['v1']['sessions'][':id']['offerings'][':offeringId']['$put']>[0]['json'];
-  /** A subject set up as the coordinator sets it up: added (here, not on the reference list), then its form saved. */
+  /**
+   * A subject set up as the coordinator sets it up: added (here, not on the reference list), then its form saved and
+   * switched on (one added while the session takes reservations starts switched off until she has looked).
+   */
   const subjectWith = async (name: string, body: Body) => {
     const made = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: session }, json: { custom: { board: 'cambridge', name: `${name} (08p ${RUN})`, level: 'igcse', group: 'O.L.' } } }));
-    const saved = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: session, offeringId: made.id }, json: body }));
+    const saved = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: session, offeringId: made.id }, json: { accepting: true, ...body } }));
     expect(saved.saved).toBe(true);
     return saved.offering;
   };
@@ -92,7 +95,7 @@ describe('08p: pricing policies on pricing v2', () => {
     // The session opens once its sitting has its board date (C6).
     const s = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: session } }));
     for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
-      await boardDate(adm, c.seriesId!, { entryDeadline: new Date(Date.now() + 50 * day) });
+      await boardDate(adm, c.seriesId!, { entryDeadline: cairoDateIn(50) });
     }
     await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: session } }));
     // The A.2.'s and the retakes' earlier sitting: June Y − 1, one of the board's two before (D6).
@@ -308,6 +311,13 @@ describe('08p: pricing policies on pricing v2', () => {
     await audited([line!.id], ['LINE_DUE_MOVED']);
     expect(await priceOf(converted!.id)).toMatchObject({ price: 23200, provisional: false, basis: { v: 1 } });
     await audited([converted!.id], ['LINE_DUE_MOVED']);
+    // A later re-date (here the payment due date moved to tomorrow) keeps the grace the switch gave — the converted
+    // line's too: its row's exam fee and the session's prices_final_at, not its old grid's rows, say when its price
+    // stopped being provisional. Without that, it would be due tomorrow and the sweep could expire it.
+    const dueOf = async (id: string) => new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [id])).d).getTime();
+    const { saved: moved } = await confirmed((expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: session }, json: { paymentDueAt: new Date(Date.now() + day), ...(expected ? { expected } : {}) } })));
+    expect(moved.saved).toBe(true);
+    for (const id of [line!.id, converted!.id]) expect(Math.abs((await dueOf(id)) - (switchedAt + grace * day))).toBeLessThan(10_000);
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [pay!.id!])).amount)).toBe(23200);
   });

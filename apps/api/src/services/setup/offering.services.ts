@@ -87,6 +87,9 @@ async function lockSessionLinks(tx: Tx, sessionId: string) {
   await tx.select({ id: sessionBoardSeries.id }).from(sessionBoardSeries).where(eq(sessionBoardSeries.sessionId, sessionId)).orderBy(asc(sessionBoardSeries.id)).for('update');
 }
 
+/** A session families reserve in now: a subject added to it starts switched off (accepting false) until she switches it on. */
+const takesReservations = (s: Pick<SessionRow, 'status'>) => s.status === 'active';
+
 async function offeringForSetup(tx: Tx, sessionId: string, offeringId: string) {
   const [o] = await tx.select().from(sessionOffer).where(and(eq(sessionOffer.id, offeringId), eq(sessionOffer.sessionId, sessionId))).for('update');
   if (!o) throw new SetupError('That subject is not in this session', 404);
@@ -492,9 +495,12 @@ export async function addOffering(sessionId: string, input: AddOfferingType, act
       if (dup) throw new SetupError(`${subjectRow.name} is already in this session`, 409);
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sessionOffer).where(eq(sessionOffer.sessionId, sessionId)) as [{ n: number }];
       const id = randomUUID();
+      // Added while the session takes reservations: switched off until she has looked (its default ticks and the
+      // fees the board rule fills reach no family before then; the check list says so).
+      const accepting = !takesReservations(session);
       const [offer] = await tx.insert(sessionOffer).values({
-        id, sessionId, subjectId: subjectRow.id, availability: 'open', courseFee: null, referenceCode, teacherChoice: 'families', teacherTbc: false,
-        accepting: true, closesAt: null, sortOrder: n, createdBy: actorId,
+        id, sessionId, subjectId: subjectRow.id, availability: accepting ? 'open' : 'closed', courseFee: null, referenceCode, teacherChoice: 'families', teacherTbc: false,
+        accepting, closesAt: null, sortOrder: n, createdBy: actorId,
       }).returning();
       // The reference's suggested rows (D2), no cell ticked: she ticks what the school offers.
       const board = await boardRules(tx, subjectRow.council);
@@ -543,8 +549,8 @@ export async function copyOfferingInto(tx: Tx, session: SessionRow, src: OfferRo
   };
   const id = randomUUID();
   const [offer] = await tx.insert(sessionOffer).values({
-    id, sessionId: session.id, subjectId: s.id, availability: 'open', courseFee: src.courseFee, courseStartsOn: null, grade10Core: false, notes: src.notes,
-    referenceCode: src.referenceCode, teacherChoice: src.teacherChoice, teacherTbc: src.teacherTbc, accepting: true, closesAt: roll(src.closesAt),
+    id, sessionId: session.id, subjectId: s.id, availability: takesReservations(session) ? 'closed' : 'open', courseFee: src.courseFee, courseStartsOn: null, grade10Core: false, notes: src.notes,
+    referenceCode: src.referenceCode, teacherChoice: src.teacherChoice, teacherTbc: src.teacherTbc, accepting: !takesReservations(session), closesAt: roll(src.closesAt),
     sortOrder: src.sortOrder ?? n, createdBy: actorId,
   }).returning();
   const teachers = await tx.select({ teacherId: sessionOfferTeacher.teacherId, mode: sessionOfferTeacher.mode, sortOrder: sessionOfferTeacher.sortOrder })
@@ -714,8 +720,12 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         changed = true;
       }
 
-      // The fees that follow others (E5): a one-paper retake on the board rule, a row summing its units.
-      for (const id of await deriveFollowingFees(tx, [offeringId], { actorId, ctx })) {
+      // The fees that follow others (E5): a one-paper retake on the board rule, a row summing its units — cleared
+      // with a source fee this save cleared.
+      const feesNow = new Map((await tx.select({ id: sessionOfferItem.id, examFee: sessionOfferItem.examFee }).from(sessionOfferItem)
+        .where(eq(sessionOfferItem.offerId, offeringId))).map((r) => [r.id, r.examFee]));
+      const cleared = new Set(rows.filter((r) => r.examFee !== null && feesNow.has(r.id) && feesNow.get(r.id) === null).map((r) => r.id));
+      for (const id of await deriveFollowingFees(tx, [offeringId], { actorId, ctx }, cleared)) {
         priceRows.add(id);
         changed = true;
       }

@@ -311,4 +311,35 @@ function main(): number {
   return 0;
 }
 
-process.exit(main());
+/**
+ * With a database (DATABASE_URL), the deadlines the admin entered from the check list (C6, dates_source
+ * 'admin') that the files now give differently: warned, never failed — the loader keeps the admin's, and
+ * someone checks which is right. Without one (CI's check runs before any database), skipped.
+ */
+async function adminDates(): Promise<void> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return;
+  const { connectTo } = await import("../src/scratch");
+  const { adminDateDisagreements } = await import("../src/reference");
+  const db = connectTo(url);
+  try {
+    const kept = await db.query<{ board_code: string; month: string; year: number; entry_deadline: Date | null; retake_deadline: Date | null }>(
+      `select board_code, month, year, entry_deadline, retake_deadline from board_series where label = '' and dates_source = 'admin'`);
+    const monthNumber: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
+    const { boards } = loadReferenceFiles();
+    const found = kept.flatMap((k) => {
+      const s = boards.find((b) => b.code === k.board_code)?.sittings.find((x) => x.month === monthNumber[k.month] && x.year === k.year);
+      return s ? adminDateDisagreements(`${k.board_code} ${k.month} ${k.year}`, { entry: k.entry_deadline, retake: k.retake_deadline }, { entry: s.entryDeadline, retake: s.retakeDeadline }) : [];
+    });
+    console.log(`  admin-entered deadlines (C6): ${kept.length}, ${found.length} the files give differently`);
+    for (const w of found) console.log(`  warning: ${w}`);
+  } catch (e) {
+    console.log(`  admin-entered deadlines (C6): skipped (${(e as Error).message})`);
+  } finally {
+    await db.end();
+  }
+}
+
+const code = main();
+if (code === 0) await adminDates();
+process.exit(code);

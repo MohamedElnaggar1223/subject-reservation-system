@@ -171,9 +171,34 @@ describe('F0b: board series', () => {
       });
     });
 
-    // Retired with the coordinator rework (P1a; .audit/coordinator-p1a.tsv): "the coordinator's answer moves a subject to
-    // another board" — a subject set up through the subject editor is priced by its board's rows, and its board change is
-    // refused, nothing moved (08y 'reservations are protected'). P1b removes the board-change machinery.
+    it("the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series", async () => {
+      // The coordinator rework (P1a): offered the old way (priced from the grid), as a converted row still is — a subject
+      // set up through the subject editor keeps its board (08y). P1b retires this scenario with the machinery.
+      const che = await subject(adm, 'BS-CHE', 'Chemistry (series)', { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
+      await fee(oct, che);
+      await apiResponse(place(che, oct));
+      const z = await family('board');
+      const reg = (await direct(z, [che]))[0]!.id;
+      expect(await seriesOfRegistration(reg)).toBe(oct);
+      const oxfordAward = await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
+        json: { boardCode: 'oxford', code: '9621', title: 'Chemistry (AS)', level: 'as_level', suite: 'OxfordAQA International AS', subjectArea: 'Chemistry', entryMethod: 'qualification' },
+      }));
+      // MO-10 per line: the line's cut-off (October's exams' start: no entry deadline yet) is the
+      // same where it goes, so OxfordAQA's November gets that date first.
+      const octExams = (await one<{ d: string }>(`select exams_start::text as d from board_series where id = $1`, [oct])).d;
+      const [oxRow] = await sql<{ id: string }>(`select id from board_series where board_code = 'oxford' and month = 'november' and year = $1 and label = ''`, [Y]);
+      if (oxRow) await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: oxRow.id }, json: { examsStart: octExams } }));
+      else await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'oxford', month: 'november', year: Y, examsStart: octExams } }));
+      const r = await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({
+        param: { subjectId: che }, json: { boardCode: 'oxford', qualificationId: oxfordAward.id, unitIds: [], reason: 'coordinator: Chemistry is OxfordAQA' },
+      }));
+      expect(r).toMatchObject({ boardCode: 'oxford', registrationsMoved: 1 });
+      // OxfordAQA's November of the session (its AS default).
+      const oxNov = await one<{ id: string }>(`select id from board_series where board_code = 'oxford' and month = 'november' and year = $1 and label = ''`, [Y]);
+      expect(await seriesOfRegistration(reg)).toBe(oxNov.id);
+      await audited([reg], ['REGISTRATION_SERIES_MOVED']);
+      expect((await one<{ council: string }>(`select council from subject where id = $1`, [che])).council).toBe('oxford');
+    });
   });
 
   describe('a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series)', () => {
