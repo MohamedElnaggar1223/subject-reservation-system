@@ -346,7 +346,10 @@ async function writeRow(
   const mine = lines.filter((l) => existing && l.itemId === existing.id);
   const live = mine.filter((l) => isLiveStatus(l.status));
   let seriesId = existing?.boardSeriesId ?? null;
-  if (!existing || sitting !== currentSitting) {
+  // A row that exists keeps its sitting unless the save names another: a row whose series has no exam month (made
+  // before the rework) is left as it is, not moved to the default month (refused once reservations use it, which
+  // would refuse every later save of the subject).
+  if (!existing || (input.sitting !== undefined && input.sitting !== currentSitting)) {
     if (existing && mine.length) throw new SetupError(`${label} has reservations in its sitting: a row's sitting does not change while reservations use it — close the row and add another`, 409);
     seriesId = await seriesForSitting(tx, c, sitting);
   }
