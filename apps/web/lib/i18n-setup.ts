@@ -358,6 +358,8 @@ export const setupArabic: Record<string, string> = {
   'declared': 'مُصرَّح به',
   'Paid': 'مدفوع',
   'Waiting for payment': 'بانتظار الدفع',
+  'Waiting for the parent to approve': 'بانتظار موافقة ولي الأمر',
+  'Dropped: the receipt is to come back to the school': 'أُلغي: يُعاد الإيصال إلى المدرسة',
   'not final': 'غير نهائي',
   '“Earlier exam” is what the family declared for a one-paper retake or an A.2.: listed for anyone who wants to check it.': '«الامتحان السابق» هو ما صرّحت به العائلة لإعادة ورقة واحدة أو A.2.: مدرج لمن يريد التحقق منه.',
 
@@ -487,6 +489,8 @@ export const setupArabic: Record<string, string> = {
   'No session is open or being prepared.': 'لا جلسة مفتوحة أو قيد الإعداد.',
   'Start the next one: copy the last session of its type, and its subjects, teachers and policy come across.': 'ابدأ الجلسة التالية: انسخ آخر جلسة من نوعها، فتنتقل موادها ومعلموها وسياستها.',
   'What families are doing:': 'ما تفعله العائلات:',
+  'Families here still owe money, or a payment is not confirmed yet.': 'لا تزال العائلات هنا مدينة بمبالغ، أو لم يُؤكَّد دفع بعد.',
+  'not confirmed yet': 'لم يُؤكَّد بعد',
 };
 
 /** Her screens' sentences that carry a number, a name or a date (aria-labels and options among them). */

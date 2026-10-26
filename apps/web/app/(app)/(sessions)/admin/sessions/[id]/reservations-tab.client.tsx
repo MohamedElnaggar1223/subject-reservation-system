@@ -13,15 +13,43 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { Button } from '~/components/ui/button';
-import { Badge } from '~/components/ui/tone';
+import { Badge, type Tone } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { downloadCsv } from '~/lib/csv';
 import { cn } from '~/lib/utils';
 import { Money, ErrorLine } from '../sessions-shared';
-import { fetchReservations, reservationsKey, refusalText, type SetupSession } from '../setup-shared';
+import { fetchReservations, reservationsKey, refusalText, subjectTitle, examMonth, type SetupSession } from '../setup-shared';
 
 const th = 'px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 const td = 'px-3 py-2 align-top';
+
+type Line = Awaited<ReturnType<typeof fetchReservations>>['lines'][number];
+
+/** Where a reservation stands, in plain words (every status a live line can have). */
+const STATUS: Record<string, { words: string; tone: Tone }> = {
+  confirmed: { words: 'Paid', tone: 'success' },
+  pending_payment: { words: 'Waiting for payment', tone: 'warning' },
+  pending_approval: { words: 'Waiting for the parent to approve', tone: 'warning' },
+  preregistered: { words: 'Preregistered', tone: 'info' },
+  dropped_pending_receipt: { words: 'Dropped: the receipt is to come back to the school', tone: 'neutral' },
+};
+
+/**
+ * A reservation's subject with its group, as her screens name it ("Arabic O.L."): the line names the subject alone,
+ * so it is matched to the session's offering by name, then by its row's kind and codes when two subjects share it.
+ */
+function subjectOf(s: SetupSession, l: Line): string {
+  const named = s.offerings.filter((o) => o.subject.name === l.subject);
+  const sameRow = named.filter((o) => o.rows.some((r) => r.kind === l.kind && r.referenceCodes.join() === l.codes.join()));
+  const one = named.length === 1 ? named[0] : sameRow.length === 1 ? sameRow[0] : undefined;
+  return one ? subjectTitle(one) : l.subject;
+}
+
+/** The exam a retake declared, as the school says it: Pearson's October International A Level is "November" (D12). */
+function declared(carriedFrom: string): string {
+  const m = /^([A-Za-z]+) (\d{4})$/.exec(carriedFrom);
+  return m ? examMonth(m[1]!.toLowerCase(), Number(m[2])) : carriedFrom;
+}
 
 export default function ReservationsTab({ s }: { s: SetupSession }) {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: reservationsKey(s.id), queryFn: () => fetchReservations(s.id) });
@@ -69,12 +97,12 @@ export default function ReservationsTab({ s }: { s: SetupSession }) {
               return (
                 <tr key={l.id} className="border-b border-border last:border-0">
                   <td className={td}><bdi data-i18n-skip="true">{l.studentName}</bdi></td>
-                  <td className={td}><bdi data-i18n-skip="true">{l.subject}</bdi></td>
+                  <td className={td}><bdi data-i18n-skip="true">{subjectOf(s, l)}</bdi></td>
                   <td className={td}><span data-i18n-skip="true">{l.option}</span></td>
                   <td className={td}>{l.teacher ? <bdi data-i18n-skip="true">{l.teacher}</bdi> : <span className="text-muted-foreground">{l.mode === 'self_study' ? 'self study' : 'to be announced'}</span>}</td>
-                  <td className={td}>{l.carriedFrom ? <><span>{l.carriedFrom}</span> <span className="text-xs text-muted-foreground">declared</span></> : '—'}</td>
+                  <td className={td}>{l.carriedFrom ? <><span>{declared(l.carriedFrom)}</span> <span className="text-xs text-muted-foreground">declared</span></> : '—'}</td>
                   <td className={cn(td, 'whitespace-nowrap')}><Money amount={l.price} />{l.provisional && <> <span className="text-xs text-muted-foreground">not final</span></>}</td>
-                  <td className={td}>{l.paid ? <Badge tone="success">Paid</Badge> : <Badge tone="warning">Waiting for payment</Badge>}</td>
+                  <td className={td}><Badge tone={STATUS[l.status]?.tone ?? 'neutral'}>{STATUS[l.status]?.words ?? l.status}</Badge></td>
                   {questions.length > 0 && (
                     <td className={cn(td, 'text-xs')}>
                       {questions.map((q, i) => <span key={q.id}>{i > 0 && ' · '}<bdi data-i18n-skip="true">{st?.answers.find((a) => a.questionId === q.id)?.value ?? '—'}</bdi></span>)}
