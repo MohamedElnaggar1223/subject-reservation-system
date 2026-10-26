@@ -61,7 +61,7 @@ import * as preregService from '../services/prereg.services';
 import * as deskService from '../services/desk.services';
 import * as linkService from '../services/link.services';
 import { mayRegisterFor } from '../services/eligibility.services';
-import { offersForStudent, offersPreview } from '../services/offers-read.services';
+import { offersForStudent, offersPreview, familyOfferings } from '../services/offers-read.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { isInsufficientBalance } from '../services/escrow.services';
 
@@ -132,7 +132,10 @@ export const registrations = new Hono<HonoEnv>()
       try {
         const offers = await offersForStudent(studentId, q.sessionId);
         if (!offers) return error(c, 'Session not found', 404);
-        return success(c, offers);
+        // The coordinator rework (Appendix A): the family payload beside today's read (`offers`, the Reserve
+        // page P3 replaces): one page per child — `offerings` and the session's terms.
+        const v2 = await familyOfferings(q.sessionId, { studentId });
+        return success(c, { ...offers, session: { ...offers.session, ...v2!.session }, offerings: v2!.offerings });
       } catch (err) {
         const message = clientMessage(err, 'Failed to load the offers');
         return error(c, message, message.includes('not found') ? 404 : 400);

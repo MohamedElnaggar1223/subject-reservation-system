@@ -107,6 +107,28 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/registrations/offers',
     // F6a: the Session screen's "Preview the family's form" (no student).
     'GET /v1/registrations/offers/preview',
+    // The coordinator rework (COORDINATOR_REWORK.md B1): all of set-up — sessions (create, the header and
+    // what families agree to, the Accepting switch, prices final), offerings, price lists and prices, the
+    // live preview, the reservations (read), the reference data, teachers with the duplicate check. Never
+    // money: she does not take payments, issue receipts or refund.
+    'POST /v1/sessions',
+    'PUT /v1/sessions/:id',
+    'POST /v1/sessions/:id/open',
+    'POST /v1/sessions/:id/close',
+    'POST /v1/sessions/:id/reopen',
+    'PUT /v1/sessions/:id/prices-final',
+    '* /v1/sessions/:id/offerings',
+    '* /v1/sessions/:id/offerings/*',
+    '* /v1/sessions/:id/price-lists',
+    '* /v1/sessions/:id/price-lists/*',
+    'GET /v1/sessions/:id/prices',
+    'PUT /v1/sessions/:id/rows/:rowId/exam-fee',
+    'GET /v1/sessions/:id/preview',
+    'GET /v1/sessions/:id/reservations',
+    'GET /v1/reference/boards',
+    'GET /v1/reference/subjects',
+    'POST /v1/teachers',
+    'GET /v1/teachers/duplicates',
     // The reservations rework, step C: the policy registry and the exceptions they grant (the
     // handler refuses a money policy), "Check these" for theirs, the boards' services and their
     // deadlines (the fees are finance's).

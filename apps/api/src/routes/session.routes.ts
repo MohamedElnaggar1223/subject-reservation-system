@@ -4,13 +4,19 @@
  * Any signed-in user:
  * - GET  /sessions/active, /sessions/upcoming
  * Admin; coordinator and finance read:
- * - GET  /sessions, /sessions/:id
+ * - GET  /sessions, /sessions/:id      — with the coordinator rework: the settings families agree to, the
+ *                                        check list, the counts and the subjects
+ * Admin and coordinator (the coordinator rework, B1; COORDINATOR_REWORK.md Appendix A):
+ * - POST /sessions                     — a type and a year, empty or copied with the years moved forward
+ *                                        (the deprecated legacy contract: with its dates)
+ * - PUT  /sessions/:id                 — the header and what families agree to (a share change answers its impact)
+ * - POST /sessions/:id/open, /close, /reopen — the Accepting switch
+ * - PUT  /sessions/:id/prices-final    — one-way once a line exists (impact first)
+ *   (offerings, price lists, prices, the preview, the reservations: setup.routes.ts)
  * Admin:
- * - POST /sessions                     — six inputs; the name and refund policy follow; copy from a predecessor
- * - PUT  /sessions/:id                 — the header (dates, course start, payment due, refund policy)
- * - POST /sessions/:id/copy-from       — offers of an earlier session of the same kind
+ * - POST /sessions/:id/copy-from       — deprecated: offers of an earlier session of the same kind
  * - PUT  /sessions/:id/series          — correct the exam series (F0a)
- * - POST /sessions/:id/activate, /close
+ * - POST /sessions/:id/activate        — deprecated: the old screen's open (the new switch is /open)
  * - POST /sessions/:id/board-series/move — lines to another series (behind the item's series)
  * Admin and coordinator — the links sheet:
  * - GET  /sessions/:id/board-series    — the series its items are entered in (derived, read only)
@@ -44,6 +50,8 @@ import {
   OfferItemParam,
   Grade10Bulk,
   SessionMoneyQuery,
+  SessionReason,
+  PricesFinal,
   ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -58,12 +66,16 @@ import { previewGrade10, commitGrade10, Grade10Error } from '../services/grade10
 import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { StudentsKeptChanging } from '../lib/student-locks';
+import * as setup from '../services/setup/session-setup.services';
+import { SetupError } from '../services/setup/offering.services';
+import { ImpactChanged } from '../services/setup/reprice.services';
 
 /** The status a refusal answers with, from the error the service threw. */
 function failure(err: unknown, fallback: string) {
   const message = clientMessage(err, fallback);
   const status = err instanceof sessionService.SessionError || err instanceof seriesService.SeriesError
     || err instanceof offerService.OfferError || err instanceof Grade10Error || err instanceof StudentsKeptChanging
+    || err instanceof SetupError || err instanceof ImpactChanged
     ? err.status
     : seriesService.seriesRuleSentence(err) ? 409 : 400;
   return { message: seriesService.seriesRuleSentence(err) ?? message, status: status as 400 | 403 | 404 | 409 };
@@ -71,6 +83,8 @@ function failure(err: unknown, fallback: string) {
 
 const STAFF_READ = [ROLES.ADMIN, ROLES.COORDINATOR, ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN] as const;
 const LINKS_SHEET = [ROLES.ADMIN, ROLES.COORDINATOR] as const;
+/** The coordinator rework (B1): all of set-up is the coordinator's and the admin's. */
+const SET_UP = [ROLES.ADMIN, ROLES.COORDINATOR] as const;
 const MONEY_READ = [ROLES.ADMIN, ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN] as const;
 
 export const sessions = new Hono<HonoEnv>()
@@ -110,20 +124,26 @@ export const sessions = new Hono<HonoEnv>()
     async (c) => {
       const found = await sessionService.getSessionDetail(c.req.valid('param').id);
       if (!found) return error(c, 'Session not found', 404);
-      return success(c, found);
+      const { db } = await import('@repo/db');
+      return success(c, { ...found, ...(await setup.sessionSetupView(db, found)) });
     }
   )
 
   /**
-   * CREATE A SESSION — type, year, reserve from, reserve to, course starts, payment due; the
-   * name and refund policy follow; `copyFromSessionId` brings an earlier session's offers.
+   * CREATE A SESSION (C1–C3) — a type and a year; the name derived; empty, or `copyFromSessionId` copied
+   * with every year moved forward; born a draft. With `startDate` (deprecated): the legacy contract.
    */
   .post('/',
-    requireAdmin(),
+    requireRole(...SET_UP),
     zValidator('json', CreateSession),
     async (c) => {
       try {
-        const created = await sessionService.createSession(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c));
+        const body = c.req.valid('json');
+        if (body.startDate) {
+          const created = await sessionService.createSession(body as sessionService.LegacyCreateSession, c.get('user')!.id, extractAuditContext(c));
+          return success(c, { ...created, copy: null }, 201);
+        }
+        const created = await setup.createSetupSession({ type: body.type, year: body.year, label: body.label, copyFromSessionId: body.copyFromSessionId }, c.get('user')!.id, extractAuditContext(c));
         return success(c, created, 201);
       } catch (err) {
         const f = failure(err, 'Failed to create session');
@@ -132,14 +152,21 @@ export const sessions = new Hono<HonoEnv>()
     }
   )
 
-  /** CHANGE A SESSION'S HEADER (draft: any; open: end with a reason, course start, payment due, refund policy until a consent). */
+  /**
+   * THE HEADER AND WHAT FAMILIES AGREE TO — the close date, payment due, first lesson, self-study share,
+   * grades, cancel days, refund policy (until a consent), the session's questions. A share change answers
+   * its impact first: `{ saved: false, impact }` until the same counts come back as `expected`.
+   */
   .put('/:id',
-    requireAdmin(),
+    requireRole(...SET_UP),
     zValidator('param', SessionId),
     zValidator('json', UpdateSession),
     async (c) => {
+      const { id } = c.req.valid('param');
       try {
-        return success(c, await sessionService.updateSession(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+        const saved = await setup.updateSetupSession(id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c));
+        const now = await sessionService.getSessionById(id);
+        return success(c, { ...now!, ...saved });
       } catch (err) {
         const f = failure(err, 'Failed to update session');
         return error(c, f.message, f.status);
@@ -276,9 +303,9 @@ export const sessions = new Hono<HonoEnv>()
     }
   )
 
-  /** CLOSE A SESSION EARLY. */
+  /** CLOSE A SESSION — the Accepting switch off (C4); the coordinator's and the admin's. */
   .post('/:id/close',
-    requireAdmin(),
+    requireRole(...SET_UP),
     zValidator('param', SessionId),
     zValidator('json', CloseSession),
     async (c) => {
@@ -314,7 +341,59 @@ export const sessions = new Hono<HonoEnv>()
     }
   )
 
-  // ─── The links sheet: offers, teachers, items (§4.2) ───────────────────────
+  /** OPEN — the Accepting switch on (C4): a draft opens, refused while the check list blocks it. */
+  .post('/:id/open',
+    requireRole(...SET_UP),
+    zValidator('param', SessionId),
+    async (c) => {
+      try {
+        return success(c, await setup.openSetupSession(c.req.valid('param').id, c.get('user')!.id, extractAuditContext(c)));
+      } catch (err) {
+        const f = failure(err, 'Failed to open the session');
+        return error(c, f.message, f.status);
+      }
+    }
+  )
+
+  /** REOPEN — a closed session opens again (§9.1: closed → active). */
+  .post('/:id/reopen',
+    requireRole(...SET_UP),
+    zValidator('param', SessionId),
+    zValidator('json', SessionReason),
+    async (c) => {
+      try {
+        return success(c, await setup.reopenSetupSession(c.req.valid('param').id, c.get('user')!.id, c.req.valid('json').reason, extractAuditContext(c)));
+      } catch (err) {
+        const f = failure(err, 'Failed to reopen the session');
+        return error(c, f.message, f.status);
+      }
+    }
+  )
+
+  /**
+   * PRICES FINAL (E6) — families may reserve before it and pay only once it is on; one-way once a line
+   * exists. Switching it on makes the waiting lines payable and re-dates them: its impact answered first.
+   */
+  .put('/:id/prices-final',
+    requireRole(...SET_UP),
+    zValidator('param', SessionId),
+    zValidator('json', PricesFinal),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      try {
+        const saved = await setup.setPricesFinal(id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c));
+        const now = await sessionService.getSessionById(id);
+        return success(c, { ...now!, ...saved });
+      } catch (err) {
+        const f = failure(err, 'Failed to change prices final');
+        return error(c, f.message, f.status);
+      }
+    }
+  )
+
+  // ─── The links sheet: offers, teachers, items (§4.2) — deprecated by the coordinator rework ─────
+  // The old screen's routes keep working until P2 replaces it (the new subject editor is
+  // /sessions/:id/offerings, setup.routes.ts); items made here are priced from their fee keys.
 
   .get('/:id/offers',
     requireRole(...LINKS_SHEET),
