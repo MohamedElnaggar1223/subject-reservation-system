@@ -102,7 +102,8 @@ describe('V3 flows', () => {
     // The reservations rework (RESERVATIONS_REWORK.md §3.1, §3.3): a winter session is valid;
     // "IGCSE sits neither October nor January" is checked per item, so an IGCSE item entered in a
     // January series is refused (it was a January IGCSE window that was refused before).
-    const igcse = await subject(adm, 'T4MA1', 'Mathematics (IGCSE, v3 flows)', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    // Offered the old way (priced from the grid): the old item route below is refused on a subject priced by its rows (P1b fix 2).
+    const igcse = await subject(adm, 'T4MA1', 'Mathematics (IGCSE, v3 flows)', { course: 1000, registration: 400 }, { council: 'pearson_edexcel', pricedByGrid: true });
     const winter = await session(adm, 'Winter (IGCSE, v3 flows)', 'november', 'igcse', draft);
     const offer = (await apiResponse(adm.api.v1.sessions[':id'].offers.$get({ param: { id: winter } }))).offers.find((o) => o.subjectId === igcse)!;
     const year = (await one<{ y: number }>(`select series_year as y from registration_session where id = $1`, [winter])).y;
