@@ -303,6 +303,9 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@repo/validations':
+        specifier: workspace:*
+        version: link:../validations
       '@types/eslint':
         specifier: 9.6.1
         version: 9.6.1

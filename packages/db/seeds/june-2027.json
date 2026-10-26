@@ -1,0 +1,1556 @@
+{
+  "session": {
+    "type": "june",
+    "year": 2027,
+    "refundPolicy": {
+      "steps": [
+        {
+          "throughWeek": 2,
+          "percent": 100
+        },
+        {
+          "throughWeek": 3,
+          "percent": 50
+        },
+        {
+          "throughWeek": null,
+          "percent": 0
+        }
+      ]
+    },
+    "selfStudyPercent": 50,
+    "closesAt": null,
+    "paymentDueAt": null,
+    "courseStartsOn": null
+  },
+  "offerings": [
+    {
+      "order": 1,
+      "board": "cambridge",
+      "subject": "3180",
+      "teachers": [
+        {
+          "key": "T-ARABIC-OL-1",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-ARABIC-OL-2",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-ARABIC-OL-3",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 9850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-1",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 9850,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            }
+          ]
+        },
+        {
+          "key": "paper-2",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 9850,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "The June form offers a one-paper retake from June 2026 without asking which paper; the Paper 1 and Paper 2 rows follow her November form."
+      ]
+    },
+    {
+      "order": 2,
+      "board": "cambridge",
+      "subject": "0970",
+      "teachers": [
+        {
+          "key": "T-BIOLOGY-OL-1",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-BIOLOGY-OL-2",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-BIOLOGY-OL-3",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 10850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-41-42",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 10850,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2026
+            }
+          ]
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 3,
+      "board": "cambridge",
+      "subject": "0986",
+      "teachers": [
+        {
+          "key": "T-BUSINESS-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 9850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 4,
+      "board": "cambridge",
+      "subject": "0971",
+      "teachers": [
+        {
+          "key": "T-CHEMISTRY-OL-1",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-CHEMISTRY-OL-2",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-CHEMISTRY-OL-3",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 10850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-41-42",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 10850,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2026
+            }
+          ]
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 5,
+      "board": "cambridge",
+      "subject": "0653",
+      "teachers": [
+        {
+          "key": "T-CHEMISTRY-OL-3",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 10850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-41-42",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 10850,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2026
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "Spelling (Q15): the form spells {T-CHEMISTRY-OL-3-FORM}, the links sheet {T-CHEMISTRY-OL-3}."
+      ]
+    },
+    {
+      "order": 6,
+      "board": "cambridge",
+      "subject": "0984",
+      "teachers": [
+        {
+          "key": "T-CS-OL-1",
+          "online": false,
+          "external": true
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 9850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Q14: the form's 'Paper 41/42' retake question (offering June 2025 / November 2025) is not pre-loaded: 0984 has no such paper. Add a one-paper row if she means one."
+      ]
+    },
+    {
+      "order": 7,
+      "board": "oxford",
+      "subject": "9280",
+      "teachers": [
+        {
+          "key": "T-ESL-1",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-ESL-2",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Q15: the links sheet names {T-ESL-SHEET-1} where the form names {T-ESL-2}.",
+        "Code to check: OxfordAQA International GCSE ESL is 9280; the school's artefacts print no code. No OxfordAQA fee list: exam fee not set."
+      ]
+    },
+    {
+      "order": 8,
+      "board": "cambridge",
+      "subject": "0680",
+      "teachers": [
+        {
+          "key": "T-BIOLOGY-OL-2",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Code to check: IGCSE 0680 or O Level 5014. On no fee list: exam fee not set."
+      ]
+    },
+    {
+      "order": 9,
+      "board": "cambridge",
+      "subject": "7156",
+      "teachers": [
+        {
+          "key": "T-FRENCH-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 12550,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 10,
+      "board": "cambridge",
+      "subject": "7159",
+      "teachers": [
+        {
+          "key": "T-GERMAN-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 12550,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 11,
+      "board": "cambridge",
+      "subject": "0457",
+      "teachers": [
+        {
+          "key": "T-GLOBAL-PERSPECTIVES-1",
+          "online": true,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Spelling (Q15): the form spells {T-GLOBAL-PERSPECTIVES-1-FORM}, the links sheet {T-GLOBAL-PERSPECTIVES-1}.",
+        "Code to check: IGCSE 0457 (O Level is 2069). On no fee list: exam fee not set."
+      ]
+    },
+    {
+      "order": 12,
+      "board": "cambridge",
+      "subject": "X-cambridge-global-citizenship",
+      "teachers": [
+        {
+          "key": "T-GLOBAL-CITIZENSHIP-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Q15: the form names {T-GLOBAL-CITIZENSHIP-1-FORM}, the links sheet {T-GLOBAL-CITIZENSHIP-1}.",
+        "Code to check: no Cambridge syllabus named Global Citizenship was found. On no fee list: exam fee not set."
+      ]
+    },
+    {
+      "order": 13,
+      "board": "pearson_edexcel",
+      "subject": "4HB1",
+      "teachers": [
+        {
+          "key": "T-BIOLOGY-OL-2",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 9840,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel November 2026 (International GCSE)",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Price source: the Edexcel November 2026 list; no June list prices 4HB1."
+      ]
+    },
+    {
+      "order": 14,
+      "board": "cambridge",
+      "subject": "0983",
+      "teachers": [
+        {
+          "key": "T-ICT-OL-1",
+          "online": false,
+          "external": true
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 12950,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-theory",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 12950,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2026
+            }
+          ]
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 15,
+      "board": "pearson_edexcel",
+      "subject": "4MA1",
+      "teachers": [
+        {
+          "key": "T-MATHS-OL-1",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-MATHS-OL-2",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-MATHS-OL-3",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 9200,
+          "examFeeSource": "units_sum",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-1h",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4600,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-2h",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4600,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Price to check: the June 2026 list prices each paper 4,600 (printed 4WM1H, 4WM2H), so all papers 9,200, the figures pre-loaded. The November 2026 list prints 4MA1H and 4MA2H at 9,840 each: either per paper (more than double June's) or, more likely, the whole qualification (Human Biology 4HB1 is 9,840 on the same list, and 9,200 plus about 7%, the IAL units' June-to-November rise, is about 9,840). The June figures stand until the school says which.",
+        "Q15: the links sheet names {T-MATHS-OL-SHEET-1} where the form names {T-MATHS-OL-2}."
+      ]
+    },
+    {
+      "order": 16,
+      "board": "cambridge",
+      "subject": "0972",
+      "teachers": [
+        {
+          "key": "T-PHYSICS-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 10850,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "paper-41-42",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 10850,
+          "examFeeSource": "board_rule",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2026
+            }
+          ]
+        }
+      ],
+      "flags": []
+    },
+    {
+      "order": 17,
+      "board": "oxford",
+      "subject": "9218",
+      "teachers": [
+        {
+          "key": "T-PSYCHOLOGY-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "all-papers",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Code to check: OxfordAQA International GCSE Psychology is 9218; the school's artefacts print no code. No OxfordAQA fee list: exam fee not set."
+      ]
+    },
+    {
+      "order": 18,
+      "board": "pearson_edexcel",
+      "subject": "YAA01",
+      "teachers": [
+        {
+          "key": "T-ARABIC-OL-1",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-ARABIC-OL-3",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "yaa01",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 18300,
+          "examFeeSource": "units_sum",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-ARABIC-OL-1",
+              "online": false,
+              "external": false
+            }
+          ]
+        },
+        {
+          "key": "9aa0",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-ARABIC-OL-3",
+              "online": false,
+              "external": false
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "Q13: self study is offered on both A Levels.",
+        "Code 9AA0: the form prints 9AA01, the links sheet 9AA1.",
+        "The GCE A Level (9AA0) is on no fee list: exam fee not set."
+      ]
+    },
+    {
+      "order": 19,
+      "board": "pearson_edexcel",
+      "subject": "YBI11",
+      "teachers": [
+        {
+          "key": "T-BIOLOGY-AL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "wbi11",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4790,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel November 2026 (IAL)",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "wbi12",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4790,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel November 2026 (IAL)",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "wbi13",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4790,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel November 2026 (IAL)",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "wbi14",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4790,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel November 2026 (IAL)",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "wbi15",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4450,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "wbi16",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [],
+          "examFee": 4450,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Price source: units 1–4 from the Edexcel November 2026 list (the June 2026 list prices units 5 and 6 only; January 2026 priced units 3 and 4 at 4,550).",
+        "Q10: the form offers units 5 and 6 as 'First entry 100%' or 'Self Study 50% 2nd entry ONLY', no retake in school."
+      ]
+    },
+    {
+      "order": 20,
+      "board": "cambridge",
+      "subject": "9701",
+      "teachers": [
+        {
+          "key": "T-CHEMISTRY-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "as",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 14100,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "al",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 18600,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Q12: retake self study on every route offered.",
+        "Spelling (Q15): the form spells {T-CHEMISTRY-OL-1-FORM}, the links sheet {T-CHEMISTRY-OL-1}."
+      ]
+    },
+    {
+      "order": 21,
+      "board": "cambridge",
+      "subject": "9618",
+      "teachers": [],
+      "teacherTbc": true,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "as",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 11400,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "a2",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 12450,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2026
+            }
+          ]
+        },
+        {
+          "key": "al",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 16950,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Teacher to be confirmed: the form lists none; the November links sheet says External.",
+        "Q12: retake self study on every route offered.",
+        "The A.S. fee is the list's '9608 SY' row (the previous syllabus code)."
+      ]
+    },
+    {
+      "order": 22,
+      "board": "cambridge",
+      "subject": "9898",
+      "teachers": [
+        {
+          "key": "T-FRENCH-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "as",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "al",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Q12: retake self study on every route offered.",
+        "Codes to check: AS French Language 8028, A Level French Language & Literature 9898. On no fee list: exam fees not set."
+      ]
+    },
+    {
+      "order": 23,
+      "board": "pearson_edexcel",
+      "subject": "YMA01",
+      "teachers": [
+        {
+          "key": "T-MATHS-OL-2",
+          "online": false,
+          "external": false
+        },
+        {
+          "key": "T-MATHS-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "wma11",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 4800,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-MATHS-OL-2",
+              "online": true,
+              "external": false
+            }
+          ]
+        },
+        {
+          "key": "wma12",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 4800,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-MATHS-OL-2",
+              "online": true,
+              "external": false
+            }
+          ]
+        },
+        {
+          "key": "wma13",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 4800,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-MATHS-OL-2",
+              "online": false,
+              "external": false
+            }
+          ]
+        },
+        {
+          "key": "wma14",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 4800,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-MATHS-OL-2",
+              "online": false,
+              "external": false
+            }
+          ]
+        },
+        {
+          "key": "wme01",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 4450,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-MATHS-OL-1",
+              "online": false,
+              "external": false
+            },
+            {
+              "key": "T-MATHS-OL-2",
+              "online": false,
+              "external": false
+            }
+          ]
+        },
+        {
+          "key": "wst01",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 4450,
+          "examFeeSource": "list",
+          "examFeeList": "Edexcel June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null,
+          "teachers": [
+            {
+              "key": "T-MATHS-OL-1",
+              "online": false,
+              "external": false
+            },
+            {
+              "key": "T-MATHS-OL-2",
+              "online": false,
+              "external": false
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "Q10: the form offers a teacher or self study per unit; retake in school is ticked by default.",
+        "P1 and P2 are taught online only."
+      ]
+    },
+    {
+      "order": 24,
+      "board": "cambridge",
+      "subject": "9702",
+      "teachers": [
+        {
+          "key": "T-PHYSICS-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "as",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": 14100,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": null
+        },
+        {
+          "key": "a2",
+          "cells": {
+            "firstInSchool": false,
+            "retakeInSchool": false,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": true
+          },
+          "cellsByDefault": [],
+          "examFee": 11400,
+          "examFeeSource": "list",
+          "examFeeList": "Cambridge June 2026",
+          "courseFee": null,
+          "allowedPriorSittings": [
+            {
+              "month": 6,
+              "year": 2026
+            },
+            {
+              "month": 11,
+              "year": 2025
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "Q11: one A.2. row, first entry self study and retake self study, carried from June 2026 or November 2025 (her two options).",
+        "November 2025 is older than Cambridge's 13 months before June 2027: kept (her list), warned (D6)."
+      ]
+    },
+    {
+      "order": 25,
+      "board": "cambridge",
+      "subject": "9990",
+      "teachers": [
+        {
+          "key": "T-PSYCHOLOGY-OL-1",
+          "online": false,
+          "external": false
+        }
+      ],
+      "teacherTbc": false,
+      "teacherChoice": "families",
+      "note": null,
+      "courseFee": null,
+      "rows": [
+        {
+          "key": "al",
+          "cells": {
+            "firstInSchool": true,
+            "retakeInSchool": true,
+            "retakeSelfStudy": true,
+            "firstSelfStudy": false
+          },
+          "cellsByDefault": [
+            "retakeInSchool"
+          ],
+          "examFee": null,
+          "examFeeSource": null,
+          "examFeeList": null,
+          "courseFee": null,
+          "allowedPriorSittings": null
+        }
+      ],
+      "flags": [
+        "Code to check: Cambridge AS & A Level Psychology is 9990; the school's artefacts print no code. On no fee list: exam fee not set."
+      ]
+    }
+  ]
+}
