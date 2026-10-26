@@ -621,8 +621,9 @@ describe('money invariants over the whole database', () => {
       if (later.length === 0) capturedWhileRefused.push(c.id);
     }
     expect(capturedWhileRefused).toEqual([]);
-    // There was something to check: 08e holds preregistrations of a student who left.
-    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
+    // There was something to check: lines expired because their student could no longer sit the series (08e: a
+    // withdrawal; P1b: no preregistration is held for a student who left any more, C4).
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'REGISTRATION_EXPIRED' and new_data->>'reason' = 'ineligible'`))[0]?.n)).toBeGreaterThan(0);
   });
 
   // ─── F4: exam entries (not money, but the hard stop is MO-10's) ─────────────
