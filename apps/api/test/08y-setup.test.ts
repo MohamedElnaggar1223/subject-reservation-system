@@ -45,8 +45,9 @@ describe('08y: the coordinator sets up a session', () => {
   const lineOf = (id: string) => one<{ status: string; price: number; course: number; exam: number; provisional: boolean; v: number }>(
     `select status, price_at_registration::float as price, course_fee_at_registration::float as course, registration_fee_at_registration::float as exam,
        price_provisional as provisional, (pricing_basis->>'v')::int as v from registration where id = $1`, [id]);
-  const reserve = (f: { parent: Client; studentId: string }, lines: { offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string; priorSittingSeriesId?: string }[]) =>
-    f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, studentId: f.studentId, lines, consent: CONSENT } });
+  const reserve = (f: { parent: Client; studentId: string }, lines: { offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string; priorSittingSeriesId?: string }[],
+    answers: { questionId: string; value: string }[] = []) =>
+    f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, studentId: f.studentId, lines, consent: CONSENT, answers } });
 
   beforeAll(async () => {
     adm = await admin(`y08-${RUN}`);
@@ -359,7 +360,7 @@ describe('08y: the coordinator sets up a session', () => {
     const f1 = await onboard(officer, `y08-pf-${RUN}`, 11);
     const [l1] = await apiResponse(reserve(f1, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]));
     expect(await lineOf(l1!.id)).toEqual({ status: 'pending_payment', price: 13850, course: 3000, exam: 10850, provisional: true, v: 2 });
-    expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f1.studentId, registrationIds: [l1!.id], instrumentUsed: 'cash' } })))).toMatchObject({ error: expect.stringContaining('provisional') });
+    expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f1.studentId, registrationIds: [l1!.id], instrumentUsed: 'cash' } })))).toMatchObject({ error: expect.stringContaining('prices of this session are not final') });
     const final = (expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: june }, json: { final: true, ...(expected ? { expected } : {}) } }));
     const { shown, saved } = await confirmed(final);
     expect(shown).toMatchObject({ saved: false, pricesFinal: false, impact: { repriced: 0, listedForFinance: 0, linesAffected: 1 } });
@@ -489,7 +490,8 @@ describe('08y: the coordinator sets up a session', () => {
       const { shown } = await confirmed(send(false));
       expect(shown.impact).toEqual({ repriced: 0, listedForFinance: 0, linesAffected: 3, dueDatesMoved: 0 });
       const f = await onboard(officer, `y08-closed-${RUN}`, 11);
-      expect(await refused(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school' }]))).toMatchObject({ error: expect.stringContaining('closed in this session') });
+      // P1b (mayReserve): NOT_ACCEPTING names the subject.
+      expect(await refused(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]))).toMatchObject({ error: 'Biology is not taking reservations' });
       expect((await familyRead(f)).offerings).toEqual([]);
       expect((await lineOf(unpaidLine)).status).toBe('pending_payment');
       await confirmed(send(true));
@@ -595,7 +597,12 @@ describe('08y: the coordinator sets up a session', () => {
 
   it('her rights (B1–B3): all of set-up is the coordinator\'s and the admin\'s, never money; finance reads set-up and changes none of it; families neither', async () => {
     const f = await onboard(officer, `y08-rights-${RUN}`, 11);
-    const [line] = await apiResponse(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]));
+    // Biology asks a required question since the case above (D13, P1b): a reservation answers it.
+    const lab = (await familyRead(f)).offerings[0]!.questions.find((q) => q.prompt === 'Lab group')!;
+    const unanswered = await refused(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }]));
+    expect(unanswered).toEqual({ status: 400, error: 'Answer: Lab group' });
+    const [line] = await apiResponse(reserve(f, [{ offerItemId: row.bioAll!, attempt: 'first', mode: 'in_school', teacherId: teacherA }], [{ questionId: lab.id, value: 'Saturday' }]));
+    expect(await one(`select value from registration_answer where question_id = $1 and student_id = $2`, [lab.id, f.studentId])).toEqual({ value: 'Saturday' });
     expect((await refused(coordinator.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [line!.id], instrumentUsed: 'cash' } }))).status).toBe(403);
     for (const who of [officer, finadmin]) {
       expect((await apiResponse(who.api.v1.sessions[':id'].prices.$get({ param: { id: june } }))).rows.length).toBeGreaterThan(0);
