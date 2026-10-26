@@ -137,7 +137,7 @@ export const SETTINGS = {
     label: 'School days of the week',
     description:
       'The weekdays the school is open during term. The calendar marks holidays, early dismissals, exam-only days and extra school days on top of these.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'weekdays',
   }),
   // F0b: what the school's "A.S./A.2." marks on a single AS unit — the
@@ -151,7 +151,7 @@ export const SETTINGS = {
     label: 'What "A.S./A.2." marks on a single AS unit',
     description:
       'The school writes "A.S./A.2." on some single AS units such as M1 and S1. An entry that mixes AS and A2 units (Biology Paper 3 & 4) is always "A.S./A.2."; for an AS unit alone, choose what the code means. Nothing stored changes: every screen derives the code from the unit\'s own level, the awards it counts toward and the student\'s year.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-01',
     input: 'choice',
     choices: LEVEL_CODE_READINGS.map((r) => ({ value: r, label: LEVEL_CODE_READING_LABELS[r] })),
@@ -166,7 +166,7 @@ export const SETTINGS = {
     label: 'Self-study on a subject the school teaches',
     description:
       'The school\'s sheet marks some rows self-study on subjects the school also teaches. Today\'s rule allows studying outside school only on a retake, or on an A.2. that carries the AS forward: any other first entry in self-study is the student\'s exception. The day-one import starts every review from this answer.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-03',
     input: 'choice',
     choices: SELF_STUDY_RULES.map((r) => ({ value: r, label: SELF_STUDY_RULE_LABELS[r] })),
@@ -178,7 +178,7 @@ export const SETTINGS = {
     label: 'What "Carry forward on …" means in the sheet',
     description:
       'Staff wrote "Carry forward on June 2022" on some A2 rows: an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-02',
     input: 'choice',
     choices: CARRY_FORWARD_READINGS.map((r) => ({ value: r, label: CARRY_FORWARD_LABELS[r] })),
@@ -226,7 +226,7 @@ export const SETTINGS = {
     label: 'Centre numbers and entry route',
     description:
       "The school's centre number with each exam board, printed on every entry list, statement of entry and candidate number, and whether the school enters directly or through the British Council. An entry list flags every row while its board's centre number is missing.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'Q-05',
     input: 'centres',
   }),
@@ -237,7 +237,7 @@ export const SETTINGS = {
     label: 'Carry forward on A Level entries',
     description:
       "When a candidate's A Level entry follows their AS entry of the same syllabus within the board's carry-forward period (Cambridge: 13 months), suggest carrying the AS result forward and fill in the previous series, centre and candidate number for the coordinator to confirm. Manual: never suggested; staff fill the reference in themselves.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'Q-02',
     input: 'choice',
     choices: [
@@ -252,7 +252,7 @@ export const SETTINGS = {
     label: 'Forecast grades for self-study candidates',
     description:
       'A self-study candidate has no teacher to give the forecast grade the board asks for. The coordinator gives it, or it is not asked for (the entry list does not flag it).',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     source: 'IS-03',
     input: 'choice',
     choices: [
@@ -267,7 +267,7 @@ export const SETTINGS = {
     label: 'How long unclaimed certificates are kept',
     description:
       "Certificates not collected this many months after they arrived are listed as unclaimed, to return to the board or destroy with a reason. Cambridge asks centres to keep them at least 12 months.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'number',
     min: 1,
     max: 120,
@@ -280,7 +280,7 @@ export const SETTINGS = {
     label: 'Candidates per invigilator',
     description:
       'An exam room needs one invigilator for every this many candidates (the boards\' guidance is one to 30 for written papers); a room with fewer is flagged on the seating screen.',
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'number',
     min: 5,
     max: 100,
@@ -293,7 +293,7 @@ export const SETTINGS = {
     label: 'Remind staff of exam deadlines',
     description:
       "The coordinator and the admin are told this many days before each board date that needs the school (entry deadline, forecast grades, access arrangements, coursework marks), and again the day before, with what is still outstanding.",
-    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    editableBy: [ROLES.ADMIN],
     input: 'number',
     min: 1,
     max: 60,

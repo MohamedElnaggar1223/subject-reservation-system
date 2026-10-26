@@ -60,26 +60,27 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'reservation.declarationText': false,
         'schoolFee.graduatesExempt': false,
         'schoolFee.newYearWithoutSchedule': false,
-        'calendar.schoolWeekdays': true,
+        // The P1b review (L4; COORDINATOR_REWORK.md B1, G3): the coordinator changes no school setting — her rules
+        // live on the session; the catalogue, the import and the parked exam features' settings are the admin's.
+        'calendar.schoolWeekdays': false,
         // The reservations rework (step 1): the payment and refund policies are finance's and the admin's. P1b: the
         // pricing.* percents left (the session's share, a row's prices), and so did payOnProvisionalFee (prices final).
         'payment.graceDays': false,
         'refund.defaultPolicy.june': false,
         'refund.defaultPolicy.winter': false,
         // P1b: the overdue expiry is the session's unpaid-cancel days, and late board entries (Q-20) left.
-        // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
-        'catalogue.levelCodeReading': true,
-        // F7: two more of the coordinator's pending answers, the import's defaults (IS-02, IS-03).
-        'import.selfStudyOnTaught': true,
-        'import.carryForward': true,
+        // F0b: what "A.S./A.2." marks (IS-01), and F7's import defaults (IS-02, IS-03): the coordinator's answers, set by the admin.
+        'catalogue.levelCodeReading': false,
+        'import.selfStudyOnTaught': false,
+        'import.carryForward': false,
         // P1b: the hold of an unverified declared sitting at its deadline left the reservation path (Q-22's setting gone).
-        // F4: the school as an exam centre — the coordinator keeps these.
-        'exams.centres': true,
-        'exams.carryForward': true,
-        'exams.selfStudyForecast': true,
-        'exams.certificateRetentionMonths': true,
-        'exams.candidatesPerInvigilator': true,
-        'exams.reminderDaysBefore': true,
+        // F4: the school as an exam centre (parked, A6): the admin's.
+        'exams.centres': false,
+        'exams.carryForward': false,
+        'exams.selfStudyForecast': false,
+        'exams.certificateRetentionMonths': false,
+        'exams.candidatesPerInvigilator': false,
+        'exams.reminderDaysBefore': false,
         // The reservations rework, step D: the reminders' switch is the admin's; their send hour the
         // admin's and finance admin's.
         'reminders.enabled': false,
@@ -88,9 +89,11 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
     });
 
     it('a change is refused to any role the key does not name, and nothing is written', async () => {
+      // The coordinator is refused at the gate: she changes no key (P1b review, L4).
+      for (const key of ['reservation.declarationText', 'calendar.schoolWeekdays', 'catalogue.levelCodeReading', 'exams.centres']) {
+        expect((await refused(put(coordinator, key, null))).status, key).toBe(403);
+      }
       for (const [who, key, value] of [
-        [coordinator, 'reservation.declarationText', 'I agree.'],
-        [coordinator, 'schoolFee.graduatesExempt', false],
         [finadmin, 'reservation.declarationText', 'I agree.'],
         [finadmin, 'calendar.schoolWeekdays', [0, 1, 2, 3]],
       ] as const) {
@@ -105,14 +108,14 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
     });
 
     it('a permitted change is validated against the key, audited with before, after and reason, and read back', async () => {
-      expect((await refused(put(coordinator, 'calendar.schoolWeekdays', ['monday']))).status).toBe(400);
-      expect((await refused(put(coordinator, 'calendar.schoolWeekdays', [0, 0]))).status).toBe(400);
-      expect((await refused(put(coordinator, 'no.such.key', true))).status).toBe(404);
-      const changed = await apiResponse(put(coordinator, 'calendar.schoolWeekdays', [0, 1, 2, 3, 4, 6]));
-      expect(changed).toMatchObject({ value: [0, 1, 2, 3, 4, 6], isDefault: false, updatedBy: `coordinator f0s` });
+      expect((await refused(put(adm, 'calendar.schoolWeekdays', ['monday']))).status).toBe(400);
+      expect((await refused(put(adm, 'calendar.schoolWeekdays', [0, 0]))).status).toBe(400);
+      expect((await refused(put(adm, 'no.such.key', true))).status).toBe(404);
+      const changed = await apiResponse(put(adm, 'calendar.schoolWeekdays', [0, 1, 2, 3, 4, 6]));
+      expect(changed).toMatchObject({ value: [0, 1, 2, 3, 4, 6], isDefault: false });
       expect(await one(`select user_id, previous_data, new_data from audit_log where action = 'SETTING_CHANGED' and entity_id = 'calendar.schoolWeekdays'`))
-        .toEqual({ user_id: coordinator.id, previous_data: { value: [0, 1, 2, 3, 4] }, new_data: { value: [0, 1, 2, 3, 4, 6], reason: 'F0a settings scenario' } });
-      expect((await refused(put(coordinator, 'calendar.schoolWeekdays', [0, 1, 2, 3, 4, 6]))).status).toBe(409);
+        .toEqual({ user_id: adm.id, previous_data: { value: [0, 1, 2, 3, 4] }, new_data: { value: [0, 1, 2, 3, 4, 6], reason: 'F0a settings scenario' } });
+      expect((await refused(put(adm, 'calendar.schoolWeekdays', [0, 1, 2, 3, 4, 6]))).status).toBe(409);
       await apiResponse(put(adm, 'calendar.schoolWeekdays', [0, 1, 2, 3, 4]));
       await apiResponse(put(finadmin, 'schoolFee.graduatesExempt', false));
       await apiResponse(put(finadmin, 'schoolFee.graduatesExempt', true));
@@ -231,7 +234,7 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       expect((await refused(upload(teacher, 'import_file', file(new TextEncoder().encode('a,b\n1,2\n'), 'x.csv', 'text/csv')))).status).toBe(403);
       expect((await refused(upload(b.parent, 'supporting_document', file(PDF, 'x.pdf', 'application/pdf'), a.studentId))).status).toBe(403);
       expect((await refused(upload(b.student, 'excuse_note', file(PDF, 'x.pdf', 'application/pdf'), a.studentId))).status).toBe(403);
-      // Staff may upload for any student; the coordinator imports.
+      // Staff may upload for any student; the coordinator uploads an import file (F4's results import is hers; the day-one import is the admin's since the P1b review).
       expect((await upload(coordinator, 'supporting_document', file(PDF, 'x.pdf', 'application/pdf'), b.studentId)).status).toBe(201);
       expect((await upload(coordinator, 'import_file', file(new TextEncoder().encode('name,grade\nA,11\n'), 'sheet.csv', 'text/csv'))).status).toBe(201);
       expect(await sql(`select 1 from file where user_id in ($1, $2, $3) and purpose <> 'payment_evidence' and purpose <> 'supporting_document'`, [a.student.id, teacher.id, b.student.id])).toEqual([]);

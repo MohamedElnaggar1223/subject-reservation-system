@@ -94,7 +94,7 @@ describe('F4 on the reservations rework', () => {
 
     // Mathematics as the rework shapes it: one subject, P1 and P2 each an item with its own teacher.
     pMaths = await subject('MU', 'Mathematics units', 'pearson_edexcel', 'as_level');
-    await apiResponse(coord.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: pMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: w.catalogue.pAward, unitIds: [] } }));
+    await apiResponse(w.adm.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: pMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: w.catalogue.pAward, unitIds: [] } }));
     await fee(w.series.pearsonJan, 'unit', w.catalogue.pu2);
     [itemP1, itemP2] = await offer(w.sessionId, pMaths, 1000, [w.teacherId, w.teacher2Id], [
       { label: 'P1', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu1] }, boardSeriesId: w.series.pearsonJan, availability: 'open', requiredInSeries: false, teachers: [{ teacherId: w.teacherId, mode: 'in_school' }] },
@@ -102,7 +102,7 @@ describe('F4 on the reservations rework', () => {
     ]) as [string, string];
 
     // A Cambridge A Level syllabus: AS components 1-2, A2 components 4-5; A Level (AX) and A2 carried forward (BY).
-    const cat = coord.api.v1.catalogue;
+    const cat = w.adm.api.v1.catalogue;
     const comp = async (n: string, unitLevel: 'as' | 'a2') => (await apiResponse(cat.units.$post({ json: { boardCode: 'cambridge', code: `${T}9700/${n}`, shortCode: `Paper ${n}`, title: `Paper ${n}`, unitLevel, kind: 'component' } }))).id;
     const [c1, c2, c4, c5] = [await comp('12', 'as'), await comp('22', 'as'), await comp('42', 'a2'), await comp('52', 'a2')];
     alSyllabus = (await apiResponse(cat.qualifications.$post({ json: { boardCode: 'cambridge', code: `${T}9700`, title: `Biology ${T} (A Level)`, level: 'a_level', suite: 'Cambridge International AS & A Level', subjectArea: `Biology ${T}`, entryMethod: 'syllabus_option' } }))).id;
@@ -346,7 +346,7 @@ describe('F4 on the reservations rework', () => {
       await audited([e.id], ['EXAM_ENTRY_CREATED']);
       expect((await entryList(w.series.pearsonJan)).cashInsToEnter.map((x) => x.chargeId)).not.toContain(c.id);
       // One cash-in is one award entry: the same charge on another award is refused (the database's index).
-      const other = await apiResponse(coord.api.v1.catalogue.qualifications.$post({ json: {
+      const other = await apiResponse(w.adm.api.v1.catalogue.qualifications.$post({ json: {
         boardCode: 'pearson_edexcel', code: `${T}YMA01`, title: `Mathematics ${T} (A Level)`, level: 'a_level', suite: 'International Advanced Level', subjectArea: `Mathematics ${T}`, entryMethod: 'units_cash_in',
       } }));
       expect(await refused(coord.api.v1.exams.entries.$post({ json: { studentId: fam.ci!.studentId, boardSeriesId: w.series.pearsonJan, qualificationId: other.id, chargeId: c.id } })))

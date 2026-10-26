@@ -853,11 +853,11 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
   // board deadline (to the balance).
 
   it('the same award in a converted session and a new session of one series: the board takes one entry', async () => {
-    const q = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
+    const q = (await apiResponse(adm.api.v1.catalogue.qualifications.$post({
       json: { boardCode: 'cambridge', code: `V08Q-${RUN}`, title: `Converted award (08n ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: 'Test', entryMethod: 'qualification' },
     })))!.id;
     const sub = await subject(adm, `RWN-VCA-${RUN}`, `Converted award subject (08n ${RUN})`, { course: 1000, registration: 300 });
-    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: sub }, json: { boardCode: 'cambridge', qualificationId: q, unitIds: [], reason: '08n: mapped' } }));
+    await apiResponse(adm.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: sub }, json: { boardCode: 'cambridge', qualificationId: q, unitIds: [], reason: '08n: mapped' } }));
     await fee(series, 'qualification', q, 300);
     const award = { label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'award' as const, qualificationId: q }, boardSeriesId: series, availability: 'open' as const, requiredInSeries: false };
     // A window converted by 0042 (its label, its offer and line marked as the conversion marks them).

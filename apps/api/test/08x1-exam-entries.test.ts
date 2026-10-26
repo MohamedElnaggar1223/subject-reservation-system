@@ -209,7 +209,7 @@ describe('F4: candidates and entries', () => {
     });
 
     it("an option's tier is the one its tiered components share (an untiered paper does not stop it); a forecast must fit the level", async () => {
-      const cat = coord.api.v1.catalogue;
+      const cat = w.adm.api.v1.catalogue;
       const ig = await apiResponse(cat.qualifications.$post({ json: { boardCode: 'cambridge', code: `${w.T}0610`, title: 'Biology (IGCSE)', level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: `Biology ${w.T}`, entryMethod: 'syllabus_option' } }));
       const comp = async (n: string, tier: 'extended' | null) => (await apiResponse(cat.units.$post({ json: { boardCode: 'cambridge', code: `${w.T}0610/${n}`, shortCode: `Paper ${n}`, title: `Paper ${n}`, unitLevel: 'igcse', kind: 'component', tier } }))).id;
       const [p22, p62] = [await comp('22', 'extended'), await comp('62', null)];

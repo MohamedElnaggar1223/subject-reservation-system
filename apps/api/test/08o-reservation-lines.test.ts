@@ -311,7 +311,7 @@ describe('08o: reservation lines (step B)', () => {
 
   it("F4's results and sent entries are known sittings: the retake is pre-set with its series, priced as a retake and cut off at the retake deadline; a withdrawn entry is not", async () => {
     // A Cambridge IGCSE syllabus mapped to a subject; November's series sets a retake deadline after its entry deadline.
-    const cat = coordinator.api.v1.catalogue;
+    const cat = adm.api.v1.catalogue;
     const award = await apiResponse(cat.qualifications.$post({ json: {
       boardCode: 'cambridge', code: `F4${RUN}`.toUpperCase().slice(0, 8), title: `Chemistry (08o ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE',
       subjectArea: `Chemistry (08o ${RUN})`, entryMethod: 'syllabus_option',
@@ -766,7 +766,7 @@ describe('08o: reservation lines (step B)', () => {
 
   // ─── The desk (§4.3) ───────────────────────────────────────────────────────
 
-  it("the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed", async () => {
+  it("the desk: reserve only; reserve and collect takes one payment for lines of two board deadlines (P1b, §10), a provisional line reserved and collected once its fee is confirmed", async () => {
     const f = await onboard(officer, `o08-desk-${RUN}`, 11);
     // Reserve only: waiting for payment, the desk's consent on every line.
     const only = await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: june, lines: [first(coreItem)], consent: CONSENT } }));

@@ -14,7 +14,7 @@ import {
   IdParam, CreateImport, ImportSettings, UpdateImportRows, UpdateImportPerson, CreateImportSubjects,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
-import { requireAuth, requireAcademic, requireAdmin } from '../middleware/access-control.middleware';
+import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import * as imports from '../services/import.services';
@@ -31,7 +31,8 @@ const actorOf = (c: { get: (k: 'user') => { id: string; role?: string | null } |
 
 export const importRoutes = new Hono<HonoEnv>()
   .use('*', requireAuth())
-  .use('*', requireAcademic())
+  // The day-one import is parked (COORDINATOR_REWORK.md §9.2): the admin's; the coordinator's plan (B1) has no import.
+  .use('*', requireAdmin())
   // The review of a school-sized file is about a megabyte of JSON (460 lines: 1.1 MB); gzip takes it to a tenth.
   .use('*', compress())
 

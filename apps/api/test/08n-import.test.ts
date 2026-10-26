@@ -75,7 +75,7 @@ async function snapshot() {
 }
 
 describe('F7: the day-one import', () => {
-  let adm: Client, adm2: Client, coordinator: Client, officer: Client;
+  let adm: Client, adm2: Client, coordinator: Client, importer: Client, officer: Client;
   let yearId: string;
   const subj: Record<string, string> = {};
   let firstBatch: string;
@@ -84,6 +84,8 @@ describe('F7: the day-one import', () => {
     adm = await admin('imp');
     adm2 = await admin('imp2');
     coordinator = await staff(adm, 'coordinator', 'imp');
+    // The day-one import is the admin's (P1b review, L4: parked, and the coordinator's plan has none): staged here by another admin.
+    importer = await admin('imp3');
     officer = await staff(adm, 'finance_officer', 'imp');
     // A staff account whose email a sheet row gives as a parent's (IS-06: "belongs to another kind of account").
     await apiResponse(adm.api.v1.users.$post({ json: { name: 'Ezz Staff', email: `ezz${D}`, password: 'TestPass1', role: 'gate' } }));
@@ -103,10 +105,10 @@ describe('F7: the day-one import', () => {
     subj.BIO34 = await subject(adm, 'IMP-BIO34', 'Biology (Paper 3 & Paper 4)', { course: 900, registration: 450 }, { qualificationLevel: 'a_level', council: 'pearson_edexcel' });
     subj.SOC = await subject(adm, 'IMP-SOC', 'Sociology', { course: 900, registration: 450 }, { qualificationLevel: 'a_level' });
     subj.MAR = await subject(adm, 'IMP-MAR', 'Marine Science', { course: 900, registration: 450 }, { qualificationLevel: 'a_level' });
-    for (const set of ['pearson_ial_mathematics', 'pearson_ial_biology'] as const) await apiResponse(coordinator.api.v1.catalogue.starter.$post({ json: { set } }));
-    const cat = await apiResponse(coordinator.api.v1.catalogue.$get());
+    for (const set of ['pearson_ial_mathematics', 'pearson_ial_biology'] as const) await apiResponse(importer.api.v1.catalogue.starter.$post({ json: { set } }));
+    const cat = await apiResponse(importer.api.v1.catalogue.$get());
     const unit = (code: string) => cat.units.find((u) => u.code === code)!.id;
-    const map = (subjectId: string, unitCodes: string[], qualificationCode?: string) => apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({
+    const map = (subjectId: string, unitCodes: string[], qualificationCode?: string) => apiResponse(importer.api.v1.catalogue.registrable[':subjectId'].$put({
       param: { subjectId }, json: { boardCode: 'pearson_edexcel', qualificationId: qualificationCode ? cat.qualifications.find((q) => q.code === qualificationCode)!.id : null, unitIds: unitCodes.map(unit) },
     }));
     await map(subj.P1, ['WMA11']);
@@ -127,8 +129,8 @@ describe('F7: the day-one import', () => {
 
     beforeAll(async () => {
       before = await snapshot();
-      firstBatch = await stage(coordinator, schoolSheet(), 'Nov registration.xlsx', 'school_sheet');
-      v = await fetchView(coordinator, firstBatch);
+      firstBatch = await stage(importer, schoolSheet(), 'Nov registration.xlsx', 'school_sheet');
+      v = await fetchView(importer, firstBatch);
     });
 
     it('reads the tabs by their headers: the two session tabs, and the per-unit roster left alone', async () => {
@@ -271,12 +273,12 @@ describe('F7: the day-one import', () => {
     let before: Awaited<ReturnType<typeof snapshot>>;
 
     it('fix: a missing email typed in, a shared email split, a parent given their own email, a class read', async () => {
-      v = await fetchView(coordinator, firstBatch);
-      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 13).id], edits: { studentEmail: `farid${D}` } });
-      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 15).id], edits: { studentEmail: `omar.mostafa${D}` } });
-      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 18).id], edits: { parentEmail: `said${D}` } });
-      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 20).id], edits: { classGrade: '11F', parentEmail: `ezz.nader${D}` } });
-      v = await fetchView(coordinator, firstBatch);
+      v = await fetchView(importer, firstBatch);
+      await putRows(importer, firstBatch, { rowIds: [rowAt(v, '2024', 13).id], edits: { studentEmail: `farid${D}` } });
+      await putRows(importer, firstBatch, { rowIds: [rowAt(v, '2024', 15).id], edits: { studentEmail: `omar.mostafa${D}` } });
+      await putRows(importer, firstBatch, { rowIds: [rowAt(v, '2024', 18).id], edits: { parentEmail: `said${D}` } });
+      await putRows(importer, firstBatch, { rowIds: [rowAt(v, '2024', 20).id], edits: { classGrade: '11F', parentEmail: `ezz.nader${D}` } });
+      v = await fetchView(importer, firstBatch);
       expect(codes(rowAt(v, '2024', 13))).toEqual([]);
       expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: `farid${D}`, studentEmailOk: true });
       expect(codes(person(v, 'student', `mostafa.kids${D}`))).toEqual([]);
@@ -289,34 +291,32 @@ describe('F7: the day-one import', () => {
     });
 
     it('merge: the duplicate family becomes one child; skip: a row the school does not offer', async () => {
-      await putPerson(coordinator, firstBatch, { role: 'student', key: `karim.l${D}`, mergedInto: `karim.lotfy${D}` });
-      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 19).id], decision: 'skip', note: 'French is not offered' });
-      v = await fetchView(coordinator, firstBatch);
+      await putPerson(importer, firstBatch, { role: 'student', key: `karim.l${D}`, mergedInto: `karim.lotfy${D}` });
+      await putRows(importer, firstBatch, { rowIds: [rowAt(v, '2024', 19).id], decision: 'skip', note: 'French is not offered' });
+      v = await fetchView(importer, firstBatch);
       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`karim.lotfy${D}`);
       expect(person(v, 'student', `karim.lotfy${D}`).rowIds).toHaveLength(2);
       expect(codes(person(v, 'student', `karim.lotfy${D}`))).toEqual([]);
       expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', decisionSource: 'staff', skipReason: 'French is not offered' });
       expect(v.people.some((p) => p.key === `mona${D}`)).toBe(false);
       // A person cannot be merged into someone who is merged: no chain turns back on itself.
-      expect((await refused(coordinator.api.v1.imports[':id'].people.$put({ param: { id: firstBatch }, json: { role: 'student', key: `karim.lotfy${D}`, mergedInto: `karim.l${D}` } }))).status).toBe(404);
+      expect((await refused(importer.api.v1.imports[':id'].people.$put({ param: { id: firstBatch }, json: { role: 'student', key: `karim.lotfy${D}`, mergedInto: `karim.l${D}` } }))).status).toBe(404);
     });
 
     it('confirm: a new parent for a child already in the system, once staff have checked it is him', async () => {
-      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 7).id], edits: { confirmLink: true } });
-      v = await fetchView(coordinator, firstBatch);
+      await putRows(importer, firstBatch, { rowIds: [rowAt(v, '2024', 7).id], edits: { confirmLink: true } });
+      v = await fetchView(importer, firstBatch);
       expect(codes(rowAt(v, '2024', 7))).toEqual([]);
       expect(rowAt(v, '2024', 7).plan).toMatchObject({ student: 'match', parents: ['create'], links: ['create'] });
       expect(v.families.find((f) => f.students.includes(`bassem${D}`))!.status).toBe('ready');
     });
 
     it("the coordinator's pending answers are mapping settings: carry forward read as an AS result", async () => {
-      expect((await putSettings(coordinator, firstBatch, { carryForward: 'result' })).status).toBe(200);
-      // Registering families in a window is the admin's.
+      expect((await putSettings(importer, firstBatch, { carryForward: 'result' })).status).toBe(200);
+      // Registering families in a window was the admin's; since the P1b review (L4) the coordinator reaches no import at all.
       const nov = v.mapping.series.find((s) => s.key === `november-${Y}-igcse`)!;
-      expect(await refused(putSettings(coordinator, firstBatch, { series: { [nov.key]: { mode: 'window', sessionId: 'x' } } }))).toEqual({
-        status: 403, error: 'Registering families in an open window is the admin’s: map the series to "History only", or ask the admin',
-      });
-      v = await fetchView(coordinator, firstBatch);
+      expect(await refused(putSettings(coordinator, firstBatch, { series: { [nov.key]: { mode: 'window', sessionId: 'x' } } }))).toEqual({ status: 403, error: 'Forbidden' });
+      v = await fetchView(importer, firstBatch);
       expect(v.settings).toMatchObject({ carryForward: 'result', selfStudyOnTaught: 'retake_only', createSections: true, enrol: true });
       expect(v.summary).toMatchObject({ heldFamilies: 0, families: 11, readyFamilies: 11 });
       expect(v.summary.plan).toMatchObject({
@@ -327,7 +327,7 @@ describe('F7: the day-one import', () => {
 
     it('commit: every family in its own transaction, exactly what the review showed', async () => {
       before = await snapshot();
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: firstBatch } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id: firstBatch } }));
       expect(out).toMatchObject({
         status: 'committed',
         result: {
@@ -446,8 +446,8 @@ describe('F7: the day-one import', () => {
 
     it('the import is committed: nothing more changes it', async () => {
       expect((await one<{ status: string }>(`select status from import_batch where id = $1`, [firstBatch])).status).toBe('committed');
-      expect(await refused(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: firstBatch } }))).toEqual({ status: 409, error: 'This import is already committed' });
-      expect(await refused(coordinator.api.v1.imports[':id'].rows.$put({ param: { id: firstBatch }, json: { rowIds: [rowAt(v, '2024', 3).id], decision: 'skip' } })))
+      expect(await refused(importer.api.v1.imports[':id'].commit.$post({ param: { id: firstBatch } }))).toEqual({ status: 409, error: 'This import is already committed' });
+      expect(await refused(importer.api.v1.imports[':id'].rows.$put({ param: { id: firstBatch }, json: { rowIds: [rowAt(v, '2024', 3).id], decision: 'skip' } })))
         .toEqual({ status: 409, error: 'This import is committed: what it made is in the system now' });
     });
   });
@@ -455,8 +455,8 @@ describe('F7: the day-one import', () => {
   describe('a re-run of the same file changes nothing', () => {
     it('staged again, it carries the review over and finds everything already there', async () => {
       const before = await snapshot();
-      const again = await stage(coordinator, schoolSheet(), 'Nov registration (again).xlsx', 'school_sheet');
-      const v = await fetchView(coordinator, again);
+      const again = await stage(importer, schoolSheet(), 'Nov registration (again).xlsx', 'school_sheet');
+      const v = await fetchView(importer, again);
       // The fixes, the merge, the skip and the mapping of the first run are this run's too.
       expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: `farid${D}` });
       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`karim.lotfy${D}`);
@@ -472,7 +472,7 @@ describe('F7: the day-one import', () => {
         enrolments: 0, history: 0, registrations: 0, money: 0, newTeachers: 0,
         existing: { enrolments: 16, history: 22, registrations: 0, money: 3 },
       });
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: again } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id: again } }));
       expect(out.result.created).toEqual({ students: 0, parents: 0, links: 0, sectionPlaces: 0, enrolments: 0, history: 0, registrations: 0, money: 0 });
       expect(out.result.teachersCreated).toEqual([]);
       expect(out.result.sectionsCreated).toEqual([]);
@@ -485,8 +485,8 @@ describe('F7: the day-one import', () => {
       const live = liveTabRows();
       live.push(['Bassem Nour', '11G', 'O.L.', 'Computer Science', 'Mr Karim', serial(years().november, 11), '010 3333 3333', `bassem${D}`, 'Rania Nour', `rania${D}`, 1044444444, 'I confirm my registration', 'No', '']);
       const file = workbook([{ name: '2024', rows: live }, { name: 'Sheet1', rows: historyTabRows() }, { name: 'S1', rows: rosterTabRows() }]);
-      const id = await stage(coordinator, file, 'Nov registration (re-exported).xlsx', 'school_sheet');
-      const v = await fetchView(coordinator, id);
+      const id = await stage(importer, file, 'Nov registration (re-exported).xlsx', 'school_sheet');
+      const v = await fetchView(importer, id);
       expect(v.batch.sameFileBefore).toEqual([]);
       // The earlier files' decisions, found by what each line says: the typed email, the split, the parent's own
       // email, the class, the confirmed link, the skip; the merge by email; the mapping.
@@ -500,7 +500,7 @@ describe('F7: the day-one import', () => {
       expect(v.settings.carryForward).toBe('result');
       expect(v.summary).toMatchObject({ heldFamilies: 0 });
       expect(rowAt(v, '2024', 22).plan).toMatchObject({ student: 'match', links: ['exists'], enrolment: 'create', registration: 'history' });
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }));
       expect(out.result.created).toEqual({ students: 0, parents: 0, links: 0, sectionPlaces: 0, enrolments: 1, history: 1, registrations: 0, money: 0 });
       expect(await snapshot()).toEqual({ ...before, enrolments: before.enrolments + 1, history: before.history + 1 });
     });
@@ -512,18 +512,18 @@ describe('F7: the day-one import', () => {
         ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''],
         ['Karim Lotfy', '11J', 'O.L.', 'Combined Science', 'Ms Salma', serial(Y, 11), 1017171717, `karim.lotfy2${D}`, 'Lotfy Hassan', `lotfy${D}`, 1018181818, 'I confirm my registration', 'No'],
       ] }]);
-      const id = await stage(coordinator, file, 'karim-again.xlsx', 'school_sheet');
-      let v = await fetchView(coordinator, id);
+      const id = await stage(importer, file, 'karim-again.xlsx', 'school_sheet');
+      let v = await fetchView(importer, id);
       const k = person(v, 'student', `karim.lotfy2${D}`);
       expect(k.problems.find((p) => p.code === 'duplicate_account')).toMatchObject({ severity: 'error', detail: `Karim Lotfy (karim.lotfy${D}): the same name and parent` });
       expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.lotfy${D}`]);
       expect(v.families.find((f) => f.students.includes(`karim.lotfy2${D}`))!.status).toBe('held');
       // Staff say it is him: his line joins the account already in the system.
-      await putPerson(coordinator, id, { role: 'student', key: `karim.lotfy2${D}`, mergedInto: `karim.lotfy${D}` });
-      v = await fetchView(coordinator, id);
+      await putPerson(importer, id, { role: 'student', key: `karim.lotfy2${D}`, mergedInto: `karim.lotfy${D}` });
+      v = await fetchView(importer, id);
       expect(rowAt(v, 'Again', 3).plan).toMatchObject({ student: 'match', links: ['exists'] });
       expect(v.summary.heldFamilies).toBe(0);
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }));
       expect(out.result.created).toMatchObject({ students: 0, parents: 0, links: 0 });
       expect(await snapshot()).toEqual({ ...before, history: before.history + 1, enrolments: before.enrolments + 1 });
     });
@@ -532,15 +532,15 @@ describe('F7: the day-one import', () => {
   describe('look-alikes inside one file are the review\'s warnings, and the commit makes what the review showed', () => {
     it('two families whose children share a name and whose parents share a phone are both committed: an account the same commit made is not an account already in the system', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-      const id = await stage(coordinator, workbook([{ name: 'Look-alikes', rows: [[`Nov. ${Y} Session`], header,
+      const id = await stage(importer, workbook([{ name: 'Look-alikes', rows: [[`Nov. ${Y} Session`], header,
         ['Look Alike', '11G', 'O.L.', 'Computer Science', 'Mr Karim', serial(Y, 11), '01070707070', `look.alike.a${D}`, 'Look Parent A', `look.parent.a${D}`, '01071717171', 'I confirm my registration', 'No'],
         ['Look Alike', '11G', 'O.L.', 'Computer Science', 'Mr Karim', serial(Y, 11), '01072727272', `look.alike.b${D}`, 'Look Parent B', `look.parent.b${D}`, '01071717171', 'I confirm my registration', 'No'],
       ] }]), 'look-alikes.xlsx', 'school_sheet');
-      expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
-      const v = await fetchView(coordinator, id);
+      expect((await putSettings(importer, id, { enrol: false, createSections: false })).status).toBe(200);
+      const v = await fetchView(importer, id);
       expect(person(v, 'student', `look.alike.b${D}`).problems.map((p) => [p.code, p.severity])).toEqual([['duplicate_student', 'warning']]);
       expect(v.summary).toMatchObject({ families: 2, readyFamilies: 2, heldFamilies: 0 });
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }));
       expect(out.result.families).toEqual({ committed: 2, failed: 0 });
       expect(out.result.created).toMatchObject({ students: 2, parents: 2, links: 2 });
     });
@@ -689,9 +689,8 @@ describe('F7: the day-one import', () => {
       expect(codes(rowAt(v, 'Live', 5))).not.toContain('registration_refused');
       expect(lineOf(rowAt(v, 'Live', 5))).toMatchObject({ attempt: 'retake', mode: 'self_study', priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'line' }, price: { total: 1000, coursePercent: 50 } });
       expect(v.summary).toMatchObject({ heldFamilies: 0, plan: { registrations: 8, history: 2 } });
-      expect(await refused(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: liveBatch } }))).toEqual({
-        status: 403, error: 'Reserving lines for families in a session is the admin’s: ask the admin to commit this import, or set those series to "History only"',
-      });
+      // The coordinator reaches no import (P1b review, L4: the gate refuses her before the service's own rule).
+      expect(await refused(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: liveBatch } }))).toEqual({ status: 403, error: 'Forbidden' });
       expect((await one<{ status: string }>(`select status from import_batch where id = $1`, [liveBatch])).status).toBe('staged');
     });
 
@@ -788,12 +787,12 @@ describe('F7: the day-one import', () => {
       const three = (cls: string, subject: string, self: 'Yes' | 'No'): Cell[] =>
         ['Live Three', cls, 'A.S.', subject, self === 'Yes' ? '' : 'Mr Live', '01046464646', `live.three${D}`, 'Live Parent Three', `live.parent.three${D}`, '01047474747', C, self, ''];
       // Recorded before the system, as history (the coordinator's default): Subject C in this session's own series, Subject A a year later.
-      const past = await stage(coordinator, workbook([
+      const past = await stage(importer, workbook([
         { name: 'Same', rows: [[`November ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'No')] },
         { name: 'Later', rows: [[`November ${seriesYear + 1} Session`], header, three('12K', 'Live Subject A', 'No')] },
       ]), 'three.xlsx', 'school_sheet');
-      expect((await putSettings(coordinator, past, { enrol: false, createSections: false })).status).toBe(200);
-      expect((await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: past } }))).result.created).toMatchObject({ students: 1, parents: 1, history: 2, registrations: 0 });
+      expect((await putSettings(importer, past, { enrol: false, createSections: false })).status).toBe(200);
+      expect((await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id: past } }))).result.created).toMatchObject({ students: 1, parents: 1, history: 2, registrations: 0 });
       // Self-study in this session on C or A (their history is this series or later) and on B (the file's only other
       // line of it is a later series) is a first entry: refused without the exception.
       const again = await stage(adm, workbook([
@@ -820,9 +819,9 @@ describe('F7: the day-one import', () => {
       // The June session of Y+1 (Cambridge's June series), after November Y.
       juneSession = await session(adm, 'June session (interim rule)', 'june', 'as_level', { ...openWindow(), activate: true, seriesYear: Y + 1 });
       // November Y, imported as history by the coordinator.
-      const id = await stage(coordinator, workbook([{ name: 'Nov', rows: [[`Nov. ${Y} Session`], header, row('No')] }]), 'nov-history.xlsx', 'school_sheet');
-      expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
-      expect((await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }))).result.created).toMatchObject({ students: 1, history: 1 });
+      const id = await stage(importer, workbook([{ name: 'Nov', rows: [[`Nov. ${Y} Session`], header, row('No')] }]), 'nov-history.xlsx', 'school_sheet');
+      expect((await putSettings(importer, id, { enrol: false, createSections: false })).status).toBe(200);
+      expect((await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }))).result.created).toMatchObject({ students: 1, history: 1 });
     });
     afterAll(async () => {
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: juneSession }, json: { reason: 'interim rule scenario done' } }));
@@ -876,9 +875,9 @@ describe('F7: the day-one import', () => {
       const dropRow = (n: number, self: 'Yes' | 'No', note: string): Cell[] => [`Drop Hist ${n}`, '11K', 'A.S.', 'Interim Subject N', self === 'Yes' ? '' : 'Mr Live',
         `0104747474${n}`, `drop.hist${n}${D}`, `Drop Hist Parent ${n}`, `drop.hist.parent${n}${D}`, `0104646464${n}`, 'I confirm my registration', self, note];
       // Child 1 dropped November's course: in the system as history, committed after November had ended.
-      const first = await stage(coordinator, workbook([{ name: 'Nov drop', rows: [[`Nov. ${Y} Session`], h13, dropRow(1, 'No', 'Dropped 20% School fees')] }]), 'nov-dropped.xlsx', 'school_sheet');
-      expect((await putSettings(coordinator, first, { enrol: false, createSections: false })).status).toBe(200);
-      expect((await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: first } }))).result.created).toMatchObject({ students: 1, history: 1 });
+      const first = await stage(importer, workbook([{ name: 'Nov drop', rows: [[`Nov. ${Y} Session`], h13, dropRow(1, 'No', 'Dropped 20% School fees')] }]), 'nov-dropped.xlsx', 'school_sheet');
+      expect((await putSettings(importer, first, { enrol: false, createSections: false })).status).toBe(200);
+      expect((await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id: first } }))).result.created).toMatchObject({ students: 1, history: 1 });
       await sql(`update registration_history set created_at = $1 where student_id = (select id from "user" where email = $2)`, [`${Y}-12-01T10:00:00Z`, `drop.hist1${D}`]);
       expect(await sql(`select h.outcome from registration_history h join "user" u on u.id = h.student_id where u.email = $1`, [`drop.hist1${D}`])).toEqual([{ outcome: 'dropped' }]);
       // Child 2 dropped last June's course: in the same file as the June line.
@@ -908,36 +907,36 @@ describe('F7: the day-one import', () => {
       const row = (n: number, parent: string, entry: string, self: 'Yes' | 'No', note: string): Cell[] =>
         [`Column Child ${n}`, '11K', 'O.L.', 'Combined Science', self === 'No' ? 'Ms Salma' : '', `0107575757${n}`, `column.child${n}${D}`, parent, `column.parent${n}${D}`, `0107676767${n}`,
           'I confirm my registration', entry, self, note];
-      const id = await stage(coordinator, workbook([{ name: 'Columns', rows: [[`Nov. ${Y} Session`], header,
+      const id = await stage(importer, workbook([{ name: 'Columns', rows: [[`Nov. ${Y} Session`], header,
         row(1, 'Retake Paperwork One', 'Retake', 'Yes', 'Self Study 50% School fees'),
         row(2, 'Retake Paperwork Two', 'Retake', 'No', ''),
         row(3, 'Retake Paperwork Three', 'Retake', 'No', `Retake in School 100% fees (All Papers) From June ${Y}`),
       ] }]), 'columns.xlsx', 'school_sheet');
-      const v = await fetchView(coordinator, id);
+      const v = await fetchView(importer, id);
       expect(rowAt(v, 'Columns', 3).data).toMatchObject({ parentName: 'Retake Paperwork One', feeNote: 'Self Study 50% School fees', selfStudy: true, noteRetake: false });
       expect(rowAt(v, 'Columns', 4).data).toMatchObject({ parentName: 'Retake Paperwork Two', feeNote: null, selfStudy: false, noteRetake: false });
       expect(rowAt(v, 'Columns', 5).data).toMatchObject({ feeNote: `Retake in School 100% fees (All Papers) From June ${Y}`, noteRetake: true, noteSitting: { type: 'june', year: Y } });
       for (const n of [3, 4, 5]) expect(codes(rowAt(v, 'Columns', n))).not.toContain('column_drift');
-      await apiResponse(coordinator.api.v1.imports[':id'].discard.$post({ param: { id } }));
+      await apiResponse(importer.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
     it('a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
       const row = (n: number, self: 'Yes' | 'No', note: string): Cell[] =>
         [`Note Child ${n}`, '11K', 'O.L.', 'Combined Science', self === 'No' && !note ? 'Ms Salma' : '', `0105050505${n}`, `note.child${n}${D}`, `Note Parent ${n}`, `note.parent${n}${D}`, `0105151515${n}`, 'I confirm my registration', self, note];
-      const id = await stage(coordinator, workbook([{ name: 'Notes', rows: [[`Nov. ${Y} Session`], header,
+      const id = await stage(importer, workbook([{ name: 'Notes', rows: [[`Nov. ${Y} Session`], header,
         row(1, 'No', 'Self Study 50% School fees'), row(2, 'No', ''), row(3, 'Yes', 'Self Study 50% School fees'),
       ] }]), 'notes.xlsx', 'school_sheet');
-      const v = await fetchView(coordinator, id);
+      const v = await fetchView(importer, id);
       expect(rowAt(v, 'Notes', 3).problems.find((p) => p.code === 'self_study_contradiction')).toEqual({ code: 'self_study_contradiction', severity: 'warning', detail: 'Self Study 50% School fees' });
       expect(rowAt(v, 'Notes', 3).data).toMatchObject({ selfStudy: true, selfStudyAnswer: 'no' });
       expect(codes(rowAt(v, 'Notes', 4))).not.toContain('self_study_contradiction');
       expect(rowAt(v, 'Notes', 4).data).toMatchObject({ selfStudy: false, selfStudyAnswer: 'no' });
       expect(codes(rowAt(v, 'Notes', 5))).not.toContain('self_study_contradiction');
       // Staff who check with the family set the line's self-study themselves: the flag goes.
-      await putRows(coordinator, id, { rowIds: [rowAt(v, 'Notes', 3).id], edits: { selfStudy: false } });
-      expect(codes(rowAt(await fetchView(coordinator, id), 'Notes', 3))).not.toContain('self_study_contradiction');
-      await apiResponse(coordinator.api.v1.imports[':id'].discard.$post({ param: { id } }));
+      await putRows(importer, id, { rowIds: [rowAt(v, 'Notes', 3).id], edits: { selfStudy: false } });
+      expect(codes(rowAt(await fetchView(importer, id), 'Notes', 3))).not.toContain('self_study_contradiction');
+      await apiResponse(importer.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
   });
 
@@ -952,12 +951,12 @@ describe('F7: the day-one import', () => {
         const o = await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [sess, sid]);
         await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$delete({ param: { id: sess, offerId: o.id } }));
       }
-      const cat = await apiResponse(coordinator.api.v1.catalogue.$get());
+      const cat = await apiResponse(importer.api.v1.catalogue.$get());
       const unit = (code: string) => cat.units.find((u) => u.code === code)!.id;
       teacher = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher of the IAL units (imp)' } })))!.id;
       const parent = async (name: string, code: string, units: string[]) => {
         const s = await apiResponse(adm.api.v1.subjects.$post({ json: { name, code, council: 'pearson_edexcel', qualificationLevel: 'as_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false } }));
-        await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: s.id }, json: { boardCode: 'pearson_edexcel', qualificationId: null, unitIds: units.map(unit) } }));
+        await apiResponse(importer.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: s.id }, json: { boardCode: 'pearson_edexcel', qualificationId: null, unitIds: units.map(unit) } }));
         return s.id;
       };
       maths = await parent('Mathematics A.S./A.L. (imp)', 'IMP-IALMA', ['WMA11', 'WMA12', 'WME01']);
@@ -1281,7 +1280,7 @@ describe('F7: the day-one import', () => {
 
     it('the commit holds every student with lines before the first line, in id order: while it waits for either of a family\'s two students, none of their fee rows is held (both orders)', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-      const cat = await apiResponse(coordinator.api.v1.catalogue.$get());
+      const cat = await apiResponse(importer.api.v1.catalogue.$get());
       const feeRow = async (code: string) => (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'unit' and key_id = $2`,
         [series, cat.units.find((u) => u.code === code)!.id])).id;
       const fees = { P1: await feeRow('WMA11'), M1: await feeRow('WME01') };
@@ -1335,16 +1334,16 @@ describe('F7: the day-one import', () => {
     it('the commit holds a family\'s students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3)', async () => {
       const { studentId, student, parent: par } = await onboard(officer, 'imp-subj-order', 11);
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-      const id = await stage(coordinator, workbook([{ name: 'Subject order', rows: [[`Nov. ${Y} Session`], header,
+      const id = await stage(importer, workbook([{ name: 'Subject order', rows: [[`Nov. ${Y} Session`], header,
         // History of a catalogue subject (a row naming it), in a class with no section this year.
         ['Student imp-subj-order', '11Z', 'O.L.', 'Combined Science', 'Ms Salma', '01111111111', student.email, 'Parent imp-subj-order', par.email, '01000000000', 'I confirm my registration', 'No'],
       ] }]), 'subject-order.xlsx', 'school_sheet');
-      expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
-      expect(rowAt(await fetchView(coordinator, id), 'Subject order', 3).problems.filter((p) => p.severity === 'error')).toEqual([]);
+      expect((await putSettings(importer, id, { enrol: false, createSections: false })).status).toBe(200);
+      expect(rowAt(await fetchView(importer, id), 'Subject order', 3).problems.filter((p) => p.severity === 'error')).toEqual([]);
       const { default: pg } = await import('pg');
       const release = await holdRowLock('subject', subj.CSCI!);
       try {
-        const commit = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        const commit = importer.api.v1.imports[':id'].commit.$post({ param: { id } });
         await waitFor(async () => Number((await one<{ n: string }>(
           `select count(*) as n from pg_locks l join pg_stat_activity a on a.pid = l.pid where not l.granted and l.locktype <> 'advisory' and a.datname = current_database()`)).n) >= 1 || null);
         // Waiting for the subject, the commit holds the student already (its history row comes after).
@@ -1382,7 +1381,7 @@ describe('F7: the day-one import', () => {
       const { student, studentId, parent: par } = await onboard(officer, 'imp-race', 11);
       // Another winter session offering IAL Mathematics with its P1 in the same board series.
       const other = await session(adm, 'Winter session (import, race)', 'november', 'as_level', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
-      const cat = await apiResponse(coordinator.api.v1.catalogue.$get());
+      const cat = await apiResponse(importer.api.v1.catalogue.$get());
       const made = await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
         param: { id: other }, json: {
           subjectId: maths, availability: 'open', courseFee: 900, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
@@ -1476,24 +1475,24 @@ describe('F7: the day-one import', () => {
 
   describe("SCL's grade-9 roster at the 9→10 boundary (the CSV template)", () => {
     it('a CSV without the template\'s columns is refused with what is missing', async () => {
-      const f = await apiResponse(coordinator.api.v1.files.upload.$post({ form: { file: new File([new TextEncoder().encode('name,grade\nA,9\n')], 'wrong.csv', { type: 'text/csv' }), purpose: 'import_file' } }));
-      expect(await refused(coordinator.api.v1.imports.$post({ json: { fileId: f.id, kind: 'scl_roster' } }))).toEqual({
+      const f = await apiResponse(importer.api.v1.files.upload.$post({ form: { file: new File([new TextEncoder().encode('name,grade\nA,9\n')], 'wrong.csv', { type: 'text/csv' }), purpose: 'import_file' } }));
+      expect(await refused(importer.api.v1.imports.$post({ json: { fileId: f.id, kind: 'scl_roster' } }))).toEqual({
         status: 400, error: "This file does not have the template's columns: student_name, student_email, parent_email are missing. Download the template and fill it in.",
       });
     });
 
     it('each student with the cohort that starts grade 10 next year, up to two parents, and the grade-10 section', async () => {
-      const id = await stage(coordinator, sclRoster(), 'scl-roster.csv', 'scl_roster');
-      let v = await fetchView(coordinator, id);
+      const id = await stage(importer, sclRoster(), 'scl-roster.csv', 'scl_roster');
+      let v = await fetchView(importer, id);
       expect(v.rows.map((r) => [r.rowNumber, codes(r)])).toEqual([[2, []], [3, []], [4, ['email_student_missing']]]);
       const yara = person(v, 'student', `yara${D}`);
       expect(yara).toMatchObject({ cohortYear: Y + 1, gradeToday: 9, section: '10A', sclIds: ['SCL-9001'] });
       expect(yara.parentKeys.sort()).toEqual([`heba${D}`, `nabil${D}`]);
       expect(v.mapping.sections.map((s) => [s.name, s.year, s.yearSetUp, s.exists])).toEqual([['10A', Y + 1, true, false], ['10B', Y + 1, true, false]]);
-      await putRows(coordinator, id, { rowIds: [v.rows[2]!.id], edits: { studentEmail: `wael.junior${D}` } });
-      v = await fetchView(coordinator, id);
+      await putRows(importer, id, { rowIds: [v.rows[2]!.id], edits: { studentEmail: `wael.junior${D}` } });
+      v = await fetchView(importer, id);
       expect(v.summary).toMatchObject({ heldFamilies: 0, plan: { students: { create: 3 }, parents: { create: 4 }, links: 4, sectionPlacements: 3, newSections: 2, enrolments: 0, history: 0 } });
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }));
       expect(out.result.created).toMatchObject({ students: 3, parents: 4, links: 4, sectionPlaces: 3 });
       const made = await sql<{ email: string; cohort: number; section: string; name: string }>(
         `select u.email, u.cohort_year as cohort, s.name as section, u.name from "user" u
@@ -1512,13 +1511,13 @@ describe('F7: the day-one import', () => {
   describe('the money record (F-01): history only, never a payment', () => {
     it('recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing', async () => {
       const before = await snapshot();
-      const id = await stage(coordinator, moneyRecord(), 'money-record.csv', 'money_record');
-      let v = await fetchView(coordinator, id);
+      const id = await stage(importer, moneyRecord(), 'money-record.csv', 'money_record');
+      let v = await fetchView(importer, id);
       expect(v.notes.map((n) => n.code)).toEqual(['money_history_only']);
       expect(v.rows.map((r) => [r.rowNumber, codes(r)])).toEqual([[2, []], [3, []], [4, ['student_not_found']]]);
       expect(v.rows[0]!.data).toMatchObject({ happenedOn: `${Y}-10-05`, amount: 4500, direction: 'in', moneyKind: 'payment', receiptNumber: 'R-0001' });
-      await putRows(coordinator, id, { rowIds: [v.rows[2]!.id], decision: 'skip', note: 'not our student' });
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      await putRows(importer, id, { rowIds: [v.rows[2]!.id], decision: 'skip', note: 'not our student' });
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }));
       expect(out.result.created).toMatchObject({ money: 2 });
       const rows = await sql<{ kind: string; direction: string | null; amount: number | null; percent: number | null; on: string | null; ref: string }>(
         `select m.kind, m.direction, m.amount, m.percent, m.happened_on::text as on, m.source_ref as ref from money_history m join "user" u on u.id = m.student_id
@@ -1529,10 +1528,10 @@ describe('F7: the day-one import', () => {
       expect(rows.every((r) => r.ref.startsWith('money-record.csv — money-record row '))).toBe(true);
       expect(await snapshot()).toEqual({ ...before, money: before.money + 2 });
       // Again: the same lines are found, nothing new.
-      const again = await stage(coordinator, moneyRecord(), 'money-record.csv', 'money_record');
-      v = await fetchView(coordinator, again);
+      const again = await stage(importer, moneyRecord(), 'money-record.csv', 'money_record');
+      v = await fetchView(importer, again);
       expect(v.rows.filter((r) => r.decision === 'import').every((r) => codes(r).includes('already_imported'))).toBe(true);
-      await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: again } }));
+      await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id: again } }));
       expect(await snapshot()).toEqual({ ...before, money: before.money + 2 });
     });
 
@@ -1540,12 +1539,12 @@ describe('F7: the day-one import', () => {
       const before = await snapshot();
       const [header, ...lines] = moneyRecord().trimEnd().split('\n');
       const file = [header, `amir${D},${Y}-10-01,250,in,payment,,cash,R-0000,November ${Y},Computer Science,`, ...lines].join('\n') + '\n';
-      const id = await stage(coordinator, file, 'money-record (2).csv', 'money_record');
-      const v = await fetchView(coordinator, id);
+      const id = await stage(importer, file, 'money-record (2).csv', 'money_record');
+      const v = await fetchView(importer, id);
       // Every later line moved down one: what staff decided goes with what the line says, not where it sits.
       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ decision: 'skip', decisionSource: 'staff' });
       expect(v.rows.filter((r) => r.decision === 'import').map((r) => [r.rowNumber, r.plan.money])).toEqual([[2, 'create'], [3, 'exists'], [4, 'exists']]);
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      const out = await apiResponse(importer.api.v1.imports[':id'].commit.$post({ param: { id } }));
       expect(out.result.created).toMatchObject({ money: 1 });
       expect(await snapshot()).toEqual({ ...before, money: before.money + 1 });
     });
@@ -1565,8 +1564,8 @@ describe('F7: the day-one import', () => {
 
   describe('files that must not be read whole, and the order of exam series', () => {
     const stageRefused = async (bytes: Buffer, name: string) => {
-      const f = await apiResponse(coordinator.api.v1.files.upload.$post({ form: { file: new File([new Uint8Array(bytes)], name, { type: XLSX }), purpose: 'import_file' } }));
-      return refused(coordinator.api.v1.imports.$post({ json: { fileId: f.id, kind: 'school_sheet' } }));
+      const f = await apiResponse(importer.api.v1.files.upload.$post({ form: { file: new File([new Uint8Array(bytes)], name, { type: XLSX }), purpose: 'import_file' } }));
+      return refused(importer.api.v1.imports.$post({ json: { fileId: f.id, kind: 'school_sheet' } }));
     };
 
     it('a workbook with too many parts, or parts that inflate too far together, is refused before it is read', async () => {
@@ -1662,9 +1661,9 @@ describe('F7: the day-one import', () => {
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: winter }, json: { reason: 'import scenario done' } }));
 
       // Put aside: nothing it would make is made, and it takes no more changes.
-      expect(await apiResponse(coordinator.api.v1.imports[':id'].discard.$post({ param: { id } }))).toEqual({ id, status: 'discarded' });
-      expect((await refused(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }))).error).toBe('This import was discarded');
-      expect((await refused(putSettings(coordinator, id, { enrol: false }))).status).toBe(409);
+      expect(await apiResponse(importer.api.v1.imports[':id'].discard.$post({ param: { id } }))).toEqual({ id, status: 'discarded' });
+      expect((await refused(importer.api.v1.imports[':id'].commit.$post({ param: { id } }))).error).toBe('This import was discarded');
+      expect((await refused(putSettings(importer, id, { enrol: false }))).status).toBe(409);
       expect(await sql(`select 1 from "user" where email = $1`, [`extra${D}`])).toEqual([]);
       await audited([id], ['IMPORT_STAGED', 'IMPORT_DISCARDED']);
     });
@@ -1746,7 +1745,7 @@ describe('F7: the day-one import', () => {
     });
 
     it('the list of imports: every file, its state and its counts', async () => {
-      const list = await apiResponse(coordinator.api.v1.imports.$get());
+      const list = await apiResponse(importer.api.v1.imports.$get());
       const first = list.find((b) => b.id === firstBatch)!;
       expect(first).toMatchObject({ kind: 'school_sheet', fileName: 'Nov registration.xlsx', status: 'committed', rows: 24, committedFamilies: 11 });
       expect(list.some((b) => b.status === 'discarded')).toBe(true);
@@ -1818,9 +1817,9 @@ describe('F7: the day-one import', () => {
       let released = false;
       const release = async () => { if (!released) { released = true; await holder.query(`select pg_advisory_unlock(hashtext('import:reference'))`); await holder.end(); } };
       try {
-        const first = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        const first = importer.api.v1.imports[':id'].commit.$post({ param: { id } });
         await lockWaiters(1);
-        expect(await batch(id)).toMatchObject({ status: 'committing', by: coordinator.id });
+        expect(await batch(id)).toMatchObject({ status: 'committing', by: importer.id });
         // Fifteen minutes on, the first commit looks stopped: the admin takes the claim over.
         await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
         const second = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
@@ -1852,7 +1851,7 @@ describe('F7: the day-one import', () => {
       let released = false;
       const release = async () => { if (!released) { released = true; await holder.query(`select pg_advisory_unlock(hashtext('import:reference'))`); await holder.end(); } };
       try {
-        const first = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        const first = importer.api.v1.imports[':id'].commit.$post({ param: { id } });
         await lockWaiters(1);
         await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
         const second = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
@@ -1890,7 +1889,7 @@ describe('F7: the day-one import', () => {
       const rowWaiters = (n: number) => waitFor(async () => Number((await one<{ n: string }>(
         `select count(*) as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query ilike '%from "import_row"%for update%'`)).n) >= n || null);
       try {
-        const first = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        const first = importer.api.v1.imports[':id'].commit.$post({ param: { id } });
         await lockWaiters(1);
         await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
         const second = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
