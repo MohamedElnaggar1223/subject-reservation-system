@@ -20,7 +20,9 @@
  *      any instalment payment in progress or under verification (unchanged). A line whose price is not final is
  *      skipped until its board deadline (the per-series step expires it there).
  *   3. A request awaiting a parent's approval (`pending_approval`) on a subject or a row that has closed expires
- *      (`subject_closed`): approving it needs mayReserve (§6).
+ *      (`subject_closed`) when approving it would be refused: approving needs mayReserve (§6), and a student's G4
+ *      later reserve date (`deadline.reserve`) still lets it be approved, so such a request stays (D2 of the P1b
+ *      review; ST-07, MO-20).
  *
  * Claimed before acting and safe with two scheduler instances (ST-06, ST-12): a checkout is failed once
  * (failOpenPayment is status-guarded), a reference time is set only where none is, and each line is expired in
@@ -32,7 +34,7 @@ import { db, registration, subject, sessionOfferItem, payment, eq, and, inArray,
 import { env } from '../env';
 import { expireWaitingRegistrations } from './expiry.services';
 import { tellFamily } from './plan.services';
-import { schoolDate, lineCutOffSql, cutOffsOf } from './window.services';
+import { schoolDate, lineCutOffSql, cutOffsOf, mayReserveRow } from './window.services';
 import { failPayment } from './payment.services';
 import { notifyPaymentReferenceDue } from './notification.services';
 
@@ -121,11 +123,17 @@ export async function expireOverdueLines(now: Date = new Date()) {
   }
 
   // 3. Requests awaiting a parent's approval on a subject or a row that has closed.
-  const closedRequests = await db.execute(sql`
-    select r.id from registration r join session_offer_item i on i.id = r.offer_item_id join session_offer o on o.id = i.offer_id
+  const candidates = await db.execute(sql`
+    select r.id, r.student_id as "studentId", r.offer_item_id as "offerItemId", r.attempt, r.prior_sitting_series_id as "priorSittingSeriesId"
+    from registration r join session_offer_item i on i.id = r.offer_item_id join session_offer o on o.id = i.offer_id
     where r.status = 'pending_approval'
       and (not o.accepting or (o.closes_at is not null and o.closes_at <= ${now}) or (i.closes_at is not null and i.closes_at <= ${now}))
-    order by r.id`).then((x) => (x.rows as { id: string }[]).map((r) => r.id));
+    order by r.id`).then((x) => x.rows as { id: string; studentId: string; offerItemId: string; attempt: string; priorSittingSeriesId: string | null }[]);
+  // Only those approving would refuse now: a later reserve date covering the student keeps theirs approvable.
+  const closedRequests: string[] = [];
+  for (const c of candidates) {
+    if (!(await mayReserveRow(db, c, now)).allowed) closedRequests.push(c.id);
+  }
   let awaitingApprovalExpired = 0;
   if (closedRequests.length) {
     try {
