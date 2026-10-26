@@ -18,4 +18,19 @@ RETURNS timestamptz LANGUAGE sql STABLE AS $$
 $$;
 --> statement-breakpoint
 
+-- A V3-shaped row (type deadline_extension or late_registration) is filled with the new key from now on.
+CREATE OR REPLACE FUNCTION exception_policy_from_legacy(p_type text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE p_type
+    WHEN 'discount_percent' THEN 'price.discountPercent'
+    WHEN 'discount_fixed' THEN 'price.discountFixed'
+    WHEN 'custom_price' THEN 'price.custom'
+    WHEN 'fee_waiver' THEN 'gate.schoolFee'
+    WHEN 'deadline_extension' THEN 'deadline.reserve'
+    WHEN 'late_registration' THEN 'deadline.reserve'
+    WHEN 'custom_refund_percent' THEN 'refund.percent'
+    WHEN 'grade10_other_series' THEN 'eligibility.grade10OtherSeries'
+  END
+$$;
+--> statement-breakpoint
+
 UPDATE exception SET policy_key = 'deadline.reserve' WHERE policy_key = 'deadline.window';
