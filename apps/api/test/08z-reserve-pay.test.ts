@@ -453,6 +453,8 @@ describe('08z: reserving and paying', () => {
       expect(await one(`select board_series_id as s from registration where id = $1`, [l!])).toEqual({ s: sitting });
       expect(await one(`select notes as note from session_offer where id = $1`, [await offeringOf(X, subj.s3!)])).toEqual({ note: 'Bring a calculator' });
       expect(await lineOf(l!)).toMatchObject({ status: 'pending_payment', price: 1500 });
+      // The row's sitting put back: 09 checks every live line sits in its row's series (F0b), and this state was made by hand.
+      await sql(`update session_offer_item set board_series_id = $1 where id = $2`, [sitting, row!.id]);
     });
 
     it('a transfer under verification shows when it really ends — the earliest board deadline among its lines — not their cut-off; its line is kept until then', async () => {
