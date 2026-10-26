@@ -169,7 +169,7 @@ export async function assertLineRules(
           // cells do not offer one is the student's exception, used once.
           await gate('gate.selfStudyFirstEntry', scopeOf(it), it.first_in_school
             ? 'Subjects can only be taken outside school when retaking or when the school does not offer them'
-            : `${name} is self study on a second entry only: name the earlier exam, or ask for the exception`);
+            : `${name} is self study on a second entry only: name the earlier sitting, or ask for the exception`);
         } else {
           throw new LineRuleError(offersAny ? `${name} is not offered as ${OPTION_WORDS[cell]}` : `${name} is not offered in this session`, null);
         }
@@ -182,6 +182,10 @@ export async function assertLineRules(
           throw new LineRuleError(`${name} was sat before (${sittingWords(known.month, known.year)}): reserve it as a retake`, null, 409);
         }
       }
+    }
+    // A retake names the sitting it follows (kept from v1; a legacy line's history is its sitting).
+    if (!recheck && l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
+      throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared');
     }
     // The earlier exam it carries from (D6).
     if (!l.priorSittingSeriesId) {

@@ -25,11 +25,16 @@ export type StudentRecord = {
 
 /** The student's record as F2 reads it: confirmed lines in the other sessions, and F4's results and sent entries. */
 export async function studentRecordOf(executor: Executor, studentId: string, sessionId: string): Promise<StudentRecord> {
+  // A student the import has not made yet (its review asks the rules for a new family) has no record; one made in
+  // the import's own transaction has no exams yet (F4's reads run outside it).
+  const exists = async (e: Executor) => (await e.execute(sql`select 1 from "user" where id = ${studentId}`)).rows.length > 0;
+  if (!(await exists(executor))) return { lines: [], exams: [] };
+  const committed = executor === db || await exists(db);
   const lines = (await executor.execute(sql`
     select r.subject_id as "subjectId", r.board_series_id as "seriesId", i.reference_codes as codes, bs.month, bs.year
     from registration r join session_offer_item i on i.id = r.offer_item_id join board_series bs on bs.id = r.board_series_id
     where r.student_id = ${studentId} and r.session_id <> ${sessionId} and r.status = 'confirmed'`)).rows as StudentRecord['lines'];
-  return { lines: lines.map((l) => ({ ...l, year: Number(l.year) })), exams: await examSittingsOf(studentId) };
+  return { lines: lines.map((l) => ({ ...l, year: Number(l.year) })), exams: committed ? await examSittingsOf(studentId) : [] };
 }
 
 /** The latest sitting of the row's subject the record shows before the row's own sitting (F2), or null. */

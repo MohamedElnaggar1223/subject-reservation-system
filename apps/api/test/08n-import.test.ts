@@ -995,7 +995,7 @@ describe('F7: the day-one import', () => {
       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
       expect(rowAt(v, 'Units', 4).plan.lines[0]).toMatchObject({ itemLabel: 'P2', offerItemId: items.P2, attempt: 'first' });
       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'registration_refused')).toEqual({
-        code: 'registration_refused', severity: 'error', detail: 'Mathematics A.S./A.L. (imp) — P2 takes retakes only this cycle',
+        code: 'registration_refused', severity: 'error', detail: 'Mathematics A.S./A.L. (imp) — P2 is not offered as a first entry in school',
       });
       // One line of the sheet, two papers the session offers as two items: two lines, each priced on its own (the review of 8 Oct, item 2).
       const set = rowAt(v, 'Units', 5);
@@ -1362,27 +1362,9 @@ describe('F7: the day-one import', () => {
       }
     });
 
-    it('the review asks the rules on lines without holding an exception row: a GET answers while the student\'s gate exception is held by another transaction', async () => {
-      const { studentId, student, parent: par } = await onboard(officer, 'imp-gate', 11);
-      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-      const id = await stage(adm, workbook([{ name: 'Gate', rows: [[`Nov. ${Y} Session`], header,
-        ['Student imp-gate', '11K', 'A.S.', 'Pure Mathematics 2 (P2)', 'Teacher of the IAL units (imp)', '01111111111', student.email, 'Parent imp-gate', par.email, '01000000000', 'I confirm my registration', 'No'],
-      ] }]), 'gate.xlsx', 'school_sheet');
-      expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: sess } }, enrol: false, createSections: false })).status).toBe(200);
-      expect(rowAt(await fetchView(adm, id), 'Gate', 3).problems.find((p) => p.code === 'registration_refused')?.detail).toBe('Mathematics A.S./A.L. (imp) — P2 takes retakes only this cycle');
-      // The coordinator grants a first entry of P2 (gate.availability, one-shot): the review lets the line through.
-      const exc = await apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.availability', studentId, scope: { offerItemId: items.P2! }, reason: 'a first entry of P2 this cycle' } }));
-      expect(rowAt(await fetchView(adm, id), 'Gate', 3).problems.filter((p) => p.severity === 'error')).toEqual([]);
-      // Another transaction holds that exception row (a revocation, a reservation using it): the GET does not wait for it.
-      const release = await holdRowLock('exception', exc.id);
-      try {
-        const answered = await Promise.race([fetchView(adm, id).then(() => 'answered'), new Promise((r) => setTimeout(() => r('waited'), 4000))]);
-        expect(answered).toBe('answered');
-      } finally {
-        await release();
-      }
-      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
-    });
+    // Retired by name (P1b; trail row "retired 08n-import gate"): 'the review asks the rules on lines without holding an
+    // exception row' granted gate.availability, which left with availability (line rules v2: a row's cells offer what
+    // they offer, no exception opens a cell). The review still asks the rules with lockExceptions: false. No money.
 
     it('a line whose family\'s confirmation is not on the sheet is an error: the import records the sheet\'s confirmation as the consent', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
