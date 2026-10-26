@@ -16,7 +16,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { ROLES, IdParam, CreateBoardSeries, UpdateBoardSeries, ListBoardSeriesQuery, MarkInferredChecked } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
-import { requireAuth, requireAcademic, requireRole } from '../middleware/access-control.middleware';
+import { requireAuth, requireAdmin, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import * as series from '../services/series.services';
@@ -40,7 +40,7 @@ export const boardSeriesRoutes = new Hono<HonoEnv>()
     requireRole(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN),
     async (c) => success(c, await series.listInferredRoutings()))
 
-  .post('/inferred/checked', requireAcademic(), zValidator('json', MarkInferredChecked), async (c) => {
+  .post('/inferred/checked', requireAdmin(), zValidator('json', MarkInferredChecked), async (c) => {
     try {
       return success(c, await series.markInferredChecked(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
@@ -49,7 +49,7 @@ export const boardSeriesRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .post('/', requireAcademic(), zValidator('json', CreateBoardSeries), async (c) => {
+  .post('/', requireAdmin(), zValidator('json', CreateBoardSeries), async (c) => {
     const user = c.get('user')!;
     try {
       return success(c, await series.createBoardSeries(c.req.valid('json'), user.id, user.role, extractAuditContext(c)), 201);
@@ -59,7 +59,7 @@ export const boardSeriesRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .put('/:id', requireAcademic(), zValidator('param', IdParam), zValidator('json', UpdateBoardSeries), async (c) => {
+  .put('/:id', requireAdmin(), zValidator('param', IdParam), zValidator('json', UpdateBoardSeries), async (c) => {
     const user = c.get('user')!;
     try {
       return success(c, await series.updateBoardSeries(c.req.valid('param').id, c.req.valid('json'), user.id, user.role, extractAuditContext(c)));
@@ -69,7 +69,7 @@ export const boardSeriesRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .delete('/:id', requireAcademic(), zValidator('param', IdParam), async (c) => {
+  .delete('/:id', requireAdmin(), zValidator('param', IdParam), async (c) => {
     try {
       return success(c, await series.deleteBoardSeries(c.req.valid('param').id, c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {

@@ -4,9 +4,10 @@
  * Runs on a 60-second interval from the moment the API server starts.
  *
  * On each tick it:
- * 1. Closes any ACTIVE sessions whose endDate has passed.
- * 2. Activates any DRAFT sessions whose startDate has arrived,
- *    provided no conflicting active session of the same type exists.
+ * 1. Closes any ACTIVE session whose optional close date (endDate) has passed. Nothing opens
+ *    automatically (COORDINATOR_REWORK.md C4): a session opens by its Accepting switch.
+ * 2. Runs the recovery sweep, the lapses, the messages and the payment deadlines (the cut-off sweep
+ *    among them, C10).
  *
  * This is an MVP implementation using Node.js setInterval.
  * Replace with BullMQ or an external scheduler (Render Cron, Vercel Cron)
@@ -16,11 +17,9 @@
 import { db, payment, eq, and } from '@repo/db';
 import { autoManageSessions, finalizePendingRecords, recoverSessionTransitions } from '../services/session.services';
 import { failPayment, enforcePaymentDeadlines } from '../services/payment.services';
-import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
+import { notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { runMessagesStep } from '../services/messages-step.services';
-import { capturePreregistrationsForSession } from '../services/prereg.services';
 import { lapseGrade10Exceptions, lapsePlans } from '../services/exception-lapse.services';
-import { expireOverdueLines } from '../services/overdue.services';
 import { sendDeadlineReminders } from '../services/exam-deadline.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
@@ -57,7 +56,7 @@ export function startSessionScheduler(): void {
     }
     tickInFlight = true;
     try {
-      const { closed, closedSessions, activated, activatedSessions } = await autoManageSessions();
+      const { closed, closedSessions } = await autoManageSessions();
 
       if (closed > 0) {
         logger.info(`[session-closer] Auto-closed ${closed} expired session(s).`);
@@ -108,57 +107,6 @@ export function startSessionScheduler(): void {
       // NOT-002's 24-hour closing reminder is the session_closing reminder rule's day −1 since step D
       // (RESERVATIONS_REWORK.md §3.8): sent by the messages step below, claimed once.
 
-      if (activated > 0) {
-        logger.info(`[session-closer] Auto-activated ${activated} session(s).`);
-
-        // Audit: log each auto-activated session
-        for (const sess of activatedSessions) {
-          await logAction(null, 'SESSION_AUTO_ACTIVATED', 'session', sess.id, { status: 'draft' }, { status: 'active', name: sess.name, sessionType: sess.sessionType })
-            .catch((err) => logger.error(`[session-closer] Audit SESSION_AUTO_ACTIVATED failed for ${sess.id}:`, err));
-        }
-
-        // V3 §6.8: capture preregistrations for each newly opened session —
-        // funded rows confirm (held debited), unfunded fall back to
-        // pending_payment. Idempotent; a failure retries next tick since
-        // rows stay preregistered.
-        for (const sess of activatedSessions) {
-          try {
-            const { captured, movedToPendingPayment } = await capturePreregistrationsForSession(sess.id);
-            if (captured + movedToPendingPayment > 0) {
-              logger.info(
-                `[session-closer] Prereg capture for "${sess.name}": ${captured} confirmed, ${movedToPendingPayment} to pending_payment.`
-              );
-            }
-          } catch (err) {
-            logger.error(`[session-closer] Prereg capture failed for ${sess.id}:`, err);
-          }
-        }
-
-        // NOT-001: Notify all active students and parents when a session window opens
-        for (const sess of activatedSessions) {
-          try {
-            const { studentIds, parentIds } = await getStudentAndParentBroadcastIds();
-
-            await notifySessionOpened({
-              sessionId:   sess.id,
-              sessionName: sess.name,
-              sessionType: sess.sessionType,
-              deadline:    sess.endDate,
-              studentIds,
-              parentIds,
-            });
-
-            logger.info(
-              `[session-closer] NOT-001 sent for session "${sess.name}" to ${studentIds.length + parentIds.length} users.`
-            );
-          } catch (notifErr) {
-            logger.error(
-              `[session-closer] NOT-001 notification failed for session ${sess.id}:`,
-              notifErr
-            );
-          }
-        }
-      }
       // F4: remind the coordinator and admin before each board date the school
       // acts by. Each reminder is claimed with the notices it sends, in one
       // transaction: a second instance sends nothing, a failure retries.
@@ -200,29 +148,20 @@ export function startSessionScheduler(): void {
         logger.error('[session-closer] Plan lapse failed:', err);
       }
 
-      // The reservations rework (§3.1): a line still unpaid payment.expireOverdueAfterDays after its
-      // due date expires ("overdue"; off by default), its plan settled as a drop that day.
-      try {
-        const o = await expireOverdueLines();
-        if (o.expired > 0) logger.info(`[session-closer] ${o.expired} overdue line(s) expired.`);
-      } catch (err) {
-        logger.error('[session-closer] Overdue expiry failed:', err);
-      }
-
       // Step D (RESERVATIONS_REWORK.md §3.8): scheduled messages whose time has come, the reminder
       // rules' reminders due now, the emails waiting to go out. Each claims before it acts (a
       // message by its row lock, a reminder by its unique claim row, an email by a status-guarded
       // update), so a second scheduler instance sends nothing twice (ST-06, ST-12).
       await runMessagesStep(new Date());
 
-      // Owner decision MO-10: InstaPay checkouts whose reference never came in
-      // the grace period after a close lapse; at a series' exam-board entry
-      // deadline, everything still unconfirmed on it is closed.
+      // The payment deadlines (MO-10; the coordinator rework C10): InstaPay checkouts whose reference never came
+      // in their grace lapse; unpaid lines past their cut-off expire, their unfinished checkouts first (the cut-off
+      // sweep); at a sitting's board deadline everything still unconfirmed on it is closed.
       try {
         const d = await enforcePaymentDeadlines();
-        if (d.referencesLapsed + d.paymentsClosedAtDeadline + d.registrationsExpiredAtDeadline > 0) {
+        if (d.referencesLapsed + d.expiredAtCutOff + d.checkoutsEndedAtCutOff + d.paymentsClosedAtDeadline + d.registrationsExpiredAtDeadline > 0) {
           logger.info(
-            `[session-closer] Deadlines: ${d.referencesLapsed} InstaPay checkout(s) lapsed, ${d.paymentsClosedAtDeadline} payment(s) and ${d.registrationsExpiredAtDeadline} registration(s) closed at entry deadlines.`
+            `[session-closer] Deadlines: ${d.referencesLapsed} InstaPay checkout(s) lapsed; at the cut-off ${d.checkoutsEndedAtCutOff} checkout(s) ended and ${d.expiredAtCutOff} line(s) expired; ${d.paymentsClosedAtDeadline} payment(s) and ${d.registrationsExpiredAtDeadline} registration(s) closed at board deadlines.`
           );
         }
       } catch (err) {

@@ -132,7 +132,7 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     maths = await subject(adm, `F1W-MAT-${RUN}`, 'Maths W', { course: 2000, registration: 800 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
     bio = await subject(adm, `F1W-BIO-${RUN}`, 'Biology W', { course: 1500, registration: 600 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
     arabic = await subject(adm, `F1W-ARA-${RUN}`, 'Arabic W', { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const unit = async (code: string, short: string) => (await apiResponse(coordinator.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}${RUN}`, shortCode: short, title: short, unitLevel: 'as', kind: 'unit' } }))).id;
+    const unit = async (code: string, short: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}${RUN}`, shortCode: short, title: short, unitLevel: 'as', kind: 'unit' } }))).id;
     p1 = await unit('WMA11', 'P1');
     p2 = await unit('WMA12', 'P2');
     const series = async (month: 'june' | 'january', year: number, label: string) =>
@@ -941,7 +941,7 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
 
   it('the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item', async () => {
     const phys = await subject(adm, `F1W-PHY-${RUN}`, 'Physics W', { course: 1500, registration: 600 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const unit = async (code: string, short: string) => (await apiResponse(coordinator.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}${RUN}`, shortCode: short, title: short, unitLevel: 'as', kind: 'unit' } }))).id;
+    const unit = async (code: string, short: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}${RUN}`, shortCode: short, title: short, unitLevel: 'as', kind: 'unit' } }))).id;
     const [q1, q2] = [await unit('WPH11', 'Q1'), await unit('WPH12', 'Q2')];
     await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: junS }, json: { rows: [{ keyKind: 'unit', keyId: q1, amount: 700, provisional: false }] } }));
     const h = t.h!.id;

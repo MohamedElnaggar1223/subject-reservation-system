@@ -7,7 +7,8 @@
  * the reference tables equal to it (a subject or a row no longer in the data is removed — offerings
  * keep the code they were made from, with no foreign key to it). A board date the data leaves empty
  * keeps a date the admin entered from the check list (C6: "once, and it joins the reference data");
- * a date the data gives replaces it.
+ * a date the data gives replaces any other — one the data itself filled included (each deadline's source is
+ * kept on its own, `admin_deadlines`: P1b fix 3).
  *
  * Callable from the seed (`pnpm --filter @repo/db seed:reference`, which reads
  * packages/db/reference/*.json — P0's files) and from the integration suite with in-memory data.
@@ -101,33 +102,36 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
         const entry = referenceDeadline(s.entryDeadline);
         const retake = referenceDeadline(s.retakeDeadline);
         const [kept] = (await tx.execute(sql`
-          select entry_deadline as entry, retake_deadline as retake from board_series
-          where board_code = ${b.code} and month = ${month} and year = ${s.year} and label = '' and dates_source = 'admin'`)).rows as { entry: string | Date | null; retake: string | Date | null }[];
+          select entry_deadline as entry, retake_deadline as retake, admin_deadlines as mine from board_series
+          where board_code = ${b.code} and month = ${month} and year = ${s.year} and label = '' and cardinality(admin_deadlines) > 0`)).rows as {
+            entry: string | Date | null; retake: string | Date | null; mine: string[];
+          }[];
         if (kept) {
-          const asDate = (v: string | Date | null) => (v === null ? null : new Date(v));
-          out.adminDatesKept.push(...adminDateDisagreements(`${b.code} ${month} ${s.year}`, { entry: asDate(kept.entry), retake: asDate(kept.retake) }, { entry: s.entryDeadline, retake: s.retakeDeadline }));
+          // Only the dates she entered: one the file filled is the file's to replace.
+          const hers = (which: 'entry' | 'retake', v: string | Date | null) => (v === null || !kept.mine.includes(which) ? null : new Date(v));
+          out.adminDatesKept.push(...adminDateDisagreements(`${b.code} ${month} ${s.year}`, { entry: hers('entry', kept.entry), retake: hers('retake', kept.retake) }, { entry: s.entryDeadline, retake: s.retakeDeadline }));
         }
         await tx.execute(sql`
           insert into board_series (id, board_code, month, year, label, entry_deadline, retake_deadline, exams_start, dates_source, dates_confirmed, levels)
           values (${randomUUID()}, ${b.code}, ${month}, ${s.year}, '', ${entry}, ${retake}, ${s.examsStart}, ${s.source}, ${s.confirmed}, ${textArray(s.levels)})
           on conflict (board_code, month, year, label) do update set
             levels = excluded.levels,
-            -- C6: a deadline the admin entered from the check list (dates_source 'admin') is kept; the file
-            -- fills a date she left empty (her retake deadline when she entered only the entry deadline).
-            entry_deadline = case when board_series.dates_source = 'admin' then coalesce(board_series.entry_deadline, excluded.entry_deadline)
+            -- C6: a deadline the admin entered from the check list (admin_deadlines) is kept; every other is the
+            -- file's — filled where she left it empty, and replaced by a later file (P1b fix 3).
+            entry_deadline = case when 'entry' = any(board_series.admin_deadlines) then board_series.entry_deadline
                                   else coalesce(excluded.entry_deadline, board_series.entry_deadline) end,
-            retake_deadline = case when board_series.dates_source = 'admin' then coalesce(board_series.retake_deadline, excluded.retake_deadline)
+            retake_deadline = case when 'retake' = any(board_series.admin_deadlines) then board_series.retake_deadline
                                    else coalesce(excluded.retake_deadline, board_series.retake_deadline) end,
             exams_start = coalesce(excluded.exams_start, board_series.exams_start),
             dates_source = case when board_series.dates_source = 'admin' then 'admin' else excluded.dates_source end,
             dates_confirmed = case when board_series.dates_source = 'admin' then board_series.dates_confirmed else excluded.dates_confirmed end,
-            updated_at = case when board_series.dates_source is distinct from 'admin' and (
-                                      board_series.entry_deadline is distinct from coalesce(excluded.entry_deadline, board_series.entry_deadline)
-                                   or board_series.retake_deadline is distinct from coalesce(excluded.retake_deadline, board_series.retake_deadline)
-                                   or board_series.dates_source is distinct from excluded.dates_source
-                                   or board_series.dates_confirmed is distinct from excluded.dates_confirmed)
-                                 or (board_series.dates_source = 'admin' and board_series.retake_deadline is null and excluded.retake_deadline is not null)
-                                 or (board_series.dates_source = 'admin' and board_series.entry_deadline is null and excluded.entry_deadline is not null)
+            updated_at = case when (board_series.dates_source is distinct from 'admin' and (
+                                      board_series.dates_source is distinct from excluded.dates_source
+                                   or board_series.dates_confirmed is distinct from excluded.dates_confirmed))
+                                 or (not 'entry' = any(board_series.admin_deadlines)
+                                     and board_series.entry_deadline is distinct from coalesce(excluded.entry_deadline, board_series.entry_deadline))
+                                 or (not 'retake' = any(board_series.admin_deadlines)
+                                     and board_series.retake_deadline is distinct from coalesce(excluded.retake_deadline, board_series.retake_deadline))
                                  or board_series.exams_start is distinct from coalesce(excluded.exams_start, board_series.exams_start)
                                  or board_series.levels is distinct from excluded.levels
                               then now() else board_series.updated_at end`);

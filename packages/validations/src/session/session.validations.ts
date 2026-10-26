@@ -229,6 +229,7 @@ export const UpdateSession = z
     expected: z.object({
       repriced: z.number().int().min(0), listedForFinance: z.number().int().min(0),
       linesAffected: z.number().int().min(0), dueDatesMoved: z.number().int().min(0),
+      cutOffsEarlier: z.number().int().min(0).default(0), cutOffsPassed: z.number().int().min(0).default(0),
     }).optional(),
     /** @deprecated the legacy contract. */
     startDate: z.coerce.date().optional(),

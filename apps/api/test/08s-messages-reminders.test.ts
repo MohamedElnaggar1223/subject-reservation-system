@@ -193,7 +193,9 @@ describe('08s: messages and reminders', () => {
       expect(await reminderCount(fOwes.parent.email)).toBe(2);
     });
 
-    it('the line paid between two days stops its reminders; the unpaid one is reminded on the day, then with the overdue text at +3, +6, +9', async () => {
+    // P1b (C10): a line past its cut-off (due + the session's unpaid-cancel days, 3 here) is no longer payable, so its
+  // reminders stop there: the overdue text goes at +3, and nothing after (it went at +3, +6, +9 until paid).
+  it('the line paid between two days stops its reminders; the unpaid one is reminded on the day, then with the overdue text at +3, and nothing past its cut-off', async () => {
       await payAtDesk(fPays, [linePays]);
       expect((await one<{ status: string }>(`select status from registration where id = $1`, [linePays])).status).toBe('confirmed');
       await step(cairoAt(dueDay, 9));
@@ -204,10 +206,10 @@ describe('08s: messages and reminders', () => {
       await step(cairoAt(shift(dueDay, 6), 9));
       await step(cairoAt(shift(dueDay, 7), 9));
       await step(cairoAt(shift(dueDay, 9), 9, 30));
-      expect(await offsetsOf(lineOwes)).toEqual([-7, -3, 0, 3, 6, 9]);
+      expect(await offsetsOf(lineOwes)).toEqual([-7, -3, 0, 3]);
       expect(await offsetsOf(linePays)).toEqual([-7, -3]);
       const all = await notificationsFor(fOwes.parent.email, 'PAYMENT_REMINDER');
-      expect(all).toHaveLength(6);
+      expect(all).toHaveLength(4);
       expect(all.at(-1)!.title).toBe(`Payment overdue — ${sessionAName} · دفعة متأخرة — ${sessionAName}`);
       expect(all.at(-1)!.body).toContain(`EGP 1,500 for Student s08-owes-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(dueDay)}).`);
       expect(all.at(-1)!.body).toContain(`مبلغ 1,500 جنيه الخاص بـ Student s08-owes-${RUN} متأخر ولم يُسدَّد بعد: ${subjAName} (متأخر منذ ${arDay(dueDay)}).`);
@@ -218,10 +220,10 @@ describe('08s: messages and reminders', () => {
 
     it('what went out: the reminders list and the log, each message with its deliveries per channel', async () => {
       const sent = await apiResponse(finadmin.api.v1.reminders.sent.$get({ query: { kind: 'payment_due', sessionId: sessionA } }));
-      expect(sent.length).toBeGreaterThanOrEqual(6);
+      expect(sent.length).toBeGreaterThanOrEqual(4);
       const msgIds = (await sql<{ message_id: string }>(`select message_id from reminder_sent where target_id = $1`, [lineOwes])).map((r) => r.message_id);
       const one9 = sent.find((s) => s.messageId === msgIds.at(-1))!;
-      expect(one9.offsets).toContain(9);
+      expect(one9.offsets).toContain(3);
       for (const id of msgIds) await emailsSettled(id);
       const d = await apiResponse(finadmin.api.v1.messages.deliveries.$get({ query: { messageId: msgIds.at(-1)! } }));
       const mine = d.deliveries.filter((x) => x.student?.id === fOwes.studentId);
@@ -528,7 +530,9 @@ describe('08s: messages and reminders', () => {
 
   // ─── Staff reminders ─────────────────────────────────────────────────────────
 
-  it('staff reminders: the closing of a session to families; a board deadline to the staff with how many lines wait; a declared retake to the coordinator until verified', async () => {
+  // P1b (§9.2: entry_deadline reminders go): the staff's board-deadline reminder no longer goes; the board deadline acts
+  // through each line's cut-off, whose reminders are the payment ones.
+  it('staff reminders: the closing of a session to families; no board-deadline reminder to the staff; a declared retake to the coordinator until verified', async () => {
     const f = await onboard(officer, `s08-staff-${RUN}`, 12);
     // A declared retake of the board's previous June: listed To verify, its deadline the series' entry deadline.
     const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
@@ -539,10 +543,7 @@ describe('08s: messages and reminders', () => {
     const deadlineDay = cairoDay(new Date((await one<{ d: string }>(`select entry_deadline as d from board_series where id = $1`, [seriesA])).d));
     // Day −14 of the series' deadline: the staff hear of the waiting lines, the coordinator of the sitting to verify.
     await step(cairoAt(shift(deadlineDay, -14), 9, 0));
-    const staffNote = (await notificationsFor(adm.email, 'STAFF_REMINDER')).find((n) => n.title.includes(`(s08-${RUN})`))!;
-    expect(staffNote.title).toContain(`the board's entry deadline is ${enDay(deadlineDay)}`);
-    const waiting = await one<{ n: string }>(`select count(*) as n from registration r where r.board_series_id = $1 and r.status in ('pending_approval', 'pending_payment')`, [seriesA]);
-    expect(staffNote.body).toContain(`${waiting.n} lines in it are still unpaid`);
+    expect((await notificationsFor(adm.email, 'STAFF_REMINDER')).filter((n) => n.title.includes(`(s08-${RUN})`))).toEqual([]);
     const coord = (await notificationsFor(coordinator.email, 'STAFF_REMINDER')).filter((n) => n.title.startsWith(sessionAName));
     expect(coord).toHaveLength(1);
     expect(coord[0]!.title).toMatch(new RegExp(`^${sessionAName.replace(/[()]/g, '\\$&')}: \\d+ declared sittings to verify`));
@@ -807,8 +808,9 @@ describe('08s: messages and reminders', () => {
     const onTime = await onboard(officer, `s08-ontime-${RUN}`, 12);
     const lateLine = await reserveUnpaid(late, itemA);
     await reserveUnpaid(onTime, itemA);
-    // The arrangement: the late family's line was due three days ago (a due date set in the past by hand, as expireByHand builds an aftermath).
-    const wasDue = new Date(Date.now() - 3 * DAY);
+    // The arrangement: the late family's line was due two days ago (a due date set in the past by hand, as expireByHand
+    // builds an aftermath) — inside its cut-off (P1b: due + the session's 3 days), so still payable and reminded.
+    const wasDue = new Date(Date.now() - 2 * DAY);
     await sql(`update registration set due_at = $1 where id = $2`, [wasDue.toISOString(), lateLine]);
     const part = (filter: 'overdue' | 'due') => ({ kind: 'batch' as const, list: 'session_unpaid' as const, sessionId: sessionA, include: 'lines' as const, filter, studentIds: [late.studentId, onTime.studentId], who: 'families' as const });
     const overdue = await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: part('overdue') } } }));
@@ -921,10 +923,11 @@ describe('08s: messages and reminders', () => {
     const line = await reserveUnpaid(f, itemA);
     const coat = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', registrationId: line, amount: 200, description: 'A lab coat', dueAt: cairoAt(dueDay, 12), reason: 'the lab' } }));
     await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', registrationId: line, amount: 300, description: 'A field trip', dueAt: cairoAt(shift(dueDay, 5), 12), reason: 'the trip' } }));
-    // Behind on two dates (set by hand, as in item 8): the line five days ago, the lab coat two days ago; the trip still ahead.
+    // Behind on two dates (set by hand, as in item 8): the line two days ago (inside its cut-off, P1b: due + 3 days),
+    // the lab coat one day ago; the trip still ahead.
     const today = cairoDay(new Date());
-    const fiveAgo = cairoAt(shift(today, -5), 12);
-    const twoAgo = cairoAt(shift(today, -2), 12);
+    const fiveAgo = cairoAt(shift(today, -2), 12);
+    const twoAgo = cairoAt(shift(today, -1), 12);
     await sql(`update registration set due_at = $1 where id = $2`, [fiveAgo.toISOString(), line]);
     await sql(`update charge set due_at = $1 where id = $2`, [twoAgo.toISOString(), coat.id]);
     const part = (filter: 'overdue' | 'due') => ({ kind: 'batch' as const, list: 'session_unpaid' as const, sessionId: sessionA, include: 'both' as const, filter, studentIds: [f.studentId], who: 'families' as const });
@@ -937,8 +940,8 @@ describe('08s: messages and reminders', () => {
     await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('due') }, templateId: TPL.paymentDue, channels: ['in_app'] } }));
     const [late, ahead] = await notificationsFor(f.parent.email, 'PAYMENT_REMINDER');
     expect(late!.body).toBe([
-      `Dear Parent s08-two-${RUN}, EGP 1,700 for Student s08-two-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(shift(today, -5))}) and A lab coat (overdue since ${enDay(shift(today, -2))}). Please pay in the app or at the school's finance desk.`,
-      `عزيزي ولي الأمر Parent s08-two-${RUN}، مبلغ 1,700 جنيه الخاص بـ Student s08-two-${RUN} متأخر ولم يُسدَّد بعد: ${subjAName} (متأخر منذ ${arDay(shift(today, -5))}) وA lab coat (متأخر منذ ${arDay(shift(today, -2))}). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.`,
+      `Dear Parent s08-two-${RUN}, EGP 1,700 for Student s08-two-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(shift(today, -2))}) and A lab coat (overdue since ${enDay(shift(today, -1))}). Please pay in the app or at the school's finance desk.`,
+      `عزيزي ولي الأمر Parent s08-two-${RUN}، مبلغ 1,700 جنيه الخاص بـ Student s08-two-${RUN} متأخر ولم يُسدَّد بعد: ${subjAName} (متأخر منذ ${arDay(shift(today, -2))}) وA lab coat (متأخر منذ ${arDay(shift(today, -1))}). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.`,
     ].join('\n\n'));
     expect(ahead!.body).toBe([
       `Dear Parent s08-two-${RUN}, EGP 300 for Student s08-two-${RUN} (A field trip) is due on ${enDay(shift(dueDay, 5))}. You can pay in the app or at the school's finance desk.`,

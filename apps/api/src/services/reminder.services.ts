@@ -70,12 +70,12 @@ const asDate = (v: unknown) => (v instanceof Date ? v : new Date(String(v)));
 
 // ─── Candidates: every target that may be reminded, with its anchor ──────────
 
-async function candidates(kind: ReminderKind, now: Date, payOnProvisional: boolean): Promise<Candidate[]> {
+async function candidates(kind: ReminderKind, now: Date): Promise<Candidate[]> {
   switch (kind) {
     case 'payment_due': {
       const lines = (await db.execute(sql`
         select r.id, r.student_id, r.session_id, r.due_at, r.created_at from registration r
-        where ${linePayableNowSql(now, payOnProvisional)}
+        where ${linePayableNowSql(now)}
         order by r.id`)).rows as Record<string, unknown>[];
       const charges = (await db.execute(sql`
         select c.id, c.student_id, r.session_id, c.due_at, c.created_at from charge c left join registration r on r.id = c.registration_id
@@ -97,19 +97,10 @@ async function candidates(kind: ReminderKind, now: Date, payOnProvisional: boole
       const rows = (await db.execute(sql`select id, end_date, created_at, reminder_sent_at from registration_session where status = 'active' and end_date > ${now} order by id`)).rows as Record<string, unknown>[];
       return rows.map((s) => ({ targetKind: 'session' as const, targetId: s.id as string, anchor: asDate(s.end_date), since: asDate(s.created_at), studentId: null, sessionId: s.id as string, legacyClosingSent: s.reminder_sent_at != null }));
     }
-    case 'entry_deadline': {
-      const rows = (await db.execute(sql`
-        select bs.id, bs.entry_deadline, bs.retake_deadline, bs.created_at from board_series bs
-        where (bs.entry_deadline > ${now} or bs.retake_deadline > ${now})
-          and exists (select 1 from registration r where r.board_series_id = bs.id and ${WAITING_LINE})
-        order by bs.id`)).rows as Record<string, unknown>[];
-      const out: Candidate[] = [];
-      for (const s of rows) {
-        if (s.entry_deadline && asDate(s.entry_deadline) > now) out.push({ targetKind: 'series_entry', targetId: s.id as string, anchor: asDate(s.entry_deadline), since: asDate(s.created_at), studentId: null, sessionId: null });
-        if (s.retake_deadline && asDate(s.retake_deadline) > now) out.push({ targetKind: 'series_retake', targetId: s.id as string, anchor: asDate(s.retake_deadline), since: asDate(s.created_at), studentId: null, sessionId: null });
-      }
-      return out;
-    }
+    case 'entry_deadline':
+      // The coordinator rework (§9.2): board deadlines are reference data, not staff's to act on — their reminders
+      // go (the kind stays for the rules already stored; it finds nothing to remind of).
+      return [];
     case 'declared_retakes_to_verify': {
       const rows = (await db.execute(sql`
         select r.id, r.student_id, r.session_id, r.created_at from registration r
@@ -155,13 +146,12 @@ class NothingClaimed extends Error {}
 export async function runReminders(now: Date = new Date()) {
   if (!(await getSetting('reminders.enabled'))) return { claimed: 0, messages: 0, off: true };
   const hour = await getSetting('reminders.sendAtHour');
-  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
   const rules = await db.select().from(reminderRule);
   let claimed = 0;
   let messages = 0;
   for (const kind of REMINDER_KINDS) {
     const due: Due[] = [];
-    for (const c of await candidates(kind, now, payOnProvisional)) {
+    for (const c of await candidates(kind, now)) {
       const rule = ruleFor(rules, kind, c.sessionId);
       if (!rule) continue;
       const offset = dueOffset({ anchor: c.anchor, offsetsDays: rule.offsetsDays, repeatEveryDays: rule.repeatEveryDays, sendAtHour: hour, now, since: c.since });
@@ -175,7 +165,7 @@ export async function runReminders(now: Date = new Date()) {
     for (const d of fresh) groups.set(groupKey(kind, d), [...(groups.get(groupKey(kind, d)) ?? []), d]);
     for (const items of groups.values()) {
       try {
-        const n = await sendGroup(kind, items, now, payOnProvisional);
+        const n = await sendGroup(kind, items, now);
         if (n > 0) { claimed += n; messages++; }
       } catch (err) {
         logger.error(`[reminders] ${kind} could not be sent:`, err);
@@ -226,7 +216,7 @@ async function lockShare(tx: Tx, table: 'registration' | 'charge', ids: string[]
   await tx.execute(sql`select id from ${sql.raw(table)} where id in (${sql.join(ids.map((x) => sql`${x}`), sql`, `)}) order by id for share`);
 }
 
-async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Date, payOnProvisional: boolean): Promise<Live[]> {
+async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Date): Promise<Live[]> {
   const ids = (k: TargetKind) => items.filter((i) => i.targetKind === k).map((i) => i.targetId).sort();
   const live: Live[] = [];
   const lineIds = ids('line');
@@ -247,7 +237,7 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
       from registration r join subject s on s.id = r.subject_id join session_offer_item i on i.id = r.offer_item_id
       join registration_session rs on rs.id = r.session_id
       where r.id in (${sql.join(lineIds.map((x) => sql`${x}`), sql`, `)})
-        and ${linePayableNowSql(now, payOnProvisional)}
+        and ${linePayableNowSql(now)}
       order by r.id`)).rows as Record<string, unknown>[];
     for (const r of rows) {
       const item = items.find((i) => i.targetKind === 'line' && i.targetId === r.id)!;
@@ -301,12 +291,12 @@ async function staff(tx: Tx, roles: string[]) {
  * index: what another scheduler claimed first, or a target already reminded today about that date,
  * is skipped; nothing claimed → nothing written), the notifications and deliveries, the audit row.
  */
-async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvisional: boolean): Promise<number> {
+async function sendGroup(kind: ReminderKind, items: Due[], now: Date): Promise<number> {
   const rule = items[0]!.rule;
   const templateId = items[0]!.templateId;
   try {
     return await db.transaction(async (tx) => {
-      const live = await lockAndRecheck(tx, kind, items, now, payOnProvisional);
+      const live = await lockAndRecheck(tx, kind, items, now);
       if (!live.length) throw new NothingClaimed();
       const [t] = await tx.select().from(messageTemplate).where(eq(messageTemplate.id, templateId));
       if (!t) throw new Error(`reminder template ${templateId} not found`);

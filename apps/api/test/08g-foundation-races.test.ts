@@ -107,7 +107,8 @@ describe('F0a: races', () => {
     for (const [i, name] of ['History', 'Geography', 'Economics', 'Sociology', 'Psychology', 'Accounting'].entries()) {
       subj.push(await subject(adm, `F0R-${i + 1}`, `${name} (F0a races)`, { course: 1000, registration: 200 }));
     }
-    nov = await session(adm, 'November (IGCSE, F0a races)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
+    // P1b (C4): a draft takes no reservation, extension or not: the races' session is open.
+    nov = await session(adm, 'November (IGCSE, F0a races)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear), activate: true });
   });
 
   // ─── A registration racing an eligibility change ───────────────────────────
@@ -141,9 +142,10 @@ describe('F0a: races', () => {
     it('a cohort correction: the registration commits first, then the correction expires it', async () => {
       const f = await family('cohort');
       await extend(f.studentId, nov);
-      // Moved back a year: grade 10 in this November, and grade 10 sits June only.
+      // P1b (C7): a session's grade list no longer strands a line, so the correction is one that makes the student
+      // unable to sit the series at all — they start grade 10 next year (it was "moved back to grade 10").
       const { reg, chg } = await race(f, nov, subj[0]!, () =>
-        adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: thisYear, reason: 'repeats grade 10' } }));
+        adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: thisYear + 1, reason: 'starts grade 10 next year' } }));
       expect(reg.status).toBe(201);
       expect(chg.status).toBe(200);
       const [created] = (await reg.json() as { data: { id: string }[] }).data;
@@ -151,56 +153,13 @@ describe('F0a: races', () => {
       expect(await expiryOf(created!.id)).toEqual({ reason: 'ineligible', detail: 'cohort_corrected' });
     });
 
-    it("a window's series corrected: the registration commits first, then the correction expires it", async () => {
-      const f = await family('series');
-      const own = await session(adm, 'November (IGCSE, F0a races, series)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
-      await extend(f.studentId, own);
-      // Corrected to the November a year earlier: grade 10 then, and grade 10 sits June only.
-      const { reg, chg } = await race(f, own, subj[1]!, () =>
-        adm.api.v1.sessions[':id'].series.$put({ param: { id: own }, json: { sessionType: 'winter', seriesYear: seriesYearInAcademicYear('november', thisYear - 1), reason: 'race check' } }));
-      expect(reg.status).toBe(201);
-      expect(chg.status).toBe(200);
-      const [created] = (await reg.json() as { data: { id: string }[] }).data;
-      expect(await waitingFor(f.studentId, own)).toEqual([]);
-      expect(await expiryOf(created!.id)).toEqual({ reason: 'ineligible', detail: 'series_corrected' });
-    });
+    // Retired (§12: 08g's sessions/:id/series race; trail row "retired 08g series"): the series correction left the
+    // reservation path. No money.
 
-    it('a grade-10 exception revoked: the registration it allowed commits first, then the revocation expires it', async () => {
-      const f = await family('exception', 10);
-      await extend(f.studentId, nov);
-      const granted = await apiResponse(coordinator.api.v1.exceptions.$post({
-        json: { type: 'grade10_other_series', studentId: f.studentId, sessionId: nov, reason: 'ready early for November' },
-      }));
-      const { reg, chg } = await race(f, nov, subj[2]!, () =>
-        coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: granted.id } }));
-      expect(reg.status).toBe(201);
-      expect(chg.status).toBe(200);
-      const [created] = (await reg.json() as { data: { id: string }[] }).data;
-      expect(await waitingFor(f.studentId, nov)).toEqual([]);
-      expect(await expiryOf(created!.id)).toEqual({ reason: 'ineligible', detail: 'exception_revoked' });
-    });
-
-    it("A-12 turned off: a graduate's registration commits first, then the change expires it", async () => {
-      const f = await family('graduate', 12);
-      // Finished grade 12 last year: a retake in this November is A-12's.
-      await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: thisYear - 3, reason: 'graduated last June' } }));
-      await extend(f.studentId, nov);
-      expect((await apiResponse(adm.api.v1.registrations.eligibility.$get({ query: { studentId: f.studentId, sessionId: nov } })))).toMatchObject({ allowed: true, graduateRetake: true });
-      try {
-        const { reg, chg } = await race(f, nov, subj[3]!, () =>
-          adm.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: false, reason: 'race check' } }));
-        expect(reg.status).toBe(201);
-        expect(chg.status).toBe(200);
-        const [created] = (await reg.json() as { data: { id: string }[] }).data;
-        expect(await waitingFor(f.studentId, nov)).toEqual([]);
-        expect(await expiryOf(created!.id)).toEqual({ reason: 'ineligible', detail: 'graduate_retakes_off' });
-      } finally {
-        await sql(`delete from school_setting where key = 'eligibility.graduateRetakes'`);
-      }
-    });
+    // Retired with C7 (trail rows "retired 08g grade-10 race" and "retired 08g A-12 race"): a revoked grade-10
+    // exception and a grade list without graduates strand no line, so nothing races their clean-up; A-12's switch is
+    // gone. No money.
   });
-
-  // ─── Two people at once ────────────────────────────────────────────────────
 
   // ─── A withdrawal landing first: every creating path asks again ────────────
 
@@ -271,15 +230,7 @@ describe('F0a: races', () => {
       expect(await sql(`select 1 from payment where student_id = $1`, [f.studentId])).toEqual([]);
     });
 
-    it('a preregistration: refused, nothing registered', async () => {
-      const f = await family('first-prereg');
-      const draft = await session(adm, 'November (IGCSE, F0a races, prereg)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
-      const created = await afterWithdrawal(f, async () =>
-        f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, ...(await reservationOf(draft, [subj[1]!])), studentId: f.studentId } }));
-      expect(created.status).toBe(400);
-      expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
-      expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
-    });
+    // 'a preregistration: refused, nothing registered' retired with preregistration (C4; trail row "retired 08g prereg").
 
     it('approving a swap: refused, the paid subject stays and nothing new waits', async () => {
       const f = await family('first-swap-approve');
@@ -318,20 +269,7 @@ describe('F0a: races', () => {
       expect((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'STUDENT_LEFT' and entity_id = $1`, [f.studentId])).n).toBe('1');
     });
 
-    it('A-12 turned off by two admins at once: one change, one audit row; each graduate registration expires once', async () => {
-      const adm2 = await admin('f0r2');
-      const g = await family('graduate-twice', 12);
-      await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: g.studentId }, json: { cohortYear: thisYear - 3, reason: 'graduated last June' } }));
-      await extend(g.studentId, nov);
-      const [reg] = await apiResponse(g.parent.api.v1.registrations.direct.$post({ json: { sessionId: nov, ...(await reservationOf(nov, [subj[4]!])), studentId: g.studentId } }));
-      const before = Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'SETTING_CHANGED' and entity_id = 'eligibility.graduateRetakes'`)).n);
-      const results = await Promise.all([adm, adm2].map((a) =>
-        a.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: false, reason: 'turned off twice' } })));
-      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-      expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'SETTING_CHANGED' and entity_id = 'eligibility.graduateRetakes'`)).n)).toBe(before + 1);
-      expect((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [reg!.id])).n).toBe('1');
-      await sql(`delete from school_setting where key = 'eligibility.graduateRetakes'`);
-    });
+    // 'A-12 turned off by two admins at once' retired with the setting (C7; trail row "retired 08g A-12 twice").
 
     it('two coordinators place one student in two sections at once: one open membership, the other ended', async () => {
       const year = (await apiResponse(coordinator.api.v1.academic.years.$get())).find((y) => y.startYear === thisYear)

@@ -9,7 +9,7 @@
  */
 
 import { db } from '@repo/db';
-import { getSetting } from './settings.services';
+import { cutOffsOf } from './window.services';
 import { academicYearForDate, getSchoolFeeStanding } from './school-fee.services';
 import { standingToday, type StudentStanding } from './eligibility.services';
 import { sectionOf } from './academic.services';
@@ -70,10 +70,11 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
     }),
   ]);
 
-  // A line on a provisional board fee is reserved, not payable, until the fee is confirmed
-  // (§3.4) — unless the school takes payment at that price; the checkout refuses it otherwise.
-  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
-  const payable = registrations.filter((r) => r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional));
+  // What can be paid now (mayPay, §6): a line whose prices are not final is reserved, not payable, until they are
+  // (E6); one past its cut-off is no longer payable (the sweep expires it).
+  const cutOffs = await cutOffsOf(db, registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id));
+  const now = new Date();
+  const payable = registrations.filter((r) => r.status === 'pending_payment' && !r.priceProvisional && !((cutOffs.get(r.id)?.cutOff ?? Infinity) <= now));
   const owing = payable.reduce((sum, r) => sum + r.priceAtRegistration, 0);
 
   // Receipts the family must physically bring back before a drop completes

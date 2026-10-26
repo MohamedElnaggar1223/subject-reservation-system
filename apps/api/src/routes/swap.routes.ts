@@ -37,6 +37,7 @@ import {
   ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
+import { codeOf } from '../lib/refusal';
 import {
   requireAuth,
   requireStudent,
@@ -82,7 +83,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
                        message.includes('Core subjects') ? 422 :
                        message.includes('closed') ? 422 :
                        message.includes('already') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -113,7 +114,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
         const status = message.includes('not found') ? 404 :
                        message.includes('Core subjects') ? 422 :
                        message.includes('already') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -141,7 +142,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 :
                        message.includes('Core subjects') || message.includes('closed') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -170,7 +171,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
                        message.includes('not linked') ? 403 :
                        message.includes('Core subjects') || message.includes('closed') ? 422 :
                        message.includes('already registered') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -189,7 +190,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
       try {
         return success(c, await deskDrop(c.req.valid('param').id, user.id, c.req.valid('json').reason, extractAuditContext(c)));
       } catch (err) {
-        return error(c, clientMessage(err, 'Failed to drop the line'), err instanceof DeskDropError ? err.status : 400);
+        return error(c, clientMessage(err, 'Failed to drop the line'), err instanceof DeskDropError ? err.status : 400, codeOf(err));
       }
     }
   );
@@ -284,7 +285,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
                        message.includes('closed') ||
                        message.includes('already processed') ||
                        message.includes('no longer') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -315,7 +316,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to reject change request');
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -344,7 +345,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to cancel change request');
         const status = message.includes('not found') ? 404 :
                        message.includes('only cancel your own') ? 403 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   );

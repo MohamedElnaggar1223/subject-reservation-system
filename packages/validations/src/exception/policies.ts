@@ -67,7 +67,7 @@ export type PolicyDefinition = {
   /** Where it is applied. */
   hook: string;
   /**
-   * `live`: applied. `gated`: off until a setting turns it on (deadline.boardEntry: Q-20).
+   * `live`: applied. `gated`: off until a setting turns it on (none since P1b removed deadline.boardEntry).
    * `pending`: registered but not yet read by its hook — refused at grant (see
    * docs/features/RESERVATIONS_MONEY.md "For the lead").
    */
@@ -77,22 +77,7 @@ export type PolicyDefinition = {
 const FINANCE = [ROLES.FINANCE_ADMIN, ROLES.ADMIN] as const;
 const ACADEMIC = [ROLES.ADMIN, ROLES.COORDINATOR] as const;
 
-const percentPolicy = (label: string, sentence: string): PolicyDefinition => ({
-  group: 'price', label, sentence, valueType: 'percent', min: 0, max: 100,
-  // A student's or a family's share (the design's pricing.* keys), narrowed to a session, a
-  // subject, an offer or an item — never one line: priceLine reads them when a line is priced
-  // and passes no line id, and a grant re-prices a line only for price.* (the review of step C, item 3).
-  scopes: ['session', 'subject', 'offer', 'item'], nullScope: 'every session',
-  // priceLine (step A, on main since b438976) reads them through the adapter in place of the
-  // settings' percents and records the ones it applied in the line's pricing basis.
-  oneShot: false, grantRoles: FINANCE, hook: 'priceLine', status: 'live',
-});
-
 export const POLICIES = {
-  'pricing.selfStudyCoursePercent': percentPolicy('Self-study share of the course fee', '{who} pays {value}% of the course fee on a self-study line, {scope}'),
-  'pricing.selfStudyBoardPercent': percentPolicy('Self-study share of the board fee', '{who} pays {value}% of the board fee on a self-study line, {scope}'),
-  'pricing.retakeTaughtCoursePercent': percentPolicy('Retake in school: share of the course fee', '{who} pays {value}% of the course fee on a retake taught in school, {scope}'),
-  'pricing.onePaperCoursePercent': percentPolicy('One-paper retake: share of its course fee', '{who} pays {value}% of a one-paper item\'s course fee, {scope}'),
   'price.discountPercent': {
     group: 'price', label: 'Discount (%)', sentence: '{who} pays {value}% less on {scope}',
     valueType: 'percent', min: 0, max: 100, scopes: ['session', 'subject', 'offer', 'item', 'line', 'charge'], nullScope: 'every line reserved from now on',
@@ -118,20 +103,18 @@ export const POLICIES = {
     valueType: 'date', scopes: ['offer', 'line'], nullScope: null,
     oneShot: false, grantRoles: FINANCE, hook: 'refundFor (the anchor)', status: 'live',
   },
-  'deadline.window': {
-    group: 'deadline', label: 'Session window extension', sentence: '{who} may still reserve and pay until {value}, {scope} (never past a board\'s entry deadline)',
-    valueType: 'date', scopes: ['session'], nullScope: 'every session',
-    oneShot: false, grantRoles: FINANCE, hook: 'sessionWindow', status: 'live',
+  // G4 (COORDINATOR_REWORK.md): a later reserve date for one student — overrides the session's, the subject's and the
+  // row's close, never a board's deadline (was deadline.window, "reserve and pay": payment no longer waits on the close).
+  'deadline.reserve': {
+    group: 'deadline', label: 'Later reserve date', sentence: '{who} may still reserve until {value}, {scope} (never past a board\'s deadline)',
+    valueType: 'date', scopes: ['session', 'subject'], nullScope: 'every session',
+    oneShot: false, grantRoles: FINANCE, hook: 'mayReserve', status: 'live',
   },
+  // G4: a later pay date for one student (the line's due date, so its cut-off follows; never past the board's deadline).
   'deadline.payment': {
-    group: 'deadline', label: 'Payment due date', sentence: '{who} owes {scope} by {value} (never past its deadline)',
+    group: 'deadline', label: 'Later pay date', sentence: '{who} owes {scope} by {value} (never past its board\'s deadline)',
     valueType: 'date', scopes: ['session', 'line', 'charge'], nullScope: null,
     oneShot: false, grantRoles: FINANCE, hook: 'dueDateFor', status: 'live',
-  },
-  'deadline.boardEntry': {
-    group: 'deadline', label: 'Late board entry', sentence: '{who} may still be entered in {scope} until {value}, the board\'s late fee charged',
-    valueType: 'date', scopes: ['boardSeries'], nullScope: null,
-    oneShot: false, grantRoles: [ROLES.ADMIN], hook: 'the entry deadline (off until the setting exceptions.boardEntryDeadline is on, Q-20)', status: 'gated',
   },
   'gate.schoolFee': {
     group: 'gate', label: 'School fee waiver', sentence: '{who} may reserve without paying the school fee, {scope}',
@@ -143,18 +126,8 @@ export const POLICIES = {
     valueType: 'none', scopes: ['offer', 'item'], nullScope: 'any subject',
     oneShot: true, grantRoles: FINANCE, hook: 'assertLineRules', status: 'live',
   },
-  'gate.availability': {
-    group: 'gate', label: 'An item not open to them', sentence: '{who} may reserve {scope} although it is not open to them (once)',
-    valueType: 'none', scopes: ['item'], nullScope: null,
-    oneShot: true, grantRoles: ACADEMIC, hook: 'assertLineRules', status: 'live',
-  },
-  'gate.requiredItems': {
-    group: 'gate', label: 'First entry without a required item', sentence: '{who} may make a first entry of {scope} without its required items (once)',
-    valueType: 'none', scopes: ['offer'], nullScope: null,
-    oneShot: true, grantRoles: ACADEMIC, hook: 'assertLineRules', status: 'live',
-  },
   'gate.priorSeries': {
-    group: 'gate', label: 'No prior sitting, or outside the carry-forward period', sentence: '{who} may reserve {scope} without a prior sitting in the carry-forward period (once)',
+    group: 'gate', label: 'An earlier exam not on the school\'s list', sentence: '{who} may reserve {scope} carrying an earlier exam that is not on the school\'s list for it, or naming none (once)',
     valueType: 'none', scopes: ['item'], nullScope: null,
     oneShot: true, grantRoles: ACADEMIC, hook: 'assertLineRules', status: 'live',
   },
@@ -168,13 +141,8 @@ export const POLICIES = {
     valueType: 'none', scopes: ['boardSeries'], nullScope: null,
     oneShot: true, grantRoles: ACADEMIC, hook: 'assertLineRules', status: 'live',
   },
-  'gate.grade10Core': {
-    group: 'gate', label: 'Grade 10 without a core subject', sentence: '{who} may reserve {scope} in grade 10 without every core subject',
-    valueType: 'none', scopes: ['session'], nullScope: null,
-    oneShot: false, grantRoles: ACADEMIC, hook: 'assertLineRules', status: 'live',
-  },
   'eligibility.grade10OtherSeries': {
-    group: 'eligibility', label: 'Grade 10: sit a series other than June', sentence: '{who} may sit {scope} in grade 10',
+    group: 'eligibility', label: 'Grade 10 where the session does not take it', sentence: '{who} may reserve {scope} in grade 10 although the session\'s grade list does not take grade 10',
     valueType: 'none', scopes: ['session'], nullScope: 'every series of their grade-10 year',
     oneShot: false, grantRoles: [ROLES.COORDINATOR, ROLES.ADMIN], hook: 'mayRegisterFor', status: 'live',
   },
@@ -215,8 +183,8 @@ export const LEGACY_TYPE_TO_POLICY = {
   discount_fixed: 'price.discountFixed',
   custom_price: 'price.custom',
   fee_waiver: 'gate.schoolFee',
-  deadline_extension: 'deadline.window',
-  late_registration: 'deadline.window',
+  deadline_extension: 'deadline.reserve',
+  late_registration: 'deadline.reserve',
   custom_refund_percent: 'refund.percent',
   grade10_other_series: 'eligibility.grade10OtherSeries',
 } as const satisfies Record<string, RegistryPolicyKey>;

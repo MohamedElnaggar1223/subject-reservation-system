@@ -46,46 +46,34 @@ describe('08r: the exceptions registry', () => {
   it('GET /policies: every policy with its sentence, value, scopes and grantors; what each caller may grant now', async () => {
     const forFinance = await apiResponse(finadmin.api.v1.policies.$get());
     const byKey = Object.fromEntries(forFinance.policies.map((p) => [p.key, p]));
+    // P1b (§9.2): the registry keeps price.*, a later reserve date and a later pay date; the pricing.* shares, the late
+    // board entry, availability, required items and the grade-10 core left; deadline.window is deadline.reserve.
     expect(Object.keys(byKey).sort()).toEqual([
-      'deadline.boardEntry', 'deadline.payment', 'deadline.window', 'eligibility.grade10OtherSeries', 'gate.availability', 'gate.exclusiveItems',
-      'gate.grade10Core', 'gate.priorSeries', 'gate.requiredItems', 'gate.sameEntryOnce', 'gate.schoolFee', 'gate.selfStudyFirstEntry',
-      'plan.instalments', 'price.custom', 'price.discountFixed', 'price.discountPercent', 'pricing.onePaperCoursePercent',
-      'pricing.retakeTaughtCoursePercent', 'pricing.selfStudyBoardPercent', 'pricing.selfStudyCoursePercent', 'refund.courseStart', 'refund.percent',
+      'deadline.payment', 'deadline.reserve', 'eligibility.grade10OtherSeries', 'gate.exclusiveItems',
+      'gate.priorSeries', 'gate.sameEntryOnce', 'gate.schoolFee', 'gate.selfStudyFirstEntry',
+      'plan.instalments', 'price.custom', 'price.discountFixed', 'price.discountPercent', 'refund.courseStart', 'refund.percent',
     ]);
     expect(byKey['price.discountPercent']).toMatchObject({ group: 'price', valueType: 'percent', min: 0, max: 100, grantable: true, oneShot: false, nullScope: 'every line reserved from now on' });
     expect(byKey['gate.selfStudyFirstEntry']).toMatchObject({ oneShot: true, grantable: true });
     expect(byKey['eligibility.grade10OtherSeries']).toMatchObject({ grantable: false, whyNot: 'not_your_role' });
-    // priceLine reads the four pricing policies since A's step is on main: live, granted by finance.
-    expect(byKey['pricing.selfStudyCoursePercent']).toMatchObject({ grantable: true, whyNot: null, status: 'live' });
+    expect(byKey['deadline.reserve']).toMatchObject({ grantable: true, whyNot: null, status: 'live', scopes: ['session', 'subject'] });
     expect(byKey['refund.courseStart']).toMatchObject({ nullScope: null, scopes: ['offer', 'line'] });
-    const forAdmin = Object.fromEntries((await apiResponse(adm.api.v1.policies.$get())).policies.map((p) => [p.key, p]));
-    expect(forAdmin['deadline.boardEntry']).toMatchObject({ grantable: false, whyNot: 'off_by_setting' });
     const forCoordinator = Object.fromEntries((await apiResponse(coordinator.api.v1.policies.$get())).policies.map((p) => [p.key, p]));
-    expect(forCoordinator['gate.availability']!.grantable).toBe(true);
+    expect(forCoordinator['gate.priorSeries']!.grantable).toBe(true);
     expect(forCoordinator['price.custom']!.grantable).toBe(false);
   });
 
-  it('a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; late entries only while their setting is on', async () => {
+  it('a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required', async () => {
     const f = await onboard(officer, 'xr-checks', 12);
     const grant = (who: Client, json: Parameters<typeof finadmin.api.v1.exceptions.$post>[0]['json']) => refused(who.api.v1.exceptions.$post({ json }));
     expect((await grant(coordinator, { policyKey: 'price.discountPercent', studentId: f.studentId, value: 10, reason: 'not the coordinator\'s' })).status).toBe(403);
     expect((await grant(finadmin, { policyKey: 'price.discountPercent', studentId: f.studentId, value: 150, reason: 'too much' })).error).toContain('0–100');
     expect((await grant(finadmin, { policyKey: 'gate.schoolFee', studentId: f.studentId, value: 5, reason: 'no value here' })).error).toContain('takes no value');
-    expect((await grant(finadmin, { policyKey: 'deadline.window', studentId: f.studentId, scope: { subjectId: subj.S1! }, value: day(10), reason: 'a subject cannot narrow it' })).error).toContain('cannot be narrowed by subject');
+    expect((await grant(finadmin, { policyKey: 'deadline.payment', studentId: f.studentId, scope: { subjectId: subj.S1! }, value: day(10), reason: 'a subject cannot narrow it' })).error).toContain('cannot be narrowed by subject');
     expect((await grant(finadmin, { policyKey: 'refund.courseStart', studentId: f.studentId, value: day(-3), reason: 'no scope' })).error).toContain('choose what it is for');
     expect((await grant(finadmin, { policyKey: 'plan.instalments', familyId: f.parent.id, value: [{ dueAt: inDays(3), amount: 100 }], scope: {}, reason: 'family plan' })).status).toBe(400);
-    const series = (await one<{ s: string }>(`select distinct i.board_series_id as s from session_offer_item i where i.session_id = $1`, [june])).s;
-    const late = { policyKey: 'deadline.boardEntry' as const, studentId: f.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'late entry (Q-20)' };
-    expect((await grant(adm, late)).error).toContain('hard stop');
-    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value: true, reason: 'trying a late entry' } }));
-    try {
-      expect((await grant(finadmin, late)).status).toBe(403);
-      const ok = await apiResponse(adm.api.v1.exceptions.$post({ json: late }));
-      expect(ok).toMatchObject({ policyKey: 'deadline.boardEntry', boardSeriesId: series });
-      await apiResponse(adm.api.v1.exceptions[':id'].revoke.$post({ param: { id: ok.id } }));
-    } finally {
-      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value: false, reason: 'back to the hard stop' } }));
-    }
+    // P1b: no late board entry (deadline.boardEntry is gone): an unknown key is refused.
+    expect((await grant(adm, { policyKey: 'deadline.boardEntry' as never, studentId: f.studentId, value: day(5), reason: 'late entry (Q-20)' })).status).toBe(400);
     // Who it is for: a student, or a family (a parent account) — never both, never another role.
     expect((await grant(finadmin, { policyKey: 'gate.schoolFee', studentId: f.studentId, familyId: f.parent.id, reason: 'both' })).status).toBe(400);
     expect((await grant(finadmin, { policyKey: 'gate.schoolFee', familyId: f.studentId, reason: 'a student is not a family' })).error).toContain('parent account');
@@ -219,8 +207,8 @@ describe('08r: the exceptions registry', () => {
       discount_fixed: ['price.discountFixed', 100, null, false],
       custom_price: ['price.custom', 1200, null, false],
       fee_waiver: ['gate.schoolFee', null, null, false],
-      deadline_extension: ['deadline.window', null, true, false],
-      late_registration: ['deadline.window', null, true, false],
+      deadline_extension: ['deadline.reserve', null, true, false],
+      late_registration: ['deadline.reserve', null, true, false],
       custom_refund_percent: ['refund.percent', 90, null, false],
       grade10_other_series: ['eligibility.grade10OtherSeries', null, null, false],
     });
@@ -289,47 +277,11 @@ describe('08r: the exceptions registry', () => {
 
   // ─── With A's step on main: the pricing policies, the window by subject, the late entry ─────
 
-  it("the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis", async () => {
-    const ss = await subject(adm, 'XR-SS', 'Self-study only (AS, registry)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', isOfferedAtSchool: false });
-    // A first entry in self-study on a subject not taught this cycle is the exception "self-study on a
-    // first entry" (the lead's decision of 16 Oct 2026, FEATURES_PLAN.md §6, 1): granted to the family
-    // before each line (a family's grant, so the student's own exceptions below stay theirs alone).
-    const reserve = async (studentId: string, familyId: string) => {
-      await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', familyId, reason: 'the subject is not taught this cycle' } }));
-      return (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, ...(await reservationOf(june, [ss])) } }))).registrations[0]!.id;
-    };
-    const lineOf = (id: string) => one<{ p: number; course: number; board: number; ids: string[]; cp: number; bp: number }>(
-      `select price_at_registration::float as p, course_fee_at_registration::float as course, registration_fee_at_registration::float as board,
-              pricing_basis->'exceptionIds' as ids, (pricing_basis->>'coursePercent')::float as cp, (pricing_basis->>'boardPercent')::float as bp
-       from registration where id = $1`, [id]);
-    // The settings' shares: 50% of the course fee, the board fee in full (A-16).
-    const plain = await onboard(officer, 'xr-ss-plain', 12);
-    const plainLine = await reserve(plain.studentId, plain.parent.id);
-    expect(await lineOf(plainLine)).toMatchObject({ p: 1000, course: 500, board: 500, cp: 50, bp: 100, ids: [] });
-    // Never one line (the review of step C, item 3): priceLine passes no line id and a grant
-    // re-prices a line only for price.* — a line-scoped share would be granted and applied nowhere.
-    for (const policyKey of ['pricing.selfStudyCoursePercent', 'pricing.selfStudyBoardPercent', 'pricing.retakeTaughtCoursePercent', 'pricing.onePaperCoursePercent'] as const) {
-      const lineOnly = await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey, studentId: plain.studentId, scope: { registrationId: plainLine }, value: 30, reason: 'one line only' } }));
-      expect(lineOnly).toMatchObject({ status: 400, error: expect.stringMatching(/ cannot be narrowed by line$/) });
-    }
-    expect(await sql(`select id from exception where student_id = $1`, [plain.studentId])).toEqual([]);
-    expect(await lineOf(plainLine)).toMatchObject({ p: 1000, cp: 50, ids: [] });
-    // One student: 30% of the course fee.
-    const f = await onboard(officer, 'xr-ss-student', 12);
-    const mine = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyCoursePercent', studentId: f.studentId, scope: { sessionId: june }, value: 30, reason: 'studies abroad, taught by the school online' } }));
-    expect(await lineOf(await reserve(f.studentId, f.parent.id))).toMatchObject({ p: 800, course: 300, board: 500, cp: 30, bp: 100, ids: [mine.id] });
-    // A family: 60% of the board fee, for each child.
-    const g = await onboard(officer, 'xr-ss-family', 12);
-    const sib = await apiResponse(officer.api.v1.links['desk-onboard'].$post({
-      json: { parent: { email: g.parent.email }, student: { email: 'student.xr-ss-family-sib@test.local', name: 'Student xr-ss-family-sib', password: 'TestPass1', grade: 12 } },
-    }));
-    const fam = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyBoardPercent', familyId: g.parent.id, value: 60, reason: 'two children sitting abroad' } }));
-    for (const s of [g.studentId, sib.student.id]) {
-      expect(await lineOf(await reserve(s, g.parent.id))).toMatchObject({ p: 800, course: 500, board: 300, cp: 50, bp: 60, ids: [fam.id] });
-    }
-  });
+  // 'the pricing policies through the registry: a student's self-study course share, a family's board share' retired
+  // with the pricing.* keys (§4; trail row "retired 08r pricing policies"): 30% of a course fee (800) and 60% of a board
+  // fee (800) no longer exist as exceptions; a price override (price.custom) remains.
 
-  it('a migrated subject-scoped window extension, once confirmed, opens the closed session for that subject alone', async () => {
+  it('a migrated subject-scoped window extension (a later reserve date), once confirmed, opens the closed session for that subject alone', async () => {
     const s = await session(adm, 'June (AS, registry window)', 'june', 'as_level', { ...openWindow(), activate: true });
     const w = await onboard(officer, 'xr-window', 12);
     const ext = (await one<{ id: string }>(
@@ -338,48 +290,19 @@ describe('08r: the exceptions registry', () => {
       [w.studentId, subj.S9!, finadmin.id])).id;
     await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'the window ended' } }));
     const reserve = async (subjectId: string) => officer.api.v1.registrations.desk.$post({ json: { studentId: w.studentId, sessionId: s, ...(await reservationOf(s, [subjectId])) } });
-    // Under "Check these", it applies to nothing: the closed window's own refusal.
-    const closed = 'Registration window is not open — a finance admin can grant this student a deadline extension';
-    expect(await refused(reserve(subj.S9!))).toEqual({ status: 422, error: closed });
+    // Under "Check these", it applies to nothing: the closed session's own refusal (P1b: NOT_ACCEPTING).
+    const closed = { status: 400, error: expect.stringMatching(/ is not taking reservations \(it closed on .+\)$/) };
+    expect(await refused(reserve(subj.S9!))).toEqual(closed);
     await apiResponse(finadmin.api.v1.exceptions[':id'].confirm.$post({ param: { id: ext }, json: { note: 'confirmed with the family' } }));
     // Confirmed: that subject, after the close; another subject still refused.
     const line = (await apiResponse(reserve(subj.S9!))).registrations[0]!.id;
     expect(await one(`select status, session_id as s from registration where id = $1`, [line])).toEqual({ status: 'pending_payment', s });
-    expect(await refused(reserve(subj.S10!))).toEqual({ status: 422, error: closed });
+    expect(await refused(reserve(subj.S10!))).toEqual(closed);
     // And paid at the desk, still under it.
     const paid = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: w.studentId, registrationIds: [line], instrumentUsed: 'cash' } }));
     expect(paid.collected).toBe(1500);
   });
 
-  it('a late board entry (Q-20) end to end through the registry: with the setting on, reserved, kept by the sweep and paid after the entry deadline; off, refused and no longer read', async () => {
-    const s = await session(adm, 'June (AS, registry late entry)', 'june', 'as_level', { ...openWindow(), activate: true });
-    const series = (await one<{ s: string }>(`select distinct i.board_series_id as s from session_offer_item i where i.session_id = $1`, [s])).s;
-    const h = await onboard(officer, 'xr-late', 12);
-    const k = await onboard(officer, 'xr-late-other', 12);
-    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [series]);
-    const reserve = async (studentId: string, subjectId: string, collect = false) => officer.api.v1.registrations.desk.$post({
-      json: { studentId, sessionId: s, ...(await reservationOf(s, [subjectId])), ...(collect ? { collectNow: { instrumentUsed: 'cash' as const, escrowAmountToApply: 0 } } : {}) },
-    });
-    const setting = (value: boolean) => apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value, reason: value ? 'a late entry this series' : 'back to the hard stop' } }));
-    await setting(true);
-    try {
-      await apiResponse(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: h.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'the board accepted a late entry' } }));
-      // Reserved and paid after the series' deadline; another student is still refused.
-      const paid = await apiResponse(reserve(h.studentId, subj.S11!, true));
-      expect(await one(`select status from registration where id = $1`, [paid.registrations[0]!.id])).toEqual({ status: 'confirmed' });
-      const pastEntry = /^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/;
-      expect(await refused(reserve(k.studentId, subj.S11!))).toMatchObject({ status: 422, error: expect.stringMatching(pastEntry) });
-      // An unpaid late line is kept by the deadline sweep until the late date.
-      const waiting = (await apiResponse(reserve(h.studentId, subj.S12!))).registrations[0]!.id;
-      await runPaymentDeadlines();
-      expect(await one(`select status from registration where id = $1`, [waiting])).toEqual({ status: 'pending_payment' });
-      await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: h.studentId, registrationIds: [waiting], instrumentUsed: 'cash' } }));
-    } finally {
-      await setting(false);
-    }
-    // Off: no new grant, and the one granted is no longer read.
-    expect(await refused(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: k.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'late' } })))
-      .toMatchObject({ status: 409, error: expect.stringContaining('Late board entries are off') });
-    expect(await refused(reserve(h.studentId, subj.S10!))).toMatchObject({ status: 422, error: expect.stringMatching(/^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/) });
-  });
+  // 'a late board entry (Q-20) end to end through the registry' retired with late entries (§9.1; trail row "retired
+  // 08r Q-20"). Past the board deadline nothing is reserved or paid: 08-money-rules and 08z-reserve-pay.
 });

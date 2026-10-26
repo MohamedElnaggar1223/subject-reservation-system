@@ -17,8 +17,8 @@
 
 import {
   db, registration, registrationConsent, registrationSession, refundWindow, boardSeries, sessionOffer, sessionOfferItem,
-  sessionOfferTeacher, sessionOfferItemTeacher, subject,
-  and, eq, inArray, sql, asc,
+  sessionOfferTeacher, sessionOfferItemTeacher, subject, sessionQuestion, registrationAnswer,
+  and, eq, or, isNull, inArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -29,9 +29,12 @@ import {
   type RefundPolicy,
   type RefundPolicySnapshot,
   type ReservationLineType,
+  type ReservationAnswersType,
   type SeriesMonth,
 } from '@repo/validations';
 import { insertLines, type InsertLinesInput } from './line.services';
+import { coded } from '../lib/refusal';
+import { LIVE_LINE_STATUSES as LIVE } from './setup/model';
 import { findOrCreateSeries, OfferError } from './offer.services';
 import { PRICE_CHANGED_REFUSAL, round2 } from './pricing.services';
 import { schoolMonthIndex } from './series.services';
@@ -51,12 +54,12 @@ export class ReservationError extends Error {
 export type DeclaredBy = 'family' | 'desk';
 export type ConsentChannel = 'app' | 'desk' | 'imported';
 
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'] as const;
-
 // ─── Known sittings ──────────────────────────────────────────────────────────
 
 type ItemFacts = {
   id: string; label: string; kind: string; sessionId: string; offerId: string; subjectId: string; subjectName: string;
+  /** D5: 'families' choose the teacher of an in-school option (required with several), 'school' assigns; D4: to be confirmed. */
+  teacherChoice: string; teacherTbc: boolean;
   subjectActive: boolean; entersKind: string; qualificationId: string | null; needsPriorSeries: boolean;
   seriesId: string | null; boardCode: string | null; month: string | null; year: number | null; boardName: string | null; units: string[];
   /** A `subject` item enters its subject row's own mapping (the catalogue's award, or its units). */
@@ -67,6 +70,7 @@ async function itemFacts(executor: Executor, itemIds: string[]): Promise<Map<str
   if (!itemIds.length) return new Map();
   const r = await executor.execute(sql`
     select i.id, i.label, i.kind, i.session_id as "sessionId", i.offer_id as "offerId", o.subject_id as "subjectId", s.name as "subjectName",
+      o.teacher_choice as "teacherChoice", o.teacher_tbc as "teacherTbc",
       s.is_active as "subjectActive", i.enters_kind as "entersKind", i.qualification_id as "qualificationId",
       i.needs_prior_series as "needsPriorSeries", i.board_series_id as "seriesId",
       coalesce(bs.board_code, s.council) as "boardCode", bs.month, bs.year, b.name as "boardName",
@@ -231,18 +235,55 @@ export async function resolveReservationLines(
       }
     }
 
-    // The teacher.
+    // The teacher (D5): families choose it, required, when an in-school option has several teachers (one is
+    // preselected on the page); where the school assigns, or the teacher is to be confirmed (D4), none is asked.
     let teacherId: string | null = null;
     if (l.mode === 'in_school') {
       if (l.teacherId) teacherId = l.teacherId;
       else {
         const pool = await teachersOf(tx, it.id, it.offerId);
-        teacherId = pool.length === 1 ? pool[0]! : null;
+        if (pool.length === 1) teacherId = pool[0]!;
+        else if (pool.length > 1 && it.teacherChoice === 'families' && !it.teacherTbc) {
+          throw coded(new ReservationError(`Choose the teacher of ${name}`), 'TEACHER_REQUIRED');
+        }
       }
     }
     out.push({ offerItemId: it.id, attempt: l.attempt, mode: l.mode, teacherId, priorSittingSeriesId: priorId, priorSittingSource: source });
   }
   return out;
+}
+
+// ─── Extra questions (D13) ───────────────────────────────────────────────────
+
+/**
+ * The answers a reservation gives to its extra questions (D13), in the caller's transaction: each must be a
+ * question of the session or of a subject these lines reserve, in its kind (yes/no: 'yes' or 'no'; a choice: one
+ * of its choices); every required one of those must be answered — now, or by an earlier reservation of the
+ * student. One answer per question and student: a later one replaces it. Never a price, never eligibility.
+ */
+async function writeAnswers(tx: Tx, a: { studentId: string; sessionId: string; itemIds: string[]; answers: ReservationAnswersType; answeredBy: string }) {
+  const offerIds = a.itemIds.length
+    ? (await tx.selectDistinct({ id: sessionOfferItem.offerId }).from(sessionOfferItem).where(inArray(sessionOfferItem.id, a.itemIds))).map((r) => r.id)
+    : [];
+  const asked = await tx.select().from(sessionQuestion).where(and(eq(sessionQuestion.sessionId, a.sessionId),
+    offerIds.length ? or(isNull(sessionQuestion.offeringId), inArray(sessionQuestion.offeringId, offerIds)) : isNull(sessionQuestion.offeringId)));
+  for (const ans of a.answers) {
+    const q = asked.find((x) => x.id === ans.questionId);
+    if (!q) throw new ReservationError('That question is not asked with these subjects');
+    if (q.kind === 'yes_no' && ans.value !== 'yes' && ans.value !== 'no') throw new ReservationError(`${q.prompt}: answer yes or no`);
+    if (q.kind === 'choice' && !q.choices.includes(ans.value)) throw new ReservationError(`${q.prompt}: choose one of ${q.choices.join(', ')}`);
+  }
+  const required = asked.filter((q) => q.required && !a.answers.some((x) => x.questionId === q.id));
+  if (required.length) {
+    const before = await tx.select({ questionId: registrationAnswer.questionId }).from(registrationAnswer)
+      .where(and(eq(registrationAnswer.studentId, a.studentId), inArray(registrationAnswer.questionId, required.map((q) => q.id))));
+    const missing = required.filter((q) => !before.some((b) => b.questionId === q.id));
+    if (missing.length) throw coded(new ReservationError(`Answer: ${missing.map((q) => q.prompt).join('; ')}`), 'ANSWER_REQUIRED');
+  }
+  for (const ans of a.answers) {
+    await tx.insert(registrationAnswer).values({ id: randomUUID(), questionId: ans.questionId, studentId: a.studentId, sessionId: a.sessionId, value: ans.value, answeredBy: a.answeredBy })
+      .onConflictDoUpdate({ target: [registrationAnswer.questionId, registrationAnswer.studentId], set: { value: ans.value, answeredBy: a.answeredBy, updatedAt: new Date() } });
+  }
 }
 
 // ─── Consent ─────────────────────────────────────────────────────────────────
@@ -357,6 +398,8 @@ export async function reserveLines(
     /** The consent rows' channel; null when the caller writes them (a swap inherits the dropped line's). */
     channel: ConsentChannel | null;
     eligibility: Eligibility;
+    /** D13: the answers to the session's and these subjects' extra questions. */
+    answers?: ReservationAnswersType;
   },
 ) {
   const held = await tx.select({ itemId: registration.offerItemId, label: sessionOfferItem.label, kind: sessionOfferItem.kind, subjectName: subject.name })
@@ -370,11 +413,12 @@ export async function reserveLines(
     throw new ReservationError(`Already reserved for this student in this session: ${held.map((h) => itemName({ kind: h.kind, subjectName: h.subjectName, label: h.label })).join(', ')}`, 409);
   }
   const lines = await resolveReservationLines(tx, { studentId: a.studentId, sessionId: a.sessionId, lines: a.lines, declaredBy: a.declaredBy, actorId: a.requestedBy });
-  const { declaredBy: _d, channel, lines: asked, ...rest } = a;
+  const { declaredBy: _d, channel, lines: asked, answers, ...rest } = a;
   const inserted = await insertLines(tx, { ...rest, lines });
+  await writeAnswers(tx, { studentId: a.studentId, sessionId: a.sessionId, itemIds: inserted.map((r) => r.offerItemId), answers: answers ?? [], answeredBy: a.requestedBy });
   const expected = new Map(asked.filter((l) => l.expectedPrice !== undefined).map((l) => [l.offerItemId, l.expectedPrice!]));
   if (inserted.some((r) => expected.has(r.offerItemId) && round2(expected.get(r.offerItemId)!) !== round2(r.priceAtRegistration))) {
-    throw new ReservationError(PRICE_CHANGED_REFUSAL, 409);
+    throw coded(new ReservationError(PRICE_CHANGED_REFUSAL, 409), 'PRICE_CHANGED');
   }
   if (channel) await writeConsents(tx, inserted.map((r) => r.id), { channel, confirmedBy: a.requestedBy });
   // A declared sitting the school's own results show is verified at once (F4; the review of

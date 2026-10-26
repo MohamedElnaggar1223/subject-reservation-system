@@ -45,6 +45,7 @@ import {
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
+import { codeOf } from '../lib/refusal';
 import {
   requireAuth,
   requireParent,
@@ -102,7 +103,7 @@ export const registrations = new Hono<HonoEnv>()
         return success(c, await mayRegisterFor(studentId, sessionId));
       } catch (err) {
         const message = clientMessage(err, 'Failed to check eligibility');
-        return error(c, message, message.includes('not found') ? 404 : 400);
+        return error(c, message, message.includes('not found') ? 404 : 400, codeOf(err));
       }
     }
   )
@@ -138,7 +139,7 @@ export const registrations = new Hono<HonoEnv>()
         return success(c, { ...offers, session: { ...offers.session, ...v2!.session }, offerings: v2!.offerings });
       } catch (err) {
         const message = clientMessage(err, 'Failed to load the offers');
-        return error(c, message, message.includes('not found') ? 404 : 400);
+        return error(c, message, message.includes('not found') ? 404 : 400, codeOf(err));
       }
     }
   )
@@ -160,7 +161,7 @@ export const registrations = new Hono<HonoEnv>()
         if (!offers) return error(c, 'Session not found', 404);
         return success(c, offers);
       } catch (err) {
-        return error(c, clientMessage(err, 'Failed to load the preview'), 400);
+        return error(c, clientMessage(err, 'Failed to load the preview'), 400, codeOf(err));
       }
     }
   )
@@ -315,7 +316,7 @@ export const registrations = new Hono<HonoEnv>()
                        message.includes('window is not open') ||
                        message.includes('already registered') ||
                        message.includes('core subjects') ? 422 : 400;
-        return error(c, message, statusOf(err, status));
+        return error(c, message, statusOf(err, status), codeOf(err));
       }
     }
   )
@@ -347,7 +348,7 @@ export const registrations = new Hono<HonoEnv>()
                        message.includes('window is not open') ||
                        message.includes('already registered') ||
                        message.includes('core subjects') ? 422 : 400;
-        return error(c, message, statusOf(err, status));
+        return error(c, message, statusOf(err, status), codeOf(err));
       }
     }
   )
@@ -379,7 +380,7 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to approve registrations');
         const status = message.includes('not authorized') ? 403 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -406,7 +407,7 @@ export const registrations = new Hono<HonoEnv>()
         const status =
           message.includes('already') || message.includes('Already') ? 409 :
           message.includes('not open') || isInsufficientBalance(err) ? 422 : 400;
-        return error(c, message, statusOf(err, status));
+        return error(c, message, statusOf(err, status), codeOf(err));
       }
     }
   )
@@ -432,7 +433,7 @@ export const registrations = new Hono<HonoEnv>()
         const status =
           message.includes('in progress') ? 409 :
           message.includes('not open') || isInsufficientBalance(err) ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -464,7 +465,7 @@ export const registrations = new Hono<HonoEnv>()
         const status =
           message.includes('not linked') ? 403 :
           message.includes('already') || message.includes('Already') ? 409 : 400;
-        return error(c, message, statusOf(err, status));
+        return error(c, message, statusOf(err, status), codeOf(err));
       }
     }
   )
@@ -492,7 +493,7 @@ export const registrations = new Hono<HonoEnv>()
           message.includes('not linked') ? 403 :
           message.includes('already opened') || message.includes('Only preregistered') ? 409 :
           message.includes('not found') ? 404 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -525,7 +526,7 @@ export const registrations = new Hono<HonoEnv>()
         const status = message.includes('not authorized') ? 403 :
                        message.includes('payment in progress') ||
                        message.includes('cannot be reverted') ? 409 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -558,7 +559,7 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to reject registrations');
         const status = message.includes('not authorized') ? 403 : 400;
-        return error(c, message, status);
+        return error(c, message, status, codeOf(err));
       }
     }
   )
@@ -595,7 +596,7 @@ export const registrations = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to override approval');
         const status = message.includes('window is not open') ||
                        message.includes('already registered') ? 422 : 400;
-        return error(c, message, statusOf(err, status));
+        return error(c, message, statusOf(err, status), codeOf(err));
       }
     }
   )

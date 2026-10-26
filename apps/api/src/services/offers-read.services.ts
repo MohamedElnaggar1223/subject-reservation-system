@@ -29,6 +29,8 @@ import { availabilityConstraints } from './offer.services';
 import { priceLine, PricingError } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { examSittingsOf, examKeysOf } from './reservation.services';
+import { studentRecordOf, knownSittingOf } from './known-sittings.services';
+import { getSetting } from './settings.services';
 import { lineExceptions, coversScope } from './line-exceptions';
 import { offeringsView } from './setup/offering.services';
 import { refundSentenceOf } from './setup/session-setup.services';
@@ -273,23 +275,16 @@ export async function familyOfferings(
     .where(and(eq(sessionQuestion.sessionId, sessionId), isNull(sessionQuestion.offeringId))).orderBy(asc(sessionQuestion.sortOrder));
   const session = {
     id: s.id, name: s.name, status: s.status, closesAt: s.endDate, paymentDueAt: s.paymentDueAt, pricesFinal: s.pricesFinal,
-    refundSentence: refundSentenceOf(s), declaration: DECLARATION_TEXT, selfStudyShare: s.selfStudyPercent,
+    // C8: the school-wide declaration (the admin's setting), snapshotted on each consent.
+    refundSentence: refundSentenceOf(s), declaration: await getSetting('reservation.declarationText'), selfStudyShare: s.selfStudyPercent,
     questions: sessionQs.map(({ id, kind, prompt, choices, required }) => ({ id, kind, prompt, choices, required })),
   };
   // C4: a draft is invisible to families.
   if (!preview && s.status === 'draft') return { session, offerings: [] };
   const all = await offeringsView(db, sessionId, preview && viewer.offeringId ? [viewer.offeringId] : undefined);
   const now = new Date();
-  // F2: what the student is known to have sat — confirmed lines of the subject in other sessions, and F4's results and sent entries.
-  const history = studentId ? await db.execute(sql`
-    select r.subject_id as "subjectId", r.board_series_id as "seriesId", i.reference_codes as codes, bs.month, bs.year,
-      s.qualification_id as "subjectQualificationId",
-      coalesce((select array_agg(su.unit_id) from subject_unit su where su.subject_id = s.id), '{}') as "subjectUnits"
-    from registration r join session_offer_item i on i.id = r.offer_item_id join subject s on s.id = r.subject_id
-    left join board_series bs on bs.id = r.board_series_id
-    where r.student_id = ${studentId} and r.session_id <> ${sessionId} and r.status = 'confirmed' and r.board_series_id is not null`)
-    .then((x) => x.rows as { subjectId: string; seriesId: string; codes: string[]; month: string; year: number; subjectQualificationId: string | null; subjectUnits: string[] }[]) : [];
-  const exams = studentId ? await examSittingsOf(studentId) : [];
+  // F2: what the student is known to have sat — the one rule the line rules refuse by (known-sittings.services).
+  const record = studentId ? await studentRecordOf(db, studentId, sessionId) : null;
   const priorIds = [...new Set(all.flatMap((o) => o.rows.flatMap((r) => r.allowedPriorSittings.map((p) => p.id))))];
   const priors = new Map((priorIds.length ? await db.select().from(boardSeries).where(inArray(boardSeries.id, priorIds)) : []).map((p) => [p.id, p]));
   const order = (m: string, y: number) => y * 12 + (MONTH_ORDER[m] ?? 0);
@@ -303,15 +298,9 @@ export async function familyOfferings(
     for (const r of o.rows) {
       const ticked = (Object.keys(r.cells) as (keyof typeof r.cells)[]).filter((k) => r.cells[k]);
       if (!ticked.length) continue;
-      const here = r.series ? order(r.series.month, r.series.year) : Infinity;
       // F2: the latest sitting on record of the subject before this row's, by the row's codes where both name them.
-      const known = studentId ? [
-        ...history.filter((h) => h.subjectId === o.subject.id && order(h.month, h.year) < here
-          && (!h.codes.length || !r.referenceCodes.length || h.codes.some((c) => r.referenceCodes.includes(c))))
-          .map((h) => ({ id: h.seriesId, month: h.month, year: h.year })),
-        ...exams.filter((e) => subj?.qualificationId && e.key === `q:${subj.qualificationId}` && order(e.month, e.year) < here)
-          .map((e) => ({ id: e.seriesId, month: e.month, year: e.year })),
-      ].sort((a, b) => order(b.month, b.year) - order(a.month, a.year))[0] ?? null
+      const known = record
+        ? knownSittingOf(record, { subjectId: o.subject.id, subjectQualificationId: subj?.qualificationId ?? null, referenceCodes: r.referenceCodes, month: r.series?.month ?? null, year: r.series?.year ?? null })
         : viewer && 'preview' in viewer && viewer.preview === 'retaker'
           ? (() => { const p = r.allowedPriorSittings[0]; return p ? { id: p.id, month: p.month, year: p.year } : { id: null, month: 'june', year: (r.series?.year ?? s.seriesYear) - 1 }; })()
           : null;
@@ -322,8 +311,9 @@ export async function familyOfferings(
       for (const cell of ticked) {
         const attempt = cell === 'firstInSchool' || cell === 'firstSelfStudy' ? 'first' as const : 'retake' as const;
         const mode = cell === 'firstInSchool' || cell === 'retakeInSchool' ? 'in_school' as const : 'self_study' as const;
-        // F2: a student known to have sat it sees the retake options only.
-        if (known && attempt === 'first') continue;
+        // F2: a student known to have sat it sees the retake options only (a row that carries an earlier exam
+        // forward, the A.2., is its own entry: the line rules take its first entry too).
+        if (known && attempt === 'first' && !r.needsCarriedFrom) continue;
         let price: { total: number; examFee: number; courseFee: number } | null = null;
         try {
           const p = studentId

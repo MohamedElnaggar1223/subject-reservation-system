@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { ReservationLines, ReservationConsent } from './reservation.validations';
+import { ReservationLines, ReservationConsent, ReservationAnswers } from './reservation.validations';
 
 // ─── Status Enum ────────────────────────────────────────────────────────────
 
@@ -55,6 +55,8 @@ export type RegistrationIdType = z.infer<typeof RegistrationId>;
 export const RequestRegistration = z.object({
   sessionId: z.string().min(1, 'Invalid session ID'),
   lines: ReservationLines,
+  // D13: the extra questions' answers (none asked: none sent).
+  answers: ReservationAnswers.default([]),
   consent: ReservationConsent,
 });
 export type RequestRegistrationType = z.infer<typeof RequestRegistration>;
@@ -70,6 +72,8 @@ export const DirectRegistration = z.object({
   sessionId: z.string().min(1, 'Invalid session ID'),
   studentId: z.string().min(1, 'Invalid student ID'),
   lines: ReservationLines,
+  // D13: the extra questions' answers (none asked: none sent).
+  answers: ReservationAnswers.default([]),
   consent: ReservationConsent,
 });
 export type DirectRegistrationType = z.infer<typeof DirectRegistration>;

@@ -1,25 +1,46 @@
 /**
- * The rules on a line (RESERVATIONS_REWORK.md §3.5's table; docs/features/RESERVATIONS.md §2.5).
+ * The rules on a line — v2, the coordinator rework (COORDINATOR_REWORK.md §6 "May reserve", D3, D6–D8, F2;
+ * §9.2's line-rules row).
  *
- * `assertLineRules` is asked by every path that puts a line into a series — the reservation
- * paths, an item's series change, the grade-10 bulk commit, the day-one import, preregistration —
- * inside its transaction, after the student lock (assertMayRegisterForInTx). Each rule is a
- * policy with a key; before refusing, it asks the exception adapter for an active exception of
- * that key covering the line (one-shot gates are locked FOR UPDATE and returned to be marked
- * used in the same transaction). The school-fee gate and the session window stay where they are
- * (schoolFeeGateReason, sessionWindow).
+ * `assertLineRules` is asked by every path that puts a line into a row — the reservation paths through
+ * insertLines, the day-one import, a move (`recheck`) — inside its transaction, after the student lock
+ * (assertMayRegisterForInTx, which judges the session's grade list, D11). For a new line:
+ *
+ *   - may reserve (window.services mayReserveRow): the session open, the subject accepting and not past its
+ *     close, the row not past its close — or a G4 later reserve date — and never past its board deadline;
+ *     a date refusal names the policy key G4's exception lifts (`deadline.reserve`);
+ *   - the option's cell ticked on the row (D3): what the row offers is the cells, nothing else (no exception, G4),
+ *     save a first entry in self study, which the student's exception "self-study on a first entry" still lets
+ *     through (decision 1 of 16 Oct 2026); a one-paper row is a retake (its cells never offer a first entry);
+ *   - F2: a student the system knows has sat the subject reserves a retake, not a first entry;
+ *   - the earlier exam a row carries from (D6): where the row asks it (an A.2., a one-paper retake where the board
+ *     asks), it is named and is one of her list for the row; her list wins over the board's carry-forward months
+ *     (an older exam is a warning on her screen, never a refusal here); elsewhere a retake may name none;
+ *   - D8: one line per exclusive group of a subject in the session (all papers and the one-paper rows, A.S./A.2./A.L.,
+ *     the qualifications), units freely;
+ *   - the same entry once (`gate.sameEntryOnce`, kept on): one live line per (row code, sitting) for the student.
+ *
+ * Required items, today's availability and the grade-10 core left with the old model. Each gate is a policy
+ * with a key; before refusing it asks the exception adapter for an active exception of that key covering the
+ * line (one-shot gates are locked FOR UPDATE and returned to be marked used in the same transaction).
  */
 
 import { db, sql } from '@repo/db';
 import { type Eligibility, type LinePolicyKey } from '@repo/validations';
 import { lineExceptions, type ExceptionScope } from './line-exceptions';
-import { availabilityConstraints } from './offer.services';
 import { schoolMonthIndex } from './series.services';
+import { mayReserveRow } from './window.services';
+import type { RefusalCode } from '../lib/refusal';
+import { studentRecordOf, knownSittingOf, type StudentRecord } from './known-sittings.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class LineRuleError extends Error {
-  constructor(message: string, public readonly policyKey: LinePolicyKey, public readonly status: 400 | 409 = 400) {
+  /**
+   * `policyKey`: the exception that could lift it, or null for a rule nothing lifts. `refusalCode`: the rule's
+   * machine-readable code (decision 2 of the P1b review), passed by the routes with the sentence.
+   */
+  constructor(message: string, public readonly policyKey: LinePolicyKey | null, public readonly status: 400 | 409 = 400, public readonly refusalCode?: RefusalCode) {
     super(message);
   }
 }
@@ -34,20 +55,20 @@ export type RuleLine = {
 
 type ItemRow = {
   id: string; offer_id: string; session_id: string; label: string; kind: string; enters_kind: string;
-  qualification_id: string | null; board_series_id: string | null; availability: string; needs_prior_series: boolean;
-  required_in_series: boolean; exclusive_group: string | null;
-  offer_availability: string; grade10_core: boolean; subject_id: string; subject_name: string;
+  qualification_id: string | null; board_series_id: string | null; needs_prior_series: boolean; exclusive_group: string | null;
+  first_in_school: boolean; retake_in_school: boolean; retake_self_study: boolean; first_self_study: boolean;
+  allowed_prior_series_ids: string[]; subject_id: string; subject_name: string; subject_qualification_id: string | null;
   board_code: string | null; month: string | null; year: number | null; series_label: string | null; board_name: string | null;
-  carry_forward_months: number | null; reference_codes: string[];
+  reference_codes: string[];
 };
 
 async function loadItems(tx: Tx, ids: string[]): Promise<Map<string, ItemRow & { units: string[] }>> {
   if (!ids.length) return new Map();
   const r = await tx.execute(sql`
-    select i.id, i.offer_id, i.session_id, i.label, i.kind, i.enters_kind, i.qualification_id, i.board_series_id, i.availability,
-      i.needs_prior_series, i.required_in_series, i.exclusive_group, i.reference_codes,
-      o.availability as offer_availability, o.grade10_core, o.subject_id, s.name as subject_name,
-      bs.board_code, bs.month, bs.year, bs.label as series_label, b.name as board_name, b.carry_forward_months,
+    select i.id, i.offer_id, i.session_id, i.label, i.kind, i.enters_kind, i.qualification_id, i.board_series_id,
+      i.needs_prior_series, i.exclusive_group, i.reference_codes, i.first_in_school, i.retake_in_school, i.retake_self_study,
+      i.first_self_study, i.allowed_prior_series_ids, o.subject_id, s.name as subject_name, s.qualification_id as subject_qualification_id,
+      bs.board_code, bs.month, bs.year, bs.label as series_label, b.name as board_name,
       coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units
     from session_offer_item i
     join session_offer o on o.id = i.offer_id
@@ -55,7 +76,7 @@ async function loadItems(tx: Tx, ids: string[]): Promise<Map<string, ItemRow & {
     left join board_series bs on bs.id = i.board_series_id
     left join exam_board b on b.code = bs.board_code
     where i.id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`);
-  return new Map((r.rows as (ItemRow & { units: string[] })[]).map((x) => [x.id, x]));
+  return new Map((r.rows as (ItemRow & { units: string[] })[]).map((x) => [x.id, { ...x, year: x.year === null ? null : Number(x.year) }]));
 }
 
 /**
@@ -72,6 +93,16 @@ function entryKeys(i: { enters_kind: string; qualification_id: string | null; su
 }
 
 const seriesName = (i: ItemRow) => (i.board_name && i.month ? `${i.board_name} ${i.month.charAt(0).toUpperCase()}${i.month.slice(1)} ${i.year}${i.series_label ? ` (${i.series_label})` : ''}` : 'its series');
+const nameOf = (i: { kind: string; subject_name: string; label: string }) => (i.kind === 'all_papers' ? i.subject_name : `${i.subject_name} — ${i.label}`);
+const sittingWords = (month: string, year: number) => `${month.charAt(0).toUpperCase()}${month.slice(1)} ${year}`;
+
+/** The cell (D3) an option is: how it is studied, first entry or retake. */
+export function cellOf(attempt: 'first' | 'retake', mode: 'in_school' | 'self_study') {
+  return attempt === 'first'
+    ? (mode === 'in_school' ? 'first_in_school' as const : 'first_self_study' as const)
+    : (mode === 'in_school' ? 'retake_in_school' as const : 'retake_self_study' as const);
+}
+const OPTION_WORDS = { first_in_school: 'a first entry in school', first_self_study: 'a first entry in self study', retake_in_school: 'a retake in school', retake_self_study: 'a retake in self study' } as const;
 
 /**
  * Check the lines a path is about to create for one student in one session, against each other
@@ -88,9 +119,9 @@ export async function assertLineRules(
      */
     excludeLineIds?: string[];
     /**
-     * Check again only what a move can change — the carry-forward period, the same entry once in
-     * the series, the required items there. What governs a new line (availability, self-study,
-     * a declared retake, exclusive groups, the grade-10 core) was asked when it was made.
+     * Check again only what a move can change — the same entry once in the sitting, and an earlier exam of
+     * its own board before it. What governs a new line (may reserve, the cells, F2, her list, D8) was asked
+     * when it was made.
      */
     recheck?: boolean;
     /**
@@ -99,80 +130,98 @@ export async function assertLineRules(
      * path that makes a line leaves it true (one-shot gates are locked and marked used).
      */
     lockExceptions?: boolean;
+    /** The moment the lines are made (insertLines' `now`). */
+    now?: Date;
   } = {},
 ): Promise<{ usedExceptionIds: string[] }> {
   const used: string[] = [];
   const recheck = !!opts.recheck;
+  const now = opts.now ?? new Date();
   const excluded = new Set(opts.excludeLineIds ?? []);
   const items = await loadItems(tx, [...new Set(lines.map((l) => l.offerItemId))]);
   for (const l of lines) {
     const it = items.get(l.offerItemId);
-    if (!it || it.session_id !== ctx.sessionId) throw new LineRuleError('That item is not on offer in this session', 'gate.availability');
+    if (!it || it.session_id !== ctx.sessionId) throw new LineRuleError('That item is not on offer in this session', null);
   }
   /** Refuse unless an exception of `key` covers the line; a one-shot one is used. */
-  const gate = async (key: LinePolicyKey, scope: ExceptionScope, message: string, status: 400 | 409 = 400) => {
+  const gate = async (key: LinePolicyKey, scope: ExceptionScope, message: string, code: RefusalCode, status: 400 | 409 = 400) => {
     const exc = await lineExceptions.active(tx, ctx.studentId, [key], scope, opts.lockExceptions === false ? undefined : { lock: 'update' });
     const e = exc.find((x) => !used.includes(x.id));
-    if (!e) throw new LineRuleError(message, key, status);
+    if (!e) throw new LineRuleError(message, key, status, code);
     if (e.oneShot) used.push(e.id);
   };
   const scopeOf = (it: ItemRow) => ({ sessionId: ctx.sessionId, subjectId: it.subject_id, offerId: it.offer_id, offerItemId: it.id, ...(it.board_series_id ? { boardSeriesId: it.board_series_id } : {}) });
+  let record: StudentRecord | null = null;
 
-  // Per line: availability, self-study first entry, a retake's prior sitting, the carry-forward period.
   for (const l of lines) {
     const it = items.get(l.offerItemId)!;
-    const c = availabilityConstraints(it.offer_availability, it.availability);
-    const name = it.kind === 'all_papers' ? it.subject_name : `${it.subject_name} — ${it.label}`;
-    if (recheck) {
-      // Only the carry-forward period below.
-    } else if (c.closed) await gate('gate.availability', scopeOf(it), `${name} is closed in this session`);
-    else if (c.retakeOnly && l.attempt !== 'retake') await gate('gate.availability', scopeOf(it), `${name} takes retakes only this cycle`);
-    else if (c.selfStudyOnly && l.mode !== 'self_study') await gate('gate.availability', scopeOf(it), `${name} is self-study only: the school does not teach it this cycle`);
-    // "One paper ONLY" is always a retake (the lead's decision of 11 Oct 2026, F6a): a one-paper
-    // item takes no first entry, whatever its availability. A rule, not a gate: no exception lifts it.
-    if (!recheck && it.kind === 'paper' && l.attempt === 'first') {
-      throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, 'gate.availability');
-    }
-    if (!recheck && l.mode === 'self_study' && l.attempt === 'first') {
-      if (c.selfStudyOnly && !it.needs_prior_series) {
-        // The forms' rule, "Self Study 50% … ONLY 2nd entry", on a subject the links sheet gives as "Retake
-        // (Self Study ONLY)" and on a unit or route marked self study only alike (the IAL forms say it per
-        // unit): no first entry in self-study but by the student's exception "self-study on a first entry"
-        // (the lead's decisions of 16 Oct 2026, FEATURES_PLAN.md §6, 1: G-09's allowance for the untaught
-        // subject is gone). The one exception is an item that carries an earlier sitting forward (the
-        // Physics form's "A.2. (Self Study 50% fees …)", its own entry after the AS): it takes one.
-        await gate('gate.selfStudyFirstEntry', scopeOf(it), `${name} is self study on a second entry only: name the earlier sitting, or ask for the exception`);
-      } else if (!c.selfStudyOnly) {
-        // The forms' "Self Study … (ONLY 2nd entry)" (G-09) on what the school teaches; the old sentence kept.
-        await gate('gate.selfStudyFirstEntry', scopeOf(it), 'Subjects can only be taken outside school when retaking or when the school does not offer them');
+    const name = nameOf(it);
+    if (!recheck) {
+      // May reserve (§6): her dates (or a G4 later reserve date), never the board's deadline.
+      const may = await mayReserveRow(tx, { studentId: ctx.studentId, offerItemId: it.id, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId }, now);
+      if (!may.allowed) throw new LineRuleError(may.message, may.code === 'NOT_ACCEPTING' ? 'deadline.reserve' : null, may.code === 'NOT_FOUND' ? 400 : 409, may.code === 'NOT_FOUND' ? undefined : may.code);
+      // The cells (D3): what the row offers.
+      const cell = cellOf(l.attempt, l.mode);
+      if (!it[cell]) {
+        const offersAny = it.first_in_school || it.retake_in_school || it.retake_self_study || it.first_self_study;
+        if (it.kind === 'paper' && l.attempt === 'first') {
+          // "One paper ONLY" is always a retake (F6a; the database refuses a first-entry cell on it).
+          throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, null, 400, 'ONE_PAPER_IS_RETAKE');
+        }
+        if (cell === 'first_self_study' && offersAny) {
+          // Decision 1 of 16 Oct 2026 ("Self Study … ONLY 2nd entry"): a first entry in self study where her
+          // cells do not offer one is the student's exception, used once.
+          await gate('gate.selfStudyFirstEntry', scopeOf(it), it.first_in_school
+            ? 'Subjects can only be taken outside school when retaking or when the school does not offer them'
+            : `${name} is self study on a second entry only: name the earlier sitting, or ask for the exception`, 'SELF_STUDY_SECOND_ENTRY_ONLY');
+        } else {
+          throw new LineRuleError(offersAny ? `${name} is not offered as ${OPTION_WORDS[cell]}` : `${name} is not offered in this session`, null, 400, 'OPTION_NOT_OFFERED');
+        }
       }
-    }
-    if (!recheck && l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
-      throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared');
-    }
-    if (it.needs_prior_series) {
-      if (!l.priorSittingSeriesId) {
-        await gate('gate.priorSeries', scopeOf(it), `${name} carries an earlier sitting forward: name the series it is carried from`);
-      } else {
-        const p = await tx.execute(sql`select bs.board_code, bs.month, bs.year from board_series bs where bs.id = ${l.priorSittingSeriesId}`);
-        const prior = p.rows[0] as { board_code: string; month: string; year: number } | undefined;
-        if (!prior || !it.month || !it.year) throw new LineRuleError('The sitting carried from was not found', 'gate.priorSeries');
-        const here = it.year * 12 + schoolMonthIndex(it.month);
-        const then = prior.year * 12 + schoolMonthIndex(prior.month);
-        const priorName = `${prior.month.charAt(0).toUpperCase()}${prior.month.slice(1)} ${prior.year}`;
-        if (prior.board_code !== it.board_code) {
-          await gate('gate.priorSeries', scopeOf(it), `${name} carries a sitting of its own board forward; ${priorName} was another board's`);
-        } else if (then >= here) {
-          await gate('gate.priorSeries', scopeOf(it), `${priorName} is not before ${seriesName(it)}: a carried sitting comes first`);
-        } else if (it.carry_forward_months && here - then > it.carry_forward_months) {
-          await gate('gate.priorSeries', scopeOf(it),
-            `${priorName} is outside ${it.board_name}'s carry-forward period (${it.carry_forward_months} months) for ${seriesName(it)}: it cannot be carried forward`);
+      // F2: a student known to have sat the subject reserves a retake.
+      if (l.attempt === 'first') {
+        record ??= await studentRecordOf(tx, ctx.studentId, ctx.sessionId);
+        const known = knownSittingOf(record, { subjectId: it.subject_id, subjectQualificationId: it.subject_qualification_id, referenceCodes: it.reference_codes, month: it.month, year: it.year });
+        if (known && !it.needs_prior_series) {
+          throw new LineRuleError(`${name} was sat before (${sittingWords(known.month, known.year)}): reserve it as a retake`, null, 409, 'RETAKE_ONLY');
         }
       }
     }
+    // A retake names the sitting it follows (kept from v1; a legacy line's history is its sitting).
+    if (!recheck && l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
+      throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared', 400, 'RETAKE_SITTING_REQUIRED');
+    }
+    // The earlier exam it carries from (D6).
+    if (!l.priorSittingSeriesId) {
+      if (it.needs_prior_series && !recheck) {
+        await gate('gate.priorSeries', scopeOf(it), `${name} carries an earlier exam forward: name the one it is carried from`, 'CARRIED_FROM_REQUIRED');
+      }
+      continue;
+    }
+    const p = await tx.execute(sql`select bs.board_code, bs.month, bs.year from board_series bs where bs.id = ${l.priorSittingSeriesId}`);
+    const prior = p.rows[0] as { board_code: string; month: string; year: number } | undefined;
+    if (!prior) throw new LineRuleError('The earlier exam named was not found', 'gate.priorSeries');
+    const priorName = sittingWords(prior.month, Number(prior.year));
+    if (!recheck && it.needs_prior_series && it.allowed_prior_series_ids.length) {
+      // Her list for the row (D6): it wins over the board's carry-forward months either way.
+      if (!it.allowed_prior_series_ids.includes(l.priorSittingSeriesId)) {
+        await gate('gate.priorSeries', scopeOf(it), `${priorName} is not one of the earlier exams ${name} is carried from`, 'CARRIED_FROM_NOT_ALLOWED');
+      }
+      continue;
+    }
+    // A row with no list of its own (a row made before the rework, or one whose board does not ask): an exam of
+    // its own board, before this one.
+    if (!it.month || !it.year) continue;
+    const here = it.year * 12 + schoolMonthIndex(it.month);
+    const then = Number(prior.year) * 12 + schoolMonthIndex(prior.month);
+    if (prior.board_code !== it.board_code) {
+      await gate('gate.priorSeries', scopeOf(it), `${name} carries an exam of its own board forward; ${priorName} was another board's`, 'CARRIED_FROM_NOT_ALLOWED');
+    } else if (then >= here) {
+      await gate('gate.priorSeries', scopeOf(it), `${priorName} is not before ${seriesName(it)}: a carried exam comes first`, 'CARRIED_FROM_NOT_ALLOWED');
+    }
   }
 
-  // The student's live lines, every session: exclusive groups, the same entry once, required items, core.
+  // The student's live lines, every session: exclusive groups and the same entry once.
   const r = await tx.execute(sql`
     select r.id, r.session_id, r.offer_item_id, r.board_series_id, i.offer_id, i.exclusive_group, i.enters_kind, i.qualification_id, i.kind,
       i.label, i.reference_codes, o.subject_id, s.name as subject_name, rs.name as session_name,
@@ -188,69 +237,36 @@ export async function assertLineRules(
     enters_kind: string; qualification_id: string | null; kind: string; label: string; reference_codes: string[]; subject_id: string; subject_name: string; session_name: string; units: string[];
   }[];
 
-  // Exclusive groups: one live line per group per offer, in this session.
+  // D8: one live line per exclusive group per subject, in this session.
   const groups = new Map<string, string[]>();
   for (const e of existing.filter((x) => x.session_id === ctx.sessionId && x.exclusive_group)) {
     const k = `${e.offer_id}|${e.exclusive_group}`;
-    groups.set(k, [...(groups.get(k) ?? []), e.kind === 'all_papers' ? e.subject_name : `${e.subject_name} — ${e.label}`]);
+    groups.set(k, [...(groups.get(k) ?? []), nameOf(e)]);
   }
   for (const l of recheck ? [] : lines) {
     const it = items.get(l.offerItemId)!;
     if (!it.exclusive_group) continue;
     const k = `${it.offer_id}|${it.exclusive_group}`;
     const here = groups.get(k) ?? [];
-    const name = it.kind === 'all_papers' ? it.subject_name : `${it.subject_name} — ${it.label}`;
-    if (here.length) await gate('gate.exclusiveItems', scopeOf(it), `${name} and ${here.join(', ')} cannot be reserved together`, 409);
+    const name = nameOf(it);
+    if (here.length) await gate('gate.exclusiveItems', scopeOf(it), `${name} and ${here.join(', ')} cannot be reserved together`, 'EXCLUSIVE_OPTIONS', 409);
     groups.set(k, [...here, name]);
   }
 
-  // The same unit or award once per student in one board series, across sessions.
+  // The same entry once per student in one sitting (row code, sitting), across sessions.
   const taken = existing
     .filter((e) => e.board_series_id)
-    .map((e) => ({ series: e.board_series_id!, keys: entryKeys(e), where: e.session_name, name: e.kind === 'all_papers' ? e.subject_name : `${e.subject_name} — ${e.label}` }));
+    .map((e) => ({ series: e.board_series_id!, keys: entryKeys(e), where: e.session_name, name: nameOf(e) }));
   for (const l of lines) {
     const it = items.get(l.offerItemId)!;
     if (!it.board_series_id) continue;
     const keys = entryKeys(it);
     const clash = taken.find((t) => t.series === it.board_series_id && t.keys.some((k) => keys.includes(k)));
-    const name = it.kind === 'all_papers' ? it.subject_name : `${it.subject_name} — ${it.label}`;
+    const name = nameOf(it);
     if (clash) {
-      await gate('gate.sameEntryOnce', scopeOf(it), `${name} is already reserved in ${seriesName(it)} (${clash.name}, ${clash.where}): the board takes one entry`, 409);
+      await gate('gate.sameEntryOnce', scopeOf(it), `${name} is already reserved in ${seriesName(it)} (${clash.name}, ${clash.where}): the board takes one entry`, 'SAME_ENTRY_ONCE', 409);
     }
     taken.push({ series: it.board_series_id, keys, where: 'this reservation', name });
-  }
-
-  // Required items: a first entry of a subject in a series includes the items it requires there.
-  const firstOffers = new Map<string, ItemRow>();
-  for (const l of lines) {
-    const it = items.get(l.offerItemId)!;
-    if (l.attempt === 'first' && it.board_series_id) firstOffers.set(`${it.offer_id}|${it.board_series_id}`, it);
-  }
-  for (const [key, it] of firstOffers) {
-    const [offerId, seriesId] = key.split('|') as [string, string];
-    const req = await tx.execute(sql`
-      select i.id, i.label from session_offer_item i
-      where i.offer_id = ${offerId} and i.board_series_id = ${seriesId} and i.required_in_series and i.availability <> 'closed'`);
-    const have = new Set([...existing.map((e) => e.offer_item_id), ...lines.map((x) => x.offerItemId)]);
-    const missing = (req.rows as { id: string; label: string }[]).filter((x) => !have.has(x.id));
-    if (missing.length) {
-      await gate('gate.requiredItems', scopeOf(it), `A first entry of ${it.subject_name} in ${seriesName(it)} includes ${missing.map((m) => m.label).join(', ')}`);
-    }
-  }
-
-  // Grade 10 in June registers every core offer of the session (A-05).
-  if (!recheck && ctx.eligibility.grade === 10 && ctx.eligibility.series.sessionType === 'june') {
-    const core = await tx.execute(sql`
-      select o.id, s.name from session_offer o join subject s on s.id = o.subject_id
-      where o.session_id = ${ctx.sessionId} and o.grade10_core and o.availability <> 'closed' order by s.name`);
-    const haveOffers = new Set([
-      ...existing.filter((e) => e.session_id === ctx.sessionId).map((e) => e.offer_id),
-      ...lines.map((x) => items.get(x.offerItemId)!.offer_id),
-    ]);
-    const missing = (core.rows as { id: string; name: string }[]).filter((c) => !haveOffers.has(c.id));
-    if (missing.length) {
-      await gate('gate.grade10Core', { sessionId: ctx.sessionId }, `Grade 10 June session requires all core subjects. Missing: ${missing.map((m) => m.name).join(', ')}`);
-    }
   }
   return { usedExceptionIds: used };
 }

@@ -754,6 +754,10 @@ export const boardSeries = pgTable(
     // reference data and whether they are confirmed against the board's published key dates.
     datesSource: text("dates_source"),
     datesConfirmed: boolean("dates_confirmed").notNull().default(false),
+    // Which of its deadlines the admin entered from the check list (C6): 'entry', 'retake'. The reference
+    // loader keeps those (warning when the file disagrees) and fills or replaces the others from the file,
+    // so a date the file itself filled is never frozen as the admin's (P1b fix 3).
+    adminDeadlines: text("admin_deadlines").array().notNull().default(sql`'{}'::text[]`),
     // The levels the board sits in this month (the reference data's `levels`: 'igcse' | 'as_al'). Pearson
     // sits International A Levels in October and International GCSEs in November; the school calls both
     // "November", so a winter row's "November" resolves to the autumn sitting of its subject's level.
@@ -770,6 +774,7 @@ export const boardSeries = pgTable(
     check("board_series_month_valid", sql`${table.month} IN ('january', 'june', 'october', 'november')`),
     check("board_series_year_range", sql`${table.year} BETWEEN 2000 AND 2100`),
     check("board_series_exams_ordered", sql`${table.examsStart} IS NULL OR ${table.examsEnd} IS NULL OR ${table.examsEnd} >= ${table.examsStart}`),
+    check("board_series_admin_deadlines_valid", sql`${table.adminDeadlines} <@ ARRAY['entry', 'retake']::text[]`),
   ]
 );
 

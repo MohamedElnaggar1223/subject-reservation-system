@@ -12,16 +12,19 @@
  *   - a student who left the school (withdrawn or transferred): refused
  *   - no recorded cohort: refused until an admin records it
  *   - below grade 10: refused (they have not started)
- *   - grade 10: the June series only, unless a coordinator or admin granted
- *     a `grade10_other_series` exception (owner decision 28 Sep 2026)
- *   - grades 11 and 12: any series
- *   - past grade 12 (graduated): the October, November and January series of
- *     the academic year right after grade 12, while the school allows it
- *     (setting eligibility.graduateRetakes, A-12); nothing else
+ *   - grades 10, 11, 12 and graduates (the academic year right after grade 12): for a new reservation, as
+ *     the session's grade list says (`allowed_grades`, D11; default 11, 12, graduates — it replaced the
+ *     June-only rule for grade 10 and the setting eligibility.graduateRetakes, A-12); a coordinator's
+ *     grade-10 exception lets grade 10 through where the list does not (owner decision 28 Sep 2026)
+ *   - past the year after grade 12: refused
+ *
+ * The grade list is asked of new reservations only (COORDINATOR_REWORK.md §9.2): the re-check at payment,
+ * a payment closing and the clean-up below judge without it (`forNewReservation: false`), so changing the
+ * list never strands a line.
  *
  * When eligibility changes after a registration exists — a student leaves,
- * an admin corrects a cohort or a window's series, the school turns A-12
- * off, a grade-10 exception is revoked — `expireIneligibleRegistrations`
+ * an admin corrects a cohort or a window's series, a grade-10 exception is
+ * revoked — `expireIneligibleRegistrations`
  * does what graduation did before F0a (state audit ST-04): registrations
  * the student may no longer sit expire, except one held by a transfer being
  * checked or by an InstaPay checkout inside its grace (as at a close); the
@@ -40,10 +43,9 @@ import {
 } from '@repo/db';
 import {
   academicYearLabel, academicYearShortLabel, seriesAcademicYearStart, seriesLabel, gradeInAcademicYear,
-  academicYearStartOf, GRADUATE_RETAKE_SESSION_TYPES, LAST_GRADE, FIRST_GRADE,
+  academicYearStartOf, LAST_GRADE, FIRST_GRADE,
 } from '@repo/validations';
 import type { Eligibility, EligibilityCode, StudentStatus } from '@repo/validations';
-import { getSetting, lockSetting, onSettingChanged } from './settings.services';
 import { logActions, type ExpiryReason } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { lastInstalmentBeingCheckedSql } from './plan.services';
@@ -68,7 +70,14 @@ export type EligibilityStudent = {
   leftKind: string | null;
 };
 
-export type EligibilitySeries = { id: string; sessionType: string; seriesYear: number };
+export type EligibilitySeries = { id: string; sessionType: string; seriesYear: number; allowedGrades: string[] };
+
+/** The session's grade list in words ("grades 11 and 12 and graduates"). */
+function gradesInWords(list: readonly string[]) {
+  const grades = list.filter((g) => g !== 'graduates').sort();
+  const parts = [...(grades.length ? [`grade${grades.length > 1 ? 's' : ''} ${grades.join(grades.length > 2 ? ', ' : ' and ')}`] : []), ...(list.includes('graduates') ? ['graduates'] : [])];
+  return parts.join(' and ') || 'no grade';
+}
 
 /**
  * The rule itself, with everything it reads passed in: used for one student
@@ -77,7 +86,8 @@ export type EligibilitySeries = { id: string; sessionType: string; seriesYear: n
 export function judgeEligibility(
   student: EligibilityStudent,
   series: EligibilitySeries,
-  ctx: { graduateRetakes: boolean; grade10ExceptionId: string | null },
+  // The session's grade list for a new reservation; null when the list does not enter (payment, a clean-up).
+  ctx: { allowedGrades: readonly string[] | null; grade10ExceptionId: string | null },
 ): Eligibility {
   const academicYearStart = seriesAcademicYearStart(series.sessionType, series.seriesYear);
   const base = {
@@ -104,26 +114,26 @@ export function judgeEligibility(
     const starts = academicYearShortLabel(student.cohortYear!);
     return refuse('not_started', `${name} starts grade 10 in ${starts}: the ${seriesName} series comes before that`);
   }
-  if (grade === FIRST_GRADE && series.sessionType !== 'june') {
+  // `grade12Year` is the academic year of their grade 12.
+  const grade12Year = academicYearShortLabel(student.cohortYear! + (LAST_GRADE - FIRST_GRADE));
+  if (grade > LAST_GRADE + 1) {
+    return refuse('graduated', `${name} finished grade 12 in ${grade12Year}: a graduate may reserve only in the academic year right after it`);
+  }
+  const graduate = grade === LAST_GRADE + 1;
+  // Payment and the clean-ups: the list does not enter (changing it never strands a line).
+  if (ctx.allowedGrades === null) return { ...base, allowed: true, code: 'ok', reason: null, grade, graduateRetake: graduate };
+  const listed = graduate ? ctx.allowedGrades.includes('graduates') : ctx.allowedGrades.includes(String(grade));
+  if (listed) return { ...base, allowed: true, code: 'ok', reason: null, grade, graduateRetake: graduate };
+  if (grade === FIRST_GRADE) {
     if (ctx.grade10ExceptionId) return { ...base, allowed: true, code: 'ok', reason: null, grade, grade10ExceptionId: ctx.grade10ExceptionId };
     return refuse(
       'grade10_june_only',
-      `Grade 10 sits the June series only: ${name} is in grade 10 in ${academicYearShortLabel(academicYearStart)}, so the ${seriesName} series is not open to them. A coordinator can grant an exception.`,
+      `${name} is in grade 10 in ${academicYearShortLabel(academicYearStart)}, and this session takes ${gradesInWords(ctx.allowedGrades)}. A coordinator can grant an exception.`,
     );
   }
-  if (grade <= LAST_GRADE) return { ...base, allowed: true, code: 'ok', reason: null, grade };
-
-  // Past grade 12. `grade12Year` is the academic year of their grade 12.
-  const grade12Year = academicYearShortLabel(student.cohortYear! + (LAST_GRADE - FIRST_GRADE));
-  const retakeSeries = (GRADUATE_RETAKE_SESSION_TYPES as readonly string[]).includes(series.sessionType);
-  if (grade === LAST_GRADE + 1 && retakeSeries) {
-    if (ctx.graduateRetakes) return { ...base, allowed: true, code: 'ok', reason: null, grade, graduateRetake: true };
-    return refuse('graduate_retakes_off', `${name} finished grade 12 in ${grade12Year}, and the school does not register graduates for later series`);
-  }
-  return refuse(
-    'graduated',
-    `${name} finished grade 12 in ${grade12Year}: a graduate may register only for the October, November and January series of the academic year right after it`,
-  );
+  return refuse('grade_not_listed', graduate
+    ? `${name} finished grade 12 in ${grade12Year}, and this session takes ${gradesInWords(ctx.allowedGrades)}`
+    : `${name} is in grade ${grade} in ${academicYearShortLabel(academicYearStart)}, and this session takes ${gradesInWords(ctx.allowedGrades)}`);
 }
 
 async function loadStudent(studentId: string, executor: Executor): Promise<EligibilityStudent | null> {
@@ -138,7 +148,7 @@ async function loadStudent(studentId: string, executor: Executor): Promise<Eligi
 
 async function loadSeries(sessionId: string, executor: Executor): Promise<EligibilitySeries | null> {
   const [row] = await executor
-    .select({ id: registrationSession.id, sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
+    .select({ id: registrationSession.id, sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear, allowedGrades: registrationSession.allowedGrades })
     .from(registrationSession)
     .where(eq(registrationSession.id, sessionId));
   return row ?? null;
@@ -171,23 +181,25 @@ async function grade10Exception(studentId: string, sessionId: string, executor: 
   return row?.id ?? null;
 }
 
-/** May this student register for this session's series? The one answer every path asks. */
-export async function mayRegisterFor(studentId: string, sessionId: string, executor: Executor = db): Promise<Eligibility> {
+/**
+ * May this student register for this session's series? The one answer every path asks. A new reservation
+ * (the default) is judged against the session's grade list; a payment, a payment closing and a re-check of
+ * lines already made pass `forNewReservation: false` (§9.2: the list never strands a line).
+ */
+export async function mayRegisterFor(studentId: string, sessionId: string, executor: Executor = db, opts: { forNewReservation?: boolean } = {}): Promise<Eligibility> {
   const [student, series] = await Promise.all([loadStudent(studentId, executor), loadSeries(sessionId, executor)]);
   if (!series) throw new Error('Session not found');
   if (!student) throw new Error('Student not found');
+  const forNew = opts.forNewReservation ?? true;
   const academicYearStart = seriesAcademicYearStart(series.sessionType, series.seriesYear);
   const grade = gradeInAcademicYear(student.cohortYear, academicYearStart);
-  const [graduateRetakes, exceptionId] = await Promise.all([
-    getSetting('eligibility.graduateRetakes', executor),
-    grade === FIRST_GRADE && series.sessionType !== 'june' ? grade10Exception(studentId, sessionId, executor) : Promise.resolve(null),
-  ]);
-  return judgeEligibility(student, series, { graduateRetakes, grade10ExceptionId: exceptionId });
+  const exceptionId = forNew && grade === FIRST_GRADE && !series.allowedGrades.includes('10') ? await grade10Exception(studentId, sessionId, executor) : null;
+  return judgeEligibility(student, series, { allowedGrades: forNew ? series.allowedGrades : null, grade10ExceptionId: exceptionId });
 }
 
 /** Refuse with the rule's own sentence unless the student may register for the series. */
-export async function assertMayRegisterFor(studentId: string, sessionId: string, executor: Executor = db): Promise<Eligibility> {
-  const e = await mayRegisterFor(studentId, sessionId, executor);
+export async function assertMayRegisterFor(studentId: string, sessionId: string, executor: Executor = db, opts: { forNewReservation?: boolean } = {}): Promise<Eligibility> {
+  const e = await mayRegisterFor(studentId, sessionId, executor, opts);
   if (!e.allowed) throw new Error(e.reason!);
   return e;
 }
@@ -196,14 +208,14 @@ export async function assertMayRegisterFor(studentId: string, sessionId: string,
  * The same judgement inside the transaction that creates a registration,
  * with what it rests on held — a read-then-write guard takes a lock
  * (CLAUDE.md; MONEY_AUDIT.md MA-06). The student's row and the window's
- * row are held FOR SHARE, and so is the grade-10 exception or the A-12
- * setting a verdict relies on. Every eligibility change takes the same row
+ * row (its grade list with it) are held FOR SHARE, and so is the grade-10
+ * exception a verdict relies on. Every eligibility change takes the same row
  * FOR UPDATE (the student: withdrawal, transfer, cohort correction; the
- * window: series correction; the exception: its revocation; the setting:
- * A-12 turned off) before its clean-up reads registrations, so either it
- * commits first and this re-reads it, or it waits for this registration
- * and then expires it. Lock order: student, window, then exception or
- * setting — callers run this first in their transaction.
+ * window: series correction, its grade list; the exception: its revocation)
+ * before its clean-up reads registrations, so either it commits first and
+ * this re-reads it, or it waits for this registration and then expires it.
+ * Lock order: student, window, then exception — callers run this first in
+ * their transaction.
  */
 export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessionId: string): Promise<Eligibility> {
   const e = await mayRegisterForInTx(tx, studentId, sessionId);
@@ -221,10 +233,6 @@ export async function mayRegisterForInTx(tx: Tx, studentId: string, sessionId: s
   let e = await mayRegisterFor(studentId, sessionId, tx);
   if (e.grade10ExceptionId) {
     await tx.select({ id: exception.id }).from(exception).where(eq(exception.id, e.grade10ExceptionId)).for('share');
-    e = await mayRegisterFor(studentId, sessionId, tx);
-  }
-  if (e.graduateRetake || e.code === 'graduate_retakes_off') {
-    await lockSetting(tx, 'eligibility.graduateRetakes', 'shared');
     e = await mayRegisterFor(studentId, sessionId, tx);
   }
   return e;
@@ -254,7 +262,6 @@ export type EligibilityCause =
   | 'withdrawn'
   | 'transferred'
   | 'cohort_corrected'
-  | 'graduate_retakes_off'
   | 'series_corrected'
   | 'exception_revoked'
   | 'exception_lapsed';
@@ -288,12 +295,11 @@ export async function expireIneligibleRegistrations(
 
   const studentIds = [...new Set(waiting.map((w) => w.studentId))];
   const sessionIds = [...new Set(waiting.map((w) => w.sessionId))];
-  const [students, sessions, graduateRetakes] = await Promise.all([
+  const [students, sessions] = await Promise.all([
     tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn, leftKind: user.leftKind })
       .from(user).where(inArray(user.id, studentIds)),
-    tx.select({ id: registrationSession.id, sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
+    tx.select({ id: registrationSession.id, sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear, allowedGrades: registrationSession.allowedGrades })
       .from(registrationSession).where(inArray(registrationSession.id, sessionIds)),
-    getSetting('eligibility.graduateRetakes', tx),
   ]);
   const studentById = new Map(students.map((s) => [s.id, s]));
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
@@ -305,10 +311,9 @@ export async function expireIneligibleRegistrations(
     if (!judged.has(key)) {
       const st = studentById.get(w.studentId)!;
       const se = sessionById.get(w.sessionId)!;
-      const academicYearStart = seriesAcademicYearStart(se.sessionType, se.seriesYear);
-      const needsException = gradeInAcademicYear(st.cohortYear, academicYearStart) === FIRST_GRADE && se.sessionType !== 'june';
-      const exceptionId = needsException ? await grade10Exception(st.id, se.id, tx) : null;
-      judged.set(key, judgeEligibility(st, se, { graduateRetakes, grade10ExceptionId: exceptionId }).allowed);
+      // Lines already made: the grade list does not enter (changing it never strands a line) — only what makes a
+      // student no longer able to sit the series (left, a corrected cohort or series).
+      judged.set(key, judgeEligibility(st, se, { allowedGrades: null, grade10ExceptionId: null }).allowed);
     }
     if (!judged.get(key)) ineligible.push(w.id);
   }
@@ -347,39 +352,7 @@ export const CAUSE_SENTENCE: Record<EligibilityCause, string> = {
   withdrawn: 'the student was withdrawn from the school',
   transferred: 'the student transferred to another school',
   cohort_corrected: "the student's grade was corrected",
-  graduate_retakes_off: 'the school no longer registers graduates for later series',
   series_corrected: "the window's exam series was corrected",
   exception_revoked: 'the grade-10 exception was revoked',
   exception_lapsed: 'the grade-10 exception ran out',
 };
-
-// A-12 turned off: graduates' waiting registrations for the series it
-// covered expire in the transaction that turns it off; their open checkouts
-// close after it commits. Turning it on moves nothing.
-onSettingChanged('eligibility.graduateRetakes', {
-  async inTransaction(tx, before, after) {
-    if (!(before === true && after === false)) return [];
-    // Graduates are students past grade 12 in some series' year: judge every
-    // waiting registration of a student past grade 12 today or in the series'
-    // year. Past grade 12 in the series' year is what matters; students who
-    // are graduates today but were not in that series' year are unaffected by
-    // the rule and the judge leaves them alone.
-    const candidates = await tx
-      .selectDistinct({ id: registration.studentId })
-      .from(registration)
-      .innerJoin(user, eq(user.id, registration.studentId))
-      .innerJoin(registrationSession, eq(registrationSession.id, registration.sessionId))
-      .where(and(
-        inArray(registration.status, ['pending_approval', 'pending_payment']),
-        sql`school_grade(${user.cohortYear}, school_series_academic_year_start(${registrationSession.sessionType}, ${registrationSession.seriesYear})) > ${LAST_GRADE}`,
-      ));
-    if (candidates.length === 0) return [];
-    return expireIneligibleRegistrations(tx, { studentIds: candidates.map((c) => c.id) }, 'graduate_retakes_off');
-  },
-  async afterCommit(result) {
-    const expired = result as { id: string }[];
-    const { closePaymentsOfExpiredRegistrations } = await import('./payment.services');
-    await closePaymentsOfExpiredRegistrations(expired.map((r) => r.id), 'graduate_retakes_off')
-      .catch((err) => console.error('[eligibility] Closing checkouts after A-12 was turned off failed; the recovery sweep will retry:', err));
-  },
-});

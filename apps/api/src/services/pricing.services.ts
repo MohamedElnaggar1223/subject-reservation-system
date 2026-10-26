@@ -6,14 +6,11 @@
  * Version 2 — the coordinator rework (a row made through the set-up routes, or converted by
  * migration 0066 with its exam fee):
  *
- *   exam   = the row's exam fee × 100%            (self study: × a pricing.selfStudyBoardPercent
- *                                                   exception where one applies — P1b removes the key)
+ *   exam   = the row's exam fee × 100%
  *   course = the row's course fee, else the offering's
- *            × 100% in school                      (a retake in school: × a pricing.retakeTaughtCoursePercent
- *                                                   exception; a one-paper row: × a pricing.onePaperCoursePercent
- *                                                   exception — no setting is read any more)
- *            × the session's self-study share in self study (a pricing.selfStudyCoursePercent exception
- *              replaces it), or the row's own self-study amount in its place
+ *            × 100% in school (a first entry and a retake alike)
+ *            × the session's self-study share in self study, or the row's own self-study amount in its place
+ *            (the pricing.* percent settings and their exception keys left with P1b, §9.1)
  *   then the price exceptions in today's order: a custom price replaces the total (course = total,
  *   exam = 0); else percent discounts on both parts; then a fixed discount (course first).
  *   total  = course + exam
@@ -23,8 +20,8 @@
  * offered to families until it is.
  *
  * Version 1 — the deprecated fee-key path: an item made by the deprecated offers/items routes that has
- * fee keys and no exam fee is priced from its series' fee grid exactly as before (the settings'
- * percents, provisional from the fee rows), until P1b drops those routes and the old columns.
+ * fee keys and no exam fee is priced from its series' fee grid as before, at the removed settings'
+ * defaults (OLD_GRID_SHARES), provisional from the fee rows.
  *
  * The result and its basis are snapshotted on the line, so the receipt and the statement say why.
  */
@@ -35,7 +32,6 @@ import {
 } from '@repo/db';
 import type { PricingBasis, PricingBasisV1, PricingBasisV2, Attempt, LineMode } from '@repo/validations';
 import { seriesLabel } from '@repo/validations';
-import { getSetting } from './settings.services';
 import { lineExceptions, type PolicyException } from './line-exceptions';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -155,12 +151,10 @@ function applyPriceExceptions(courseFee: number, registrationFee: number, exc: P
 
 const PRICE_KEYS = ['price.custom', 'price.discountPercent', 'price.discountFixed'] as const;
 /**
- * The percents an exception may set for one student or family (§3.4, §3.7). Version 2 reads no
- * setting for them; an exception of these keys still applies while the registry keeps them (P1b
- * removes the keys with their settings).
+ * The shares the deprecated fee-key path prices at: the removed pricing.* settings' defaults (§9.1: the session's
+ * self-study share and a row's own fee replace them on every row priced by its own exam fee).
  */
-const PERCENT_KEYS = ['pricing.selfStudyCoursePercent', 'pricing.selfStudyBoardPercent', 'pricing.retakeTaughtCoursePercent', 'pricing.onePaperCoursePercent'] as const;
-type PercentKey = (typeof PERCENT_KEYS)[number];
+export const OLD_GRID_SHARES = { selfStudyCoursePercent: 50, selfStudyBoardPercent: 100, retakeTaughtCoursePercent: 100, onePaperCoursePercent: 100 } as const;
 
 /** The row, its offering and its session as version 2 reads them; held FOR SHARE in §9.2's order when `lock`. */
 async function rowForPricing(executor: Executor, itemId: string, lock: boolean) {
@@ -199,28 +193,20 @@ export async function priceLine(
   if (courseFeeBase === null) throw new PricingError(PRICE_NOT_SET_REFUSAL(what, 'course fee'));
   const all = opts.exceptionIds
     ? await lineExceptions.byIds(executor, opts.exceptionIds)
-    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS, ...PERCENT_KEYS], {
+    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS], {
         sessionId: input.sessionId, subjectId: offer.subjectId, offerId: offer.id, offerItemId: item.id,
       }, opts.lock ? { lock: 'share' } : undefined);
-  const applied: PolicyException[] = [];
-  const percent = (key: PercentKey, base: number) => {
-    const e = all.find((x) => x.policyKey === key && x.value != null);
-    if (!e) return base;
-    applied.push(e);
-    return e.value!;
-  };
   const selfStudy = input.mode === 'self_study';
-  // The row's own self-study amount replaces the share (E4); else the session's share, which a
-  // student's pricing.selfStudyCoursePercent exception replaces.
+  // The row's own self-study amount replaces the share (E4); else the session's share.
   const ownSelfStudy = selfStudy && item.selfStudyFee !== null;
-  const coursePercent = selfStudy
-    ? (ownSelfStudy ? 100 : percent('pricing.selfStudyCoursePercent', session.selfStudyPercent))
-    : input.attempt === 'retake' ? percent('pricing.retakeTaughtCoursePercent', 100) : 100;
-  const onePaperPercent = item.kind === 'paper' ? percent('pricing.onePaperCoursePercent', 100) : 100;
+  const coursePercent = selfStudy ? (ownSelfStudy ? 100 : session.selfStudyPercent) : 100;
+  const onePaperPercent = 100;
   const courseBase = ownSelfStudy ? item.selfStudyFee! : courseFeeBase;
-  const boardPercent = selfStudy ? percent('pricing.selfStudyBoardPercent', 100) : 100;
-  const course = round2(((courseBase * coursePercent) / 100) * onePaperPercent / 100);
-  const exam = round2((item.examFee * boardPercent) / 100);
+  const boardPercent = 100;
+  const course = round2((courseBase * coursePercent) / 100);
+  const exam = round2(item.examFee);
+  // A re-price re-applies the ids its basis recorded: only the price keys among them count (a pricing.* key a
+  // line recorded before P1b is no longer applied).
   const exc = all.filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey));
   const priced = applyPriceExceptions(course, exam, exc);
   const basis: PricingBasisV2 = {
@@ -239,7 +225,7 @@ export async function priceLine(
     boardFeeBase: item.examFee,
     boardPercent,
     feeRows: [],
-    exceptionIds: [...applied, ...exc].map((e) => e.id),
+    exceptionIds: exc.map((e) => e.id),
     customPrice: priced.customPrice,
     courseFee: priced.courseFee,
     registrationFee: priced.registrationFee,
@@ -248,38 +234,23 @@ export async function priceLine(
   return { courseFee: priced.courseFee, registrationFee: priced.registrationFee, total: priced.total, provisional: !session.pricesFinal, basis };
 }
 
-/** The deprecated v1 price: from the series' fee grid, the settings' percents (see the header). */
+/** The deprecated v1 price: from the series' fee grid, at OLD_GRID_SHARES (see the header). */
 async function priceLineV1(executor: Executor, input: PriceLineInput, opts: { exceptionIds?: string[]; lock?: boolean }): Promise<LinePrice> {
   const fee = await feeRowsForItem(executor, input.item.id, { lock: opts.lock });
-  const [selfStudyCourse, selfStudyBoard, retakeTaught, onePaper] = await Promise.all([
-    getSetting('pricing.selfStudyCoursePercent', executor),
-    getSetting('pricing.selfStudyBoardPercent', executor),
-    getSetting('pricing.retakeTaughtCoursePercent', executor),
-    getSetting('pricing.onePaperCoursePercent', executor),
-  ]);
-  // The student's exceptions, price and percent keys at once (the adapter: the student's own or
-  // their family's, covering the line). Inside a creating transaction they are held FOR SHARE
-  // (§2.1), so a revocation at the same moment waits for the line, or the line for the revocation.
+  // The student's price exceptions (the adapter: the student's own or their family's, covering the line). Inside a
+  // creating transaction they are held FOR SHARE (§2.1), so a revocation at the same moment waits for the line.
   const all = opts.exceptionIds
     ? await lineExceptions.byIds(executor, opts.exceptionIds)
-    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS, ...PERCENT_KEYS], {
+    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS], {
         sessionId: input.sessionId, subjectId: fee.subjectId, offerId: fee.item.offerId, offerItemId: fee.item.id,
       }, opts.lock ? { lock: 'share' } : undefined);
-  // A percent exception replaces its setting on the lines it applies to (the first the adapter
-  // gives of each key); only those that applied are recorded in the basis.
   const applied: PolicyException[] = [];
-  const percent = (key: PercentKey, setting: number) => {
-    const e = all.find((x) => x.policyKey === key && x.value != null);
-    if (!e) return setting;
-    applied.push(e);
-    return e.value!;
-  };
   const courseFeeBase = fee.item.courseFee ?? fee.offerCourseFee;
-  const coursePercent = input.mode === 'self_study' ? percent('pricing.selfStudyCoursePercent', selfStudyCourse)
-    : input.attempt === 'retake' ? percent('pricing.retakeTaughtCoursePercent', retakeTaught) : 100;
-  const onePaperPercent = fee.item.kind === 'paper' ? percent('pricing.onePaperCoursePercent', onePaper) : 100;
+  const coursePercent = input.mode === 'self_study' ? OLD_GRID_SHARES.selfStudyCoursePercent
+    : input.attempt === 'retake' ? OLD_GRID_SHARES.retakeTaughtCoursePercent : 100;
+  const onePaperPercent = fee.item.kind === 'paper' ? OLD_GRID_SHARES.onePaperCoursePercent : 100;
   const boardFeeBase = round2(fee.rows.reduce((s, r) => s + r.amount, 0));
-  const boardPercent = input.mode === 'self_study' ? percent('pricing.selfStudyBoardPercent', selfStudyBoard) : 100;
+  const boardPercent = input.mode === 'self_study' ? OLD_GRID_SHARES.selfStudyBoardPercent : 100;
   const course = round2(((courseFeeBase * coursePercent) / 100) * onePaperPercent / 100);
   const board = round2((boardFeeBase * boardPercent) / 100);
 

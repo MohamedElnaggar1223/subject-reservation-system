@@ -25,6 +25,7 @@ import {
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
+import { codeOf } from '../lib/refusal';
 import { requireAuth, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
@@ -58,7 +59,7 @@ export const lineRoutes = new Hono<HonoEnv>()
         return success(c, await verifyPriorSitting(c.req.valid('param').id, c.req.valid('json'), { id: user.id, role: user.role ?? '' }, extractAuditContext(c)));
       } catch (err) {
         const r = refusal(err, 'Failed to record the answer');
-        return error(c, r.message, r.status);
+        return error(c, r.message, r.status, codeOf(err));
       }
     }
   )
@@ -74,7 +75,7 @@ export const lineRoutes = new Hono<HonoEnv>()
         return success(c, await changeLineTeacher(c.req.valid('param').id, c.req.valid('json'), user.id, extractAuditContext(c)));
       } catch (err) {
         const r = refusal(err, 'Failed to change the teacher');
-        return error(c, r.message, r.status);
+        return error(c, r.message, r.status, codeOf(err));
       }
     }
   );
@@ -147,7 +148,7 @@ export const statementRoutes = new Hono<HonoEnv>()
         if (!fam) return error(c, 'Family not found', 404);
         return success(c, await statementFor({ studentIds: fam.studentIds, family: fam.family }));
       } catch (err) {
-        return error(c, clientMessage(err, 'Failed to load the statement'), 400);
+        return error(c, clientMessage(err, 'Failed to load the statement'), 400, codeOf(err));
       }
     }
   );

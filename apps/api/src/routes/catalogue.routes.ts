@@ -16,7 +16,7 @@ import {
   CreateUnit, UpdateUnit, CreateQualificationOption, UpdateQualificationOption, MapRegistrable, SubjectIdParam, LoadStarterSet,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
-import { requireAuth, requireAcademic, requireRole } from '../middleware/access-control.middleware';
+import { requireAuth, requireAcademic, requireAdmin, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import * as catalogue from '../services/catalogue.services';
@@ -45,7 +45,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
   .get('/entries', requireAcademic(), zValidator('query', z.object({ sessionId: z.string().min(1) })), async (c) =>
     success(c, await catalogue.entryItemsForWindow(c.req.valid('query').sessionId)))
 
-  .put('/boards/:code', requireAcademic(), zValidator('param', BoardCodeParam), zValidator('json', UpdateBoard), async (c) => {
+  .put('/boards/:code', requireAdmin(), zValidator('param', BoardCodeParam), zValidator('json', UpdateBoard), async (c) => {
     try {
       return success(c, await catalogue.updateBoard(c.req.valid('param').code, c.req.valid('json'), c.get('user')!.id, c.get('user')!.role, extractAuditContext(c)));
     } catch (err) {
@@ -54,7 +54,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .post('/qualifications', requireAcademic(), zValidator('json', CreateQualification), async (c) => {
+  .post('/qualifications', requireAdmin(), zValidator('json', CreateQualification), async (c) => {
     try {
       return success(c, await catalogue.createQualification(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
     } catch (err) {
@@ -63,7 +63,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .put('/qualifications/:id', requireAcademic(), zValidator('param', IdParam), zValidator('json', UpdateQualification), async (c) => {
+  .put('/qualifications/:id', requireAdmin(), zValidator('param', IdParam), zValidator('json', UpdateQualification), async (c) => {
     try {
       return success(c, await catalogue.updateQualification(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
@@ -72,7 +72,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .put('/qualifications/:id/units', requireAcademic(), zValidator('param', IdParam), zValidator('json', SetQualificationUnits), async (c) => {
+  .put('/qualifications/:id/units', requireAdmin(), zValidator('param', IdParam), zValidator('json', SetQualificationUnits), async (c) => {
     try {
       return success(c, await catalogue.setQualificationUnits(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
@@ -81,7 +81,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .post('/qualifications/:id/options', requireAcademic(), zValidator('param', IdParam), zValidator('json', CreateQualificationOption), async (c) => {
+  .post('/qualifications/:id/options', requireAdmin(), zValidator('param', IdParam), zValidator('json', CreateQualificationOption), async (c) => {
     try {
       return success(c, await catalogue.createOption(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
     } catch (err) {
@@ -90,7 +90,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .put('/options/:id', requireAcademic(), zValidator('param', IdParam), zValidator('json', UpdateQualificationOption), async (c) => {
+  .put('/options/:id', requireAdmin(), zValidator('param', IdParam), zValidator('json', UpdateQualificationOption), async (c) => {
     try {
       return success(c, await catalogue.updateOption(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
@@ -99,7 +99,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .post('/units', requireAcademic(), zValidator('json', CreateUnit), async (c) => {
+  .post('/units', requireAdmin(), zValidator('json', CreateUnit), async (c) => {
     try {
       return success(c, await catalogue.createUnit(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
     } catch (err) {
@@ -108,7 +108,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .put('/units/:id', requireAcademic(), zValidator('param', IdParam), zValidator('json', UpdateUnit), async (c) => {
+  .put('/units/:id', requireAdmin(), zValidator('param', IdParam), zValidator('json', UpdateUnit), async (c) => {
     try {
       return success(c, await catalogue.updateUnit(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
@@ -118,7 +118,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
   })
 
   /** PUT /catalogue/registrable/:subjectId — its board, award and units (a board change moves its registrations). */
-  .put('/registrable/:subjectId', requireAcademic(), zValidator('param', SubjectIdParam), zValidator('json', MapRegistrable), async (c) => {
+  .put('/registrable/:subjectId', requireAdmin(), zValidator('param', SubjectIdParam), zValidator('json', MapRegistrable), async (c) => {
     try {
       return success(c, await catalogue.mapRegistrable(c.req.valid('param').subjectId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
@@ -127,7 +127,7 @@ export const catalogueRoutes = new Hono<HonoEnv>()
     }
   })
 
-  .post('/starter', requireAcademic(), zValidator('json', LoadStarterSet), async (c) => {
+  .post('/starter', requireAdmin(), zValidator('json', LoadStarterSet), async (c) => {
     try {
       return success(c, await catalogue.loadStarterSet(c.req.valid('json').set, c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {

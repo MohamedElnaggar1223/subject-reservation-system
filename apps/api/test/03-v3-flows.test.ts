@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money, openWindow, futureWindow, type Client, reservationOf, seriesOfSession } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money, openWindow, futureWindow, type Client, reservationOf, seriesOfSession, CONSENT } from './helpers';
+import { randomUUID } from 'node:crypto';
 
 /**
  * The original approval workflow and the V3 flows that had never run before
@@ -97,12 +98,13 @@ describe('V3 flows', () => {
     scheduleId = null;
   });
 
-  it('held wallet: preregister for a draft session, pay at the desk into held, capture on activation', async () => {
+  it('a draft takes no preregistration (C4); opened, the line is reserved and paid at the desk, confirmed with its receipt', async () => {
     const draft = futureWindow();
     // The reservations rework (RESERVATIONS_REWORK.md §3.1, §3.3): a winter session is valid;
     // "IGCSE sits neither October nor January" is checked per item, so an IGCSE item entered in a
     // January series is refused (it was a January IGCSE window that was refused before).
-    const igcse = await subject(adm, 'T4MA1', 'Mathematics (IGCSE, v3 flows)', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    // Offered the old way (priced from the grid): the old item route below is refused on a subject priced by its rows (P1b fix 2).
+    const igcse = await subject(adm, 'T4MA1', 'Mathematics (IGCSE, v3 flows)', { course: 1000, registration: 400 }, { council: 'pearson_edexcel', pricedByGrid: true });
     const winter = await session(adm, 'Winter (IGCSE, v3 flows)', 'november', 'igcse', draft);
     const offer = (await apiResponse(adm.api.v1.sessions[':id'].offers.$get({ param: { id: winter } }))).offers.find((o) => o.subjectId === igcse)!;
     const year = (await one<{ y: number }>(`select series_year as y from registration_session where id = $1`, [winter])).y;
@@ -113,36 +115,34 @@ describe('V3 flows', () => {
     }));
     expect(wrongLevel).toEqual({ status: 400, error: 'IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series' });
 
+    // The coordinator rework (C4): a draft is invisible to families, so it takes no preregistration and the held
+    // wallet (prereg_hold, prereg_capture) retires with it. Its money outcome — what a family pays for a line it
+    // reserved is that line's price, confirmed with its receipt — is stated here on the open session.
     januaryA = await session(adm, 'January (A-Level)', 'january', 'a_level', draft);
-    const pre = await apiResponse(parent.api.v1.registrations.preregister.$post({ json: { sessionId: januaryA, ...(await reservationOf(januaryA, [physicsA])), studentId } }));
-    preregId = pre[0]!.id;
-    expect(pre[0]).toMatchObject({ status: 'preregistered', priceAtRegistration: 1500 });
+    const pre = await refused(parent.api.v1.registrations.preregister.$post({
+      json: { sessionId: januaryA, lines: [{ offerItemId: randomUUID(), attempt: 'first', mode: 'in_school' }], consent: CONSENT, studentId },
+    }));
+    expect(pre).toEqual({ status: 400, error: 'Reservations open when the session opens: a session that is not open yet takes none' });
+    expect(await sql(`select 1 from registration where session_id = $1`, [januaryA])).toEqual([]);
+
+    await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: januaryA } }));
+    const line = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId: januaryA, ...(await reservationOf(januaryA, [physicsA])), studentId } }));
+    preregId = line[0]!.id;
+    expect(line[0]).toMatchObject({ status: 'pending_payment', priceAtRegistration: 1500 });
 
     const pay = await apiResponse(
       parent.api.v1.payments.initiate.$post({ json: { registrationIds: [preregId], paymentMethod: 'in_school', escrowAmountToApply: 0 } })
     );
-    expect(pay).toMatchObject({ purpose: 'preregistration', amount: 1500 });
+    expect(pay).toMatchObject({ purpose: 'registration', amount: 1500 });
     await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
 
-    const held = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [studentId]);
-    expect([money(held.balance), money(held.held)]).toEqual([0, 1500]);
-    expect((await one<{ status: string }>(`select status from registration where id = $1`, [preregId])).status).toBe('preregistered');
+    expect((await one<{ status: string }>(`select status from registration where id = $1`, [preregId])).status).toBe('confirmed');
     expect((await one<{ status: string }>(`select status from receipt where registration_id = $1`, [preregId])).status).toBe('pending_issue');
+    // Nothing went through the wallet: paid at the desk, the money is the line's (no escrow row moved).
+    expect(await sql(`select 1 from escrow_transaction e join escrow x on x.id = e.escrow_id where x.student_id = $1`, [studentId])).toEqual([]);
+    expect(money((await one<{ amount: string }>(`select amount from payment where id = $1 and status = 'completed'`, [pay.id!])).amount)).toBe(1500);
     const home = await apiResponse(parent.api.v1.users.me['home-summary'].$get());
-    expect(home.children[0]?.escrow).toEqual({ freeBalance: 0, heldBalance: 1500 });
-
-    await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: januaryA } }));
-    await waitFor(async () => (await one<{ status: string }>(`select status from registration where id = $1`, [preregId])).status === 'confirmed' || null);
-    const after = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [studentId]);
-    expect([money(after.balance), money(after.held)]).toEqual([0, 0]);
-    const ledger = await sql<{ amount: string; type: string; reason: string; balance_type: string }>(
-      `select e.amount, e.type, e.reason, e.balance_type from escrow_transaction e join escrow x on x.id = e.escrow_id where x.student_id = $1 order by e.created_at`, [studentId]
-    );
-    expect(ledger.map((l) => [money(l.amount), l.type, l.reason, l.balance_type])).toEqual([
-      [1500, 'credit', 'prereg_hold', 'held'],
-      [1500, 'debit', 'prereg_capture', 'held'],
-    ]);
-    await waitFor(async () => (await notificationsFor(parent.email, 'SESSION_OPENED')).length >= 1 || null);
+    expect(home.children[0]?.escrow).toEqual({ freeBalance: 0, heldBalance: 0 });
   });
 
   it('results → remark → outcome: Cambridge allows one request, consent gates payment, a grade change refunds the fee', async () => {

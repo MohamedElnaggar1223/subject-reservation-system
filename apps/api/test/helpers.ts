@@ -52,6 +52,16 @@ export async function refused(p: Promise<{ status: number; json(): Promise<unkno
   return { status: res.status, error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? '') };
 }
 
+/**
+ * A refusal with its machine-readable code (decision 2 of the P1b review: `{ success: false, error, code? }`); `code` is
+ * undefined for a refusal that has none.
+ */
+export async function refusedWithCode(p: Promise<{ status: number; json(): Promise<unknown> }>) {
+  const res = await p;
+  const body = (await res.json().catch(() => ({}))) as { error?: unknown; code?: unknown };
+  return { status: res.status, error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? ''), code: typeof body.code === 'string' ? body.code : undefined };
+}
+
 /** Raw SQL against the test database. Values are bound, never interpolated. */
 export async function sql<T = Json>(text: string, params: unknown[] = []): Promise<T[]> {
   const { db, sql: s } = await dbmod();
@@ -359,7 +369,7 @@ export async function session(
   _name: string,
   sessionType: 'june' | 'october' | 'november' | 'january',
   qualificationLevel: 'igcse' | 'as_level' | 'a_level',
-  opts: { startDate: string; endDate: string; activate?: boolean; seriesYear?: number }
+  opts: { startDate: string; endDate: string; activate?: boolean; seriesYear?: number; allowedGrades?: readonly ('10' | '11' | '12' | 'graduates')[] }
 ): Promise<string> {
   const oldYear = opts.seriesYear ?? seriesYearInAcademicYear(sessionType, academicYearStartOf(new Date(opts.startDate)));
   const type = sessionType === 'june' ? 'june' as const : 'winter' as const;
@@ -373,6 +383,10 @@ export async function session(
     },
   }));
   await apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: r.id }, json: { final: true } }));
+  // P1b: eligibility reads the session's grade list (C7). Made by the legacy create (dates in the body), a suite's
+  // session takes the grades the old rules admitted — June grades 10 to 12, winter 11, 12 and graduates — unless a
+  // suite gives its own list.
+  if (opts.allowedGrades) await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: r.id }, json: { allowedGrades: [...opts.allowedGrades] } }));
   const meta: SessionMeta = { id: r.id, oldType: sessionType, level: qualificationLevel, type, year, oldYear, label, adm };
   SESSIONS.push(meta);
   for (const sub of SUBJECTS.filter((x) => x.level === qualificationLevel)) await offerInSession(adm, meta, sub);
@@ -528,7 +542,7 @@ export async function sessionName(sessionId: string) {
 
 // ─── The coordinator's set-up (COORDINATOR_REWORK.md Appendix A) ─────────────
 
-export type Impact = { repriced: number; listedForFinance: number; linesAffected: number; dueDatesMoved: number };
+export type Impact = { repriced: number; listedForFinance: number; linesAffected: number; dueDatesMoved: number; cutOffsEarlier?: number; cutOffsPassed?: number };
 
 /**
  * A set-up change that answers its impact first (A3): sent once; when it is not saved, sent again with
@@ -732,6 +746,22 @@ export function takingsDelta(before: Takings, after: Takings) {
 export async function runPaymentDeadlines(now: Date = new Date()) {
   const { enforcePaymentDeadlines } = await import('../src/services/payment.services');
   return enforcePaymentDeadlines(now);
+}
+
+/**
+ * Bring lines past their cut-off (COORDINATOR_REWORK.md §6, C10): the due date moved back so that due + the
+ * session's unpaid-cancel days fell a minute ago — the cut-off a line reaches when its family has not paid. A line
+ * whose board deadline comes first is past its cut-off already, or not until that deadline. Returns each line's
+ * cut-off as the database computes it.
+ */
+export async function passCutOff(registrationIds: string[]) {
+  const ids = registrationIds.map((_, i) => `$${i + 1}`).join(', ');
+  await sql(`update registration r set due_at = now() - make_interval(days => s.unpaid_cancel_days) - interval '1 minute'
+    from registration_session s where s.id = r.session_id and r.id in (${ids})`, registrationIds);
+  const rows = await sql<{ id: string; cut_off: string }>(
+    `select id, line_cut_off(due_at, session_id, attempt, prior_sitting_series_id, board_series_id, declaration_rejected) as cut_off
+     from registration where id in (${ids})`, registrationIds);
+  return new Map(rows.map((r) => [r.id, new Date(r.cut_off)]));
 }
 
 /**

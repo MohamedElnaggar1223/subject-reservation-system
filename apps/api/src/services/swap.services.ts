@@ -176,7 +176,7 @@ function round2(n: number): number {
  * Enforces:
  * - Registration exists and is 'confirmed'
  * - userId is the student (for student-initiated) or session owner check is skipped (for parent-direct)
- * - Session is currently 'active'
+ * - A swap: the session takes reservations (a drop stays open after the close, until the entry is sent: F4)
  * - Subject is NOT a core subject in Grade 10 June sessions (SWAP-005)
  * - No existing pending_approval change request for this registration
  */
@@ -198,7 +198,12 @@ async function assertBeforeLineDeadline(
 async function validateChangeEligibility(
   registrationId: string,
   studentId: string,
-  checkOwnership: boolean = true
+  checkOwnership: boolean = true,
+  /**
+   * A drop stays open after the session closes, until the entry is sent (F4; COORDINATOR_REWORK.md §9.2): the
+   * session-open check is a swap's alone, since a swap makes a new line (mayReserve).
+   */
+  kind: 'drop' | 'swap' = 'swap',
 ) {
   const reg = await db.query.registration.findFirst({
     where: (r, { eq }) => eq(r.id, registrationId),
@@ -233,8 +238,9 @@ async function validateChangeEligibility(
     throw new Error(`Only confirmed registrations can be changed. Current status: ${reg.status}`);
   }
 
-  if (!reg.session || reg.session.status !== 'active') {
-    throw new Error('Changes can only be made while the registration window is open (SWAP-006)');
+  if (!reg.session) throw new Error('Session not found');
+  if (kind === 'swap' && reg.session.status !== 'active') {
+    throw new Error('A swap is made while the session takes reservations (SWAP-006): drop the subject instead');
   }
   // The cut-off is per line (§3.3): past the line's own deadline the entry is with the board,
   // and only the desk can drop it.
@@ -279,14 +285,15 @@ async function validateChangeEligibility(
  * eligibility question asked right after ownership (a student is never told
  * about someone else's registration).
  */
-async function assertOwnRegistrationEligible(registrationId: string, studentId: string) {
+async function assertOwnRegistrationEligible(registrationId: string, studentId: string, kind: 'drop' | 'swap') {
   const reg = await db.query.registration.findFirst({
     where: (r, { eq: eqOp }) => eqOp(r.id, registrationId),
     columns: { studentId: true, sessionId: true },
   });
   if (!reg) throw new Error('Registration not found');
   if (reg.studentId !== studentId) throw new Error('You do not own this registration');
-  await assertMayRegisterFor(reg.studentId, reg.sessionId);
+  // A swap makes a new line (the session's grade list applies, D11); a drop does not.
+  await assertMayRegisterFor(reg.studentId, reg.sessionId, db, { forNewReservation: kind === 'swap' });
 }
 
 /** A swap's item is not one the student already holds in the session (any live line on it). */
@@ -318,8 +325,8 @@ export async function createDropRequest(
   // not before F0a); a parent can still drop a paid subject directly. Asked
   // right after ownership, before the window, so the family hears the reason
   // that matters.
-  await assertOwnRegistrationEligible(registrationId, requestedBy);
-  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
+  await assertOwnRegistrationEligible(registrationId, requestedBy, 'drop');
+  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true, 'drop');
 
   const [request] = await db
     .insert(changeRequest)
@@ -370,8 +377,8 @@ export async function createSwapRequest(
   requestedBy: string
 ) {
   // F0a: call site 8 of mayRegisterFor — a swap registers a new subject.
-  await assertOwnRegistrationEligible(registrationId, requestedBy);
-  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
+  await assertOwnRegistrationEligible(registrationId, requestedBy, 'swap');
+  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true, 'swap');
 
   await assertItemNotHeld(reg.studentId, reg.sessionId, data.line.offerItemId, registrationId);
   const swap = await swapQuote(reg.studentId, reg.sessionId, data.line);
@@ -481,8 +488,9 @@ export async function approveChangeRequest(
   // subject, so the student must still be able to sit the series.
   if (cr.type === 'swap') await assertMayRegisterFor(cr.registration.studentId, cr.registration.sessionId);
 
-  if (cr.registration.session.status !== 'active') {
-    throw new Error('The registration window has closed; this request can no longer be approved');
+  // A swap needs the session to take reservations; a drop is approved after the close too, until the entry is sent.
+  if (cr.type === 'swap' && cr.registration.session.status !== 'active') {
+    throw new Error('The session stopped taking reservations; this swap can no longer be approved (drop the subject instead)');
   }
 
   let swap: Awaited<ReturnType<typeof swapQuote>> | null = null;
@@ -715,7 +723,7 @@ export async function executeDirectDrop(
   auditCtx?: AuditContext
 ) {
   // validateChangeEligibility is called with checkOwnership=false (parent checks their own link)
-  const { reg } = await validateChangeEligibility(registrationId, '', false);
+  const { reg } = await validateChangeEligibility(registrationId, '', false, 'drop');
 
   const linked = await validateParentStudentLink(parentId, reg.studentId);
   if (!linked) throw new Error('You are not linked to this student');

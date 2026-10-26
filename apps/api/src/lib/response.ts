@@ -1,6 +1,7 @@
 import type { Context, TypedResponse } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { JSONParsed } from 'hono/utils/types';
+import type { RefusalCode } from './refusal';
 
 /**
  * Response envelopes as the RPC client sees them.
@@ -15,8 +16,9 @@ import type { JSONParsed } from 'hono/utils/types';
  */
 export type SuccessResponse<T, U extends ContentfulStatusCode = 200> =
   Response & TypedResponse<{ success: true; data: JSONParsed<T> }, U, 'json'>;
+/** `code`: a refusal's machine-readable code (`RefusalCode`, @repo/validations), when it has one; the sentence is `error`. */
 export type ErrorResponse<U extends ContentfulStatusCode = 500> =
-  Response & TypedResponse<{ success: false; error: string }, U, 'json'>;
+  Response & TypedResponse<{ success: false; error: string; code?: RefusalCode }, U, 'json'>;
 
 /**
  * Simple wrapper for successful responses
@@ -32,14 +34,16 @@ export function success<T, U extends ContentfulStatusCode = 200>(
 
 /**
  * Simple wrapper for error responses
- * Use when you want to return an error with success: false
+ * Use when you want to return an error with success: false. A refusal passes its code too
+ * (`codeOf(err)`, lib/refusal.ts); the sentence is unchanged.
  */
 export function error<U extends ContentfulStatusCode = 500>(
   c: Context,
   message: string,
-  statusCode?: U
+  statusCode?: U,
+  code?: RefusalCode
 ): ErrorResponse<U> {
-  return c.json({ success: false as const, error: message }, (statusCode ?? 500) as U) as unknown as ErrorResponse<U>;
+  return c.json({ success: false as const, error: message, ...(code ? { code } : {}) }, (statusCode ?? 500) as U) as unknown as ErrorResponse<U>;
 }
 
 /**

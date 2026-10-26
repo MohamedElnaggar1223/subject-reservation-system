@@ -28,11 +28,12 @@ import { paymentHistoryOf, PAYMENT_HISTORY_REASON } from '../line-history.servic
 import { priceLine, PricingError, round2 } from '../pricing.services';
 import { dueDateFor } from '../deadline.services';
 import { createNotification } from '../notification.services';
+import { LIVE_LINE_STATUSES as LIVE, isLiveStatus } from './model';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type Impact = ImpactType;
-export const NO_IMPACT: Impact = { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0 };
+export const NO_IMPACT: Impact = { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0, cutOffsEarlier: 0, cutOffsPassed: 0 };
 
 /** IMPACT_CHANGED (Appendix A): the counts the client confirmed are no longer what the change does (one sentence, shared with the screens). */
 export { IMPACT_CHANGED_REFUSAL };
@@ -47,6 +48,7 @@ export class ImpactPending extends Error {
 /** The confirmed counts no longer match (409 IMPACT_CHANGED; nothing was written). */
 export class ImpactChanged extends Error {
   public readonly status = 409 as const;
+  public readonly refusalCode = 'IMPACT_CHANGED' as const;
   constructor(public readonly impact: Impact) {
     super(IMPACT_CHANGED_REFUSAL);
   }
@@ -58,12 +60,14 @@ export function addImpact(a: Impact, b: Partial<Impact>): Impact {
     listedForFinance: a.listedForFinance + (b.listedForFinance ?? 0),
     linesAffected: a.linesAffected + (b.linesAffected ?? 0),
     dueDatesMoved: a.dueDatesMoved + (b.dueDatesMoved ?? 0),
+    cutOffsEarlier: a.cutOffsEarlier + (b.cutOffsEarlier ?? 0),
+    cutOffsPassed: a.cutOffsPassed + (b.cutOffsPassed ?? 0),
   };
 }
 
-const isZero = (i: Impact) => !i.repriced && !i.listedForFinance && !i.linesAffected && !i.dueDatesMoved;
-const same = (a: Impact, b: Impact) =>
-  a.repriced === b.repriced && a.listedForFinance === b.listedForFinance && a.linesAffected === b.linesAffected && a.dueDatesMoved === b.dueDatesMoved;
+const KEYS = ['repriced', 'listedForFinance', 'linesAffected', 'dueDatesMoved', 'cutOffsEarlier', 'cutOffsPassed'] as const;
+const isZero = (i: Impact) => KEYS.every((k) => !i[k]);
+const same = (a: Impact, b: Impact) => KEYS.every((k) => (a[k] ?? 0) === (b[k] ?? 0));
 
 /**
  * The impact rule, inside the change's transaction once its effect is counted: with no `expected`, a
@@ -78,7 +82,6 @@ export function settleImpact(impact: Impact, expected: Impact | undefined) {
   if (!same(impact, expected)) throw new ImpactChanged(impact);
 }
 
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'];
 const WAITING = ['pending_approval', 'pending_payment', 'preregistered'];
 
 export type RepricedLine = { id: string; studentId: string; subjectId: string; from: number; to: number };
@@ -109,7 +112,7 @@ export async function planReprice(tx: Tx, scope: { rowIds?: string[]; selfStudyO
   const history = await paymentHistoryOf(tx, ids);
   const plan: RepricePlan = { repriced: [], listed: [] };
   for (const l of lines) {
-    if (!LIVE.includes(l.status)) continue;
+    if (!isLiveStatus(l.status)) continue;
     const basis = l.pricingBasis as PricingBasis | null;
     let next: Awaited<ReturnType<typeof priceLine>>;
     try {
@@ -178,7 +181,7 @@ export async function applyReprice(
   const priced = plan.repriced.filter((r) => round2(r.from) !== round2(r.to));
   return {
     told: priced.map(({ next: _n, ...r }) => r),
-    impact: { repriced: priced.length, listedForFinance: plan.listed.length, linesAffected: plan.repriced.length - priced.length, dueDatesMoved },
+    impact: { ...NO_IMPACT, repriced: priced.length, listedForFinance: plan.listed.length, linesAffected: plan.repriced.length - priced.length, dueDatesMoved },
   };
 }
 

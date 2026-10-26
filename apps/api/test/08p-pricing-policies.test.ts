@@ -197,16 +197,12 @@ describe('08p: pricing policies on pricing v2', () => {
     expect((await priceOf(line!.id)).basis).toMatchObject({ v: 2, itemKind: 'paper', examFee: 5000, courseFeeBase: 3000, onePaperPercent: 100 });
   });
 
-  it("the session's share prices self study, not the setting; a row's own self-study fee (E4) replaces the share", async () => {
+  // P1b (§4): the school-wide pricing.selfStudyCoursePercent setting is gone; the session's share is the only one.
+  it("the session's share prices self study; a row's own self-study fee (E4) replaces the share", async () => {
     const [x, y] = [await onboard(officer, `p08-set-a-${RUN}`, 11), await onboard(officer, `p08-set-b-${RUN}`, 11)];
-    const setPercent = (value: number) => apiResponse(finadmin.api.v1.settings[':key'].$put({ param: { key: 'pricing.selfStudyCoursePercent' }, json: { value, reason: '08p: a policy change' } }));
-    await setPercent(40);
-    try {
-      const [l] = await reserve(x, [{ offerItemId: taughtAll, attempt: 'retake', mode: 'self_study', priorSittingSeriesId: priorJune }]);
-      expect(await priceOf(l!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200, basis: { selfStudyShare: 50, coursePercent: 50 } });
-    } finally {
-      await setPercent(50);
-    }
+    expect((await refused(finadmin.api.v1.settings[':key'].$put({ param: { key: 'pricing.selfStudyCoursePercent' }, json: { value: 40, reason: '08p: a policy change' } }))).status).toBe(404);
+    const [shared] = await reserve(x, [{ offerItemId: taughtAll, attempt: 'retake', mode: 'self_study', priorSittingSeriesId: priorJune }]);
+    expect(await priceOf(shared!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200, basis: { selfStudyShare: 50, coursePercent: 50 } });
     // A row charging its own self-study amount: 5,000 in place of 50% of 14,000; the family reads "self study", no percentage.
     const own = await subjectWith('Own self-study fee', {
       courseFee: 14000, teachers: [{ teacherId, online: false, external: false }],
@@ -221,45 +217,9 @@ describe('08p: pricing policies on pricing v2', () => {
     expect(await priceOf(l!.id)).toMatchObject({ course: 5000, board: 9200, price: 14200, basis: { selfStudyFee: 5000, coursePercent: 100, courseFeeBase: 5000 } });
   });
 
-  it("a pricing.* exception replaces its part's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not", async () => {
-    // The registry answers the adapter with the exceptions covering the line; here it is answered as the
-    // registry would answer it (priceLine is what asks).
-    const { lineExceptions } = await import('../src/services/line-exceptions');
-    const self = await onboard(officer, `p08-pct-s-${RUN}`, 11);
-    const retaker = await onboard(officer, `p08-pct-r-${RUN}`, 11);
-    const none = await onboard(officer, `p08-pct-n-${RUN}`, 11);
-    await firstInSelfStudy(self.studentId);
-    await firstInSelfStudy(none.studentId);
-    const grant = (studentId: string, key: 'pricing.selfStudyCoursePercent' | 'pricing.selfStudyBoardPercent' | 'pricing.retakeTaughtCoursePercent' | 'pricing.onePaperCoursePercent', value: number) =>
-      ({ id: `test-${key}-${studentId}`, policyKey: key, value, valueDate: null, oneShot: false, scope: { sessionId: session } });
-    const held: Record<string, ReturnType<typeof grant>[]> = {
-      [self.studentId]: [grant(self.studentId, 'pricing.selfStudyCoursePercent', 30), grant(self.studentId, 'pricing.selfStudyBoardPercent', 50)],
-      [retaker.studentId]: [grant(retaker.studentId, 'pricing.retakeTaughtCoursePercent', 60), grant(retaker.studentId, 'pricing.onePaperCoursePercent', 80)],
-    };
-    const original = lineExceptions.active;
-    const spy = vi.spyOn(lineExceptions, 'active').mockImplementation(async (executor, studentId, keys, scope, opts) => {
-      const own = await original.call(lineExceptions, executor, studentId, keys, scope, opts);
-      return [...(held[studentId] ?? []).filter((e) => keys.includes(e.policyKey) && scope.sessionId === session), ...own];
-    });
-    try {
-      const [s] = await reserve(self, [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }]);
-      // 30% of the course fee (14,000) and 50% of the exam fee (9,200), in place of the share and 100%.
-      expect(await priceOf(s!.id)).toMatchObject({ course: 4200, board: 4600, price: 8800 });
-      expect((await priceOf(s!.id)).basis).toMatchObject({
-        v: 2, coursePercent: 30, boardPercent: 50, exceptionIds: [`test-pricing.selfStudyCoursePercent-${self.studentId}`, `test-pricing.selfStudyBoardPercent-${self.studentId}`],
-      });
-      // A retake in school at 60%; the one-paper percent does not apply to all papers: not recorded.
-      const [r] = await reserve(retaker, [{ offerItemId: taughtAll, attempt: 'retake', mode: 'in_school', teacherId, priorSittingSeriesId: priorJune }]);
-      expect(await priceOf(r!.id)).toMatchObject({ course: 8400, board: 9200, price: 17600 });
-      expect((await priceOf(r!.id)).basis).toMatchObject({ coursePercent: 60, onePaperPercent: 100, exceptionIds: [`test-pricing.retakeTaughtCoursePercent-${retaker.studentId}`] });
-      // A student who holds none pays the session's share.
-      const [n] = await reserve(none, [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }]);
-      expect(await priceOf(n!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200 });
-      expect((await priceOf(n!.id)).basis).toMatchObject({ coursePercent: 50, boardPercent: 100, exceptionIds: [] });
-    } finally {
-      spy.mockRestore();
-    }
-  });
+  // 'a pricing.* exception replaces its part's percent …' retired with the pricing.* keys (§4, §6: the price is the exam
+  // fee in full plus the course fee in school or at the session's share, then a per-student price override; trail row
+  // "retired 08p pricing.* exceptions"). The price exceptions that stay are the next case's.
 
   it("price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line", async () => {
     const f = await onboard(officer, `p08-exc-${RUN}`, 11);
@@ -285,7 +245,8 @@ describe('08p: pricing policies on pricing v2', () => {
     const f = await onboard(officer, `p08-prov-${RUN}`, 11);
     const [line] = await reserve(f, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
     expect(await priceOf(line!.id)).toMatchObject({ price: 23200, provisional: true });
-    const { PROVISIONAL_REFUSAL } = await import('../src/services/pricing.services');
+    // P1b (mayPay): PRICES_NOT_FINAL.
+    const { PRICES_NOT_FINAL_REFUSAL: PROVISIONAL_REFUSAL } = await import('../src/services/window.services');
     expect((await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).error).toBe(PROVISIONAL_REFUSAL);
     expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [line!.id], instrumentUsed: 'cash', escrowAmountToApply: 0 } }))).error).toBe(PROVISIONAL_REFUSAL);
     expect(await sql(`select 1 from payment_registration where registration_id = $1`, [line!.id])).toEqual([]);
@@ -302,6 +263,18 @@ describe('08p: pricing policies on pricing v2', () => {
     const [legacy] = await reserve(h, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
     await sql(`update registration set price_provisional = false, pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
       '[{"id": "a-confirmed-grid-row", "keyKind": "subject", "keyId": "x", "amount": 9200, "provisional": false}]'::jsonb) where id = $1`, [legacy!.id]);
+    // And a legacy line priced from a provisional grid row that the old Confirm later confirmed at the amount it recorded
+    // (P1b fix 1): the Confirm cleared its mark weeks ago, its basis still saying provisional; 0066 then stamped the
+    // session prices-final. Its price stopped being provisional at the confirmation, not at the stamp.
+    const k = await onboard(officer, `p08-prov-v1c-${RUN}`, 11);
+    const [cleared] = await reserve(k, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
+    const feeRowId = `p08-confirmed-grid-row-${RUN}`;
+    await sql(`insert into board_fee (id, board_series_id, key_kind, subject_id, amount, provisional, confirmed_at)
+      select $1, i.board_series_id, 'subject', o.subject_id, 9200, false, now() - interval '30 days'
+      from session_offer_item i join session_offer o on o.id = i.offer_id where i.id = $2`, [feeRowId, taughtAll]);
+    await sql(`update registration set price_provisional = false, created_at = now() - interval '40 days', pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
+      jsonb_build_array(jsonb_build_object('id', $1::text, 'keyKind', 'subject', 'keyId', 'x', 'amount', 9200, 'provisional', true))) where id = $2`, [feeRowId, cleared!.id]);
+    expect(await priceOf(cleared!.id)).toMatchObject({ provisional: false, basis: { v: 1, feeRows: [{ id: feeRowId, provisional: true }] } });
     const waiting = Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and status = 'pending_payment' and price_provisional`, [session])).n);
     const dueBefore = new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line!.id])).d).getTime();
     const switchedAt = Date.now();
@@ -328,6 +301,9 @@ describe('08p: pricing policies on pricing v2', () => {
     // grace: the moment prices became final says nothing about a price that was never provisional (0066 stamps it).
     const newPaymentDue = new Date((await one<{ d: string }>(`select payment_due_at as d from registration_session where id = $1`, [session])).d).getTime();
     expect(await dueOf(legacy!.id)).toBe(newPaymentDue);
+    // The line the old Confirm cleared keeps the Confirm's date (its grace long over): due at the payment date, not at
+    // the stamp plus the grace.
+    expect(await dueOf(cleared!.id)).toBe(newPaymentDue);
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [pay!.id!])).amount)).toBe(23200);
   });

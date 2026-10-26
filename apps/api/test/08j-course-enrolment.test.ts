@@ -67,7 +67,8 @@ describe('F0b: course enrolment', () => {
     await apiResponse(coordinator.api.v1.academic.sections[':id'].members.$post({
       param: { id: section }, json: { studentIds: [s.s1!.studentId, s.s2!.studentId, s.s3!.studentId] },
     }));
-    june = await session(adm, 'June (IGCSE, enrolment)', 'june', 'igcse', futureWindow());
+    // P1b (C4): reserved in an open session (they were preregistrations in a draft; a draft takes none now).
+    june = await session(adm, 'June (IGCSE, enrolment)', 'june', 'igcse', { ...futureWindow(), activate: true });
     // Who teaches English and Mathematics this cycle (the reservations rework: a line names one of its offer's teachers).
     await teachOffer(adm, june, subj.ENG!, [tA, tB]);
     await teachOffer(adm, june, subj.MAT!, [tA, tB]);
@@ -153,11 +154,11 @@ describe('F0b: course enrolment', () => {
     });
 
     it('from registrations: the teacher each registration names, and self-study where it was taken outside school', async () => {
-      // s3 preregisters English with teacher A, and Physics (not taught here, so outside school). A first
+      // s3 reserves English with teacher A, and Physics (not taught here, so outside school). A first
       // entry in self-study on a subject not taught this cycle is the student's exception since the lead's
       // decision of 16 Oct 2026 (FEATURES_PLAN.md §6, 1): granted first.
       await apiResponse(adm.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', studentId: s.s3!.studentId, reason: '08j: Physics is not taught here this cycle' } }));
-      await apiResponse(s.s3!.parent.api.v1.registrations.preregister.$post({
+      await apiResponse(s.s3!.parent.api.v1.registrations.direct.$post({
         json: { sessionId: june, ...(await reservationOf(june, [subj.ENG!, subj.PHY!], { teachers: { [subj.ENG!]: tA } })), studentId: s.s3!.studentId },
       }));
       const r = await apiResponse(coordinator.api.v1.enrolments.bulk.$post({
@@ -206,14 +207,14 @@ describe('F0b: course enrolment', () => {
 
   describe('registrations checked against enrolments — flagged, never blocked', () => {
     it('a registration without an enrolment is flagged, and the registration stands', async () => {
-      // s4 preregisters Biology, which nobody enrolled them in.
-      const reg = (await apiResponse(s.s4!.parent.api.v1.registrations.preregister.$post({
+      // s4 reserves Biology, which nobody enrolled them in.
+      const reg = (await apiResponse(s.s4!.parent.api.v1.registrations.direct.$post({
         json: { sessionId: june, ...(await reservationOf(june, [subj.BIO!])), studentId: s.s4!.studentId },
       })))[0]!;
-      expect(reg.status).toBe('preregistered');
+      expect(reg.status).toBe('pending_payment');
       const flags = await apiResponse(coordinator.api.v1.enrolments.check.$get({ query: { academicYearId: thisYear } }));
       expect(flags.registeredNotEnrolled.filter((f) => f.studentId === s.s4!.studentId).map((f) => [f.subjectName, f.window, f.registrationStatus]))
-        .toEqual([['Biology (enrolment)', await sessionName(june), 'preregistered']]);
+        .toEqual([['Biology (enrolment)', await sessionName(june), 'pending_payment']]);
       // s1 is enrolled in English and registered nowhere this year.
       expect(flags.enrolledNotRegistered.filter((f) => f.studentId === s.s1!.studentId).map((f) => [f.subjectName, f.teacherName, f.section]))
         .toContainEqual(['English (enrolment)', 'teacher enr-a', 'EN-11A']);
@@ -230,7 +231,7 @@ describe('F0b: course enrolment', () => {
     it('a mode or teacher that disagrees is flagged too', async () => {
       // s2 is taught Mathematics by B; their registration names A (both teach it).
       await apiResponse(adm.api.v1.subjects[':id'].teachers.$put({ param: { id: subj.MAT! }, json: { teacherIds: [tA, tB] } }));
-      await apiResponse(s.s2!.parent.api.v1.registrations.preregister.$post({
+      await apiResponse(s.s2!.parent.api.v1.registrations.direct.$post({
         json: { sessionId: june, ...(await reservationOf(june, [subj.MAT!], { teachers: { [subj.MAT!]: tA } })), studentId: s.s2!.studentId },
       }));
       const flags = await apiResponse(coordinator.api.v1.enrolments.check.$get({ query: { academicYearId: thisYear, studentId: s.s2!.studentId } }));

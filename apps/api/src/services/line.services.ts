@@ -4,8 +4,8 @@
  * `insertLines` is the one way a line is made: inside the caller's transaction, after
  * `assertMayRegisterForInTx` (the student lock), it takes the rework's locks in the one order
  * of RESERVATIONS_REWORK.md §6 (each subject's board, the session's series links, the series,
- * the offers, the items, the fee rows), refuses a line whose series is past its effective
- * deadline or has no dates at all, runs `assertLineRules`, prices each line with `priceLine`,
+ * the offers, the items, the fee rows), runs `assertLineRules` (v2: may reserve, the cells, F2,
+ * the earlier exam, D8, the same entry once), prices each line with `priceLine`,
  * sets its due date, checks its teacher and inserts it; the routing trigger enters it in its
  * item's series. It writes no consent rows: the caller does (step B).
  *
@@ -33,11 +33,10 @@ import { boardSeriesName } from './series.services';
 import { lockFeeGrids } from '../lib/fee-grid-lock';
 import { assertLineRules } from './line-rules.services';
 import { priceLine } from './pricing.services';
-import { computeDueAt, effectiveDeadlineFor, deadlinePassedSentence } from './deadline.services';
+import { computeDueAt, effectiveDeadlineFor } from './deadline.services';
 import { lineExceptions } from './line-exceptions';
 import { getSetting } from './settings.services';
 import { resolveItem, availabilityConstraints, OfferError } from './offer.services';
-import { schoolDate } from './window.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -145,24 +144,23 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
     .where(inArray(sessionOfferItem.id, itemIds));
   const byId = new Map(items.map((i) => [i.item.id, i]));
 
-  // Each line's own cut-off: its series' effective deadline (§3.3). A series with no date at all takes no line.
+  // Each line's board deadline caps its due date (§6). Whether it may be reserved at all — her dates, a G4 later
+  // reserve date, never past the board's deadline — is mayReserve, asked by the line rules under the locks above
+  // (the coordinator rework replaced the old "past the deadline / no dates" refusal: a sitting with no board date
+  // has no cap, and her own dates still apply, §14).
   const deadlines = new Map<string, Date | null>();
   for (const l of input.lines) {
     const it = byId.get(l.offerItemId);
     if (!it || it.item.sessionId !== input.sessionId) throw new LineError('That item is not on offer in this session', 404);
     if (!it.item.boardSeriesId) throw new LineError(`${it.subjectName} is entered in no board series: it cannot be reserved`);
     // A line being made has no answer to a declaration yet (declarationRejected false).
-    const d = await effectiveDeadlineFor(tx, { boardSeriesId: it.item.boardSeriesId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId ?? null, declarationRejected: false, studentId: input.studentId });
-    if (!d.at) {
-      throw new LineError(`${it.subjectName} is entered in a board series with no entry deadline and no exam dates yet: it opens for reservations once they are set`);
-    }
-    if (d.at <= now) throw new LineError(deadlinePassedSentence(d, schoolDate));
+    const d = await effectiveDeadlineFor(tx, { boardSeriesId: it.item.boardSeriesId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId ?? null, declarationRejected: false });
     deadlines.set(l.offerItemId, d.at);
   }
 
   const { usedExceptionIds } = await assertLineRules(tx, { studentId: input.studentId, sessionId: input.sessionId, eligibility: input.eligibility }, input.lines.map((l) => ({
     offerItemId: l.offerItemId, attempt: l.attempt, mode: l.mode, priorSittingSeriesId: l.priorSittingSeriesId ?? null, priorSittingSource: l.priorSittingSource ?? null,
-  })));
+  })), { now });
 
   const graceDays = await getSetting('payment.graceDays', tx);
   const records: (typeof registration.$inferInsert)[] = [];
