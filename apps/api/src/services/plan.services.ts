@@ -347,7 +347,9 @@ export async function capturePlanInTx(
     { registrationId: line.id, planId: a.planId, heldCaptured: line.priceAtRegistration, depositSlips: slips }, a.ctx, tx);
   await logAction(a.actorId, 'PAYMENT_CONFIRMED', 'payment', id, { status: 'pending' },
     { status: 'completed', instrumentUsed: 'held_deposits', notes: 'Paid from the plan\'s instalments' }, a.ctx, tx);
-  await logAction(a.actorId, 'REGISTRATION_CONFIRMED', 'registration', line.id, null, { paymentId: id, planId: a.planId }, a.ctx, tx);
+  const boardDeadline = (await effectiveDeadlineFor(tx, line)).at;
+  await logAction(a.actorId, 'REGISTRATION_CONFIRMED', 'registration', line.id, null,
+    { paymentId: id, planId: a.planId, boardDeadline: boardDeadline?.toISOString() ?? null }, a.ctx, tx);
   const name = await subjectNameOf(tx, line.id);
   await tellFamily(tx, line.studentId, 'PLAN_UPDATED', `${name} is paid`,
     `The last instalment arrived: ${name} is paid in full from the instalments (${formatEgp(line.priceAtRegistration)}). Its receipt is ready at the finance desk.`,

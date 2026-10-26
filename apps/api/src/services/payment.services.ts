@@ -652,8 +652,11 @@ export async function confirmPayment(
     // Only rows that moved: a preregistration a payment funds stays
     // preregistered (its money is held), and was logged as confirmed (state
     // audit, inventory R12).
+    // Each with its board deadline as it stood (P1b: 09 checks no line was confirmed after it).
+    const deadlines = confirmedIds.length ? await effectiveDeadlinesOf(tx, confirmedIds) : new Map<string, { at: Date | null }>();
     for (const regId of confirmedIds) {
-      await logAction(confirmedBy ?? null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId }, auditCtx, tx);
+      await logAction(confirmedBy ?? null, 'REGISTRATION_CONFIRMED', 'registration', regId, null,
+        { paymentId, boardDeadline: deadlines.get(regId)?.at?.toISOString() ?? null }, auditCtx, tx);
     }
 
     return { updated: paymentUpdate, registrationIds: regIds };
