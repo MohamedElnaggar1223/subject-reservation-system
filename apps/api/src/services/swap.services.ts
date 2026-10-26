@@ -115,7 +115,7 @@ async function swapQuote(studentId: string, sessionId: string, line: SwapLine) {
   const sub = await db.query.subject.findFirst({ where: (s, { eq: eqOp }) => eqOp(s.id, item.offer.subjectId), columns: { id: true, name: true, isActive: true } });
   if (!sub || !sub.isActive) throw new Error('This subject is no longer available for registration');
   const price = await priceLine(db, { item: { id: item.id }, attempt: line.attempt, mode: line.mode, studentId, sessionId });
-  const name = item.kind === 'whole' ? sub.name : `${sub.name} — ${item.label}`;
+  const name = item.kind === 'all_papers' ? sub.name : `${sub.name} — ${item.label}`;
   return { line, price, subject: sub, name, isCore: item.offer.grade10Core };
 }
 

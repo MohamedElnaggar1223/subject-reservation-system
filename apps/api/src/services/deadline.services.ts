@@ -15,7 +15,7 @@
  * reminders, "overdue" and the statement; it expires nothing by itself.
  */
 
-import { db, registration, registrationSession, boardFee, sql, eq, and, inArray } from '@repo/db';
+import { db, registration, registrationSession, sessionOfferItem, boardFee, sql, eq, and, inArray } from '@repo/db';
 import { getSetting } from './settings.services';
 import { lineExceptions, type ExceptionScope } from './line-exceptions';
 import { logActions } from './audit.services';
@@ -184,17 +184,27 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
       offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt,
       priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected, createdAt: registration.createdAt,
       priceProvisional: registration.priceProvisional, pricingBasis: registration.pricingBasis, paymentDueAt: registrationSession.paymentDueAt,
+      pricesFinalAt: registrationSession.pricesFinalAt, payBy: sessionOfferItem.payBy,
     })
     .from(registration)
     .innerJoin(registrationSession, eq(registrationSession.id, registration.sessionId))
+    .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
     .where(eq(registration.id, input.lineId));
   if (!line) throw new Error('Registration not found');
-  const feeIds = ((line.pricingBasis as { feeRows?: { id: string }[] } | null)?.feeRows ?? []).map((f) => f.id);
-  const rows = feeIds.length
-    ? await executor.select({ confirmedAt: boardFee.confirmedAt }).from(boardFee).where(inArray(boardFee.id, feeIds))
-    : [];
-  const confirmed = rows.map((r) => r.confirmedAt).filter((d): d is Date => !!d);
-  const feeConfirmedAt = !line.priceProvisional && confirmed.length ? new Date(Math.max(...confirmed.map((d) => d.getTime()))) : null;
+  // When the price stopped being provisional: a v2 line (the coordinator rework) when its session's
+  // prices were switched final (§6: switching them final re-dates every waiting line from prices_final_at);
+  // a v1 line when the last fee row its basis read was confirmed.
+  let feeConfirmedAt: Date | null = null;
+  if ((line.pricingBasis as { v?: number } | null)?.v === 2) {
+    feeConfirmedAt = !line.priceProvisional ? line.pricesFinalAt : null;
+  } else {
+    const feeIds = ((line.pricingBasis as { feeRows?: { id: string }[] } | null)?.feeRows ?? []).map((f) => f.id);
+    const rows = feeIds.length
+      ? await executor.select({ confirmedAt: boardFee.confirmedAt }).from(boardFee).where(inArray(boardFee.id, feeIds))
+      : [];
+    const confirmed = rows.map((r) => r.confirmedAt).filter((d): d is Date => !!d);
+    feeConfirmedAt = !line.priceProvisional && confirmed.length ? new Date(Math.max(...confirmed.map((d) => d.getTime()))) : null;
+  }
   const [deadline, exc] = await Promise.all([
     effectiveDeadlineFor(executor, line),
     lineExceptions.active(executor, line.studentId, ['deadline.payment'], {
@@ -202,7 +212,8 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
     }),
   ]);
   return computeDueAt({
-    basis: line.paymentDueAt, reservedAt: line.createdAt, graceDays, provisional: line.priceProvisional, feeConfirmedAt,
+    // §6: the row's pay-by if set (D12), else the session's payment due date.
+    basis: line.payBy ?? line.paymentDueAt, reservedAt: line.createdAt, graceDays, provisional: line.priceProvisional, feeConfirmedAt,
     exceptionDate: exc.find((e) => e.valueDate)?.valueDate ?? null, cap: deadline.at,
   });
 }

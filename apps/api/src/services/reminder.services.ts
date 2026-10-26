@@ -253,7 +253,7 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
       const item = items.find((i) => i.targetKind === 'line' && i.targetId === r.id)!;
       // The due date it was found with: a line re-dated meanwhile is reminded on its new day, not now.
       if (asDate(r.due_at).getTime() !== item.anchor.getTime()) continue;
-      live.push({ item, amount: Number(r.price), label: r.itemKind === 'whole' ? (r.subject as string) : `${r.subject as string} — ${r.label as string}`, dueAt: item.anchor, sessionName: r.sessionName as string });
+      live.push({ item, amount: Number(r.price), label: r.itemKind === 'all_papers' ? (r.subject as string) : `${r.subject as string} — ${r.label as string}`, dueAt: item.anchor, sessionName: r.sessionName as string });
     }
   }
   const chargeIds = ids('charge');
@@ -366,8 +366,10 @@ async function targetsOf(tx: Tx, kind: ReminderKind, won: Live[], overdueText = 
     const sessionId = won[0]!.item.targetId;
     const [s] = await tx.select({ name: registrationSession.name, endDate: registrationSession.endDate }).from(registrationSession).where(eq(registrationSession.id, sessionId));
     // Every active student and every parent, as the 24-hour reminder (NOT-002) reached them.
+    // A session that closes by hand only (no close date, the coordinator rework's C4) is never "closing".
+    if (!s?.endDate) return [];
     const people = [...(await broadcastMembers(tx, 'students', null)), ...(await broadcastMembers(tx, 'parents', null))];
-    const extra = { en: { session: s!.name, closes: messageDate(s!.endDate, 'en') }, ar: { session: s!.name, closes: messageDate(s!.endDate, 'ar') } };
+    const extra = { en: { session: s.name, closes: messageDate(s.endDate, 'en') }, ar: { session: s.name, closes: messageDate(s.endDate, 'ar') } };
     return people.map((member) => ({ member, extra }));
   }
   if (kind === 'entry_deadline') {

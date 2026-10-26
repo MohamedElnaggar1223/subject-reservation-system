@@ -39,11 +39,12 @@ export function formatSeriesName(s: { boardName: string | null; month: string; y
 export function basisText(basis: PricingBasis | null, line: { courseFee: number; boardFee: number; provisional?: boolean }) {
   if (!basis) return `course ${fmt(line.courseFee)} + board ${fmt(line.boardFee)} (recorded before the rework)`;
   if (basis.customPrice) return `custom price ${fmt(basis.total)} (an exception; board fee included)`;
-  const coursePct = round2((basis.coursePercent * (basis.itemKind === 'one_paper' ? basis.onePaperPercent : 100)) / 100);
+  const coursePct = round2((basis.coursePercent * (basis.itemKind === 'paper' || basis.itemKind === 'one_paper' ? basis.onePaperPercent : 100)) / 100);
   const parts = `course ${fmt(basis.courseFeeBase)} × ${coursePct}% + board ${fmt(basis.boardFeeBase)} × ${basis.boardPercent}%`;
   const plain = round2((basis.courseFeeBase * coursePct) / 100 + (basis.boardFeeBase * basis.boardPercent) / 100);
-  // Provisional as the line is now: a fee confirmed at its amount clears the line, not its basis.
-  const provisional = line.provisional ? ' (board fee provisional)' : '';
+  // Provisional as the line is now: a fee confirmed at its amount clears the line, not its basis. A v2 line
+  // (the coordinator rework) is provisional while its session's prices are not final (E6).
+  const provisional = line.provisional ? (basis.v === 2 ? ' (prices not final yet)' : ' (board fee provisional)') : '';
   return round2(basis.total) === plain ? `${parts}${provisional}` : `${parts} = ${fmt(plain)}, less exceptions = ${fmt(basis.total)}${provisional}`;
 }
 
@@ -126,7 +127,7 @@ async function linesOf(studentIds: string[]) {
       subject: l.subject,
       item: l.item,
       kind: l.kind,
-      label: l.kind === 'whole' ? l.subject : `${l.subject} — ${l.item}`,
+      label: l.kind === 'all_papers' ? l.subject : `${l.subject} — ${l.item}`,
       attempt: l.attempt,
       mode: l.mode,
       teacher: l.teacher,
@@ -211,7 +212,7 @@ async function paymentsOf(studentIds: string[]) {
   const r = await db.execute(sql`
     select p.id, p.student_id, p.purpose, p.status, p.payment_method as method, p.instrument_used as instrument, p.amount, p.escrow_amount_applied as escrow,
       p.created_at, p.confirmed_at, p.reversed_at, p.external_reference as reference, p.academic_year,
-      (select json_agg(json_build_object('registrationId', r.id, 'label', case when i.kind = 'whole' then s.name else s.name || ' — ' || i.label end,
+      (select json_agg(json_build_object('registrationId', r.id, 'label', case when i.kind = 'all_papers' then s.name else s.name || ' — ' || i.label end,
           'receipt', (select rc.receipt_number from receipt rc where rc.registration_id = r.id)) order by s.name)
         from payment_registration pr join registration r on r.id = pr.registration_id join session_offer_item i on i.id = r.offer_item_id
         join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id where pr.payment_id = p.id) as covers,

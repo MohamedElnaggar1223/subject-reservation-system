@@ -62,7 +62,8 @@ export function varsFor(m: AudienceMember, resolved: Pick<ResolvedAudience, 'ses
   };
   const sessionName = resolved.session?.name ?? m.owed?.sessionName ?? null;
   if (sessionName) v.session = sessionName;
-  if (resolved.session) v.closes = messageDate(resolved.session.endDate, lang);
+  // A session with no close date (closed by hand only, the coordinator rework's C4) gives no {closes}.
+  if (resolved.session?.endDate) v.closes = messageDate(resolved.session.endDate, lang);
   if (m.owed) {
     v.amount = messageAmount(m.owed.amount, lang);
     v.due = messageDate(m.owed.dueAt, lang);

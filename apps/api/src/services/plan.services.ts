@@ -145,7 +145,8 @@ export async function grantPlanInTx(tx: Tx, a: { planId: string; lineId: string;
   if (rows[0]!.dueAt < dayStart) throw new PlanError('The first instalment is not in the past');
   const [sess] = await tx.select({ endDate: registrationSession.endDate }).from(registrationSession).where(eq(registrationSession.id, line.sessionId));
   const deadline = await effectiveDeadlineFor(tx, line);
-  const cap = deadline.at && sess && deadline.at < sess.endDate ? deadline.at : sess?.endDate ?? deadline.at;
+  const end = sess?.endDate ?? null;
+  const cap = deadline.at && end && deadline.at < end ? deadline.at : end ?? deadline.at;
   const last = rows[rows.length - 1]!.dueAt;
   if (cap && last > cap) {
     throw new PlanError(`The last instalment is due by ${schoolDate(cap)} at the latest (the earlier of the session's end and the line's deadline)`);

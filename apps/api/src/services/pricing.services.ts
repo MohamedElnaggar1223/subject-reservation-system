@@ -1,24 +1,39 @@
 /**
- * The one pricing function (RESERVATIONS_REWORK.md §3.4; docs/features/RESERVATIONS.md §2.3).
+ * The one pricing function (COORDINATOR_REWORK.md §6, §9.2; RESERVATIONS_REWORK.md §3.4).
  *
- * `priceLine(item, attempt, mode, student, session)` replaces `computeRegistrationPricing`
- * in every path that creates or re-prices a line:
+ * `priceLine(item, attempt, mode, student, session)` prices every line a path creates or re-prices.
  *
- *   course = (item's course fee ?? offer's) × the mode's and attempt's percent
- *            (self-study: pricing.selfStudyCoursePercent; a retake in school:
- *             pricing.retakeTaughtCoursePercent) × pricing.onePaperCoursePercent for a one-paper item
- *   board  = Σ the series' fee rows for the item's fee keys × (self-study: pricing.selfStudyBoardPercent)
+ * Version 2 — the coordinator rework (a row made through the set-up routes, or converted by
+ * migration 0066 with its exam fee):
+ *
+ *   exam   = the row's exam fee × 100%            (self study: × a pricing.selfStudyBoardPercent
+ *                                                   exception where one applies — P1b removes the key)
+ *   course = the row's course fee, else the offering's
+ *            × 100% in school                      (a retake in school: × a pricing.retakeTaughtCoursePercent
+ *                                                   exception; a one-paper row: × a pricing.onePaperCoursePercent
+ *                                                   exception — no setting is read any more)
+ *            × the session's self-study share in self study (a pricing.selfStudyCoursePercent exception
+ *              replaces it), or the row's own self-study amount in its place
  *   then the price exceptions in today's order: a custom price replaces the total (course = total,
- *   board = 0); else percent discounts on both parts; then a fixed discount (course first).
- *   total  = course + board
+ *   exam = 0); else percent discounts on both parts; then a fixed discount (course first).
+ *   total  = course + exam
+ *   provisional = !session.prices_final   (E6: reserved before, paid only once it is on)
  *
- * The result and its basis (attempt, mode, percents, fee rows with their provisional flag,
- * exception ids) are snapshotted on the line, so the receipt and the statement say why. An item
- * whose key has no fee row cannot be priced (nor reserved) until one is set.
+ * A row whose exam fee or course fee is not set cannot be priced (PRICE_NOT_SET_REFUSAL): it is not
+ * offered to families until it is.
+ *
+ * Version 1 — the deprecated fee-key path: an item made by the deprecated offers/items routes that has
+ * fee keys and no exam fee is priced from its series' fee grid exactly as before (the settings'
+ * percents, provisional from the fee rows), until P1b drops those routes and the old columns.
+ *
+ * The result and its basis are snapshotted on the line, so the receipt and the statement say why.
  */
 
-import { db, sessionOffer, sessionOfferItem, sessionOfferItemFeeKey, boardFee, boardSeries, examBoard, and, or, eq, inArray } from '@repo/db';
-import type { PricingBasis, Attempt, LineMode } from '@repo/validations';
+import {
+  db, registrationSession, sessionOffer, sessionOfferItem, sessionOfferItemFeeKey, boardFee, boardSeries, examBoard, subject,
+  and, or, eq, inArray,
+} from '@repo/db';
+import type { PricingBasis, PricingBasisV1, PricingBasisV2, Attempt, LineMode } from '@repo/validations';
 import { seriesLabel } from '@repo/validations';
 import { getSetting } from './settings.services';
 import { lineExceptions, type PolicyException } from './line-exceptions';
@@ -43,16 +58,20 @@ export const PRICE_CHANGED_REFUSAL = 'The price of one or more of these subjects
 /** The desk's and the checkout's refusal for a line whose board fee is not yet confirmed (§3.4). */
 export const PROVISIONAL_REFUSAL = 'Board fee provisional, confirmed before payment: this line can be reserved but not paid until the exam board publishes its fee and the school confirms it';
 
+/** PRICE_NOT_SET (Appendix A): a row whose exam fee or course fee is not set is not offered to families. */
+export const PRICE_NOT_SET_REFUSAL = (what: string, part: 'exam fee' | 'course fee') =>
+  `${what} has no ${part} set yet: it is not offered to families until the school sets it`;
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
 export type LinePrice = {
   courseFee: number;
-  /** The board part (the line's registration_fee_at_registration). */
+  /** The exam (board) part (the line's registration_fee_at_registration). */
   registrationFee: number;
   total: number;
-  /** A fee row read is still provisional: the line can be reserved, not paid (unless the setting allows). */
+  /** v2: the session's prices are not final; v1: a fee row read is still provisional. */
   provisional: boolean;
   basis: PricingBasis;
 };
@@ -67,7 +86,7 @@ export type PriceLineInput = {
 
 type FeeRow = typeof boardFee.$inferSelect;
 
-/** The fee rows an item's keys read in its series; refused when one is missing. */
+/** The fee rows an item's keys read in its series; refused when one is missing (the deprecated v1 path). */
 export async function feeRowsForItem(executor: Executor, itemId: string, opts: { lock?: boolean } = {}) {
   const [it] = await executor
     .select({ item: sessionOfferItem, subjectId: sessionOffer.subjectId, offerCourseFee: sessionOffer.courseFee, offerSessionId: sessionOffer.sessionId })
@@ -94,7 +113,17 @@ export async function feeRowsForItem(executor: Executor, itemId: string, opts: {
     const series = s ? `${s.boardName} ${seriesLabel(s.month, s.year)}${s.label ? ` (${s.label})` : ''}` : 'its series';
     throw new PricingError(`${it.item.label} has no board fee in ${series} yet — set one on the session's Fees tab`);
   }
-  return { item: it.item, subjectId: it.subjectId, offerCourseFee: it.offerCourseFee, sessionId: it.offerSessionId, keys, rows };
+  return { item: it.item, subjectId: it.subjectId, offerCourseFee: it.offerCourseFee ?? 0, sessionId: it.offerSessionId, keys, rows };
+}
+
+/**
+ * Whether an item is priced the deprecated way (v1): no exam fee of its own, and fee keys that read
+ * the series' fee grid — an item made by the deprecated offers/items routes. Every other item is v2.
+ */
+export async function isFeeKeyPriced(executor: Executor, item: { id: string; examFee: number | null }): Promise<boolean> {
+  if (item.examFee !== null) return false;
+  const [k] = await executor.select({ id: sessionOfferItemFeeKey.id }).from(sessionOfferItemFeeKey).where(eq(sessionOfferItemFeeKey.itemId, item.id)).limit(1);
+  return !!k;
 }
 
 /** The price exceptions applied in today's order (exception.services applyPricingExceptions). */
@@ -125,20 +154,102 @@ function applyPriceExceptions(courseFee: number, registrationFee: number, exc: P
 }
 
 const PRICE_KEYS = ['price.custom', 'price.discountPercent', 'price.discountFixed'] as const;
-/** The percents an exception may set for one student or family in place of the settings' (§3.4, §3.7). */
+/**
+ * The percents an exception may set for one student or family (§3.4, §3.7). Version 2 reads no
+ * setting for them; an exception of these keys still applies while the registry keeps them (P1b
+ * removes the keys with their settings).
+ */
 const PERCENT_KEYS = ['pricing.selfStudyCoursePercent', 'pricing.selfStudyBoardPercent', 'pricing.retakeTaughtCoursePercent', 'pricing.onePaperCoursePercent'] as const;
 type PercentKey = (typeof PERCENT_KEYS)[number];
 
+/** The row, its offering and its session as version 2 reads them; held FOR SHARE in §9.2's order when `lock`. */
+async function rowForPricing(executor: Executor, itemId: string, lock: boolean) {
+  const [found] = await executor.select({ sessionId: sessionOfferItem.sessionId, offerId: sessionOfferItem.offerId })
+    .from(sessionOfferItem).where(eq(sessionOfferItem.id, itemId));
+  if (!found) throw new PricingError('That item is not on offer', 404);
+  // The session, the offering, the row — FOR SHARE in that order (insertLines' order, §9.2): a share,
+  // course fee or exam fee change takes them FOR UPDATE in the same order before it re-prices.
+  const sq = executor.select({ selfStudyPercent: registrationSession.selfStudyPercent, pricesFinal: registrationSession.pricesFinal })
+    .from(registrationSession).where(eq(registrationSession.id, found.sessionId));
+  const [session] = lock ? await sq.for('share') : await sq;
+  const oq = executor.select({ id: sessionOffer.id, courseFee: sessionOffer.courseFee, subjectId: sessionOffer.subjectId, subjectName: subject.name })
+    .from(sessionOffer).innerJoin(subject, eq(subject.id, sessionOffer.subjectId)).where(eq(sessionOffer.id, found.offerId));
+  const [offer] = lock ? await oq.for('share', { of: sessionOffer }) : await oq;
+  const iq = executor.select().from(sessionOfferItem).where(eq(sessionOfferItem.id, itemId));
+  const [item] = lock ? await iq.for('share') : await iq;
+  if (!session || !offer || !item) throw new PricingError('That item is not on offer', 404);
+  return { session, offer, item };
+}
+
 /**
  * The price of one line. `exceptionIds`: a re-price applies exactly these (the ids its basis
- * recorded) instead of the student's current exceptions. `lock`: the fee rows are read FOR
- * SHARE (inside a creating transaction), so a confirm or a re-price waits for it.
+ * recorded) instead of the student's current exceptions. `lock`: what it reads is held FOR SHARE
+ * (inside a creating transaction), so a re-price or a confirm waits for it.
  */
 export async function priceLine(
   executor: Executor,
   input: PriceLineInput,
   opts: { exceptionIds?: string[]; lock?: boolean } = {},
 ): Promise<LinePrice> {
+  const { session, offer, item } = await rowForPricing(executor, input.item.id, !!opts.lock);
+  if (await isFeeKeyPriced(executor, item)) return priceLineV1(executor, input, opts);
+  const what = item.kind === 'all_papers' ? offer.subjectName : `${offer.subjectName} — ${item.label}`;
+  if (item.examFee === null) throw new PricingError(PRICE_NOT_SET_REFUSAL(what, 'exam fee'));
+  const courseFeeBase = item.courseFee ?? offer.courseFee;
+  if (courseFeeBase === null) throw new PricingError(PRICE_NOT_SET_REFUSAL(what, 'course fee'));
+  const all = opts.exceptionIds
+    ? await lineExceptions.byIds(executor, opts.exceptionIds)
+    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS, ...PERCENT_KEYS], {
+        sessionId: input.sessionId, subjectId: offer.subjectId, offerId: offer.id, offerItemId: item.id,
+      }, opts.lock ? { lock: 'share' } : undefined);
+  const applied: PolicyException[] = [];
+  const percent = (key: PercentKey, base: number) => {
+    const e = all.find((x) => x.policyKey === key && x.value != null);
+    if (!e) return base;
+    applied.push(e);
+    return e.value!;
+  };
+  const selfStudy = input.mode === 'self_study';
+  // The row's own self-study amount replaces the share (E4); else the session's share, which a
+  // student's pricing.selfStudyCoursePercent exception replaces.
+  const ownSelfStudy = selfStudy && item.selfStudyFee !== null;
+  const coursePercent = selfStudy
+    ? (ownSelfStudy ? 100 : percent('pricing.selfStudyCoursePercent', session.selfStudyPercent))
+    : input.attempt === 'retake' ? percent('pricing.retakeTaughtCoursePercent', 100) : 100;
+  const onePaperPercent = item.kind === 'paper' ? percent('pricing.onePaperCoursePercent', 100) : 100;
+  const courseBase = ownSelfStudy ? item.selfStudyFee! : courseFeeBase;
+  const boardPercent = selfStudy ? percent('pricing.selfStudyBoardPercent', 100) : 100;
+  const course = round2(((courseBase * coursePercent) / 100) * onePaperPercent / 100);
+  const exam = round2((item.examFee * boardPercent) / 100);
+  const exc = all.filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey));
+  const priced = applyPriceExceptions(course, exam, exc);
+  const basis: PricingBasisV2 = {
+    v: 2,
+    rowId: item.id,
+    attempt: input.attempt,
+    mode: input.mode,
+    itemKind: item.kind,
+    examFee: item.examFee,
+    examFeeSource: item.examFeeSource,
+    selfStudyShare: session.selfStudyPercent,
+    selfStudyFee: ownSelfStudy ? item.selfStudyFee : null,
+    courseFeeBase: courseBase,
+    coursePercent,
+    onePaperPercent,
+    boardFeeBase: item.examFee,
+    boardPercent,
+    feeRows: [],
+    exceptionIds: [...applied, ...exc].map((e) => e.id),
+    customPrice: priced.customPrice,
+    courseFee: priced.courseFee,
+    registrationFee: priced.registrationFee,
+    total: priced.total,
+  };
+  return { courseFee: priced.courseFee, registrationFee: priced.registrationFee, total: priced.total, provisional: !session.pricesFinal, basis };
+}
+
+/** The deprecated v1 price: from the series' fee grid, the settings' percents (see the header). */
+async function priceLineV1(executor: Executor, input: PriceLineInput, opts: { exceptionIds?: string[]; lock?: boolean }): Promise<LinePrice> {
   const fee = await feeRowsForItem(executor, input.item.id, { lock: opts.lock });
   const [selfStudyCourse, selfStudyBoard, retakeTaught, onePaper] = await Promise.all([
     getSetting('pricing.selfStudyCoursePercent', executor),
@@ -166,7 +277,7 @@ export async function priceLine(
   const courseFeeBase = fee.item.courseFee ?? fee.offerCourseFee;
   const coursePercent = input.mode === 'self_study' ? percent('pricing.selfStudyCoursePercent', selfStudyCourse)
     : input.attempt === 'retake' ? percent('pricing.retakeTaughtCoursePercent', retakeTaught) : 100;
-  const onePaperPercent = fee.item.kind === 'one_paper' ? percent('pricing.onePaperCoursePercent', onePaper) : 100;
+  const onePaperPercent = fee.item.kind === 'paper' ? percent('pricing.onePaperCoursePercent', onePaper) : 100;
   const boardFeeBase = round2(fee.rows.reduce((s, r) => s + r.amount, 0));
   const boardPercent = input.mode === 'self_study' ? percent('pricing.selfStudyBoardPercent', selfStudyBoard) : 100;
   const course = round2(((courseFeeBase * coursePercent) / 100) * onePaperPercent / 100);
@@ -174,7 +285,7 @@ export async function priceLine(
 
   const exc = all.filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey));
   const priced = applyPriceExceptions(course, board, exc);
-  const basis: PricingBasis = {
+  const basis: PricingBasisV1 = {
     v: 1,
     attempt: input.attempt,
     mode: input.mode,
@@ -204,7 +315,9 @@ export async function priceLine(
  * Re-price the board part of a line whose fee rows were confirmed at another amount (§3.4): the
  * course part as its basis recorded it, the board part from the rows as they are now, then the
  * exceptions its basis recorded (not the student's current ones). Null for a line with no basis
- * (a converted line keeps its price).
+ * (a converted line keeps its price) and for a v2 line: its price is its row's, not its series',
+ * so a series move or a fee grid's Confirm leaves it as it is (a row's fee change re-prices it,
+ * setup/reprice.services.ts).
  */
 export async function repriceBoardPart(
   executor: Executor,
@@ -218,7 +331,7 @@ export async function repriceBoardPart(
   const board = round2((boardFeeBase * basis.boardPercent) / 100);
   const exc = (await lineExceptions.byIds(executor, basis.exceptionIds)).filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey));
   const priced = applyPriceExceptions(course, board, exc);
-  const next: PricingBasis = {
+  const next: PricingBasisV1 = {
     ...basis,
     boardFeeBase,
     feeRows: fee.rows.map((r) => ({ id: r.id, keyKind: r.keyKind, keyId: r.keyId, amount: r.amount, provisional: r.provisional })),
@@ -230,16 +343,25 @@ export async function repriceBoardPart(
   return { courseFee: priced.courseFee, registrationFee: priced.registrationFee, total: priced.total, provisional: fee.rows.some((r) => r.provisional), basis: next };
 }
 
-/** The fee rows of several items at once (screens): per item the sum, provisional and missing keys. */
+/**
+ * The exam fee of several items at once (screens): per item the amount, provisional and missing keys.
+ * A v2 row reads its own exam fee (provisional: its session's prices not final); a deprecated
+ * fee-key item reads the series' grid as before.
+ */
 export async function itemBoardFees(executor: Executor, itemIds: string[]) {
   const out = new Map<string, { amount: number | null; provisional: boolean; missing: number; rows: FeeRow[] }>();
   if (!itemIds.length) return out;
-  const items = await executor.select({ id: sessionOfferItem.id, seriesId: sessionOfferItem.boardSeriesId }).from(sessionOfferItem).where(inArray(sessionOfferItem.id, itemIds));
+  const items = await executor.select({ id: sessionOfferItem.id, seriesId: sessionOfferItem.boardSeriesId, examFee: sessionOfferItem.examFee, pricesFinal: registrationSession.pricesFinal })
+    .from(sessionOfferItem).innerJoin(registrationSession, eq(registrationSession.id, sessionOfferItem.sessionId)).where(inArray(sessionOfferItem.id, itemIds));
   const keys = await executor.select().from(sessionOfferItemFeeKey).where(inArray(sessionOfferItemFeeKey.itemId, itemIds));
   const seriesIds = [...new Set(items.map((i) => i.seriesId).filter((s): s is string => !!s))];
   const rows = seriesIds.length ? await executor.select().from(boardFee).where(inArray(boardFee.boardSeriesId, seriesIds)) : [];
   for (const it of items) {
     const ks = keys.filter((k) => k.itemId === it.id);
+    if (it.examFee !== null || !ks.length) {
+      out.set(it.id, { amount: it.examFee, provisional: !it.pricesFinal, missing: it.examFee === null ? 1 : 0, rows: [] });
+      continue;
+    }
     const found = ks.map((k) => rows.find((r) => r.boardSeriesId === it.seriesId && r.keyKind === k.keyKind && r.keyId === k.keyId)).filter((r): r is FeeRow => !!r);
     const missing = it.seriesId ? ks.length - found.length : ks.length;
     out.set(it.id, {
@@ -251,3 +373,9 @@ export async function itemBoardFees(executor: Executor, itemIds: string[]) {
   }
   return out;
 }
+
+/** Whether a stored basis is version 2 (the row's exam fee) — readers that only v1 concerns skip it. */
+export function isBasisV2(basis: unknown): basis is PricingBasisV2 {
+  return !!basis && typeof basis === 'object' && (basis as { v?: number }).v === 2;
+}
+

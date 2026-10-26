@@ -180,7 +180,7 @@ async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow |
       r.prior_sitting_series_id as "priorSittingSeriesId", r.prior_sitting_source as "priorSittingSource",
       r.prior_sitting_verified_outcome as outcome, r.declaration_rejected as "declarationRejected", r.price_at_registration as "priceAtRegistration",
       r.registration_fee_at_registration as "registrationFeeAtRegistration",
-      case when i.kind = 'whole' then s.name else s.name || ' — ' || i.label end as name,
+      case when i.kind = 'all_papers' then s.name else s.name || ' — ' || i.label end as name,
       pb.name as "priorBoardName", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel"
     from registration r join session_offer_item i on i.id = r.offer_item_id join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id
     left join board_series ps on ps.id = r.prior_sitting_series_id left join exam_board pb on pb.code = ps.board_code

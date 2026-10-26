@@ -46,10 +46,10 @@ function round2(n: number): number {
 }
 
 /** The absolute windows of a session (else its academic year): V3's rule, for converted lines. */
-async function windowsPercent(executor: Executor, at: Date, sessionId: string, sessionStart: Date): Promise<number> {
+async function windowsPercent(executor: Executor, at: Date, sessionId: string, sessionStart: Date | null): Promise<number> {
   let windows = await executor.select().from(refundWindow).where(eq(refundWindow.sessionId, sessionId));
   if (windows.length === 0) {
-    windows = await executor.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(sessionStart)));
+    windows = await executor.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(sessionStart ?? at)));
   }
   if (windows.length === 0) return 100; // nothing configured → gate off
   const match = windows.find((w) => w.startsAt <= at && at <= w.endsAt);

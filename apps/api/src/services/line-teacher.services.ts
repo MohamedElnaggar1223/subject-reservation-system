@@ -78,7 +78,7 @@ export async function changeLineTeacherTx(
         subjectId: string; offerAvailability: string; itemAvailability: string; boardSeriesId: string | null; sessionId: string;
       }[]);
     if (!facts) throw new LineTeacherError('Registration not found', 404);
-    const name = facts.kind === 'whole' ? facts.subjectName : `${facts.subjectName} — ${facts.label}`;
+    const name = facts.kind === 'all_papers' ? facts.subjectName : `${facts.subjectName} — ${facts.label}`;
 
     const mode = input.mode ?? (input.teacherId ? 'in_school' : line.mode as 'in_school' | 'self_study');
     if (line.mode === 'self_study' && mode === 'in_school') {
