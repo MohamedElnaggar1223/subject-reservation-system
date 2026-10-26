@@ -17,7 +17,7 @@ import {
   db, user, subject, teacher, subjectTeacher, registrationSession, registration, boardSeries, boardFee, examBoard, examUnit,
   qualification, qualificationOption, sessionBoardSeries, sessionOffer, sessionOfferTeacher, sessionOfferItem,
   sessionOfferItemUnit, sessionOfferItemTeacher, sessionOfferItemFeeKey, courseEnrolment, subjectUnit, qualificationUnit, qualificationOptionUnit,
-  and, eq, ne, inArray, isNull, sql, asc,
+  and, eq, ne, inArray, isNull, isNotNull, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -548,11 +548,30 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
   });
 }
 
+/** The refusal of a price or a close the deprecated routes would make on a subject priced by its rows. */
+export const PRICED_BY_ROWS_REFUSAL = (name: string, what: 'its course fee' | 'closing it') =>
+  `${name} is priced by its rows (the coordinator rework): change ${what === 'closing it' ? 'whether it takes reservations' : what} in the subject editor, where what it does to families is counted first`;
+
+/**
+ * A subject set up through the subject editor (any row with its own exam fee) is priced and closed there:
+ * the deprecated offer, item and form routes change neither its course fee nor whether it is open (they
+ * would re-price nothing and count nothing). Their other edits (teachers, notes, grade 10) still work.
+ */
+async function assertNotPricedByRows(tx: Tx, offerId: string, name: string, what: 'its course fee' | 'closing it') {
+  const [v2] = await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem)
+    .where(and(eq(sessionOfferItem.offerId, offerId), isNotNull(sessionOfferItem.examFee))).limit(1);
+  if (v2) throw new OfferError(PRICED_BY_ROWS_REFUSAL(name, what), 409);
+}
+
+const feeOf = (v: number | string | null) => (v === null ? null : Number(v));
+
 /** updateOffer's change of an offer the caller holds FOR UPDATE (the offer endpoint and the form). */
 async function changeOfferInTx(
   tx: Tx, offer: typeof sessionOffer.$inferSelect, subjectRow: typeof subject.$inferSelect, data: UpdateOfferType, actorId: string, ctx?: AuditContext,
 ) {
   const offerId = offer.id;
+  if (data.courseFee !== undefined && feeOf(data.courseFee) !== feeOf(offer.courseFee)) await assertNotPricedByRows(tx, offerId, subjectRow.name, 'its course fee');
+  if (data.availability === 'closed' && offer.availability !== 'closed') await assertNotPricedByRows(tx, offerId, subjectRow.name, 'closing it');
   const current = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
   let teachers = current.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' }));
   if (data.teachers) {
@@ -675,6 +694,11 @@ async function changeItemInTx(
 ) {
   const itemId = item.id;
   const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
+  if (fields.courseFee !== undefined || (fields.availability === 'closed' && item.availability !== 'closed')) {
+    const [s] = await tx.select({ name: subject.name }).from(subject).where(eq(subject.id, offer.subjectId));
+    if (fields.courseFee !== undefined && feeOf(fields.courseFee) !== feeOf(item.courseFee)) await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'its course fee');
+    if (fields.availability === 'closed' && item.availability !== 'closed') await assertNotPricedByRows(tx, item.offerId, s?.name ?? 'This subject', 'closing it');
+  }
   if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
   if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
   // The coordinator rework: the four cells follow the availability the deprecated route sets.

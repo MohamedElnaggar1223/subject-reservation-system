@@ -10,7 +10,8 @@
  * - POST /sessions                     — a type and a year, empty or copied with the years moved forward
  *                                        (the deprecated legacy contract: with its dates)
  * - PUT  /sessions/:id                 — the header and what families agree to (a share change answers its impact)
- * - POST /sessions/:id/open, /close, /reopen — the Accepting switch
+ * - POST /sessions/:id/open, /reopen    — the Accepting switch (its close is the admin's until P1b:
+ *                                        today's close still expires waiting lines)
  * - PUT  /sessions/:id/prices-final    — one-way once a line exists (impact first)
  *   (offerings, price lists, prices, the preview, the reservations: setup.routes.ts)
  * Admin:
@@ -304,8 +305,9 @@ export const sessions = new Hono<HonoEnv>()
   )
 
   /** CLOSE A SESSION — the Accepting switch off (C4); the coordinator's and the admin's. */
+  // The admin's alone until P1b: today's close still expires the waiting lines (C10 moves that to the cut-off).
   .post('/:id/close',
-    requireRole(...SET_UP),
+    requireAdmin(),
     zValidator('param', SessionId),
     zValidator('json', CloseSession),
     async (c) => {

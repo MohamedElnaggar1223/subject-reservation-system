@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import { admin, staff, onboard, refused, one, sql, refuseAudit, money, boardDate, CONSENT, type Client } from './helpers';
+import { admin, staff, onboard, refused, one, sql, refuseAudit, money, lockWaiters, CONSENT, type Client } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
 /**
@@ -69,9 +69,7 @@ describe("08u: the school's forms in the subject editor", () => {
   async function open(sessionId: string) {
     const s = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: sessionId } }));
     for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
-      const sr = await one<{ month: string; year: number }>(`select month, year from board_series where id = $1`, [c.seriesId]);
-      const mm = { january: '01', june: '06', october: '10', november: '11' }[sr.month]!;
-      await boardDate(adm, c.seriesId!, { examsStart: `${sr.year}-${mm}-01`, entryDeadline: new Date(Date.now() + 60 * day) });
+      await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: new Date(Date.now() + 60 * day) } }));
     }
     expect((await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: sessionId } }))).status).toBe('active');
   }
@@ -114,13 +112,12 @@ describe("08u: the school's forms in the subject editor", () => {
       ],
     }));
     expect(saved).toMatchObject({ saved: true, impact: { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0 } });
-    // The save's rows: the subject's answers (its course fee), its teachers, each row changed — and nothing else.
+    // The save's rows: the subject's answers (its course fee), its teachers, each row changed, and the paper's exam fee
+    // the board rule filled from all papers in the same save (Cambridge charges the syllabus's: E5) — nothing else.
     expect((await actions()).slice(before).sort((a, b) => a.e.localeCompare(b.e) || a.action.localeCompare(b.action))).toEqual([
       { e: bio.id, action: 'SESSION_OFFER_UPDATED' }, { e: bio.id, action: 'SESSION_OFFER_UPDATED' },
-      { e: all.id, action: 'OFFER_ITEM_UPDATED' }, { e: paper.id, action: 'OFFER_ITEM_UPDATED' },
+      { e: all.id, action: 'OFFER_ITEM_UPDATED' }, { e: paper.id, action: 'OFFER_ITEM_UPDATED' }, { e: paper.id, action: 'OFFER_ITEM_UPDATED' },
     ].sort((a, b) => a.e.localeCompare(b.e) || a.action.localeCompare(b.action)));
-    // The board rule fills the paper's exam fee (Cambridge charges the syllabus's: E5).
-    await apiResponse(coordinator.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: june, rowId: paper.id }, json: { source: 'board_rule' } }));
     const o = await view(june, bio.id);
     expect(o.teachers.map((t) => [t.teacherId, t.online])).toEqual([[teacherA, false], [teacherB, true]]);
     expect(o.rows.map((r) => [r.kind, r.label, r.cells, r.examFee, r.examFeeSource, r.courseFee, r.exclusiveGroup])).toEqual([
@@ -242,6 +239,37 @@ describe("08u: the school's forms in the subject editor", () => {
     // The qualification, which nobody reserved, moves.
     await apiResponse(put(coordinator, winter, ar.id, { rows: [{ id: u1.id, kind: 'unit', cells: cells(true, true, true) }, { id: q.id, kind: 'qualification', sitting: 'november', cells: NONE }] }));
     expect(rowOf(await view(winter, ar.id), 'yaa01').sitting).toBe('november');
+    offering.arWinter = ar.id;
+  });
+
+  it("a save that leaves a sitting unused, while a reservation of the same subject is taking its locks: the save takes the session's sitting links first, as the reservation does, so it waits and both go through (no deadlock)", async () => {
+    const ar = await view(winter, offering.arWinter!);
+    const [u1, q] = [rowOf(ar, 'waa01'), rowOf(ar, 'yaa01')];
+    const lonely = q.series!.id;
+    // The reservation held after it took the links (FOR SHARE), before the offering: at its row's sitting, held here.
+    const { default: pg } = await import('pg');
+    const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await holder.connect();
+    await holder.query('begin');
+    await holder.query('select id from board_series where id = $1 for update', [u1.series!.id]);
+    const f = await onboard(officer, `u08-lk-${RUN}`, 11);
+    let reserving: ReturnType<typeof reserve> | undefined;
+    let saving: ReturnType<typeof put> | undefined;
+    try {
+      reserving = reserve(f, winter, [{ offerItemId: u1.id, attempt: 'first', mode: 'in_school', teacherId: teacherA }]);
+      await lockWaiters(1);
+      // The qualification left out: removed (nothing ever used it), its November sitting no longer used by the session.
+      saving = put(coordinator, winter, ar.id, { rows: [{ id: u1.id, kind: 'unit', cells: cells(true, true, true) }] });
+      await lockWaiters(2);
+    } finally {
+      await holder.query('commit');
+      await holder.end();
+    }
+    const [r, sv] = await Promise.all([reserving!, saving!]);
+    expect(r.status).toBe(201);
+    expect(sv.status).toBe(200);
+    expect(await sql(`select id from session_offer_item where id = $1`, [q.id])).toEqual([]);
+    expect(await sql(`select 1 as one from session_board_series where session_id = $1 and board_series_id = $2`, [winter, lonely])).toEqual([]);
   });
 
   it("a Cambridge A level's three routes: A.S. offered at its fee, A.2. carried forward in self study (its own first entry after the A.S., and a retake) asking its earlier sitting, A.L. not this cycle — one choice", async () => {

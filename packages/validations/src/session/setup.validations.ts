@@ -180,6 +180,10 @@ export const UpdateOffering = z.object({
   teachers: z.array(OfferingTeacherInput).max(10).optional(),
   rows: z.array(OfferingRowInput).max(40).optional(),
   questions: z.array(QuestionInput).max(20).optional(),
+  // Her "Looks right" on the check list: the pre-load's notes on the subject are reviewed (only then they leave it).
+  notesReviewed: z.literal(true).optional(),
+  // Her "Looks right" on the cells a default ticked: they are hers now (changing a row's cells does it for that row).
+  defaultsReviewed: z.literal(true).optional(),
   expected: ImpactSchema.optional(),
 });
 export type UpdateOfferingType = z.infer<typeof UpdateOffering>;
@@ -226,6 +230,17 @@ export const SetRowExamFee = z.union([
   z.object({ source: z.enum(['units_sum', 'board_rule']), expected: ImpactSchema.optional() }),
 ]);
 export type SetRowExamFeeType = z.infer<typeof SetRowExamFee>;
+
+/**
+ * PUT /reference/sittings/:id/board-date — C6's one exception: the admin enters, once, the board's entry
+ * deadline of a sitting the reference data gives none (and its retake deadline, when the board has one).
+ */
+export const EnterBoardDate = z.object({
+  entryDeadline: z.coerce.date(),
+  retakeDeadline: z.coerce.date().nullable().optional(),
+});
+export type EnterBoardDateType = z.infer<typeof EnterBoardDate>;
+export const SittingParam = z.object({ id: z.string().min(1) });
 
 export const ReferenceSubjectsQuery = z.object({ board: BoardCodeInputSchema.optional() });
 

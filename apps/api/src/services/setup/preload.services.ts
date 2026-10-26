@@ -19,6 +19,7 @@ import type { SessionSeedFile, LocalTeachersFile } from '@repo/validations';
 import { logAction } from '../audit.services';
 import { createSetupSession, updateSetupSession } from './session-setup.services';
 import { addOffering, updateOffering, SetupError } from './offering.services';
+import { NO_CELLS } from './model';
 
 const MONTH_NAME: Record<number, 'january' | 'june' | 'october' | 'november'> = { 1: 'january', 6: 'june', 10: 'october', 11: 'november' };
 
@@ -76,9 +77,9 @@ export async function loadSessionSeed(seed: SessionSeedFile, names: LocalTeacher
         ...(r.teachers ? { teachers: await Promise.all(r.teachers.map(async (t) => ({ teacherId: await teacherOf(t.key, t.external), online: t.online, external: t.external }))) } : {}),
       });
     }
-    // The reference's other suggested rows stay unticked (she ticks what the school offers).
+    // The reference's other suggested rows are not on the school's forms: unticked (the add's default ticks undone).
     for (const r of offering.rows.filter((x) => !o.rows.some((y) => y.key === x.referenceKey))) {
-      rows.push({ id: r.id, kind: r.kind as 'all_papers', cells: r.cells });
+      rows.push({ id: r.id, kind: r.kind as 'all_papers', cells: { ...NO_CELLS } });
     }
     const saved = await updateOffering(session.id, offering.id, {
       note: o.note, teacherChoice: o.teacherChoice, teacherTbc: o.teacherTbc, courseFee: o.courseFee,

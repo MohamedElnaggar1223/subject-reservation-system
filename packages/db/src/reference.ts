@@ -82,17 +82,22 @@ export async function loadReference(executor: Db | Tx, data: ReferenceData, opts
           values (${randomUUID()}, ${b.code}, ${month}, ${s.year}, '', ${entry}, ${retake}, ${s.examsStart}, ${s.source}, ${s.confirmed}, ${textArray(s.levels)})
           on conflict (board_code, month, year, label) do update set
             levels = excluded.levels,
-            entry_deadline = coalesce(excluded.entry_deadline, board_series.entry_deadline),
-            retake_deadline = coalesce(excluded.retake_deadline, board_series.retake_deadline),
+            -- C6: a deadline the admin entered from the check list (dates_source 'admin') is kept; the file
+            -- fills the rest.
+            entry_deadline = case when board_series.dates_source = 'admin' then board_series.entry_deadline
+                                  else coalesce(excluded.entry_deadline, board_series.entry_deadline) end,
+            retake_deadline = case when board_series.dates_source = 'admin' then board_series.retake_deadline
+                                   else coalesce(excluded.retake_deadline, board_series.retake_deadline) end,
             exams_start = coalesce(excluded.exams_start, board_series.exams_start),
-            dates_source = excluded.dates_source,
-            dates_confirmed = excluded.dates_confirmed,
-            updated_at = case when (board_series.entry_deadline is distinct from coalesce(excluded.entry_deadline, board_series.entry_deadline)
-                                    or board_series.retake_deadline is distinct from coalesce(excluded.retake_deadline, board_series.retake_deadline)
-                                    or board_series.exams_start is distinct from coalesce(excluded.exams_start, board_series.exams_start)
-                                    or board_series.dates_source is distinct from excluded.dates_source
-                                    or board_series.dates_confirmed is distinct from excluded.dates_confirmed
-                                    or board_series.levels is distinct from excluded.levels)
+            dates_source = case when board_series.dates_source = 'admin' then 'admin' else excluded.dates_source end,
+            dates_confirmed = case when board_series.dates_source = 'admin' then board_series.dates_confirmed else excluded.dates_confirmed end,
+            updated_at = case when board_series.dates_source is distinct from 'admin' and (
+                                      board_series.entry_deadline is distinct from coalesce(excluded.entry_deadline, board_series.entry_deadline)
+                                   or board_series.retake_deadline is distinct from coalesce(excluded.retake_deadline, board_series.retake_deadline)
+                                   or board_series.dates_source is distinct from excluded.dates_source
+                                   or board_series.dates_confirmed is distinct from excluded.dates_confirmed)
+                                 or board_series.exams_start is distinct from coalesce(excluded.exams_start, board_series.exams_start)
+                                 or board_series.levels is distinct from excluded.levels
                               then now() else board_series.updated_at end`);
         out.sittings++;
       }

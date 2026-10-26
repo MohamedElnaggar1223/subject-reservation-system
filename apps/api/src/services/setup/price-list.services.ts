@@ -29,7 +29,7 @@ import { logAction, type AuditContext } from '../audit.services';
 import { round2 } from '../pricing.services';
 import { SetupError, sessionForSetup, setupRethrow } from './offering.services';
 import {
-  planReprice, applyReprice, impactOfPlan, settleImpact, tellRepriced, ImpactPending, type Impact,
+  planReprice, applyReprice, settleImpact, tellRepriced, ImpactPending, type Impact,
 } from './reprice.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -86,20 +86,27 @@ async function referenceFor(executor: Executor, sessionId: string, board: string
 /** A line's match: the reference row and the session's rows of it; `toCheck` (an alias in doubt) is applied only when confirmed. */
 type Target = { matchedKey: string; label: string; rowIds: string[]; toCheck?: true; note?: string };
 
-/** What a printed code reaches: the reference rows P0's matcher finds (and the session's rows of each), else a custom row by its own code. */
+/**
+ * What a printed code reaches: the reference rows P0's matcher finds through the printed price codes and the
+ * board's aliases (a `toCheck` alias marked so); else a row's own code as the board enters it — a bare
+ * syllabus ("3180") or paper code ("3180/01") — when it names exactly one reference row (one code on several
+ * rows, as 9618 on A.S., A.2. and A.L., matches none); else a custom row by its own code. With the session's
+ * rows of each.
+ */
 function targetsOf(printed: string, ref: Reference): Target[] {
+  const target = (subjectCode: string, key: string, extra: Partial<Target> = {}): Target => {
+    const r = ref.refs.find((x) => x.subjectCode === subjectCode && x.key === key);
+    return {
+      matchedKey: `${subjectCode}:${key}`, label: r ? `${r.subjectName} — ${r.label}` : `${subjectCode} ${key}`,
+      rowIds: ref.rows.filter((x) => x.referenceCode === subjectCode && x.key === key).map((x) => x.id), ...extra,
+    };
+  };
   const matches = matchPrintedCode(printed, { aliases: ref.aliases }, ref.subjects);
-  if (matches.length) {
-    return matches.map((m) => {
-      const r = ref.refs.find((x) => x.subjectCode === m.subject && x.key === m.row);
-      return {
-        matchedKey: `${m.subject}:${m.row}`, label: r ? `${r.subjectName} — ${r.label}` : `${m.subject} ${m.row}`,
-        rowIds: ref.rows.filter((x) => x.referenceCode === m.subject && x.key === m.row).map((x) => x.id),
-        ...(m.toCheck ? { toCheck: true as const, note: m.note } : {}),
-      };
-    });
-  }
+  if (matches.length) return matches.map((m) => target(m.subject, m.row, m.toCheck ? { toCheck: true as const, note: m.note } : {}));
   const wanted = new Set(printedCodeCandidates(printed));
+  const byOwnCode = ref.subjects.flatMap((s) => s.rows.filter((r) => r.codes.some((c) => wanted.has(normalizePrintedCode(c)))).map((r) => ({ subject: s.code, key: r.key })));
+  if (byOwnCode.length === 1) return [target(byOwnCode[0]!.subject, byOwnCode[0]!.key)];
+  if (byOwnCode.length > 1) return [];
   return ref.rows.filter((x) => !x.key && x.codes.some((c) => wanted.has(normalizePrintedCode(c))))
     .map((x) => ({ matchedKey: `${x.subjectCode}:#${x.id}`, label: `${x.subjectName} — ${x.label}`, rowIds: [x.id] }));
 }
@@ -151,13 +158,13 @@ export async function parsePriceList(sessionId: string, board: string, text: str
 // ─── Fees that follow other fees (E5, §6) ────────────────────────────────────
 
 /**
- * The fees that follow others, re-derived for the given offerings (their rows held FOR UPDATE by the
- * caller): a one-paper row on a board that charges the syllabus takes the subject's all-papers fee
- * (the board rule); a row whose reference sums units takes their sum once each has a fee. A row filled
- * this way before keeps following; one with no fee yet is filled; a typed or listed fee is left alone.
- * Returns the rows whose fee changed.
+ * The fees that follow others (E5), on these offerings: a row summing its units (the reference's
+ * sumOfUnits), then a one-paper retake on a board that charges the syllabus (the board rule, from all
+ * papers). A row is filled when it has no fee, or kept in step when its fee came from the same rule; a
+ * fee typed or read from a list is hers and stays. Returns the rows whose fee changed (the caller
+ * re-prices their lines); with `audit`, each change has its OFFER_ITEM_UPDATED row.
  */
-async function deriveFollowingFees(tx: Tx, offerIds: string[]) {
+export async function deriveFollowingFees(tx: Tx, offerIds: string[], audit?: { actorId: string; ctx?: AuditContext }) {
   if (!offerIds.length) return [] as string[];
   const changed: string[] = [];
   const offers = await tx.select({ id: sessionOffer.id, referenceCode: sessionOffer.referenceCode, board: subject.council, feeKey: examBoard.onePaperFeeKey })
@@ -173,6 +180,10 @@ async function deriveFollowingFees(tx: Tx, offerIds: string[]) {
       if (r.examFee !== null && r.examFeeSource !== source) return;
       if (r.examFee === fee && r.examFeeSource === source) return;
       await tx.update(sessionOfferItem).set({ examFee: fee, examFeeSource: source, priceListRowId: null, updatedAt: new Date() }).where(eq(sessionOfferItem.id, r.id));
+      if (audit) {
+        await logAction(audit.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', r.id, { examFee: r.examFee, examFeeSource: r.examFeeSource },
+          { examFee: fee, examFeeSource: source, via: source === 'board_rule' ? 'the board rule' : 'the sum of its units' }, audit.ctx, tx);
+      }
       r.examFee = fee;
       r.examFeeSource = source;
       changed.push(r.id);
@@ -260,9 +271,8 @@ export async function applyPriceList(sessionId: string, input: ApplyPriceListTyp
       }
       for (const id of await deriveFollowingFees(tx, offerIds)) priceRows.add(id);
       const plan = await planReprice(tx, { rowIds: [...priceRows] });
-      const impact = impactOfPlan(plan);
+      const { told: repriced, impact } = await applyReprice(tx, plan, { actorId, reason: `the price list "${input.name}" was applied to ${session.name}`, entity: { type: 'price_list', id: listId }, ctx });
       settleImpact(impact, input.expected);
-      const repriced = await applyReprice(tx, plan, { actorId, reason: `the price list "${input.name}" was applied to ${session.name}`, entity: { type: 'price_list', id: listId }, ctx });
       await logAction(actorId, 'PRICE_LIST_APPLIED', 'price_list', listId, existing ? { name: existing.name } : null,
         { sessionId, board: input.board, name: input.name, lines: input.rows.length, matched, unmatched: unmatched.length, rowsPriced: priceRows.size, repriced: repriced.length, listedForFinance: plan.listed.length }, ctx, tx);
       return { impact, repriced, listId, matched, unmatched, toConfirm, rowsPriced: priceRows.size, sessionName: session.name };
@@ -324,9 +334,8 @@ export async function setRowExamFee(sessionId: string, rowId: string, input: Set
       }
       for (const id of await deriveFollowingFees(tx, [found.offerId])) priceRows.add(id);
       const plan = await planReprice(tx, { rowIds: [...priceRows] });
-      const impact = impactOfPlan(plan);
+      const { told: repriced, impact } = await applyReprice(tx, plan, { actorId, reason: `${offer!.name} — ${row.label}: its exam fee changed`, entity: { type: 'offer_item', id: rowId }, ctx });
       settleImpact(impact, input.expected);
-      const repriced = await applyReprice(tx, plan, { actorId, reason: `${offer!.name} — ${row.label}: its exam fee changed`, entity: { type: 'offer_item', id: rowId }, ctx });
       return { impact, repriced, examFee: fee, examFeeSource: source, sessionName: session.name };
     });
     await tellRepriced(out.repriced, `The exam fee changed in ${out.sessionName}`);

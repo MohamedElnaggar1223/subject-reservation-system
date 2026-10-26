@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, deriveSessionName } from '@repo/validations';
 import {
-  admin, staff, onboard, refused, one, sql, money, notified, confirmed, boardDate, CONSENT, type Client, type Impact,
+  admin, staff, onboard, refused, one, sql, money, notified, confirmed, pauseAtAudit, lockWaiters, CONSENT, type Client, type Impact,
 } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
@@ -82,7 +82,7 @@ describe('08y: the coordinator sets up a session', () => {
     expect((await refused(f.parent.api.v1.reference.boards.$get())).status).toBe(403);
   });
 
-  it('a June session from scratch: a type and a year, the name derived, born a draft (invisible to families), its default dates on the check list', async () => {
+  it('a June session from scratch: a type and a year, the name derived, born a draft (invisible to families), its default dates blocking the opening until she sets them or keeps them (C5)', async () => {
     const made = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y, label } }));
     june = made.id;
     expect(made).toMatchObject({ name: deriveSessionName('june', Y, label), status: 'draft', startDate: null, endDate: null, selfStudyPercent: 50, pricesFinal: false, unpaidCancelDays: 3, copy: null });
@@ -90,16 +90,24 @@ describe('08y: the coordinator sets up a session', () => {
     expect(made.courseStartsOn).toBe(`${Y - 1}-10-01`);
     const s = await sessionOf(coordinator, june);
     expect(s.refundSentence).toBe('100% to week 2 · 50% in week 3 · 0% from week 4');
-    expect(s.checkList.map((c) => c.code)).toEqual(['dates_to_check']);
-    expect(s.blocked).toBe(false);
+    expect(s.checkList.map((c) => [c.code, c.severity])).toEqual([['dates_to_check', 'blocks']]);
+    expect(s.blocked).toBe(true);
+    // Kept as they are, said so: the check list stops blocking on them (another session, so this one's dates are set below).
+    const kept = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y, label: `${label}-kept` } }));
+    await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: kept.id }, json: { datesConfirmed: true } }));
+    expect(await sessionOf(coordinator, kept.id)).toMatchObject({ checkList: [], blocked: false, paymentDueAt: kept.paymentDueAt, courseStartsOn: kept.courseStartsOn });
+    expect(await one(`select new_data->>'datesConfirmed' as kept from audit_log where action = 'SESSION_UPDATED' and entity_id = $1`, [kept.id])).toEqual({ kept: 'true' });
     await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: june }, json: { paymentDueAt: new Date(Date.now() + 40 * day), courseStartsOn: `${Y - 1}-10-04`, closesAt: new Date(Date.now() + 200 * day) } }));
     expect((await sessionOf(coordinator, june)).checkList).toEqual([]);
+    // A start date (the deprecated contract) would let the scheduler open the draft past its check list: refused.
+    expect(await refused(coordinator.api.v1.sessions[':id'].$put({ param: { id: june }, json: { startDate: new Date(Date.now() + day) } })))
+      .toEqual({ status: 409, error: 'This draft opens with the Accepting switch once its check list is clear, not with a start date' });
     const f = await onboard(officer, `y08-draft-${RUN}`, 11);
     expect((await familyRead(f)).offerings).toEqual([]);
     expect(await sql(`select action from audit_log where entity_id = $1 order by created_at`, [june])).toEqual([{ action: 'SESSION_CREATED' }, { action: 'SESSION_UPDATED' }]);
   });
 
-  it('subjects from the reference list come with their suggested rows, none ticked: D8\'s groups, the board rule on a one-paper retake\'s earlier exam with D6\'s default list, the generated words; one not on the list; one twice is refused', async () => {
+  it('subjects from the reference list come with their suggested rows, the usual offer ticked by default for her to confirm (D4): D8\'s groups, the board rule on a one-paper retake\'s earlier exam with D6\'s default list, the generated words; one not on the list; one twice is refused', async () => {
     const bio = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: june }, json: { referenceCode: '0970' } }));
     offering.bio = bio.id;
     expect(bio).toMatchObject({ subject: { name: 'Biology', code: '0970' }, referenceCode: '0970', board: { code: 'cambridge', onePaperFee: 'syllabus' }, group: 'O.L.', courseFee: null, offeredToFamilies: false });
@@ -107,7 +115,12 @@ describe('08y: the coordinator sets up a session', () => {
       ['all_papers', 'All papers', 'كل الأوراق', 'entry', false, 'june'],
       ['paper', 'Paper 41/42 only', 'الورقة 41/42 فقط', 'entry', true, 'june'],
     ]);
-    expect(bio.rows.every((r) => !r.cells.firstInSchool && !r.cells.retakeInSchool && !r.cells.retakeSelfStudy && !r.cells.firstSelfStudy)).toBe(true);
+    // D4: all papers first entry and both retakes, the one-paper retake both retakes — each tick a default, on her check list.
+    expect(bio.rows.map((r) => [r.cells, r.cellsByDefault])).toEqual([
+      [{ firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false }, ['firstInSchool', 'retakeInSchool', 'retakeSelfStudy']],
+      [{ firstInSchool: false, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false }, ['retakeInSchool', 'retakeSelfStudy']],
+    ]);
+    expect((await sessionOf(coordinator, june)).checkList.filter((c) => c.offeringId === bio.id && c.code === 'ticked_by_default').map((c) => c.rowId)).toEqual(bio.rows.map((r) => r.id));
     // D6: the board's two sittings before this one (Cambridge sits June and November).
     expect(bio.rows[1]!.allowedPriorSittings.map((p) => [p.month, p.year, p.beyondCarryForward])).toEqual([['november', Y - 1, false], ['june', Y - 1, false]]);
     row.bioAll = bio.rows[0]!.id;
@@ -117,6 +130,10 @@ describe('08y: the coordinator sets up a session', () => {
     offering.cs = cs.id;
     expect(cs.group).toBe('A.S./A.L.');
     expect(cs.rows.map((r) => [r.kind, r.label, r.exclusiveGroup, r.needsCarriedFrom])).toEqual([['as', 'A.S.', 'route', false], ['a2', 'A.2. (carry forward)', 'route', true], ['al', 'A.L.', 'route', false]]);
+    // The A.2. (its own entry after the A.S., her call) starts unticked.
+    expect(cs.rows.map((r) => r.cellsByDefault.length)).toEqual([3, 0, 3]);
+    // E6: rows ticked with no price keep the subject from families.
+    expect(cs).toMatchObject({ offeredToFamilies: false, priceNotSet: [cs.rows[0]!.id, cs.rows[2]!.id] });
 
     const maths = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: june }, json: { referenceCode: '4MA1' } }));
     offering.maths = maths.id;
@@ -161,16 +178,19 @@ describe('08y: the coordinator sets up a session', () => {
     teacherB = saved.offering.teachers.find((t) => t.name === doubt)!.teacherId;
     expect(saved.offering).toMatchObject({ note: 'Practical work on Saturdays', courseFee: 3000 });
     expect(saved.offering.teachers.map((t) => [t.name, t.online, t.external])).toEqual([[`Huda Fawzy ${RUN}`, true, false], [doubt, false, true]]);
+    // E5: the one-paper retake's fee follows all papers by the board rule (Cambridge charges the syllabus's), in the same save.
     expect(saved.offering.rows.map((r) => [r.kind, r.cells, r.examFee, r.examFeeSource])).toEqual([
       ['all_papers', { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false }, 10850, 'typed'],
-      ['paper', { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: false }, null, null],
+      ['paper', { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: false }, 10850, 'board_rule'],
     ]);
+    // Her change to the paper's cells makes them hers; all papers' default ticks, untouched, stay on the check list until she says they look right.
+    expect(saved.offering.rows.map((r) => r.cellsByDefault.length)).toEqual([3, 0]);
+    await apiResponse(put(coordinator, offering.bio!, { defaultsReviewed: true }));
+    expect((await offeringOf(coordinator, offering.bio!)).rows.map((r) => r.cellsByDefault)).toEqual([[], []]);
     // The old columns kept in step for the reservation path P1b has not replaced yet.
     expect(await sql(`select kind, availability, exclusive_group as g from session_offer_item where offer_id = $1 order by sort_order`, [offering.bio!]))
       .toEqual([{ kind: 'all_papers', availability: 'open', g: 'entry' }, { kind: 'paper', availability: 'self_study_only', g: 'entry' }]);
-    // E6: a ticked row with a price not set keeps the subject from families.
-    expect(saved.offering.offeredToFamilies).toBe(false);
-    // The board rule fills the one-paper retake's fee: Cambridge charges the syllabus's (E5).
+    // Asked again, the board rule gives the same fee: nothing changes.
     expect(await apiResponse(coordinator.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: june, rowId: row.bioPaper! }, json: { source: 'board_rule' } })))
       .toEqual({ saved: true, impact: { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0 }, examFee: 10850, examFeeSource: 'board_rule' });
     expect((await offeringOf(coordinator, offering.bio!)).offeredToFamilies).toBe(true);
@@ -186,19 +206,49 @@ describe('08y: the coordinator sets up a session', () => {
       { id: row.bioAll, kind: 'all_papers', examFee: 10850, cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false } },
       { id: row.bioPaper, kind: 'paper', cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: false } },
     ] }));
+    // Untick what the other subjects were ticked with by default: only Biology is offered in this scenario.
+    for (const id of [offering.cs!, offering.maths!]) {
+      const o = await offeringOf(coordinator, id);
+      await apiResponse(put(coordinator, id, { rows: o.rows.map((r) => ({ id: r.id, kind: r.kind as 'all_papers', cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } })) }));
+    }
     expect(again.saved).toBe(true);
     expect(await audits()).toBe(n);
   });
 
-  it('the check list blocks opening on a sitting with no board date; the admin enters it once; she opens the session', async () => {
+  it('the check list blocks opening on a sitting with no board date; the admin enters it once from the check list (C6) — only the admin, only a missing one, kept by the reference loader; she opens the session', async () => {
     const s = await sessionOf(coordinator, june);
     const blocking = s.checkList.filter((c) => c.severity === 'blocks');
     expect(blocking.map((c) => c.code)).toEqual(['sitting_no_board_date']);
     expect(s.blocked).toBe(true);
     const refusal = await refused(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june } }));
     expect(refusal).toMatchObject({ status: 409, error: expect.stringContaining('cannot open yet') });
-    await boardDate(adm, blocking[0]!.seriesId!, { examsStart: `${Y}-06-01`, entryDeadline: new Date(Date.now() + 120 * day) });
+    const enter = (who: Client, id: string, json: { entryDeadline: Date; retakeDeadline?: Date | null }) =>
+      who.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id }, json });
+    const sittingId = blocking[0]!.seriesId!;
+    const entryDeadline = new Date(Date.now() + 120 * day);
+    expect((await refused(enter(coordinator, sittingId, { entryDeadline }))).status).toBe(403);
+    expect(await apiResponse(enter(adm, sittingId, { entryDeadline, retakeDeadline: new Date(Date.now() + 130 * day) })))
+      .toMatchObject({ id: sittingId, entryDeadline: entryDeadline.toISOString(), datesSource: 'admin' });
+    expect(await one(`select new_data->>'datesSource' as source, new_data->>'via' as via from audit_log where action = 'BOARD_SERIES_DEADLINE_SET' and entity_id = $1`, [sittingId]))
+      .toEqual({ source: 'admin', via: 'the check list (C6: the admin enters a missing board date once)' });
+    // Once: a sitting with its deadline is the reference data's.
+    expect(await refused(enter(adm, sittingId, { entryDeadline: new Date(Date.now() + 90 * day) }))).toMatchObject({ status: 409, error: expect.stringContaining('has its board entry deadline') });
     expect((await sessionOf(coordinator, june)).blocked).toBe(false);
+
+    // The reference loader keeps a deadline the admin entered: a sitting the file first gives none, entered by the
+    // admin, then loaded again from a file that now gives one.
+    const { db, loadReference } = await import('@repo/db');
+    const withSitting = (entryDeadline: string | null) => {
+      const data = referenceFixture();
+      data.boards = data.boards.map((b) => b.code !== 'oxford' ? b : { ...b, sittings: [...b.sittings, { ...b.sittings[0]!, month: 11 as const, levels: ['igcse' as const], entryDeadline }] });
+      return data;
+    };
+    await loadReference(db, withSitting(null));
+    const nov = (await one<{ id: string }>(`select id from board_series where board_code = 'oxford' and month = 'november' and year = $1 and label = ''`, [Y + 6])).id;
+    const admins = new Date(Date.now() + 100 * day);
+    await apiResponse(enter(adm, nov, { entryDeadline: admins }));
+    await loadReference(db, withSitting(`${Y + 6}-06-20`));
+    expect(await one(`select entry_deadline = $1::timestamptz as kept, dates_source as source from board_series where id = $2`, [admins.toISOString(), nov])).toEqual({ kept: true, source: 'admin' });
     const opened = await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june } }));
     expect(opened.status).toBe('active');
     expect(opened.startDate).not.toBeNull();
@@ -290,7 +340,7 @@ describe('08y: the coordinator sets up a session', () => {
       expect((await lineOf(unpaidLine)).price).toBe(14350);
     });
 
-    it('reservations are protected: a cell they use stays ticked, a row they use is not removed, a subject they hold is not deleted (close it instead)', async () => {
+    it('reservations are protected: a cell they use stays ticked, a row they use is not removed, a subject they hold is not deleted (close it instead); the deprecated routes change neither its course fee nor whether it is open; its board does not change under it', async () => {
       const cells = (first: boolean) => ({ firstInSchool: first, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false });
       expect(await refused(put(coordinator, offering.bio!, { rows: [
         { id: row.bioAll, kind: 'all_papers', cells: cells(false) },
@@ -300,6 +350,29 @@ describe('08y: the coordinator sets up a session', () => {
         .toMatchObject({ status: 409, error: expect.stringContaining('is not removed — close it instead') });
       expect(await refused(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$delete({ param: { id: june, offeringId: offering.bio! } })))
         .toEqual({ status: 409, error: 'Biology has reservations in this session: close it instead (they stand)' });
+      // The old Session screen's routes would re-price and count nothing: a subject priced by its rows refuses them.
+      const { PRICED_BY_ROWS_REFUSAL } = await import('../src/services/offer.services');
+      const linePrices = () => sql(`select id, price_at_registration::float as p from registration where session_id = $1 order by id`, [june]);
+      const pricesBefore = await linePrices();
+      const oldOffer = (json: { courseFee?: number; availability?: 'closed'; notes?: string; reason?: string }) =>
+        coordinator.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: june, offerId: offering.bio! }, json });
+      expect(await refused(oldOffer({ courseFee: 4000, reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'its course fee') });
+      expect(await refused(oldOffer({ availability: 'closed', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'closing it') });
+      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { courseFee: 500, reason: 'the old screen' } })))
+        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'its course fee') });
+      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { availability: 'closed', reason: 'the old screen' } })))
+        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'closing it') });
+      expect(await offeringOf(coordinator, offering.bio!)).toMatchObject({ courseFee: 3500, accepting: true });
+      expect(await linePrices()).toEqual(pricesBefore);
+      // The Catalogue's board change cannot carry a subject set up with its board's rows: refused, nothing moved.
+      const bioSubject = (await offeringOf(coordinator, offering.bio!)).subject.id;
+      const series = () => sql(`select id, board_series_id as s from registration where session_id = $1 order by id`, [june]);
+      const seriesBefore = await series();
+      // (The subject screen's route answers its refusals 400.)
+      expect(await refused(adm.api.v1.subjects[':id'].$put({ param: { id: bioSubject }, json: { council: 'pearson_edexcel' } })))
+        .toMatchObject({ status: 400, error: expect.stringMatching(/^Biology is set up in .+ with its board's rows and fees: a board change does not move it — remove it from that session and add it again from the reference list under the other board$/) });
+      expect(await one(`select council from subject where id = $1`, [bioSubject])).toEqual({ council: 'cambridge' });
+      expect(await series()).toEqual(seriesBefore);
     });
 
     it('a subject closed (C4): its reservations stand and are counted first; no new one is taken and families no longer see it; reopened, it is offered again', async () => {
@@ -370,18 +443,21 @@ describe('08y: the coordinator sets up a session', () => {
     expect((await refused(coordinator.api.v1.sessions.$post({ json: { type: 'winter', year: Y, label: `${label}-w`, copyFromSessionId: june } }))).status).toBe(400);
   });
 
-  it('the Accepting switch: an empty session opens, closes, and reopens (closed → open); a second open session of its cycle is refused', async () => {
+  it('the Accepting switch: an empty session opens, closes, and reopens (closed → open); a second open session of its cycle is refused; the close stays the admin\'s until P1b (it still expires waiting lines)', async () => {
     const s = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'winter', year: Y, label: `${label}-sw` } }));
+    await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { datesConfirmed: true } }));
     expect((await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: s.id } }))).status).toBe('active');
-    expect((await apiResponse(coordinator.api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: {} }))).status).toBe('closed');
+    expect((await refused(coordinator.api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: {} }))).status).toBe(403);
+    expect((await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: {} }))).status).toBe('closed');
     const twin = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'winter', year: Y, label: `${label}-sw` } }));
+    await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: twin.id }, json: { datesConfirmed: true } }));
     expect((await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: twin.id } }))).status).toBe('active');
     expect(await refused(coordinator.api.v1.sessions[':id'].reopen.$post({ param: { id: s.id }, json: {} }))).toMatchObject({ status: 409, error: expect.stringContaining('already exists') });
-    await apiResponse(coordinator.api.v1.sessions[':id'].close.$post({ param: { id: twin.id }, json: {} }));
+    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: twin.id }, json: {} }));
     const back = await apiResponse(coordinator.api.v1.sessions[':id'].reopen.$post({ param: { id: s.id }, json: { reason: 'one more week' } }));
     expect(back).toMatchObject({ status: 'active', closedAt: null, finalizedAt: null });
     expect(await sql(`select new_data->>'reason' as r from audit_log where action = 'SESSION_REOPENED' and entity_id = $1`, [s.id])).toEqual([{ r: 'one more week' }]);
-    await apiResponse(coordinator.api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: {} }));
+    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: {} }));
   });
 
   it('her rights (B1–B3): all of set-up is the coordinator\'s and the admin\'s, never money; finance reads set-up and changes none of it; families neither', async () => {
@@ -397,5 +473,123 @@ describe('08y: the coordinator sets up a session', () => {
     expect((await refused(f.parent.api.v1.sessions[':id'].offerings[':offeringId'].$get({ param: { id: june, offeringId: offering.bio! } }))).status).toBe(403);
     expect((await refused(f.student.api.v1.sessions[':id'].reservations.$get({ param: { id: june }, query: {} }))).status).toBe(403);
     expect(money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [line!.id])).p)).toBe(14350);
+  });
+
+  describe("races on the session (§9.2: insertLines takes the session FOR SHARE before the offering and the row; a share change and the prices-final switch take it FOR UPDATE)", () => {
+    let race: string, raceRow: string, nov: string;
+    const raceReserve = (f: { parent: Client; studentId: string }, mode: 'in_school' | 'self_study') =>
+      f.parent.api.v1.registrations.direct.$post({ json: { sessionId: race, studentId: f.studentId, consent: CONSENT,
+        lines: [mode === 'self_study' ? { offerItemId: raceRow, attempt: 'retake', mode, priorSittingSeriesId: nov } : { offerItemId: raceRow, attempt: 'first', mode, teacherId: teacherA }] } });
+    const raceLine = (id: string) => one<{ price: number; course: number; provisional: boolean }>(
+      `select price_at_registration::float as price, course_fee_at_registration::float as course, price_provisional as provisional from registration where id = $1`, [id]);
+    const share = (percent: number, expected?: Impact) => coordinator.api.v1.sessions[':id'].$put({ param: { id: race }, json: { selfStudyPercent: percent, ...(expected ? { expected } : {}) } });
+    const pricesFinal = (expected?: Impact) => coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: race }, json: { final: true, ...(expected ? { expected } : {}) } });
+    /** A reservation held after it has taken the session, the offering and the row FOR SHARE (at the fee-grid lock it takes next). */
+    async function holdingAReservation<T>(f: { parent: Client; studentId: string }, mode: 'in_school' | 'self_study', meanwhile: () => Promise<T>) {
+      const { default: pg } = await import('pg');
+      const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await holder.connect();
+      const series = (await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [raceRow])).s;
+      await holder.query(`select pg_advisory_lock(4041, hashtext($1))`, [series]);
+      let reserving: ReturnType<typeof raceReserve> | undefined;
+      let other: Promise<T> | undefined;
+      try {
+        reserving = raceReserve(f, mode);
+        await lockWaiters(1);
+        other = meanwhile();
+        await lockWaiters(2);
+      } finally {
+        await holder.query(`select pg_advisory_unlock(4041, hashtext($1))`, [series]);
+        await holder.end();
+      }
+      return Promise.all([reserving!, other!]);
+    }
+
+    beforeAll(async () => {
+      race = (await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y, label: `${label}-race` } }))).id;
+      await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: race }, json: { datesConfirmed: true } }));
+      const bio = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: race }, json: { referenceCode: '0970' } }));
+      raceRow = bio.rows[0]!.id;
+      await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: race, offeringId: bio.id }, json: {
+        courseFee: 4000, teachers: [{ teacherId: teacherA, online: false, external: false }], defaultsReviewed: true,
+        rows: [{ id: raceRow, kind: 'all_papers', examFee: 10000, cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false } }],
+      } }));
+      const s = await sessionOf(coordinator, race);
+      for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
+        await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: new Date(Date.now() + 120 * day) } }));
+      }
+      expect((await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: race } }))).status).toBe('active');
+      nov = (await one<{ id: string }>(`select id from board_series where board_code = 'cambridge' and month = 'november' and year = $1 and label = ''`, [Y - 1])).id;
+    });
+
+    it('the self-study share changed while a reservation lands: the change first, the reservation waits and is priced at the new share; the reservation first, the change sent with the counts it had is refused (IMPACT_CHANGED) and nothing changes', async () => {
+      const a = await onboard(officer, `y08-race-a-${RUN}`, 11);
+      const [first] = await apiResponse(raceReserve(a, 'self_study'));
+      expect(await raceLine(first!.id)).toMatchObject({ course: 2000, price: 12000 });
+      // The change first: its counts, then sent with them and paused at its own audit row, holding the session.
+      const shown = await apiResponse(share(40));
+      expect(shown).toMatchObject({ saved: false, impact: { repriced: 1 } });
+      const release = await pauseAtAudit('SESSION_UPDATED');
+      const b = await onboard(officer, `y08-race-b-${RUN}`, 11);
+      let changing: ReturnType<typeof share> | undefined;
+      let reserving: ReturnType<typeof raceReserve> | undefined;
+      try {
+        changing = share(40, shown.impact);
+        await lockWaiters(1);
+        reserving = raceReserve(b, 'self_study');
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [c, r] = await Promise.all([changing!, reserving!]);
+      expect(c.status).toBe(200);
+      expect(r.status).toBe(201);
+      const raced = ((await r.json()) as { data: { id: string }[] }).data[0]!.id;
+      expect(await raceLine(raced)).toMatchObject({ course: 1600, price: 11600 });
+      expect(await raceLine(first!.id)).toMatchObject({ course: 1600, price: 11600 });
+
+      // The reservation first: the change, sent with the counts it had before, finds a self-study line it did not count.
+      const counts = (await apiResponse(share(30))).impact;
+      expect(counts.repriced).toBe(2);
+      const g = await onboard(officer, `y08-race-c-${RUN}`, 11);
+      const [r2, c2] = await holdingAReservation(g, 'self_study', () => share(30, counts));
+      expect(r2.status).toBe(201);
+      expect(await refused(Promise.resolve(c2))).toEqual({ status: 409, error: 'What this change does to families changed while you were looking: look at the new counts and save again' });
+      expect((await sessionOf(coordinator, race)).selfStudyPercent).toBe(40);
+      expect(await raceLine(first!.id)).toMatchObject({ course: 1600 });
+    });
+
+    it('prices made final while a reservation lands: the reservation first, the switch sent with the counts it had is refused and the prices stay not final; the switch first, the reservation waits and its line is payable', async () => {
+      const shownBefore = (await apiResponse(pricesFinal())).impact;
+      const f = await onboard(officer, `y08-race-pf-a-${RUN}`, 11);
+      const [r1, p1] = await holdingAReservation(f, 'in_school', () => pricesFinal(shownBefore));
+      expect(r1.status).toBe(201);
+      expect(await refused(Promise.resolve(p1))).toEqual({ status: 409, error: 'What this change does to families changed while you were looking: look at the new counts and save again' });
+      expect((await sessionOf(coordinator, race)).pricesFinal).toBe(false);
+      const pending = ((await r1.json()) as { data: { id: string }[] }).data[0]!.id;
+      expect((await raceLine(pending)).provisional).toBe(true);
+
+      // The switch first: paused at its own audit row holding the session; the reservation waits for it.
+      const shown = await apiResponse(pricesFinal());
+      expect(shown.impact.linesAffected).toBe(shownBefore.linesAffected + 1);
+      const release = await pauseAtAudit('SESSION_PRICES_FINAL');
+      const g = await onboard(officer, `y08-race-pf-b-${RUN}`, 11);
+      let switching: ReturnType<typeof pricesFinal> | undefined;
+      let reserving: ReturnType<typeof raceReserve> | undefined;
+      try {
+        switching = pricesFinal(shown.impact);
+        await lockWaiters(1);
+        reserving = raceReserve(g, 'in_school');
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [p2, r2] = await Promise.all([switching!, reserving!]);
+      expect(p2.status).toBe(200);
+      expect(r2.status).toBe(201);
+      const raced = ((await r2.json()) as { data: { id: string }[] }).data[0]!.id;
+      expect(await raceLine(raced)).toMatchObject({ provisional: false, price: 14000 });
+      expect((await raceLine(pending)).provisional).toBe(false);
+    });
   });
 });

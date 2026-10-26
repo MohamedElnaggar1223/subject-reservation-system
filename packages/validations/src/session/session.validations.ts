@@ -216,6 +216,9 @@ export const UpdateSession = z
     allowedGrades: z.array(z.enum(['10', '11', '12', 'graduates'])).min(1).max(4).optional(),
     unpaidCancelDays: z.number().int().min(0).max(60).optional(),
     refundPolicy: RefundPolicySchema.optional(),
+    // C5: the payment due date and the first lesson kept as they are (the defaults, or a copy's dates a year
+    // on), said so: the check list stops blocking the opening on them.
+    datesConfirmed: z.literal(true).optional(),
     questions: z.array(z.object({
       id: z.string().min(1).optional(),
       kind: z.enum(['yes_no', 'text', 'choice']),

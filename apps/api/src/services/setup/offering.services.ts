@@ -22,7 +22,7 @@
 
 import {
   db, subject, teacher, subjectTeacher, registrationSession, registration, examBoard, boardSeries, sessionOffer, sessionOfferTeacher,
-  sessionOfferItem, sessionOfferItemTeacher, sessionQuestion, registrationAnswer, referenceSubject, referenceRow,
+  sessionOfferItem, sessionOfferItemTeacher, sessionQuestion, registrationAnswer, referenceSubject, referenceRow, sessionBoardSeries,
   and, eq, inArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -34,14 +34,15 @@ import { findOrCreateSeries, attachSeries, detachUnusedSeries, OfferError } from
 import { seriesRuleSentence } from '../series.services';
 import { teacherDuplicates, duplicateTeacherRefusal } from './teacher-names';
 import { findReferenceSubject } from './reference.services';
+import { deriveFollowingFees } from './price-list.services';
 import { rowLabel, labelRowOf } from './labels';
 import { WHOLE_ITEM_LABEL } from '@repo/validations';
 import {
-  availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, KIND_ORDER,
+  availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
   NO_CELLS, type Cells,
 } from './model';
 import {
-  planReprice, applyReprice, impactOfPlan, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact, type RepricedLine,
+  planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact, type RepricedLine,
 } from './reprice.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -75,6 +76,15 @@ export async function sessionForSetup(tx: Tx, sessionId: string, lock: 'share' |
   if (!s) throw new SetupError('Session not found', 404);
   if (s.status === 'closed') throw new SetupError(`${s.name} is closed: reopen it to change it`, 409);
   return s;
+}
+
+/**
+ * The session's sitting links (session_board_series), FOR UPDATE in id order, before the session and the
+ * offering: a save that may detach a sitting deletes links, and insertLines takes them FOR SHARE before the
+ * session, the offering and the row (lockForLines) — taken in the same order, neither waits on the other in a cycle.
+ */
+async function lockSessionLinks(tx: Tx, sessionId: string) {
+  await tx.select({ id: sessionBoardSeries.id }).from(sessionBoardSeries).where(eq(sessionBoardSeries.sessionId, sessionId)).orderBy(asc(sessionBoardSeries.id)).for('update');
 }
 
 async function offeringForSetup(tx: Tx, sessionId: string, offeringId: string) {
@@ -299,7 +309,10 @@ type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: 
  * differs is written; a change that unticks a cell lines use is refused (close the row instead); a
  * sitting changes only while no line uses the row (§6). Returns what changed, for the impact.
  */
-async function writeRow(tx: Tx, c: RowContext, input: OfferingRowInputType, existing: ItemRow | null, sortOrder: number, lines: Awaited<ReturnType<typeof linesOfRows>>): Promise<RowWrite> {
+async function writeRow(
+  tx: Tx, c: RowContext, input: OfferingRowInputType, existing: ItemRow | null, sortOrder: number, lines: Awaited<ReturnType<typeof linesOfRows>>,
+  opts: { defaultsReviewed?: boolean; cellsByDefault?: string[] } = {},
+): Promise<RowWrite> {
   const now = new Date();
   const kind = input.kind;
   if (existing && existing.kind !== kind) throw new SetupError(`${existing.label}: a row keeps its kind — add another row instead`, 409);
@@ -362,6 +375,10 @@ async function writeRow(tx: Tx, c: RowContext, input: OfferingRowInputType, exis
   const courseFee = input.courseFee !== undefined ? input.courseFee : existing?.courseFee ?? null;
   const selfStudyFee = input.selfStudyFee !== undefined ? input.selfStudyFee : existing?.selfStudyFee ?? null;
   const cells: Cells = { ...NO_CELLS, ...input.cells };
+  // The cells a default ticked (D4, Q10) stay on the check list until she changes the row's cells or says
+  // they look right; a new row records the ones its maker ticked by default.
+  const cellsChanged = !!existing && (Object.keys(NO_CELLS) as (keyof Cells)[]).some((k) => existing[k] !== cells[k]);
+  const cellsByDefault = !existing ? (opts.cellsByDefault ?? []) : opts.defaultsReviewed || cellsChanged ? [] : existing.cellsByDefault;
   const values = {
     label, kind, referenceKey: ref?.key ?? (input.referenceKey === null ? null : existing?.referenceKey ?? null), referenceCodes: codes,
     boardSeriesId: seriesId, closesAt, payBy, examFee, examFeeSource, priceListRowId, courseFee, selfStudyFee,
@@ -371,8 +388,7 @@ async function writeRow(tx: Tx, c: RowContext, input: OfferingRowInputType, exis
     exclusiveGroup: exclusiveGroupFor(kind),
     allowedPriorSeriesIds: priors ?? existing?.allowedPriorSeriesIds ?? [],
     sortOrder,
-    // Saved by her, the row is reviewed: cells a default ticked (§3) are now hers.
-    cellsByDefault: [] as string[],
+    cellsByDefault,
   };
   // The row's own teachers (null or empty: the offering's).
   const own = input.teachers === undefined ? undefined : await resolveTeachers(tx, c.offer.subjectId, input.teachers ?? [], c.actorId);
@@ -488,9 +504,13 @@ export async function addOffering(sessionId: string, input: AddOfferingType, act
       // every save orders them (all papers, one-paper rows, units, A.S., A.2., A.L., then the rest).
       const suggested = refRows.filter((r) => !(session.sessionType === 'winter' && r.winterSitting === 'none'))
         .map((r, i) => ({ r, i })).sort((a, b) => (KIND_ORDER[a.r.kind] ?? 9) - (KIND_ORDER[b.r.kind] ?? 9) || a.i - b.i).map((x) => x.r);
+      // D4: the usual offer ticked by default, each tick recorded for her check list (Q10).
+      const hasQualification = suggested.some((r) => r.kind === 'qualification');
       for (const [i, r] of suggested.entries()) {
         const sitting = defaultSitting(session.sessionType, r.winterSitting && r.winterSitting !== 'none' ? r.winterSitting : winter);
-        await writeRow(tx, c, { kind: r.kind as OfferingRowInputType['kind'], referenceKey: r.key, sitting, cells: { ...NO_CELLS } }, null, i, []);
+        const cells = defaultCells(r.kind, hasQualification);
+        await writeRow(tx, c, { kind: r.kind as OfferingRowInputType['kind'], referenceKey: r.key, sitting, cells }, null, i, [],
+          { cellsByDefault: (Object.keys(cells) as (keyof Cells)[]).filter((k) => cells[k]) });
       }
       await logAction(actorId, 'SESSION_OFFER_CREATED', 'session_offer', id, null,
         { sessionId, subjectId: subjectRow.id, referenceCode, notOnTheList: !referenceCode, suggestedRows: refRows.filter((r) => !(session.sessionType === 'winter' && r.winterSitting === 'none')).length }, ctx, tx);
@@ -585,6 +605,8 @@ export type OfferingSave = { saved: boolean; impact: Impact; repriced: RepricedL
 export async function updateOffering(sessionId: string, offeringId: string, data: UpdateOfferingType, actorId: string, ctx?: AuditContext): Promise<OfferingSave> {
   try {
     const out = await db.transaction(async (tx) => {
+      // Rows sent may place a row in a new sitting or leave one unused (its link detached): the links first.
+      if (data.rows) await lockSessionLinks(tx, sessionId);
       const session = await sessionForSetup(tx, sessionId);
       const { offer, subjectRow } = await offeringForSetup(tx, sessionId, offeringId);
       const rows = await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offeringId)).orderBy(asc(sessionOfferItem.id)).for('update');
@@ -607,8 +629,8 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       const closesAt = next.closesAt !== undefined ? next.closesAt : offer.closesAt;
       const availability = offerAvailability(accepting, closesAt ?? null, now);
       if (availability !== offer.availability) next.availability = availability;
-      // Saved by her, the subject is reviewed: the pre-load's notes leave its check list.
-      if (offer.checkNotes.length) next.checkNotes = [];
+      // Her "Looks right": the pre-load's notes leave the check list (an unrelated save keeps them).
+      if (data.notesReviewed && offer.checkNotes.length) next.checkNotes = [];
       const live = (ids: string[]) => lines.filter((l) => ids.includes(l.itemId) && LIVE.includes(l.status)).reduce((a, l) => a + l.n, 0);
       // Closing the subject (its switch off, or a close date reached): the reservations that stand are counted.
       if (offer.availability !== 'closed' && availability === 'closed') linesAffected += live(rows.map((r) => r.id));
@@ -663,7 +685,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         });
         const ordered = sent.map((r, i) => ({ r, i })).sort((a, b) => (KIND_ORDER[a.r.kind] ?? 9) - (KIND_ORDER[b.r.kind] ?? 9) || a.i - b.i);
         for (const [pos, { r }] of ordered.entries()) {
-          const w = await writeRow(tx, c, r, r.id ? byId.get(r.id)! : null, pos, lines);
+          const w = await writeRow(tx, c, r, r.id ? byId.get(r.id)! : null, pos, lines, { defaultsReviewed: !!data.defaultsReviewed });
           if (w.changed) changed = true;
           if (w.priceChanged) priceRows.add(w.id);
           if (w.closedNow) linesAffected += live([w.id]);
@@ -673,6 +695,14 @@ export async function updateOffering(sessionId: string, offeringId: string, data
           changed = true;
         }
         await detachUnusedSeries(tx, sessionId);
+      }
+      // Her "Looks right" on the default ticks with no rows sent: every row's are hers now.
+      if (data.defaultsReviewed && !data.rows) {
+        for (const r of rows.filter((x) => x.cellsByDefault.length)) {
+          await tx.update(sessionOfferItem).set({ cellsByDefault: [], updatedAt: now }).where(eq(sessionOfferItem.id, r.id));
+          await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', r.id, { cellsByDefault: r.cellsByDefault }, { cellsByDefault: [], via: 'the check list (looks right)' }, ctx, tx);
+          changed = true;
+        }
       }
       // A course fee change reaches every row priced from it (no course fee of its own).
       if ('courseFee' in next) {
@@ -684,10 +714,15 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         changed = true;
       }
 
+      // The fees that follow others (E5): a one-paper retake on the board rule, a row summing its units.
+      for (const id of await deriveFollowingFees(tx, [offeringId], { actorId, ctx })) {
+        priceRows.add(id);
+        changed = true;
+      }
       const plan = await planReprice(tx, { rowIds: [...priceRows] });
-      const impact = addImpact(impactOfPlan(plan), { linesAffected });
+      const { told: repriced, impact: priced } = await applyReprice(tx, plan, { actorId, reason: `${subjectRow.name}: its price changed in ${session.name}`, entity: { type: 'session_offer', id: offeringId }, ctx });
+      const impact = addImpact(priced, { linesAffected });
       settleImpact(impact, data.expected);
-      const repriced = await applyReprice(tx, plan, { actorId, reason: `${subjectRow.name}: its price changed in ${session.name}`, entity: { type: 'session_offer', id: offeringId }, ctx });
       return { saved: true, impact: changed || plan.repriced.length ? impact : NO_IMPACT, repriced, subjectName: subjectRow.name, sessionName: session.name };
     });
     await tellRepriced(out.repriced, `${out.subjectName}'s price changed in ${out.sessionName}`);
@@ -701,6 +736,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
 /** DELETE /sessions/:id/offerings/:offeringId — refused while any line exists (close it instead). */
 export async function deleteOffering(sessionId: string, offeringId: string, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
+    await lockSessionLinks(tx, sessionId);
     await sessionForSetup(tx, sessionId);
     const { offer, subjectRow } = await offeringForSetup(tx, sessionId, offeringId);
     const [line] = await tx.select({ id: registration.id }).from(registration)

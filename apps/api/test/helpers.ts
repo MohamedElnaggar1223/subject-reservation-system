@@ -516,13 +516,11 @@ export async function confirmed<T extends { saved: boolean; impact: Impact }>(se
 }
 
 /**
- * C6's one exception, as the admin makes it from the check list: a sitting the reference data gives no
- * board date gets one (an exam start, and an entry deadline when given), once.
+ * C6's one exception, as the admin makes it from the check list (PUT /reference/sittings/:id/board-date): a
+ * sitting the reference data gives no board entry deadline gets one (and its retake deadline), once.
  */
-export async function boardDate(adm: Client, seriesId: string, d: { examsStart: string; entryDeadline?: Date }) {
-  return apiResponse(adm.api.v1['board-series'][':id'].$put({
-    param: { id: seriesId }, json: { examsStart: d.examsStart, ...(d.entryDeadline ? { entryDeadline: d.entryDeadline, reason: 'the board published its key dates' } : {}) },
-  }));
+export async function boardDate(adm: Client, seriesId: string, d: { entryDeadline: Date; retakeDeadline?: Date | null }) {
+  return apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: seriesId }, json: d }));
 }
 
 // ─── Observation ─────────────────────────────────────────────────────────────

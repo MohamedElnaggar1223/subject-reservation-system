@@ -140,29 +140,30 @@ export async function planReprice(tx: Tx, scope: { rowIds?: string[]; selfStudyO
   return plan;
 }
 
-export const impactOfPlan = (p: RepricePlan): Impact => ({
-  repriced: p.repriced.filter((r) => round2(r.from) !== round2(r.to)).length,
-  listedForFinance: p.listed.length,
-  linesAffected: 0,
-  dueDatesMoved: 0,
-});
-
 /**
- * Write a confirmed plan in the caller's transaction: each re-priced line's price, basis and due date,
- * its LINE_REPRICED row, and one ROWS_REPRICED row for the batch naming the lines listed for finance.
- * Returns the lines whose price changed (the families to tell after the commit).
+ * Write a plan in the caller's transaction: each re-priced line's price, basis and due date, its
+ * LINE_REPRICED row, and one ROWS_REPRICED row for the batch naming the lines listed for finance.
+ * Returns the lines whose price changed (the families to tell after the commit) and the plan's impact,
+ * counted from what was written: re-priced (the price changed), listed for finance, lines whose only
+ * change is the provisional mark (linesAffected) and due dates moved. The caller settles the impact
+ * after this (a change still to be confirmed rolls the transaction back, these writes with it).
  */
 export async function applyReprice(
   tx: Tx, plan: RepricePlan, a: { actorId: string; reason: string; entity: { type: 'session' | 'session_offer' | 'offer_item' | 'price_list'; id: string }; ctx?: AuditContext },
-): Promise<RepricedLine[]> {
+): Promise<{ told: RepricedLine[]; impact: Impact }> {
   const now = new Date();
+  let dueDatesMoved = 0;
   for (const r of plan.repriced) {
+    const [before] = await tx.select({ dueAt: registration.dueAt }).from(registration).where(eq(registration.id, r.id));
     await tx.update(registration).set({
       priceAtRegistration: r.next.total, courseFeeAtRegistration: r.next.courseFee, registrationFeeAtRegistration: r.next.registrationFee,
       priceProvisional: r.next.provisional, pricingBasis: r.next.basis as unknown as Record<string, unknown>, updatedAt: now,
     }).where(eq(registration.id, r.id));
     const due = await dueDateFor(tx, { kind: 'line', lineId: r.id });
-    await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, r.id));
+    if ((before?.dueAt?.getTime() ?? null) !== due.getTime()) {
+      await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, r.id));
+      dueDatesMoved++;
+    }
   }
   await logActions(plan.repriced.map((r) => ({
     userId: a.actorId, action: 'LINE_REPRICED' as const, entityType: 'registration' as const, entityId: r.id,
@@ -174,7 +175,11 @@ export async function applyReprice(
       listedForFinance: plan.listed.map((l) => ({ id: l.id, price: l.price, newPrice: l.newPrice, reason: l.reason })),
     }, a.ctx, tx);
   }
-  return plan.repriced.filter((r) => round2(r.from) !== round2(r.to)).map(({ next: _n, ...r }) => r);
+  const priced = plan.repriced.filter((r) => round2(r.from) !== round2(r.to));
+  return {
+    told: priced.map(({ next: _n, ...r }) => r),
+    impact: { repriced: priced.length, listedForFinance: plan.listed.length, linesAffected: plan.repriced.length - priced.length, dueDatesMoved },
+  };
 }
 
 /** After the commit: each family whose price changed is told the old and the new price (E7). */

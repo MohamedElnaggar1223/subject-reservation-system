@@ -73,14 +73,21 @@ describe('08zb: the June 2027 pre-load', () => {
     expect(s.checkList.find((c) => c.code === 'carried_from_too_old')?.message).toMatch(/November 2025 is older than the board carries a result forward/);
     // Notes name teachers only by placeholder in the committed file; with no names file they stay so.
     expect(s.checkList.filter((c) => c.code === 'review_note').every((c) => !/\{T-/.test(c.message))).toBe(true);
-    // Saved by her, a subject's notes and its default ticks are reviewed.
-    const ticked = s.offerings.find((o) => o.rows.some((r) => r.cellsByDefault.length))!;
-    const res = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({
-      param: { id: sessionId, offeringId: ticked.id }, json: { rows: ticked.rows.map((r) => ({ id: r.id, kind: r.kind as 'all_papers', cells: r.cells })) },
-    }));
+    // An unrelated save keeps them on her check list; her "Looks right" reviews them (the notes, the default ticks).
+    const ticked = s.offerings.find((o) => o.rows.some((r) => r.cellsByDefault.length) && o.checkNotes.length)!;
+    const flagsOf = async () => (await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: sessionId } }))).checkList
+      .filter((c) => c.offeringId === ticked.id && (c.code === 'ticked_by_default' || c.code === 'review_note')).map((c) => c.code).sort();
+    const flags = await flagsOf();
+    expect(flags).toEqual(expect.arrayContaining(['review_note', 'ticked_by_default']));
+    const put = (json: Parameters<typeof coordinator.api.v1.sessions[':id']['offerings'][':offeringId']['$put']>[0]['json']) =>
+      apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: sessionId, offeringId: ticked.id }, json }));
+    await put({ note: 'a family note', rows: ticked.rows.map((r) => ({ id: r.id, kind: r.kind as 'all_papers', cells: r.cells })) });
+    expect(await flagsOf()).toEqual(flags);
+    await put({ notesReviewed: true });
+    expect(await flagsOf()).toEqual(flags.filter((c) => c !== 'review_note'));
+    const res = await put({ defaultsReviewed: true });
     expect(res.offering.rows.every((r) => r.cellsByDefault.length === 0)).toBe(true);
-    const after = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: sessionId } }));
-    expect(after.checkList.filter((c) => c.offeringId === ticked.id && (c.code === 'ticked_by_default' || c.code === 'review_note'))).toEqual([]);
+    expect(await flagsOf()).toEqual([]);
   });
 
   it('loaded again it changes nothing; June 2028 is made by copying it (C3)', async () => {

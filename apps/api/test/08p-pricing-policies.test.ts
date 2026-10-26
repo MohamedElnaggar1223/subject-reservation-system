@@ -92,7 +92,7 @@ describe('08p: pricing policies on pricing v2', () => {
     // The session opens once its sitting has its board date (C6).
     const s = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: session } }));
     for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
-      await boardDate(adm, c.seriesId!, { examsStart: `${Y}-06-01`, entryDeadline: new Date(Date.now() + 50 * day) });
+      await boardDate(adm, c.seriesId!, { entryDeadline: new Date(Date.now() + 50 * day) });
     }
     await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: session } }));
     // The A.2.'s and the retakes' earlier sitting: June Y − 1, one of the board's two before (D6).
@@ -287,6 +287,12 @@ describe('08p: pricing policies on pricing v2', () => {
     expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [line!.id], instrumentUsed: 'cash', escrowAmountToApply: 0 } }))).error).toBe(PROVISIONAL_REFUSAL);
     expect(await sql(`select 1 from payment_registration where registration_id = $1`, [line!.id])).toEqual([]);
 
+    // A line reserved before the rework on a row 0066 gave an exam fee keeps its version-1 basis: the switch reaches it by
+    // its row, not its basis.
+    const g = await onboard(officer, `p08-prov-v1-${RUN}`, 11);
+    const [converted] = await reserve(g, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
+    await sql(`update registration set pricing_basis = jsonb_set(pricing_basis, '{v}', '1') where id = $1`, [converted!.id]);
+    expect(await priceOf(converted!.id)).toMatchObject({ provisional: true, basis: { v: 1 } });
     const waiting = Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and status = 'pending_payment'`, [session])).n);
     const dueBefore = new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line!.id])).d).getTime();
     const switchedAt = Date.now();
@@ -300,6 +306,8 @@ describe('08p: pricing policies on pricing v2', () => {
     expect(dueAfter).toBeGreaterThan(dueBefore);
     expect(Math.abs(dueAfter - (switchedAt + grace * day))).toBeLessThan(10_000);
     await audited([line!.id], ['LINE_DUE_MOVED']);
+    expect(await priceOf(converted!.id)).toMatchObject({ price: 23200, provisional: false, basis: { v: 1 } });
+    await audited([converted!.id], ['LINE_DUE_MOVED']);
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [pay!.id!])).amount)).toBe(23200);
   });
@@ -342,5 +350,27 @@ describe('08p: pricing policies on pricing v2', () => {
     const email = (await one<{ email: string }>(`select email from "user" where id = $1`, [plain.studentId])).email;
     const [told] = await notified(email, 'PRICE_CHANGED', 1);
     expect(told!.body).toMatch(/was EGP 10,000 and is now EGP 10,500/);
+  });
+
+  it("a re-price counts all it does before it is confirmed: a line whose only change is its provisional mark (linesAffected) and the due dates it moves, beside the prices it changes", async () => {
+    const sub = await subjectWith('Counted', {
+      courseFee: 2000, teachers: [{ teacherId, online: false, external: false }],
+      rows: [{ kind: 'all_papers', referenceCodes: [`P08C-${RUN}`], examFee: 6000, cells: cells(true, true, true) }],
+    });
+    const row = sub.rows[0]!.id;
+    const [inSchool, selfStudy] = [await onboard(officer, `p08-cnt-a-${RUN}`, 11), await onboard(officer, `p08-cnt-b-${RUN}`, 11)];
+    const [a] = await reserve(inSchool, [{ offerItemId: row, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [b] = await reserve(selfStudy, [{ offerItemId: row, attempt: 'retake', mode: 'self_study', priorSittingSeriesId: priorJune }]);
+    // The in-school line as a converted line can be left: still marked provisional by the old grid, its due date the
+    // grid's (version-1 basis). Its price does not change with the self-study fee; its mark does.
+    await sql(`update registration set price_provisional = true, pricing_basis = jsonb_set(pricing_basis, '{v}', '1'), due_at = now() + interval '1 day' where id = $1`, [a!.id]);
+    const send = (expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: session, offeringId: sub.id }, json: { rows: [{ id: row, kind: 'all_papers', selfStudyFee: 1500, cells: cells(true, true, true) }], ...(expected ? { expected } : {}) },
+    }));
+    const { shown, saved } = await confirmed(send);
+    expect(shown).toMatchObject({ saved: false, impact: { repriced: 1, listedForFinance: 0, linesAffected: 1, dueDatesMoved: 1 } });
+    expect(saved.saved).toBe(true);
+    expect(await priceOf(a!.id)).toMatchObject({ price: 8000, provisional: false, basis: { v: 2 } });
+    expect(await priceOf(b!.id)).toMatchObject({ course: 1500, price: 7500, basis: { selfStudyFee: 1500 } });
   });
 });

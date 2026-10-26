@@ -5,7 +5,11 @@
  * (`loadReference`, @repo/db), never edited by staff.
  */
 
-import { db, examBoard, boardSeries, referenceSubject, referenceRow, and, eq, inArray, asc, sql } from '@repo/db';
+import { db, examBoard, boardSeries, referenceSubject, referenceRow, sessionBoardSeries, registrationSession, and, eq, inArray, asc, sql } from '@repo/db';
+import type { EnterBoardDateType } from '@repo/validations';
+import { logAction, type AuditContext } from '../audit.services';
+import { redateSeriesLines } from '../deadline.services';
+import { SetupError, setupRethrow } from './offering.services';
 
 type Executor = Pick<typeof db, 'select'>;
 
@@ -63,4 +67,48 @@ export async function findReferenceSubject(executor: Executor, code: string, boa
   if (found.length !== 1) return { subject: null, ambiguous: found.length > 1 };
   const rows = await executor.select().from(referenceRow).where(eq(referenceRow.referenceSubjectId, found[0]!.id)).orderBy(asc(referenceRow.sortOrder));
   return { subject: found[0]!, rows, ambiguous: false };
+}
+
+const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' }).format(d);
+
+/**
+ * PUT /reference/sittings/:id/board-date — C6's one exception, the admin's alone: a sitting with no board
+ * entry deadline (the reference data gives none yet, or a session's own sitting) gets it once, with its
+ * retake deadline when the board has one. Marked as the admin's (dates_source 'admin'), so the reference
+ * loader keeps it; a sitting that has its deadline is refused (the reference data owns it). Audited; the
+ * waiting lines of the sitting are re-dated once it commits.
+ */
+export async function enterBoardDate(seriesId: string, data: EnterBoardDateType, actorId: string, ctx?: AuditContext) {
+  try {
+    const out = await db.transaction(async (tx) => {
+      // As every series writer: the sessions it is attached to (FOR SHARE), then the series.
+      await tx.select({ id: registrationSession.id }).from(sessionBoardSeries)
+        .innerJoin(registrationSession, eq(registrationSession.id, sessionBoardSeries.sessionId))
+        .where(eq(sessionBoardSeries.boardSeriesId, seriesId)).orderBy(registrationSession.id).for('share', { of: registrationSession });
+      const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('update');
+      if (!s) throw new SetupError('That sitting was not found', 404);
+      if (s.entryDeadline) {
+        throw new SetupError(`This sitting has its board entry deadline (${cairoDay(s.entryDeadline)}): the reference data keeps it`, 409);
+      }
+      const now = new Date();
+      if (data.entryDeadline <= now) throw new SetupError("The board's entry deadline must be in the future");
+      if (data.retakeDeadline && data.retakeDeadline < data.entryDeadline) throw new SetupError('The retake deadline cannot be before the entry deadline');
+      const [updated] = await tx.update(boardSeries).set({
+        entryDeadline: data.entryDeadline, ...(data.retakeDeadline !== undefined ? { retakeDeadline: data.retakeDeadline } : {}),
+        datesSource: 'admin', updatedAt: now,
+      }).where(eq(boardSeries.id, seriesId)).returning();
+      await logAction(actorId, 'BOARD_SERIES_DEADLINE_SET', 'board_series', seriesId,
+        { entryDeadline: null, retakeDeadline: s.retakeDeadline?.toISOString() ?? null, datesSource: s.datesSource },
+        { entryDeadline: data.entryDeadline.toISOString(), retakeDeadline: (data.retakeDeadline ?? s.retakeDeadline)?.toISOString() ?? null, datesSource: 'admin',
+          via: 'the check list (C6: the admin enters a missing board date once)' }, ctx, tx);
+      return updated!;
+    });
+    await redateSeriesLines(seriesId, actorId, 'the admin entered the board\'s entry deadline');
+    return {
+      id: out.id, boardCode: out.boardCode, month: out.month, year: out.year, label: out.label,
+      entryDeadline: out.entryDeadline, retakeDeadline: out.retakeDeadline, examsStart: out.examsStart, datesSource: out.datesSource,
+    };
+  } catch (err) {
+    setupRethrow(err);
+  }
 }

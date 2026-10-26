@@ -22,7 +22,7 @@
 
 import {
   db, registrationSession, registration, registrationConsent, sessionOffer, sessionOfferItem, sessionQuestion, teacher,
-  sessionOfferTeacher, sessionOfferItemTeacher, subject, and, eq, inArray, sql, asc,
+  sessionOfferTeacher, sessionOfferItemTeacher, subject, and, eq, inArray, isNotNull, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -39,7 +39,7 @@ import { sameTeacherReason } from './teacher-names';
 import { copyOfferingInto, offeringsView, writeQuestions, SetupError, setupRethrow } from './offering.services';
 import { defaultSessionDates, rollDateOnly, rollYears } from './model';
 import {
-  planReprice, applyReprice, impactOfPlan, settleImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact,
+  planReprice, applyReprice, settleImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact,
 } from './reprice.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -116,6 +116,9 @@ export async function createSetupSession(data: { type: 'june' | 'winter'; year: 
 
 export type SessionSave = { saved: boolean; impact: Impact; dueDatesMoved: number };
 
+/** A start date on a coordinator's draft: it would let the scheduler open it past its check list. */
+export const START_DATE_REFUSAL = 'This draft opens with the Accepting switch once its check list is clear, not with a start date';
+
 /**
  * PUT /sessions/:id — the header and what families agree to (both contracts; see the header). A share
  * change re-prices the session's unpaid self-study lines and lists the rest for finance: it answers
@@ -138,6 +141,9 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
           next.endDate = data.endDate;
         }
       } else {
+        // A draft made by the coordinator has no start date: it opens with the Accepting switch, after its
+        // check list (C4, C6). A start date given here would let the scheduler open it past the check list.
+        if (data.startDate && !current.startDate) throw new SessionError(START_DATE_REFUSAL, 409);
         if (data.startDate) next.startDate = data.startDate;
         if (data.endDate) next.endDate = data.endDate;
       }
@@ -163,14 +169,22 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
         next.refundPolicy = data.refundPolicy;
       }
       const questionsChanged = data.questions ? await writeQuestions(tx, id, null, data.questions as QuestionInputType[], actorId) : false;
-      if (!Object.keys(next).length && !questionsChanged) throw new SessionError('Nothing to change');
+      // C5: the two dates kept as they stand, said so (recorded in the edit history the check list reads).
+      const datesConfirmed = !!data.datesConfirmed && datesToCheck(current) && !('paymentDueAt' in next) && !('courseStartsOn' in next);
+      if (!Object.keys(next).length && !questionsChanged && !datesConfirmed) throw new SessionError('Nothing to change');
       const history = Object.entries(next)
         .filter(([k]) => k !== 'reminderSentAt')
         .map(([field, v]) => ({
           editedBy: actorId, editedAt: now.toISOString(), field,
           oldValue: JSON.stringify((current as Record<string, unknown>)[field] ?? null), newValue: JSON.stringify(v ?? null), reason: data.reason ?? undefined,
         }));
-      if (Object.keys(next).length) {
+      if (datesConfirmed) {
+        history.push({
+          editedBy: actorId, editedAt: now.toISOString(), field: 'datesConfirmed',
+          oldValue: JSON.stringify({ paymentDueAt: current.paymentDueAt, courseStartsOn: current.courseStartsOn }), newValue: 'true', reason: data.reason ?? undefined,
+        });
+      }
+      if (Object.keys(next).length || datesConfirmed) {
         await tx.update(registrationSession).set({
           ...next,
           editHistory: sql`COALESCE(${registrationSession.editHistory}, '[]'::jsonb) || ${JSON.stringify(history)}::jsonb`,
@@ -180,9 +194,8 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
       // The share changed: the session's self-study lines priced again (its rows' FOR SHARE in insertLines
       // waits behind this session's FOR UPDATE, so no line is made at the old share meanwhile).
       const plan = 'selfStudyPercent' in next ? await planReprice(tx, { selfStudyOfSession: id }) : { repriced: [], listed: [] };
-      const impact = impactOfPlan(plan);
+      const { told: repriced, impact } = await applyReprice(tx, plan, { actorId, reason: `the self-study share of ${current.name} changed to ${next.selfStudyPercent}%`, entity: { type: 'session', id }, ctx });
       settleImpact(impact, data.expected);
-      const repriced = await applyReprice(tx, plan, { actorId, reason: `the self-study share of ${current.name} changed to ${next.selfStudyPercent}%`, entity: { type: 'session', id }, ctx });
       // The payment due date moved: the waiting lines' due dates follow.
       let dueMoved = 0;
       if (next.paymentDueAt) {
@@ -192,7 +205,7 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
       }
       await logAction(actorId, 'SESSION_UPDATED', 'session', id,
         Object.fromEntries(Object.keys(next).map((k) => [k, (current as Record<string, unknown>)[k] ?? null])),
-        { ...next, ...(questionsChanged ? { questions: data.questions!.map((q) => q.prompt) } : {}), reason: data.reason ?? null, dueDatesMoved: dueMoved, repriced: repriced.length }, ctx, tx);
+        { ...next, ...(questionsChanged ? { questions: data.questions!.map((q) => q.prompt) } : {}), ...(datesConfirmed ? { datesConfirmed: true } : {}), reason: data.reason ?? null, dueDatesMoved: dueMoved, repriced: repriced.length }, ctx, tx);
       return { impact, repriced, dueMoved, name: current.name };
     });
     await tellRepriced(out.repriced, `The self-study share of ${out.name} changed`);
@@ -284,13 +297,15 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
         return { saved: true, impact: NO_IMPACT, dueDatesMoved: 0 };
       }
       await tx.update(registrationSession).set({ pricesFinal: true, pricesFinalAt: now, updatedAt: now }).where(eq(registrationSession.id, id));
-      // The waiting lines priced while not final (version 2), locked in id order after the session.
+      // The waiting provisional lines of rows priced by their own exam fee (whatever the basis' version: a
+      // converted line on a converted row too), locked in id order after the session; a line of a row still
+      // priced from the deprecated fee grid keeps its grid's provisional mark.
       const waiting = await tx.select({ id: registration.id }).from(registration)
-        .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING), eq(registration.priceProvisional, true),
-          sql`(${registration.pricingBasis}->>'v')::int = 2`))
-        .orderBy(registration.id).for('update');
+        .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
+        .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING), eq(registration.priceProvisional, true), isNotNull(sessionOfferItem.examFee)))
+        .orderBy(registration.id).for('update', { of: registration });
       if (waiting.length) await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(inArray(registration.id, waiting.map((w) => w.id)));
-      const moved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s prices were made final');
+      const moved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s prices were made final', { feeConfirmedAt: now });
       const impact: Impact = { repriced: 0, listedForFinance: 0, linesAffected: waiting.length, dueDatesMoved: moved };
       settleImpact(impact, data.expected);
       await logAction(actorId, 'SESSION_PRICES_FINAL', 'session', id, { pricesFinal: false }, { pricesFinal: true, pricesFinalAt: now.toISOString(), linesMadePayable: waiting.length, dueDatesMoved: moved }, ctx, tx);
@@ -316,6 +331,18 @@ export type CheckItem = {
 
 const DAY = 24 * 60 * 60 * 1000;
 const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' }).format(d);
+
+/**
+ * C5: a draft's payment due date and first lesson are still the ones it was made with (the defaults, or a
+ * copy's dates a year on) — neither changed nor kept on purpose. Only a draft made by the coordinator's
+ * contract (no start date until it opens): one made by the deprecated dated contract was given its dates,
+ * and an open session is past its check list.
+ */
+function datesToCheck(s: Pick<SessionRow, 'editHistory' | 'startDate' | 'status'>): boolean {
+  if (s.status !== 'draft' || s.startDate) return false;
+  const edited = new Set((s.editHistory ?? []).map((h) => h.field));
+  return !edited.has('paymentDueAt') && !edited.has('courseStartsOn') && !edited.has('datesConfirmed');
+}
 
 /** What blocks the session from opening, and what deserves a look (§5; C6's board dates; D6; Q15). */
 export async function checkListOf(executor: Executor, s: SessionRow): Promise<CheckItem[]> {
@@ -379,14 +406,13 @@ export async function checkListOf(executor: Executor, s: SessionRow): Promise<Ch
   if (s.copiedFromSessionId && !s.pricesFinal) {
     items.push({ code: 'last_years_prices', severity: 'look', message: 'The prices are last cycle\'s, copied: check them, then switch prices final' });
   }
-  const edited = new Set((s.editHistory ?? []).map((h) => h.field));
-  const datesUntouched = !edited.has('paymentDueAt') && !edited.has('courseStartsOn');
-  if (datesUntouched) {
+  if (datesToCheck(s)) {
+    // C5: families read these dates; she sets them or says the ones shown are right before the session opens.
     items.push({
-      code: 'dates_to_check', severity: 'look',
+      code: 'dates_to_check', severity: 'blocks',
       message: s.copiedFromSessionId
-        ? `The dates were moved a year by the copy: check the payment due date (${cairoDay(s.paymentDueAt)}) and the first lesson (${s.courseStartsOn})`
-        : `The dates are the defaults: set the payment due date (${cairoDay(s.paymentDueAt)}) and the first lesson (${s.courseStartsOn})`,
+        ? `The dates were moved a year by the copy: check the payment due date (${cairoDay(s.paymentDueAt)}) and the first lesson (${s.courseStartsOn}) — change them, or keep them as they are`
+        : `The dates are the defaults: set the payment due date (${cairoDay(s.paymentDueAt)}) and the first lesson (${s.courseStartsOn}) — or keep them as they are`,
     });
   }
   // Q15: the session's teachers whose names look like another teacher's on the school's list.

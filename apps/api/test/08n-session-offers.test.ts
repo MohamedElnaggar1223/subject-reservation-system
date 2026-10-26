@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import {
   admin, staff, onboard, subject, refused, one, sql, audited, money, futureWindow, runPaymentDeadlines, runSessionRecovery,
-  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf, pauseAtAudits, lockWaiters, boardDate,
+  runSessionScheduler, schoolToday, notified, notificationsFor, waitFor, type Client, reservationOf, pauseAtAudits, lockWaiters,
 } from './helpers';
 
 /**
@@ -123,8 +123,11 @@ describe('08n: sessions and offerings, set up as the coordinator sets them up', 
     expect(s1.checkList.filter((c) => c.code === 'sitting_no_board_date').map((c) => c.seriesId)).toContain(oxRow.series!.id);
     expect((await refused(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june1 } }))).status).toBe(409);
     for (const c of s1.checkList.filter((x) => x.code === 'sitting_no_board_date')) {
-      await boardDate(adm, c.seriesId!, { examsStart: `${Y + 1}-06-01`, entryDeadline: new Date(Date.now() + 120 * day) });
+      await apiResponse(adm.api.v1.reference.sittings[':id']['board-date'].$put({ param: { id: c.seriesId! }, json: { entryDeadline: new Date(Date.now() + 120 * day) } }));
     }
+    // The default dates block too until she sets them or keeps them (C5).
+    expect((await sessionOf(june1)).checkList.filter((c) => c.severity === 'blocks').map((c) => c.code)).toEqual(['dates_to_check']);
+    await apiResponse(coordinator.api.v1.sessions[':id'].$put({ param: { id: june1 }, json: { datesConfirmed: true } }));
     expect((await sessionOf(june1)).blocked).toBe(false);
   });
 

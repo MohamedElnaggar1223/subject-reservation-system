@@ -162,7 +162,9 @@ export function computeDueAt(a: {
 }
 
 export type DueDateInput =
-  | { kind: 'line'; lineId: string }
+  // `feeConfirmedAt`: the moment the line's price stopped being provisional, when the caller made it so
+  // (the prices-final switch makes waiting lines payable whatever their basis' version).
+  | { kind: 'line'; lineId: string; feeConfirmedAt?: Date }
   | { kind: 'charge'; studentId: string; baseDueAt: Date; reservedAt: Date; cap: Date | null; scope: ExceptionScope };
 
 /**
@@ -195,7 +197,9 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
   // prices were switched final (§6: switching them final re-dates every waiting line from prices_final_at);
   // a v1 line when the last fee row its basis read was confirmed.
   let feeConfirmedAt: Date | null = null;
-  if ((line.pricingBasis as { v?: number } | null)?.v === 2) {
+  if (input.feeConfirmedAt) {
+    feeConfirmedAt = input.feeConfirmedAt;
+  } else if ((line.pricingBasis as { v?: number } | null)?.v === 2) {
     feeConfirmedAt = !line.priceProvisional ? line.pricesFinalAt : null;
   } else {
     const feeIds = ((line.pricingBasis as { feeRows?: { id: string }[] } | null)?.feeRows ?? []).map((f) => f.id);
@@ -227,14 +231,14 @@ const WAITING = ['pending_approval', 'pending_payment', 'preregistered'];
  * again (`dueDateFor`); a changed one written and audited (`LINE_DUE_MOVED`, with why). A paid or
  * finished line keeps its date. Returns how many moved.
  */
-export async function redateLines(tx: Tx, lineIds: string[], actorId: string | null, why: string) {
+export async function redateLines(tx: Tx, lineIds: string[], actorId: string | null, why: string, opts: { feeConfirmedAt?: Date } = {}) {
   if (!lineIds.length) return 0;
   const rows = await tx.select({ id: registration.id, dueAt: registration.dueAt, status: registration.status })
     .from(registration).where(inArray(registration.id, lineIds)).orderBy(registration.id);
   const moves: { id: string; from: Date; to: Date }[] = [];
   for (const r of rows) {
     if (!WAITING.includes(r.status)) continue;
-    const due = await dueDateFor(tx, { kind: 'line', lineId: r.id });
+    const due = await dueDateFor(tx, { kind: 'line', lineId: r.id, ...(opts.feeConfirmedAt ? { feeConfirmedAt: opts.feeConfirmedAt } : {}) });
     if (due.getTime() !== r.dueAt.getTime()) {
       await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, r.id));
       moves.push({ id: r.id, from: r.dueAt, to: due });

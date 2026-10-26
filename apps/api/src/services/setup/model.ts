@@ -23,6 +23,20 @@ export function exclusiveGroupFor(kind: string): string | null {
   return null;
 }
 
+/**
+ * D4: the cells a row from the reference list starts with (the mock's rule, recorded as defaults for her
+ * check list): all papers, A.S., A.L. and qualification rows, and units unless the subject also has a
+ * qualification row — first entry in school, retake in school, retake in self study; a one-paper row
+ * the two retakes; an A.2. (its own entry after the A.S., her call) and any other row nothing.
+ */
+export function defaultCells(kind: string, subjectHasQualification: boolean): Cells {
+  const usual: Cells = { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false };
+  if (kind === 'all_papers' || kind === 'as' || kind === 'al' || kind === 'qualification') return usual;
+  if (kind === 'unit') return subjectHasQualification ? { ...NO_CELLS } : usual;
+  if (kind === 'paper') return { ...NO_CELLS, retakeInSchool: true, retakeSelfStudy: true };
+  return { ...NO_CELLS };
+}
+
 /** D6: whether a row asks the sitting it carries from — an A.2. always; a one-paper retake by the board rule. */
 export function needsPriorFor(kind: string, onePaperAsksSitting: boolean): boolean {
   if (kind === 'a2') return true;

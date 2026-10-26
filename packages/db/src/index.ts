@@ -23,6 +23,9 @@ export * from './academic'
 // The reference data's loader (the coordinator rework, §7)
 export * from './reference'
 
+// A plain connection to a scratch database (a migration checked in a test)
+export * from './scratch'
+
 /**
  * Drizzle ORM Query Builders
  *

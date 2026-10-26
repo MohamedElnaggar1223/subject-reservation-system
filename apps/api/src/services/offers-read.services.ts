@@ -26,7 +26,7 @@ import { db, sql, registrationSession, sessionQuestion, boardSeries, subject, an
 import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
 import { availabilityConstraints } from './offer.services';
-import { priceLine } from './pricing.services';
+import { priceLine, PricingError } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { examSittingsOf, examKeysOf } from './reservation.services';
 import { lineExceptions, coversScope } from './line-exceptions';
@@ -330,7 +330,9 @@ export async function familyOfferings(
             ? await priceLine(db, { item: { id: r.id }, attempt, mode, studentId, sessionId })
             : await priceLine(db, { item: { id: r.id }, attempt, mode, studentId: '', sessionId }, { exceptionIds: [] });
           price = { total: p.total, examFee: p.registrationFee, courseFee: p.courseFee };
-        } catch {
+        } catch (err) {
+          // A price not set reads as "no price yet"; any other failure is a failure, not a missing price.
+          if (!(err instanceof PricingError)) throw err;
           price = null;
         }
         options.push({

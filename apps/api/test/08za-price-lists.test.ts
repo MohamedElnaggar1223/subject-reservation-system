@@ -112,6 +112,16 @@ describe('08za: price lists', () => {
     expect(await sql(`select id from price_list where session_id = $1`, [june])).toEqual([]);
   });
 
+  it('a bare syllabus or paper code, as the board enters the row, matches the row it names when it names exactly one: 0970 all papers, 0970/42 the paper; 9618 names A.S., A.2. and A.L., so nothing', async () => {
+    const p = await parse('cambridge', `0970 Biology 10,850\n0970/42 Biology paper 4 10,850\n9618 Computer Science 11,400`);
+    expect(p.rows.map((r) => [r.code, r.matches.map((m) => [m.matchedKey, m.rowIds, m.toCheck ?? false])])).toEqual([
+      ['0970', [['0970:all-papers', [row.bioAll], false]]],
+      ['0970/42', [['0970:paper-41-42', [row.bioPaper], false]]],
+      ['9618', []],
+    ]);
+    expect(p.unmatched.map((r) => r.code)).toEqual(['9618']);
+  });
+
   it("applied: the matched rows take its amounts (from the list), the one-paper retake follows its syllabus's fee (the board rule), the list is kept as printed; the same list again changes nothing", async () => {
     const p = await parse('cambridge', CAMBRIDGE);
     const rows = p.rows.map(({ lineNo, code, name, amount }) => ({ lineNo, code, name, amount }));
@@ -185,7 +195,7 @@ describe('08za: price lists', () => {
     beforeAll(async () => {
       // C6: the admin gives the scenario's sittings their board dates; prices final; open.
       const s = await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: june } }));
-      for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) await boardDate(adm, c.seriesId!, { examsStart: `${Y}-06-01`, entryDeadline: new Date(Date.now() + 120 * day) });
+      for (const c of s.checkList.filter((x) => x.code === 'sitting_no_board_date')) await boardDate(adm, c.seriesId!, { entryDeadline: new Date(Date.now() + 120 * day) });
       await apiResponse(coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: june }, json: { final: true } }));
       await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june } }));
       fam = await onboard(officer, `za08-a-${RUN}`, 11);
@@ -259,6 +269,36 @@ describe('08za: price lists', () => {
       expect(await refused(Promise.resolve(l2))).toEqual({ status: 409, error: 'What this change does to families changed while you were looking: look at the new counts and save again' });
       expect({ unpaid: await priceOf(unpaid), fee: (await fees())[row.bioAll!] }).toEqual(before);
       expect(await sql(`select id from price_list where session_id = $1 and name = $2`, [june, `Cambridge June ${Y - 1} (late)`])).toEqual([]);
+    });
+
+    it("the subject editor carries a fee to the fees that follow it (E5): all papers typed, the paper on the board rule follows and its lines are re-priced in the same counts; a unit's fee, the qualification summing it follows", async () => {
+      const editor = (offeringId: string, json: Parameters<Client['api']['v1']['sessions'][':id']['offerings'][':offeringId']['$put']>[0]['json']) => (expected?: Impact) =>
+        apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: june, offeringId }, json: { ...json, ...(expected ? { expected } : {}) } }));
+      const paperBefore = await priceOf(paperLine);
+      const waitingOnAll = (await sql<{ id: string }>(`select r.id from registration r where r.offer_item_id = $1 and r.status = 'pending_payment'
+        and not exists (select 1 from payment_registration pr where pr.registration_id = r.id)`, [row.bioAll!])).map((r) => r.id);
+      const { shown, saved } = await confirmed(editor(offering.bio!, { rows: [
+        { id: row.bioAll, kind: 'all_papers', examFee: 13000, cells: tick(true) }, { id: row.bioPaper, kind: 'paper', cells: tick(false) },
+      ] }));
+      // Counted together: the all-papers lines waiting and the paper's line, re-priced through the board rule.
+      expect(shown).toMatchObject({ saved: false, impact: { repriced: waitingOnAll.length + 1 } });
+      expect(saved.saved).toBe(true);
+      expect((await fees())[row.bioPaper!]).toEqual([13000, 'board_rule']);
+      expect(await priceOf(paperLine)).toBe(paperBefore - 12000 + 13000);
+      const batch = await one<{ repriced: { id: string }[] }>(`select new_data->'repriced' as repriced from audit_log where action = 'ROWS_REPRICED' and entity_id = $1 order by created_at desc limit 1`, [offering.bio!]);
+      expect(batch.repriced.map((r) => r.id).sort()).toEqual([...waitingOnAll, paperLine].sort());
+      expect(await one(`select new_data->>'via' as via, (new_data->>'examFee')::float as fee from audit_log where action = 'OFFER_ITEM_UPDATED' and entity_id = $1 order by created_at desc limit 1`, [row.bioPaper!]))
+        .toEqual({ via: 'the board rule', fee: 13000 });
+
+      // A unit's fee changed in the editor: the qualification summing the units follows (no lines: saved at once).
+      const r = await editor(offering.arabic!, { rows: [
+        { id: row.yaa01, kind: 'qualification', cells: tick(true) },
+        { id: row.waa01, kind: 'unit', examFee: 9000, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } },
+        { id: row.waa02, kind: 'unit', cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false } },
+      ] })();
+      expect(r.saved).toBe(true);
+      const f = await fees();
+      expect([f[row.waa01!], f[row.yaa01!]]).toEqual([[9000, 'typed'], [18350, 'units_sum']]);
     });
   });
 });
