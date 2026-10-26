@@ -90,5 +90,10 @@ jobs:
       - name: The coordinator's words
         run: node apps/web/scripts/check-setup-words.mjs
 
+      # The words check's planted-word controls: each forbidden word planted in a screen, a shared component and a
+      # @repo/validations sentence is caught; a value the code only tests is not.
+      - name: The coordinator's words - controls
+        run: node --test apps/web/scripts/check-setup-words.test.mjs
+
       - name: Gate 3 - integration suite
         run: pnpm --filter @repo/api test
