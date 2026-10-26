@@ -38,7 +38,7 @@ import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 import { upsertEnrolments, lineEnrolmentUnits, groupFollowNotices, type EnrolmentRowInput } from './enrolment.services';
-import { cellsOfAvailability, kindOfLegacy, NO_CELLS } from './setup/model';
+import { cellsOfAvailability, kindOfLegacy, NO_CELLS, LIVE_LINE_STATUSES as LIVE } from './setup/model';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -49,7 +49,6 @@ export class OfferError extends Error {
   }
 }
 
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'] as const;
 const DONE = ['rejected', 'expired', 'dropped'] as const;
 
 /** A database rule refused the change: its sentence, or the error itself. */
@@ -549,9 +548,10 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
 }
 
 /** The refusal of a price or a close the deprecated routes would make on a subject priced by its rows. */
-type PricedByRowsChange = 'its course fee' | 'closing it' | 'what it offers' | 'the sitting of a row with reservations';
+type PricedByRowsChange = 'its course fee' | 'closing it' | 'what it offers' | 'the sitting of a row with reservations' | 'its rows';
 const PRICED_BY_ROWS_WORDS: Record<PricedByRowsChange, string> = {
   'its course fee': 'its course fee',
+  'its rows': 'its rows (a row is added there with its own exam fee, and removed there with the fees that follow it)',
   'closing it': 'whether it takes reservations',
   'what it offers': 'what it offers (its rows\' options, and whether it takes reservations)',
   'the sitting of a row with reservations': "a row's sitting (not while reservations use the row: close it and add another)",
@@ -564,7 +564,10 @@ export const PRICED_BY_ROWS_REFUSAL = (name: string, what: PricedByRowsChange) =
  * ticked and placed there: the deprecated offer, item and form routes change neither its course fee, nor its
  * availability or a row's (which would rewrite its cells — untick an option reservations use, re-tick a first
  * entry, switch a switched-off subject back on), nor the sitting of a row with reservations (they would
- * re-price, count and refuse nothing the editor does). Their other edits (teachers, notes, grade 10) still work.
+ * re-price, count and refuse nothing the editor does). Nor do they add a row to it or remove one (P1b fix 2 and
+ * fix 4): a row they made would be priced from the old grid (a row with no price hides the whole subject from
+ * families), and a row they removed would leave the fees that follow it (board rule, units sum) stale. Their
+ * other edits (teachers, notes, grade 10) still work.
  */
 async function assertNotPricedByRows(tx: Tx, offerId: string, name: string, what: PricedByRowsChange) {
   const [v2] = await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem)
@@ -649,6 +652,7 @@ async function createItemInTx(
   tx: Tx, session: SessionRow, offer: { id: string; subjectId: string }, subjectRow: typeof subject.$inferSelect, draft: ItemDraft,
   audit: Record<string, unknown>, actorId: string, ctx?: AuditContext,
 ) {
+  await assertNotPricedByRows(tx, offer.id, subjectRow.name, 'its rows');
   const id = await insertItem(tx, session, offer, subjectRow, draft, actorId);
   await logAction(actorId, 'OFFER_ITEM_CREATED', 'offer_item', id, null, audit, ctx, tx);
   return id;
@@ -865,8 +869,9 @@ async function liveLinesByItem(tx: Tx, itemIds: string[]) {
 export async function deleteItem(sessionId: string, offerId: string, itemId: string, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
     await sessionForChange(tx, sessionId);
-    await offerForChange(tx, sessionId, offerId);
+    const { subjectRow } = await offerForChange(tx, sessionId, offerId);
     const item = await itemForChange(tx, offerId, itemId);
+    await assertNotPricedByRows(tx, offerId, subjectRow.name, 'its rows');
     const counts = await tx.select({ status: registration.status, n: sql<number>`count(*)::int` }).from(registration)
       .where(eq(registration.offerItemId, itemId)).groupBy(registration.status);
     const live = liveOf(counts);
@@ -1035,6 +1040,8 @@ export async function saveOfferForm(sessionId: string, offerId: string, form: Of
       // (d) A paper the catalogue gives the subject that is not on the sheet yet: made when offered (createItem's logic).
       const papers = form.items.filter((x) => x.paperUnitId);
       if (papers.length) {
+        // A subject priced by its rows takes no row from this form (P1b fix 2): asked before the Catalogue is read.
+        await assertNotPricedByRows(tx, offerId, subjectRow.name, 'its rows');
         const drafts = (await generateItems(tx, subjectRow.id)).filter((d) => d.kind === 'one_paper' && d.enters.kind === 'units');
         const units = await tx.select().from(sessionOfferItemUnit).where(inArray(sessionOfferItemUnit.itemId, items.map((i) => i.id).concat('__none__')));
         // "All papers" and "Paper N only" are one or the other (withOnePaper's group): a whole item made

@@ -72,8 +72,10 @@ describe('F0b: races', () => {
     }));
 
     const release = await holdInsert(f.studentId, w, subj[0]!);
-    let registering: Promise<Res> | undefined;
-    let changing: Promise<Res> | undefined;
+    const direct = f.parent.api.v1.registrations.direct.$post;
+    const moveItem = adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put;
+    let registering: ReturnType<typeof direct> | undefined;
+    let changing: ReturnType<typeof moveItem> | undefined;
     try {
       registering = f.parent.api.v1.registrations.direct.$post({ json: { sessionId: w, ...(await reservationOf(w, [subj[0]!])), studentId: f.studentId } });
       await lockWaiters(1);
@@ -87,11 +89,11 @@ describe('F0b: races', () => {
     }
     const [reg, chg] = await Promise.all([registering!, changing!]);
     expect(reg.status).toBe(201);
-    const [created] = (await reg.json() as { data: { id: string }[] }).data;
+    const [created] = await apiResponse(Promise.resolve(reg));
     // The change waited for the line, saw it, and carried it with the item (run again with the
     // line's student locked first): the line is in B, where its item is, and the move is audited.
     expect(chg.status).toBe(200);
-    expect((await chg.json() as { data: { linesMoved: number } }).data.linesMoved).toBe(1);
+    expect((await apiResponse(Promise.resolve(chg))).linesMoved).toBe(1);
     expect(await sql(`select r.board_series_id as s, i.board_series_id as item from registration r join session_offer_item i on i.id = r.offer_item_id where r.id = $1`, [created!.id]))
       .toEqual([{ s: b, item: b }]);
     await audited([created!.id], ['LINE_SERIES_MOVED']);
@@ -124,8 +126,8 @@ describe('F0b: races', () => {
       const f = await onboard(officer, 'f0br-line-first', 11);
       const earlier = new Date(end.getTime() - days(5));
       const release = await holdInsert(f.studentId, w, subj[1]!);
-      let first: Promise<Res> | undefined;
-      let second: Promise<Res> | undefined;
+      let first: ReturnType<typeof prereg> | undefined;
+      let second: ReturnType<typeof moveDeadline> | undefined;
       try {
         first = prereg(f, w);
         await lockWaiters(1);
@@ -138,7 +140,7 @@ describe('F0b: races', () => {
       const [reg, dl] = await Promise.all([first!, second!]);
       expect(reg.status).toBe(201);
       expect(dl.status).toBe(200);
-      const [line] = (await reg.json() as { data: { id: string }[] }).data;
+      const [line] = await apiResponse(Promise.resolve(reg));
       // Reserved due at the session's payment date (its deadline was later); the deadline moved
       // before it, so its due date followed, audited with why.
       expect(await dueOf(line!.id)).toBe(earlier.getTime());
@@ -151,8 +153,8 @@ describe('F0b: races', () => {
       const f = await onboard(officer, 'f0br-deadline-first', 11);
       const earlier = new Date(end.getTime() - days(5));
       const release = await holdRowLock('board_series', s);
-      let first: Promise<Res> | undefined;
-      let second: Promise<Res> | undefined;
+      let first: ReturnType<typeof moveDeadline> | undefined;
+      let second: ReturnType<typeof prereg> | undefined;
       try {
         first = moveDeadline(s, earlier);
         await lockWaiters(1);
@@ -164,7 +166,7 @@ describe('F0b: races', () => {
       const [dl, reg] = await Promise.all([first!, second!]);
       expect(dl.status).toBe(200);
       expect(reg.status).toBe(201);
-      const [line] = (await reg.json() as { data: { id: string }[] }).data;
+      const [line] = await apiResponse(Promise.resolve(reg));
       expect(await dueOf(line!.id)).toBe(earlier.getTime());
       expect(await sql(`select 1 from audit_log where action = 'LINE_DUE_MOVED' and entity_id = $1`, [line!.id])).toEqual([]);
     });

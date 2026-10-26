@@ -12,6 +12,13 @@
 
 import type { Availability, RowKind, Sitting, SeriesMonth } from '@repo/validations';
 
+/**
+ * A line that is live: it holds its row, its option, its price and the session's counts (the four setup
+ * services, offer.services and reservation.services read this one list; P1b fix 5).
+ */
+export const LIVE_LINE_STATUSES = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'] as const;
+export const isLiveStatus = (status: string) => (LIVE_LINE_STATUSES as readonly string[]).includes(status);
+
 export type Cells = { firstInSchool: boolean; retakeInSchool: boolean; retakeSelfStudy: boolean; firstSelfStudy: boolean };
 export const NO_CELLS: Cells = { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false };
 

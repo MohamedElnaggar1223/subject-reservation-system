@@ -32,6 +32,7 @@ import {
   type SeriesMonth,
 } from '@repo/validations';
 import { insertLines, type InsertLinesInput } from './line.services';
+import { LIVE_LINE_STATUSES as LIVE } from './setup/model';
 import { findOrCreateSeries, OfferError } from './offer.services';
 import { PRICE_CHANGED_REFUSAL, round2 } from './pricing.services';
 import { schoolMonthIndex } from './series.services';
@@ -50,8 +51,6 @@ export class ReservationError extends Error {
 /** Who names a sitting not known to the system: the family (app) or the school's staff (desk). */
 export type DeclaredBy = 'family' | 'desk';
 export type ConsentChannel = 'app' | 'desk' | 'imported';
-
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'] as const;
 
 // ─── Known sittings ──────────────────────────────────────────────────────────
 

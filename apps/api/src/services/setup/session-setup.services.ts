@@ -37,7 +37,7 @@ import { capturePreregistrationsForSession } from '../prereg.services';
 import { notifySessionOpened, getStudentAndParentBroadcastIds } from '../notification.services';
 import { sameTeacherReason } from './teacher-names';
 import { copyOfferingInto, offeringsView, writeQuestions, SetupError, setupRethrow } from './offering.services';
-import { defaultSessionDates, rollDateOnly, rollYears } from './model';
+import { defaultSessionDates, rollDateOnly, rollYears, LIVE_LINE_STATUSES as LIVE } from './model';
 import {
   planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact,
 } from './reprice.services';
@@ -46,7 +46,6 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
 type SessionRow = typeof registrationSession.$inferSelect;
 
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'];
 const WAITING = ['pending_approval', 'pending_payment', 'preregistered'];
 
 const sameCycle = (s: { sessionType: string; seriesYear: number; label: string }) =>

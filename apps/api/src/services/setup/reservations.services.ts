@@ -9,8 +9,7 @@ import { db, registrationSession, sessionQuestion, registrationAnswer, eq, asc, 
 import { csvCell } from '../scheduling-shared.services';
 import { SetupError } from './offering.services';
 import { optionLabel, labelRowOf } from './labels';
-
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'];
+import { LIVE_LINE_STATUSES as LIVE } from './model';
 
 export async function sessionReservations(sessionId: string) {
   const [s] = await db.select().from(registrationSession).where(eq(registrationSession.id, sessionId));

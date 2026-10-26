@@ -266,9 +266,15 @@ describe('08y: the coordinator sets up a session', () => {
     expect(reloaded.adminDatesKept).toEqual([`oxford november ${Y + 6}: the file gives the entry deadline ${Y + 6}-06-20, the admin entered ${admins} — the admin's is kept; check which is right`]);
     expect(await one(`select to_char(entry_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as entry, to_char(retake_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as retake, dates_source as source from board_series where id = $1`, [nov]))
       .toEqual({ entry: `${admins} 20:59`, retake: `${Y + 6}-07-20 20:59`, source: 'admin' });
-    // A later file giving another retake deadline is warned about too, on its own; both of hers stay.
-    const third = await loadReference(db, withSitting(admins, `${Y + 6}-08-01`));
-    expect(third.adminDatesKept).toEqual([`oxford november ${Y + 6}: the file gives the retake deadline ${Y + 6}-08-01, the admin entered ${Y + 6}-07-20 — the admin's is kept; check which is right`]);
+    // The retake deadline the file filled is the file's, not hers (P1b fix 3): a later file giving another one replaces it,
+    // with no warning that she entered it; her entry deadline stays.
+    expect(await one(`select admin_deadlines as mine from board_series where id = $1`, [nov])).toEqual({ mine: ['entry'] });
+    const third = await loadReference(db, withSitting(`${Y + 6}-06-20`, `${Y + 6}-08-01`));
+    expect(third.adminDatesKept).toEqual([`oxford november ${Y + 6}: the file gives the entry deadline ${Y + 6}-06-20, the admin entered ${admins} — the admin's is kept; check which is right`]);
+    expect(await one(`select to_char(entry_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as entry, to_char(retake_deadline at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as retake from board_series where id = $1`, [nov]))
+      .toEqual({ entry: `${admins} 20:59`, retake: `${Y + 6}-08-01 20:59` });
+    // Her own retake deadline (entered with her entry deadline, on the session's sitting above) is hers: a file does not replace it.
+    expect(await one(`select admin_deadlines as mine from board_series where id = $1`, [sittingId])).toEqual({ mine: ['entry', 'retake'] });
     const opened = await apiResponse(coordinator.api.v1.sessions[':id'].open.$post({ param: { id: june } }));
     expect(opened.status).toBe('active');
     expect(opened.startDate).not.toBeNull();

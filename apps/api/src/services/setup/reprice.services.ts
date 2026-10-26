@@ -28,6 +28,7 @@ import { paymentHistoryOf, PAYMENT_HISTORY_REASON } from '../line-history.servic
 import { priceLine, PricingError, round2 } from '../pricing.services';
 import { dueDateFor } from '../deadline.services';
 import { createNotification } from '../notification.services';
+import { LIVE_LINE_STATUSES as LIVE, isLiveStatus } from './model';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -78,7 +79,6 @@ export function settleImpact(impact: Impact, expected: Impact | undefined) {
   if (!same(impact, expected)) throw new ImpactChanged(impact);
 }
 
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'];
 const WAITING = ['pending_approval', 'pending_payment', 'preregistered'];
 
 export type RepricedLine = { id: string; studentId: string; subjectId: string; from: number; to: number };
@@ -109,7 +109,7 @@ export async function planReprice(tx: Tx, scope: { rowIds?: string[]; selfStudyO
   const history = await paymentHistoryOf(tx, ids);
   const plan: RepricePlan = { repriced: [], listed: [] };
   for (const l of lines) {
-    if (!LIVE.includes(l.status)) continue;
+    if (!isLiveStatus(l.status)) continue;
     const basis = l.pricingBasis as PricingBasis | null;
     let next: Awaited<ReturnType<typeof priceLine>>;
     try {

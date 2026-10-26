@@ -39,7 +39,7 @@ import { rowLabel, labelRowOf } from './labels';
 import { WHOLE_ITEM_LABEL } from '@repo/validations';
 import {
   availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
-  NO_CELLS, type Cells,
+  NO_CELLS, isLiveStatus, type Cells,
 } from './model';
 import {
   planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact, type RepricedLine,
@@ -54,7 +54,6 @@ export class SetupError extends Error {
   }
 }
 
-const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt'];
 type SessionRow = typeof registrationSession.$inferSelect;
 type OfferRow = typeof sessionOffer.$inferSelect;
 type ItemRow = typeof sessionOfferItem.$inferSelect;
@@ -345,7 +344,7 @@ async function writeRow(
   const rowWinter = ref?.winterSitting && ref.winterSitting !== 'none' ? ref.winterSitting : null;
   const sitting = input.sitting ?? currentSitting ?? defaultSitting(c.session.sessionType, rowWinter ?? refSubject?.winterSitting);
   const mine = lines.filter((l) => existing && l.itemId === existing.id);
-  const live = mine.filter((l) => LIVE.includes(l.status));
+  const live = mine.filter((l) => isLiveStatus(l.status));
   let seriesId = existing?.boardSeriesId ?? null;
   if (!existing || sitting !== currentSitting) {
     if (existing && mine.length) throw new SetupError(`${label} has reservations in its sitting: a row's sitting does not change while reservations use it — close the row and add another`, 409);
@@ -430,7 +429,7 @@ async function writeRow(
 /** A row left out of the set: removed when nothing ever used it, closed (kept for its history) when only history does; refused with live lines. */
 async function removeRow(tx: Tx, c: RowContext, row: ItemRow, lines: Awaited<ReturnType<typeof linesOfRows>>) {
   const mine = lines.filter((l) => l.itemId === row.id);
-  const live = mine.filter((l) => LIVE.includes(l.status)).reduce((a, l) => a + l.n, 0);
+  const live = mine.filter((l) => isLiveStatus(l.status)).reduce((a, l) => a + l.n, 0);
   if (live) throw new SetupError(`${row.label} has ${live} reservation${live === 1 ? '' : 's'}: a row with reservations is not removed — close it instead (they stand)`, 409);
   if (mine.length) {
     await tx.update(sessionOfferItem).set({ ...NO_CELLS, availability: 'closed', closesAt: row.closesAt ?? new Date(), updatedAt: new Date() }).where(eq(sessionOfferItem.id, row.id));
@@ -637,7 +636,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       if (availability !== offer.availability) next.availability = availability;
       // Her "Looks right": the pre-load's notes leave the check list (an unrelated save keeps them).
       if (data.notesReviewed && offer.checkNotes.length) next.checkNotes = [];
-      const live = (ids: string[]) => lines.filter((l) => ids.includes(l.itemId) && LIVE.includes(l.status)).reduce((a, l) => a + l.n, 0);
+      const live = (ids: string[]) => lines.filter((l) => ids.includes(l.itemId) && isLiveStatus(l.status)).reduce((a, l) => a + l.n, 0);
       // Closing the subject (its switch off, or a close date reached): the reservations that stand are counted.
       if (offer.availability !== 'closed' && availability === 'closed') linesAffected += live(rows.map((r) => r.id));
       if (Object.keys(next).length) {
@@ -843,7 +842,7 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
         // A row made by the deprecated routes keeps its fee keys until P1b (priced from the fee grid).
         legacyFeeKeys: r.examFee === null && r.entersKind !== 'subject',
         lines: {
-          live: counts.filter((x) => LIVE.includes(x.status)).reduce((a, x) => a + x.n, 0),
+          live: counts.filter((x) => isLiveStatus(x.status)).reduce((a, x) => a + x.n, 0),
           all: counts.reduce((a, x) => a + x.n, 0),
           confirmed: counts.filter((x) => x.status === 'confirmed').reduce((a, x) => a + x.n, 0),
         },

@@ -64,7 +64,9 @@ describe('F0b: one checkout per entry deadline', () => {
     officer = await staff(adm, 'finance_officer', 'ckd');
     finadmin = await staff(adm, 'finance_admin', 'ckd');
     for (const tag of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'PO', 'PJ']) {
-      subj[tag] = await subject(adm, `CKD-${tag}`, `Deadlines ${tag}`, { course: 1000, registration: 500 }, { qualificationLevel: level, council: 'pearson_edexcel' });
+      // A and C are offered the old way (priced from the grid): the admin's move adds each an item through the old item route, which a
+      // subject priced by its rows refuses (P1b fix 2). P1b retires the file with the per-series machinery.
+      subj[tag] = await subject(adm, `CKD-${tag}`, `Deadlines ${tag}`, { course: 1000, registration: 500 }, { qualificationLevel: level, council: 'pearson_edexcel', pricedByGrid: tag === 'A' || tag === 'C' });
     }
     const now = Date.now();
     windowId = await session(adm, `Open window (deadlines)`, type, level, {

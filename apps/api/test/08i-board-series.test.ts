@@ -71,7 +71,9 @@ describe('F0b: board series', () => {
       ['BI4', 'Biology Unit 4', 'pearson_edexcel'], ['BI5', 'Biology Unit 5', 'pearson_edexcel'],
       ['GEO', 'Geography', 'cambridge'],
     ] as const) {
-      subj[code] = await subject(adm, `BS-${code}`, `${name} (series)`, { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council });
+      // MA3 is offered the old way (priced from the grid): the admin's move below adds it an item through the old item route,
+      // which a subject priced by its rows refuses (P1b fix 2). P1b retires the scenario with the machinery.
+      subj[code] = await subject(adm, `BS-${code}`, `${name} (series)`, { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council, pricedByGrid: code === 'MA3' });
     }
     windowId = await session(adm, 'January (AS, series)', 'january', 'as_level', { ...openWindow(), activate: true });
     // IAL October and IAL January of this academic year, June of it, and October of the next.
