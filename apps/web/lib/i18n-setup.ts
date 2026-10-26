@@ -153,6 +153,7 @@ export const setupArabic: Record<string, string> = {
   'nothing ticked — not offered to families.': 'لا شيء محدد — لا تُعرض على العائلات.',
   'taught in school, but no teacher is named.': 'تُدرَّس في المدرسة، لكن لم يُسمَّ معلم.',
   'teacher to be confirmed. Families read “teacher to be announced”.': 'المعلم لم يُؤكَّد بعد. تقرأ العائلات «سيُعلن عن المعلم لاحقًا».',
+  'Only a draft nobody has reserved in can be deleted. Its subjects, rows, teachers and prices in this session go with it; the boards\' lists and the school\'s teachers stay. Kept in the audit trail with your reason.': 'لا تُحذف إلا مسودة لم يحجز فيها أحد. تُحذف معها موادها وصفوفها ومعلموها وأسعارها في هذه الجلسة؛ وتبقى قوائم المجالس ومعلمو المدرسة. يُحفظ ذلك في سجل التدقيق مع السبب.',
   'Not on the board\'s list we hold:': 'ليست في قائمة المجلس التي لدينا:',
   'Families see its name as you typed it, and the admin is told to add it.': 'ترى العائلات اسمها كما كتبته، وتُبلَّغ الإدارة لإضافتها.',
   'Families see the names as you typed them, and the admin is told to add them.': 'ترى العائلات الأسماء كما كتبتها، وتُبلَّغ الإدارة لإضافتها.',
@@ -522,6 +523,7 @@ export function translateSetupText(text: string): string | null {
   if ((m = /^Copy the last (June|November \/ January) session \((.+)\)$/.exec(text))) return `انسخ آخر جلسة ${m[1] === 'June' ? 'يونيو' : 'نوفمبر / يناير'} (${months(m[2]!)})`;
   if ((m = /^Close ((?:June|November) \d{4}.*)$/.exec(text))) return `إغلاق ${months(m[1]!)}`;
   if ((m = /^Create ((?:June|November) \d{4}.*)$/.exec(text))) return `إنشاء ${months(m[1]!)}`;
+  if ((m = /^Delete ((?:June|November) \d{4}.*)$/.exec(text))) return `حذف ${months(m[1]!)}`;
   if ((m = /^Open ((?:June|November) \d{4}.*)$/.exec(text))) return `فتح ${months(m[1]!)}`;
   // A session's name ("November 2027 – January 2028").
   if ((m = /^November (\d{4}) – January (\d{4})$/.exec(text))) return `نوفمبر ${m[1]} – يناير ${m[2]}`;

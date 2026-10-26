@@ -17,13 +17,15 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, ROLES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { Switch } from '~/components/ui/switch';
+import { ReasonModal } from '~/components/ui/reason-modal';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { cn } from '~/lib/utils';
 import { Day, Modal, ErrorLine, INPUT_CLASS } from '../sessions-shared';
@@ -75,7 +77,7 @@ export default function SessionClient({ id, viewerRole }: { id: string; viewerRo
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <Link href="/admin/sessions" className="text-sm text-muted-foreground hover:text-foreground">← <span>Sessions</span></Link>
-      <Header s={s} canSetUp={canSetUp} />
+      <Header s={s} canSetUp={canSetUp} isAdmin={viewerRole === ROLES.ADMIN} />
       {canSetUp && (
         <section id="checks" className="mt-4 rounded-xl border border-border bg-card p-5 shadow-sm">
           <CheckList s={s} viewerRole={viewerRole} place="session" />
@@ -101,11 +103,26 @@ export default function SessionClient({ id, viewerRole }: { id: string; viewerRo
   );
 }
 
-/** The session's header: its name and status, the Accepting switch, prices final, the three dates (C4, C5, E6). */
-function Header({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
+/**
+ * The session's header: its name and status, the Accepting switch, prices final, the three dates (C4, C5, E6),
+ * and for the admin, while it is a draft, "Delete this draft" (F8-01: a duplicate or mistaken draft goes; the API
+ * refuses a draft anyone reserved in).
+ */
+function Header({ s, canSetUp, isAdmin }: { s: SetupSession; canSetUp: boolean; isAdmin: boolean }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
   const [closing, setClosing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Deleted, the screen goes back to Sessions at once and only the lists are read again: the deleted session's own
+  // queries would each answer 404 (the review of 744e553, item 2).
+  const remove = useMutation({
+    mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].$delete({ param: { id: s.id }, json: { reason } })),
+    onSuccess: () => {
+      router.replace('/admin/sessions');
+      void queryClient.invalidateQueries({ queryKey: ['sessions'], predicate: (q) => q.queryKey[1] !== s.id });
+    },
+  });
   const waits = s.status === 'draft' ? openWaitsFor(s) : [];
   const accepting = useMutation({
     mutationFn: async (on: boolean) => {
@@ -119,7 +136,8 @@ function Header({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
     (final: boolean, expected) => apiResponse(api.v1.sessions[':id']['prices-final'].$put({ param: { id: s.id }, json: { final, ...(expected ? { expected } : {}) } })),
     () => refresh(),
   );
-  const oneWay = s.pricesFinal && s.counts.lines > 0;
+  // One-way once any line exists, as the API decides it (any status, cancelled ones too): the live count, or a row's.
+  const oneWay = s.pricesFinal && (s.counts.lines > 0 || s.offerings.some((o) => o.rows.some((r) => r.lines.all > 0)));
 
   return (
     <section className="mt-3 rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -153,10 +171,22 @@ function Header({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
           </div>
           {oneWay && <p id="prices-one-way" className="text-xs text-muted-foreground">Families have reserved: prices stay final.</p>}
           <ErrorLine message={accepting.error ? refusalText(accepting.error) : pricesFinal.error} />
+          {isAdmin && s.status === 'draft' && (
+            <div className="flex justify-end">
+              <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(true)}>Delete this draft</Button>
+            </div>
+          )}
         </div>
       </div>
       <Dates s={s} canSetUp={canSetUp} />
       <ImpactDialog save={pricesFinal} />
+      {deleting && (
+        <ReasonModal title={`Delete ${s.name}`}
+          description="Only a draft nobody has reserved in can be deleted. Its subjects, rows, teachers and prices in this session go with it; the boards' lists and the school's teachers stay. Kept in the audit trail with your reason."
+          confirmLabel="Delete the draft" destructive minLength={5} isPending={remove.isPending || remove.isSuccess}
+          error={remove.error ? refusalText(remove.error) : undefined}
+          onConfirm={(reason) => remove.mutate(reason)} onClose={() => setDeleting(false)} />
+      )}
       {closing && (
         <Modal title={`Close ${s.name}`} onClose={() => setClosing(false)}>
           <div className="space-y-3 text-sm text-foreground">
@@ -195,6 +225,13 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
   const [due, setDue] = useState(pickerValue(s.paymentDueAt));
   const [first, setFirst] = useState(s.courseStartsOn);
   useEffect(() => { setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn); }, [s.closesAt, s.paymentDueAt, s.courseStartsOn]);
+  // Clear pressed while another date was being saved: sent once that save is done, so the two never race.
+  const clearNext = useRef(false);
+  useEffect(() => {
+    if (save.isPending || !clearNext.current) return;
+    clearNext.current = false;
+    save.save({ closesAt: null });
+  }, [save.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
   const valid = (d: string) => /^\d{4}-\d\d-\d\d$/.test(d) && Number(d.slice(0, 4)) >= 2000;
   const field = 'mt-1 h-10';
   return (
@@ -205,9 +242,16 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
           <input id="sess-close" type="date" className={cn(INPUT_CLASS, field)} value={close} disabled={!canSetUp || s.status === 'closed'}
             onChange={(e) => setClose(e.target.value)}
             onBlur={() => { if (close !== pickerValue(s.closesAt) && (close === '' || valid(close))) save.save({ closesAt: close ? endOfSchoolDay(close) : null }); }} />
-          {canSetUp && s.closesAt && <Button type="button" size="sm" variant="ghost" onClick={() => { setClose(''); save.save({ closesAt: null }); }}>Clear</Button>}
+          {/* Clear takes the place of a date typed and not saved yet: pressing it keeps the focus in the field, so
+              leaving the field never sends the typed date first; a save already running is let finish, then cleared. */}
+          {canSetUp && s.closesAt && (
+            <Button type="button" size="sm" variant="ghost" onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setClose(''); if (save.isPending) clearNext.current = true; else save.save({ closesAt: null }); }}>Clear</Button>
+          )}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">Switches Accepting off at the end of that day.</p>
+        {/* Until P1b: closing on this date does what the switch does (CLOSE_CANCELS_UNPAID). Drop this line with it. */}
+        {s.status !== 'closed' && <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">{CLOSE_CANCELS_UNPAID}</p>}
       </div>
       <div>
         <label htmlFor="sess-due" className="block text-sm font-medium text-foreground">Payment due</label>
