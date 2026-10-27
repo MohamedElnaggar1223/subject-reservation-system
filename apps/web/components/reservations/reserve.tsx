@@ -1,20 +1,18 @@
 'use client';
 
 /**
- * Reserve — one page per student per session, for the desk and for the family
- * (RESERVATIONS_REWORK.md §4.3, §4.4; docs/features/RESERVATIONS_LINES.md §6).
+ * Reserve — one page per child per session, for the family and for the desk (COORDINATOR_REWORK.md F1, §5; P3).
  *
- * The form version: one Google Form per subject (seven identity questions, the teacher, "first
- * entry or retake", which papers, "self study 50% (ONLY 2nd entry)", the refund policy and the
- * declaration), the response sheet read at the desk, the fee note typed by hand. Here the
- * student is already known; each subject of the session is listed with what can be entered under
- * it; a tick, the entry (attempt and mode in one choice, as the form's options), the teacher where
- * there are several, and for a retake the system does not know, the sitting it follows. The
- * price of each line is the price charged (exceptions included), a provisional board fee marked;
- * the total says when it is due and how it is paid (one payment per entry deadline). The desk
- * ticks "read and signed by the parent" once; a family ticks the refund policy and the
- * declaration. The desk reserves only, or reserves and collects; a provisional line is reserved
- * now and collected once its fee is confirmed.
+ * The form version: one Google Form per subject — seven identity questions, the teacher, "first entry or retake",
+ * which papers, "self study 50% (ONLY 2nd entry)", the refund policy and the declaration — about 35 answers for
+ * three subjects, no price anywhere, all of it again for a second child. Here the child is known: every subject
+ * the school offers this child is a card with only the choices open to them, as the coordinator set them (D3, D8,
+ * D9), the price beside each; the teacher where the family chooses one (D5), the earlier exam a retake follows (D6,
+ * F2), the school's extra questions (D13); one total, one agreement (the refund policy and the declaration) and one
+ * button per child. A parent switching children keeps each child's choices (the caller holds the draft).
+ *
+ * Built on the family read's v2 part (components/reservations/offers.ts). A refusal comes back with a code: the page
+ * puts its sentence at the subject it concerns and offers the next step; it never shows the code.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -24,41 +22,36 @@ import type { InferRequestType } from 'hono/client';
 import { api } from '~/lib/hono';
 import {
   apiResponse,
-  itemDisplayLabel,
-  refundConsentText,
-  DECLARATION_TEXT,
+  refusalCodeOf,
   DESK_CONSENT_TEXT,
   IN_SCHOOL_INSTRUMENTS,
-  IN_SCHOOL_INSTRUMENT_LABELS, formatEgp,
+  IN_SCHOOL_INSTRUMENT_LABELS,
+  formatEgp,
+  refundConsentText,
+  type RefusalCode,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
+import { useI18n } from '~/lib/i18n';
+import { familyWords } from '~/lib/i18n-reservations';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, INPUT_CLASS, ErrorLine, errorText } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { fetchStatement, statementKey } from './statement';
+import { fetchReserveOffers, reserveOffersKey, optionKey, type OffersRead, type Offering, type OfferRow, type RowOption, type Question } from './offers';
 
-// ─── Fetchers, typed by the API (PATTERNS.md) ───────────────────────────────
+export { fetchReserveOffers, reserveOffersKey } from './offers';
 
-export const fetchReserveOffers = (sessionId: string, studentId?: string) =>
-  apiResponse(api.v1.registrations.offers.$get({ query: { sessionId, ...(studentId ? { studentId } : {}) } }));
-type OffersRead = Awaited<ReturnType<typeof fetchReserveOffers>>;
-type Offer = OffersRead['offers'][number];
-type Item = Offer['items'][number];
-type Price = Item['prices'][number];
-type Sitting = OffersRead['declarableSittings'][number];
+// ─── The API's reservation routes, typed by it (PATTERNS.md) ─────────────────
 
 type LinesJson = InferRequestType<typeof api.v1.registrations.direct.$post>['json']['lines'];
 type Line = LinesJson[number];
-
 const reserveDirect = (json: InferRequestType<typeof api.v1.registrations.direct.$post>['json']) => apiResponse(api.v1.registrations.direct.$post({ json }));
-const reservePrereg = (json: InferRequestType<typeof api.v1.registrations.preregister.$post>['json']) => apiResponse(api.v1.registrations.preregister.$post({ json }));
 const reserveRequest = (json: InferRequestType<typeof api.v1.registrations.request.$post>['json']) => apiResponse(api.v1.registrations.request.$post({ json }));
 const reserveDesk = (json: InferRequestType<typeof api.v1.registrations.desk.$post>['json']) => apiResponse(api.v1.registrations.desk.$post({ json }));
 export type DeskResult = Awaited<ReturnType<typeof reserveDesk>>;
 
-export const reserveOffersKey = (sessionId: string, studentId: string) => ['registrations', 'offers', sessionId, studentId] as const;
-
-/** The refund terms a reservation in this session freezes at consent: weeks, or a converted session's dates. */
+/** The refund terms a reservation in this session freezes at consent: weeks, or a converted session's dates (the swap's ticks read them). */
 export const fetchRefundTerms = (sessionId: string) => apiResponse(api.v1.sessions[':id']['refund-terms'].$get({ param: { id: sessionId } }));
 export type RefundTermsState = { terms: Awaited<ReturnType<typeof fetchRefundTerms>>['terms'] | null; ready: boolean; failed: boolean };
 export function useRefundTerms(sessionId: string | null | undefined): RefundTermsState {
@@ -66,233 +59,257 @@ export function useRefundTerms(sessionId: string | null | undefined): RefundTerm
   return { terms: q.data?.terms ?? null, ready: !!q.data, failed: q.isError };
 }
 
-/**
- * The refund-policy tick's sentence: the terms the tick freezes once they are read; until then a
- * loading line, and if they cannot be read, a sentence saying so (the tick and Reserve stay off).
- */
+/** The refund-policy tick's sentence from the terms it freezes; until they are read, a line saying so. */
 export function RefundTermsSentence({ state }: { state: RefundTermsState }) {
   if (state.ready) return <span>{refundConsentText(state.terms)}</span>;
   if (state.failed) return <span className="text-destructive">The refund terms could not be loaded, so nothing can be reserved yet: reload the page to try again.</span>;
   return <span className="text-muted-foreground">Loading the refund terms…</span>;
 }
 
-// ─── Words ───────────────────────────────────────────────────────────────────
+// ─── What the caller keeps (one child's choices) ─────────────────────────────
 
-const MONTH: Record<string, string> = { january: 'January', june: 'June', october: 'October', november: 'November' };
-const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
-const ym = (month: string, year: number) => year * 12 + (MONTH_ORDER[month] ?? 0);
-const LEVEL_GROUP: Record<string, string> = { igcse: 'O.L.', as_level: 'A.S. / A.L.', a_level: 'A.S. / A.L.' };
-const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self_study_only: 'Self-study only (not taught this cycle)' };
-
-/** The board as the school's forms write it beside a qualification ("Edexcel YAA01"). */
-export const FORM_BOARD: Record<string, string> = { pearson_edexcel: 'Edexcel', cambridge: 'Cambridge', oxford: 'Oxford' };
-/**
- * What follows a teacher's name on a subject whose qualifications the family chooses through the teacher
- * (Arabic A Level, Edexcel — the form's "T1 (Edexcel YAA01)", "T2 (Edexcel 9AA01)"): the qualification the
- * row enters, as the form names it (the lead's decision of 16 Oct 2026, 3; a label only). Elsewhere nothing.
- */
-const qualificationOfTeacher = (o: Offer, it: Item) =>
-  o.items.some((x) => x.kind === 'qualification') && it.qualification ? ` (${FORM_BOARD[o.subject.boardCode] ?? o.subject.boardName} ${it.qualification.code})` : '';
-
-const entryKey = (p: { attempt: string; mode: string }) => `${p.attempt}|${p.mode}`;
-/** A sitting is known when the student sat it: a confirmed line (a dropped one was never sat, so it is declared). */
-/**
- * The sittings the school knows of, latest first: a confirmed line (a dropped one was never sat, so
- * it is declared), a result on record, or an entry sent to the board (F4).
- */
-const knownOf = (it: Item) => it.knownSittings.filter((k) => k.source !== 'line' || k.status === 'confirmed');
-const KNOWN_WORD: Record<string, string> = { line: 'sat', result: 'sat', entry: 'entered for' };
-const isKnown = (it: Item) => knownOf(it).length > 0;
-/** Open per attempt (docs/features/RESERVATIONS.md §2.12): a first entry to the entry deadline, a retake of the previous sitting to the retake deadline. */
-const reservable = (it: Item) => it.open.first || it.open.retake;
-const usable = (p: Price) => !p.noFee && p.open;
-
-/** The entry choices as the forms word them: the attempt and the mode in one list. */
-function entryLabel(p: Price, known: boolean, taught: boolean): string {
-  // A first entry in self-study is offered where nothing is taught (the A.2. carried forward in self-study) or by
-  // the student's exception on what is (the lead's decision of 16 Oct 2026, 1): only the first says "not taught".
-  if (p.attempt === 'first') return p.mode === 'in_school' ? 'First entry, in school' : taught ? 'First entry, self-study' : 'First entry, self-study (not taught this cycle)';
-  if (p.mode === 'in_school') return known ? 'Retake, in school' : 'Retake, in school — name the sitting';
-  return known ? 'Retake, self-study' : 'Retake, self-study — name the sitting';
-}
-
-/** The entry a tick starts with: a retake when the system knows the earlier sitting (§4.3). */
-function defaultEntry(it: Item): string | null {
-  const keys = it.prices.filter(usable).map(entryKey);
-  const taught = it.teachers.length > 0;
-  const want = isKnown(it)
-    ? [taught ? 'retake|in_school' : 'retake|self_study', 'retake|self_study', 'retake|in_school']
-    : ['first|in_school', 'first|self_study', taught ? 'retake|in_school' : 'retake|self_study', 'retake|self_study'];
-  return want.find((k) => keys.includes(k)) ?? keys[0] ?? null;
-}
-
-const seriesName = (o: Offer, it: Item) => (it.series ? `${o.subject.boardName} ${MONTH[it.series.month] ?? it.series.month} ${it.series.year}${it.series.label ? ` (${it.series.label})` : ''}` : null);
-const sittingName = (s: Sitting) => `${s.boardName} ${MONTH[s.month] ?? s.month} ${s.year}`;
-const sittingValue = (s: Sitting) => (s.seriesId ? `id:${s.seriesId}` : `my:${s.month}|${s.year}`);
-
-type Pick = { on: boolean; entry: string | null; teacherId: string | null | undefined; sitting: string };
+type Attempt = 'first' | 'retake';
+type Mode = 'in_school' | 'self_study';
+/** The option picked in a group, with its teacher and the earlier exam it follows ('id:<series>' or 'my:<month>|<year>'). */
+type Pick = { rowId: string; attempt: Attempt; mode: Mode; teacherId: string; earlier: string };
+/** One child's page: the picks per group, the answers, the subjects whose retakes are shown, the ticks. */
+export type ReserveDraft = {
+  picks: Record<string, Pick>;
+  answers: Record<string, string>;
+  reveal: Record<string, boolean>;
+  refund: boolean;
+  decl: boolean;
+  desk: boolean;
+};
+export const EMPTY_DRAFT: ReserveDraft = { picks: {}, answers: {}, reveal: {}, refund: false, decl: false, desk: false };
 
 /**
- * A reservation's result. `sentences` are shown each in its own element, so each is translated on
- * its own (the Arabic rules are per sentence, and step C's school-fee and charges sentences live in
- * i18n-money): one joined string stays in English as soon as one sentence has no rule in the
- * translator that reads the whole. `message` is the same text joined, for places that take a string.
+ * A reservation's result. `sentences` are shown each in its own element, so each is translated on its own;
+ * `message` is the same text joined, for places that take a string.
  */
-export type ReserveDone = { registrationIds: string[]; message: string; sentences: string[]; desk?: DeskResult };
+export type ReserveDone = {
+  registrationIds: string[];
+  message: string;
+  sentences: string[];
+  desk?: DeskResult;
+  /** What was reserved, for the family's next step: the total and whether it can be paid now (prices final). */
+  total: number;
+  payable: boolean;
+};
 
 /** Sentences shown one element each (each translated on its own), separated by a space. */
 export function Sentences({ items }: { items: string[] }) {
   return <>{items.map((s, i) => <span key={i}>{i > 0 && ' '}<span>{s}</span></span>)}</>;
 }
 
-/** At the desk, what goes with "Reserve and collect" beside the lines (step C, §4.3): the year's school fee (collected first) and charges. */
+/** At the desk, what goes with "Reserve and collect" beside the lines: the year's school fee (collected first) and charges. */
 export type DeskExtras = { chargeIds: string[]; schoolFeeYear?: string; total: number };
 
+// ─── The page's words, per who is reading ────────────────────────────────────
+
+type Viewer = 'student' | 'parent' | 'desk';
+const WORDS: Record<Viewer, { what: string; when: string; whenAS: string; approval: string }> = {
+  parent: { what: 'What will your child take?', when: 'When did your child sit it?', whenAS: 'When did your child sit the A.S.?', approval: 'waiting for your approval' },
+  student: { what: 'What will you take?', when: 'When did you sit it?', whenAS: 'When did you sit the A.S.?', approval: "waiting for your parent's approval" },
+  desk: { what: 'What will the student take?', when: 'When did the student sit it?', whenAS: 'When did the student sit the A.S.?', approval: "waiting for the parent's approval" },
+};
+const HELD_STATUS: Record<string, string> = { pending_payment: 'waiting for payment', confirmed: 'paid' };
+const LIVE = ['pending_approval', 'pending_payment', 'confirmed'];
+/** Codes whose next step is to take the subject off the choices (it can no longer be reserved as picked). */
+const TAKE_OFF: RefusalCode[] = ['NOT_ACCEPTING', 'NOT_OPEN', 'BOARD_DEADLINE_PASSED', 'OPTION_NOT_OFFERED', 'ONE_PAPER_IS_RETAKE', 'EXCLUSIVE_OPTIONS', 'SAME_ENTRY_ONCE', 'RETAKE_ONLY', 'SELF_STUDY_SECOND_ENTRY_ONLY'];
+/** Codes after which the page reads the offers again (a price, a close or what the student holds changed). */
+const READ_AGAIN: RefusalCode[] = [...TAKE_OFF, 'PRICE_CHANGED'];
+
+// ─── Groups: the rows a family picks one option of ───────────────────────────
+
+/** Rows that exclude each other (D8: all papers and one-paper rows; A.S., A.2. and A.L.) are one group; a unit is its own. */
+type Group = { key: string; offering: Offering; rows: OfferRow[] };
+function groupsOf(o: Offering): Group[] {
+  const out: Group[] = [];
+  for (const r of o.rows) {
+    const key = `${o.id}|${r.exclusiveGroup ?? r.id}`;
+    const g = out.find((x) => x.key === key);
+    if (g) g.rows.push(r);
+    else out.push({ key, offering: o, rows: [r] });
+  }
+  return out;
+}
+
+/** A DOM id for a group or a question, unique per child. */
+const domId = (studentId: string, k: string) => `reserve-${studentId}-${k}`.replace(/[^\w-]/g, '-');
+
+/** The earlier exam a picked option must name, and the choices it has (none when the school knows it, or it asks none). */
+function earlierOf(row: OfferRow, option: RowOption) {
+  if (row.knownSitting) return { asks: false, choices: [] as { value: string; label: { en: string; ar: string } }[] };
+  if (option.needsCarriedFrom) return { asks: true, choices: option.allowedSittings.map((s) => ({ value: `id:${s.id}`, label: s.label })) };
+  if (option.attempt === 'retake') {
+    return { asks: true, choices: option.retakeFrom.map((s) => ({ value: s.id ? `id:${s.id}` : `my:${s.month}|${s.year}`, label: s.label })) };
+  }
+  return { asks: false, choices: [] };
+}
+
+/** Whether the family chooses this option's teacher (D5: in school, several teachers, the families' choice). */
+const choosesTeacher = (o: Offering, option: RowOption) =>
+  option.mode === 'in_school' && o.teacherChoice === 'families' && !o.teacherTbc && option.teachers.length > 1;
+
 /**
- * `viewer`: who is reserving — the student (a request their parent approves), a parent (for a
- * linked child; a preregistration when the session has not opened), or the desk (staff).
- * `deskExtras`: the desk's "Also collect now" — sent in the same action as the lines.
+ * `viewer`: who is reserving — the student (a request their parent approves), a parent (for a linked child), or
+ * the desk (staff, on the family's behalf). `draft` / `onDraft`: the caller keeps the child's choices (a parent
+ * switching children); without them the page keeps its own. `deskExtras`: the desk's "Also collect now".
  */
-export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
-  viewer: 'student' | 'parent' | 'desk';
+export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draft: given, onDraft, childName }: {
+  viewer: Viewer;
   studentId: string;
   sessionId: string;
   onDone: (done: ReserveDone) => void;
   deskExtras?: DeskExtras;
+  draft?: ReserveDraft;
+  onDraft?: (d: ReserveDraft) => void;
+  childName?: string;
 }): React.JSX.Element {
   const desk = viewer === 'desk';
+  const words = WORDS[viewer];
+  const { language: lang } = useI18n();
   const qc = useQueryClient();
-  const { data, isLoading, isError, refetch, error } = useQuery({
+  const offers = useQuery({
     queryKey: reserveOffersKey(sessionId, studentId),
     queryFn: () => fetchReserveOffers(sessionId, viewer === 'student' ? undefined : studentId),
     retry: false,
   });
-  const terms = useRefundTerms(desk ? null : sessionId);
-  const termsReady = desk || terms.ready;
-  const [picks, setPicks] = useState<Record<string, Pick>>({});
-  const [refundTick, setRefundTick] = useState(false);
-  const [declTick, setDeclTick] = useState(false);
-  const [deskTick, setDeskTick] = useState(false);
+  // What the student already holds in the session: a subject reserved is shown as such, not offered again.
+  const statementQuery = { studentId };
+  const statement = useQuery({ queryKey: statementKey(statementQuery), queryFn: () => fetchStatement(statementQuery), retry: false });
+  const [own, setOwn] = useState<ReserveDraft>(EMPTY_DRAFT);
+  const draft = given ?? own;
+  const setDraft = (d: ReserveDraft) => (onDraft ? onDraft(d) : setOwn(d));
   const [instrument, setInstrument] = useState<(typeof IN_SCHOOL_INSTRUMENTS)[number]>('cash');
   const [escrow, setEscrow] = useState('');
-  const [failure, setFailure] = useState<string | null>(null);
+  // What stops the reservation, where it is: a group or question key → its sentence; `page` for the rest.
+  const [problems, setProblems] = useState<Record<string, string>>({});
+  const [refusal, setRefusal] = useState<{ sentence: string; code: RefusalCode | undefined; key: string | null } | null>(null);
 
-  const offers = data?.offers ?? [];
-  const items = useMemo(() => offers.flatMap((o) => o.items.map((it) => ({ o, it }))), [offers]);
-  const coreLocked = !!data && data.eligibility.grade === 10 && data.session.sessionType === 'june';
+  const data = offers.data;
+  const offerings = useMemo(() => data?.offerings ?? [], [data]);
+  const groups = useMemo(() => offerings.flatMap(groupsOf), [offerings]);
+  const held = useMemo(() => {
+    const lines = (statement.data?.students.find((s) => s.student.id === studentId) ?? statement.data?.students[0])
+      ?.sessions.find((s) => s.id === sessionId)?.lines.filter((l) => LIVE.includes(l.status)) ?? [];
+    return new Map(lines.map((l) => [l.offerItemId, l]));
+  }, [statement.data, studentId, sessionId]);
 
-  // Grade 10 in June reserves the core subjects (A-05): ticked and kept.
-  useEffect(() => {
-    if (!data || !coreLocked) return;
-    setPicks((prev) => {
-      const next = { ...prev };
-      for (const o of data.offers.filter((x) => x.grade10Core)) {
-        const it = o.items.find((i) => reservable(i) && !i.held && defaultEntry(i));
-        if (it && !next[it.id]?.on) next[it.id] = { on: true, entry: defaultEntry(it), teacherId: undefined, sitting: '' };
-      }
-      return next;
-    });
-  }, [data, coreLocked]);
-
-  const pickOf = (it: Item): Pick => picks[it.id] ?? { on: false, entry: null, teacherId: undefined, sitting: '' };
-  const setPick = (it: Item, patch: Partial<Pick>) => setPicks((prev) => ({ ...prev, [it.id]: { ...pickOf(it), ...patch } }));
-  const toggle = (o: Offer, it: Item, on: boolean) => {
-    setPicks((prev) => {
-      const next = { ...prev, [it.id]: { ...pickOf(it), on, entry: pickOf(it).entry ?? defaultEntry(it) } };
-      // One item of an exclusive group (the whole subject or one paper; AS or the A Level).
-      if (on && it.exclusiveGroup) {
-        for (const other of o.items) if (other.id !== it.id && other.exclusiveGroup === it.exclusiveGroup && next[other.id]) next[other.id] = { ...next[other.id]!, on: false };
-      }
-      return next;
-    });
-  };
-
-  const chosen = items.filter(({ it }) => pickOf(it).on).map(({ o, it }) => {
-    const p = pickOf(it);
-    const price = it.prices.find((x) => entryKey(x) === p.entry && !x.noFee) ?? null;
-    const [attempt, mode] = (p.entry ?? '|').split('|') as ['first' | 'retake', 'in_school' | 'self_study'];
-    const needsSitting = (attempt === 'retake' || it.needsPriorSeries) && !isKnown(it);
-    const sittings = (data?.declarableSittings ?? []).filter((s) => s.boardCode === o.subject.boardCode);
-    return { o, it, p, price, attempt, mode, needsSitting, sittings, missing: needsSitting && !p.sitting };
+  const rowOf = (id: string) => offerings.flatMap((o) => o.rows.map((r) => ({ o, r }))).find((x) => x.r.id === id) ?? null;
+  const chosen = Object.entries(draft.picks).flatMap(([key, p]) => {
+    const found = rowOf(p.rowId);
+    const option = found?.r.options.find((x) => optionKey(x) === optionKey(p)) ?? null;
+    return found && option ? [{ key, p, o: found.o, r: found.r, option }] : [];
   });
+  const total = chosen.reduce((a, c) => a + (c.option.price?.total ?? 0), 0);
+  const pricesFinal = !!data?.session.pricesFinal;
+  const closedSession = data?.session.status === 'closed';
 
-  const total = chosen.reduce((a, c) => a + (c.price?.total ?? 0), 0);
-  const provisionalTotal = chosen.filter((c) => c.price?.provisional).reduce((a, c) => a + (c.price?.total ?? 0), 0);
-  // The money is taken per entry deadline, as the desk and the checkout split it: a retake of
-  // the board's previous sitting runs to the series' retake deadline where the board sets one,
-  // every other line to the entry deadline (line_effective_deadline, docs/features/RESERVATIONS.md §2.6).
-  const declarable = data?.declarableSittings ?? [];
-  const priorOf = (c: (typeof chosen)[number]) => {
-    if (c.needsSitting) {
-      if (!c.p.sitting) return null;
-      if (c.p.sitting.startsWith('id:')) return declarable.find((x) => x.seriesId === c.p.sitting.slice(3)) ?? null;
-      const [month, year] = c.p.sitting.slice(3).split('|');
-      return { month: month!, year: Number(year) };
+  const patch = (next: Partial<ReserveDraft>) => setDraft({ ...draft, ...next });
+  const setPick = (key: string, p: Pick | null) => {
+    const picks = { ...draft.picks };
+    if (p) picks[key] = p;
+    else delete picks[key];
+    setProblems(({ [key]: _gone, ...rest }) => rest);
+    if (refusal?.key === key) setRefusal(null);
+    patch({ picks });
+  };
+
+  // A refusal at a subject: bring it into view.
+  useEffect(() => {
+    if (!refusal?.key) return;
+    document.getElementById(domId(studentId, refusal.key))?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [refusal, studentId]);
+
+  /** The questions asked: the session's, and each picked subject's (D13). */
+  const asked: Question[] = [
+    ...(data?.session.questions ?? []),
+    ...offerings.filter((o) => chosen.some((c) => c.o.id === o.id)).flatMap((o) => o.questions),
+  ];
+
+  /** What is not finished, each at its place (the refusals the page can see before sending). */
+  function unfinished(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const c of chosen) {
+      if (choosesTeacher(c.o, c.option) && !c.p.teacherId) out[c.key] = 'Choose the teacher';
+      else if (earlierOf(c.r, c.option).asks && !c.p.earlier) out[c.key] = 'Choose the earlier exam';
     }
-    if (c.attempt !== 'retake') return null;
-    // The latest known sitting, as the server fills it in (each carries its month and year).
-    const known = knownOf(c.it).map((k) => ({ month: k.month, year: k.year }));
-    return known.sort((a, b) => ym(b.month, b.year) - ym(a.month, a.year))[0] ?? null;
-  };
-  const deadlineOf = (c: (typeof chosen)[number]): { at: string | null; retake: boolean } => {
-    const s = c.it.series;
-    const entry = { at: c.it.firstEntryDeadline ? String(c.it.firstEntryDeadline) : null, retake: false };
-    if (!s || c.attempt !== 'retake' || !s.retakeDeadline) return entry;
-    const previous = declarable
-      .filter((x) => x.boardCode === c.o.subject.boardCode && ym(x.month, x.year) < ym(s.month, s.year))
-      .sort((a, b) => ym(b.month, b.year) - ym(a.month, a.year))[0];
-    const prior = priorOf(c);
-    return previous && prior && prior.month === previous.month && prior.year === previous.year ? { at: String(s.retakeDeadline), retake: true } : entry;
-  };
-  const bySeries = new Map<string, { name: string; amount: number; provisional: boolean; retake: boolean }>();
-  for (const c of chosen) {
-    const d = deadlineOf(c);
-    const key = `${c.it.series?.id ?? 'none'}|${d.at ?? ''}`;
-    const cur = bySeries.get(key) ?? { name: seriesName(c.o, c.it) ?? '—', amount: 0, provisional: false, retake: d.retake };
-    bySeries.set(key, { ...cur, amount: cur.amount + (c.price?.total ?? 0), provisional: cur.provisional || !!c.price?.provisional });
+    for (const q of asked) if (q.required && !(draft.answers[q.id] ?? '').trim()) out[`q:${q.id}`] = 'Answer this question';
+    if (!chosen.length) out.page = 'Pick at least one subject.';
+    else if (desk ? !draft.desk : !(draft.refund && draft.decl)) out.page = desk ? 'Tick that the parent read and signed the refund policy and the declaration.' : 'Tick the refund policy and the declaration.';
+    return out;
   }
-  const consented = desk ? deskTick : refundTick && declTick;
-  const ready = chosen.length > 0 && chosen.every((c) => c.price && !c.missing) && consented && termsReady;
 
   const linesOut = (): Line[] => chosen.map((c) => {
-    const line: Line = { offerItemId: c.it.id, attempt: c.attempt, mode: c.mode, expectedPrice: c.price!.total ?? undefined };
-    if (c.mode === 'in_school' && c.it.teachers.length > 1) line.teacherId = c.p.teacherId ?? null;
-    if (c.needsSitting && c.p.sitting) {
-      if (c.p.sitting.startsWith('id:')) line.priorSittingSeriesId = c.p.sitting.slice(3);
-      else {
-        const [month, year] = c.p.sitting.slice(3).split('|') as ['january' | 'june' | 'october' | 'november', string];
-        line.priorSitting = { month, year: Number(year) };
-      }
+    const line: Line = { offerItemId: c.r.id, attempt: c.p.attempt, mode: c.p.mode, ...(c.option.price ? { expectedPrice: c.option.price.total } : {}) };
+    if (choosesTeacher(c.o, c.option)) line.teacherId = c.p.teacherId;
+    if (c.p.earlier.startsWith('id:')) line.priorSittingSeriesId = c.p.earlier.slice(3);
+    else if (c.p.earlier.startsWith('my:')) {
+      const [month, year] = c.p.earlier.slice(3).split('|') as ['january' | 'june' | 'october' | 'november', string];
+      line.priorSitting = { month, year: Number(year) };
     }
     return line;
   });
+  const answersOut = () => asked.flatMap((q) => {
+    const v = (draft.answers[q.id] ?? '').trim();
+    return v ? [{ questionId: q.id, value: v }] : [];
+  });
   const consent = { refundPolicy: true as const, declaration: true as const };
+
+  /** Where a refusal belongs: the picked subject its sentence names (the longest name, then the row's words). */
+  function locate(sentence: string): string | null {
+    const named = chosen.filter((c) => sentence.includes(c.o.name)).sort((a, b) => b.o.name.length - a.o.name.length);
+    if (!named.length) {
+      const q = asked.find((x) => sentence.includes(x.prompt));
+      return q ? `q:${q.id}` : null;
+    }
+    const top = named.filter((c) => c.o.name === named[0]!.o.name);
+    return (top.find((c) => sentence.includes(c.r.label.en)) ?? top[0]!).key;
+  }
+  const refused = (e: unknown) => {
+    const code = refusalCodeOf(e);
+    const sentence = familyWords(errorText(e));
+    const key = code === 'ANSWER_REQUIRED' ? (asked.find((q) => sentence.includes(q.prompt)) ? `q:${asked.find((q) => sentence.includes(q.prompt))!.id}` : null) : locate(sentence);
+    setRefusal({ sentence, code, key });
+    if (code && READ_AGAIN.includes(code)) {
+      qc.invalidateQueries({ queryKey: reserveOffersKey(sessionId, studentId) });
+      qc.invalidateQueries({ queryKey: statementKey(statementQuery) });
+    }
+  };
+  const afterReserve = () => {
+    // A consent belongs to the lines it was given for; the next reservation asks again.
+    setDraft(EMPTY_DRAFT);
+    setProblems({});
+    setRefusal(null);
+    qc.invalidateQueries({ queryKey: ['registrations'] });
+    qc.invalidateQueries({ queryKey: ['statement'] });
+  };
 
   const familyMutation = useMutation({
     mutationFn: async () => {
-      const lines = linesOut();
-      if (viewer === 'student') return reserveRequest({ sessionId, lines, consent });
-      if (data?.session.status === 'draft') return reservePrereg({ sessionId, studentId, lines, consent });
-      return reserveDirect({ sessionId, studentId, lines, consent });
+      const body = { sessionId, lines: linesOut(), answers: answersOut(), consent };
+      if (viewer === 'student') return reserveRequest(body);
+      return reserveDirect({ ...body, studentId });
     },
     onSuccess: (made) => {
-      // A consent belongs to the lines it was given for; the next reservation asks again.
-      setPicks({}); setRefundTick(false); setDeclTick(false);
-      qc.invalidateQueries({ queryKey: ['registrations'] });
-      const lines = `${made.length} reservation${made.length === 1 ? '' : 's'}`;
+      const reservedTotal = total;
+      afterReserve();
+      const n = `${made.length} reservation${made.length === 1 ? '' : 's'}`;
       const sentences = viewer === 'student'
-        ? [`Sent to your parent for approval: ${lines}.`]
-        : data?.session.status === 'draft'
-          ? [`Preregistered: ${lines}. Pay now to hold the money until the session opens.`]
-          : [`Reserved: ${lines} awaiting payment. Pay by exam series on the next screen.`];
-      onDone({ registrationIds: made.map((r) => r.id), message: sentences.join(' '), sentences });
+        ? [`Sent to your parent for approval: ${n}.`]
+        : pricesFinal
+          ? [`Reserved: ${n} waiting for payment.`]
+          : [`Reserved: ${n}.`, 'You can pay once the school confirms its prices.'];
+      onDone({ registrationIds: made.map((r) => r.id), message: sentences.join(' '), sentences, total: reservedTotal, payable: pricesFinal && viewer === 'parent' });
     },
-    onError: (e) => setFailure(errorText(e)),
+    onError: refused,
   });
 
   const deskMutation = useMutation({
     mutationFn: (collect: boolean) => reserveDesk({
-      studentId, sessionId, lines: linesOut(), consent,
+      studentId, sessionId, lines: linesOut(), answers: answersOut(), consent,
       ...(collect ? { collectNow: {
         instrumentUsed: instrument, escrowAmountToApply: Number(escrow) > 0 ? Number(escrow) : 0,
         // The year's school fee first (the registration's gate asks for it) and the charges after, each its own payment.
@@ -301,277 +318,376 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       } } : {}),
     }),
     onSuccess: (r) => {
-      setPicks({}); setDeskTick(false);
-      qc.invalidateQueries({ queryKey: ['registrations'] });
+      const reservedTotal = total;
+      afterReserve();
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
       const parts = [`Reserved ${r.registrations.length} reservation${r.registrations.length === 1 ? '' : 's'}.`];
       if (r.schoolFee) parts.push(`The ${r.schoolFee.academicYear} school fee collected first (${formatEgp(r.schoolFee.amount)}).`);
-      // With charges (step C's "Also collect now") the subjects are paid per entry deadline and each charge group on its own.
-      const withCharges = r.payments.some((p) => 'chargeIds' in p && (p.chargeIds as string[] | undefined)?.length);
-      if (r.collected > 0) parts.push(`Collected ${formatEgp(r.collected)}${r.payments.length > 1 ? ` in ${r.payments.length} payments, ${withCharges ? 'the subjects per entry deadline and the charges on their own' : 'one per entry deadline'}` : ''}.`);
-      if (r.reservedNotCollected.length) parts.push(`${r.reservedNotCollected.length} on a provisional board fee: collected once the fee is confirmed.`);
-      if (r.notCollected.length) parts.push(`Not collected — hand this money back: ${r.notCollected.map((n) => n.series.join(' and ')).join('; ')}.`);
-      onDone({ registrationIds: r.registrations.map((x) => x.id), message: parts.join(' '), sentences: parts, desk: r });
+      // One payment for the subjects (no split by deadline), the charges each in their own.
+      if (r.collected > 0) parts.push(`Collected ${formatEgp(r.collected)}.`);
+      if (r.reservedNotCollected.length) parts.push(`${r.reservedNotCollected.length} reserved, not collected: prices are not final yet.`);
+      for (const n of r.notCollected) parts.push(`Not collected — hand this money back: ${formatEgp(n.amount)} (${familyWords(n.reason)}).`);
+      onDone({ registrationIds: r.registrations.map((x) => x.id), message: parts.join(' '), sentences: parts, desk: r, total: reservedTotal, payable: false });
     },
-    onError: (e) => setFailure(errorText(e)),
+    onError: refused,
   });
   const pending = familyMutation.isPending || deskMutation.isPending;
 
-  if (isLoading) return <LoadingState />;
-  if (isError || !data) return <ErrorState message={error instanceof Error ? error.message : undefined} onRetry={() => refetch()} />;
+  const submit = (send: () => void) => {
+    setRefusal(null);
+    const left = unfinished();
+    setProblems(left);
+    const first = Object.keys(left).find((k) => k !== 'page');
+    if (first) {
+      document.getElementById(domId(studentId, first))?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    if (left.page) return;
+    send();
+  };
+
+  if (offers.isLoading) return <LoadingState />;
+  if (offers.isError || !data) return <ErrorState message={offers.error instanceof Error ? familyWords(offers.error.message) : undefined} onRetry={() => offers.refetch()} />;
   if (!data.eligibility.allowed) {
-    return <Notice tone="danger" title="Not open to this student">{data.eligibility.reason}</Notice>;
+    return <Notice tone="danger" title="Not open to this student">{familyWords(data.eligibility.reason ?? '')}</Notice>;
   }
-  if (!offers.length) return <EmptyState title="Nothing is offered in this session yet" />;
+  if (data.session.status === 'draft') return <EmptyState title="Reservations have not opened yet" />;
+  if (!offerings.length) return <EmptyState title="Nothing is offered in this session yet" />;
 
-  const groups = [...new Set(offers.map((o) => LEVEL_GROUP[o.subject.level] ?? 'Other'))];
-
-  const payableNow = Math.max(0, total - provisionalTotal + (deskExtras?.total ?? 0) - (Number(escrow) > 0 ? Number(escrow) : 0));
+  const payableNow = pricesFinal ? Math.max(0, total + (deskExtras?.total ?? 0) - (Number(escrow) > 0 ? Number(escrow) : 0)) : 0;
+  const pageProblem = problems.page ?? (refusal && !refusal.key ? refusal.sentence : null);
 
   return (
-    <div className="space-y-4">
-      {coreLocked && <Notice tone="info">Grade 10 in June: the core subjects are ticked and stay ticked.</Notice>}
-      <p className="text-xs text-muted-foreground">
-        {desk
-          ? 'A retake is set when the system knows the earlier sitting. For a new family choose "retake" and name the sitting: it is recorded and listed on the session\'s To verify tab. A teacher may be left as "no preference". A line on a provisional board fee (ⓟ) is reserved now and collected once the fee is confirmed.'
-          : 'Tick what you want to sit. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.'}
-      </p>
-
-      {/* At a phone each paper's teacher, entry and price stack under it (F6: a 760 px table put the
-          entry and the price off a family's phone screen); from 640 px it is the table. */}
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-        <table className="w-full text-sm max-sm:block sm:min-w-[760px]">
-          <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground max-sm:hidden">
-            <tr>
-              <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
-              <th className="px-3 py-2 text-start font-medium">Teacher</th>
-              <th className="px-3 py-2 text-start font-medium">Entry</th>
-              <th className="px-3 py-2 text-end font-medium">Price</th>
-            </tr>
-          </thead>
-          {groups.map((g) => (
-            <tbody key={g} className="max-sm:block">
-              <tr className="max-sm:block"><td colSpan={5} className="bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground max-sm:block">{g}</td></tr>
-              {offers.filter((o) => (LEVEL_GROUP[o.subject.level] ?? 'Other') === g).map((o) => (
-                <OfferRows key={o.id} o={o} desk={desk} coreLocked={coreLocked && o.grade10Core} pickOf={pickOf} setPick={setPick} toggle={toggle}
-                  sittings={(data.declarableSittings ?? []).filter((s) => s.boardCode === o.subject.boardCode)} />
-              ))}
-            </tbody>
-          ))}
-        </table>
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground">
+          <span>Reservations close</span>{' '}
+          {data.session.closesAt ? <Day iso={String(data.session.closesAt)} /> : <span>when the school closes them</span>}
+          {' · '}
+          {data.session.paymentDueAt ? <><span>Pay by</span> <Day iso={String(data.session.paymentDueAt)} /></> : <span>The payment date is not set yet</span>}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {desk
+            ? 'Every subject this student may take, with only the choices open to them and their prices. Pick what the parent asks for; the total is at the bottom.'
+            : viewer === 'student'
+              ? 'Every subject open to you this session, with its choices and their prices. Pick one choice per subject; your parent approves and pays.'
+              : 'Every subject open to your child this session, with its choices and their prices. Pick one choice per subject; the total is at the bottom.'}
+        </p>
       </div>
+      {closedSession && <Notice tone="neutral">Reservations for this session are closed. What is already reserved can still be paid.</Notice>}
+      {!pricesFinal && !closedSession && <Notice tone="info">Prices are not final yet: you can reserve now and pay once the school confirms them.</Notice>}
 
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
+      {(['O.L.', 'A.S./A.L.'] as const).map((group) => {
+        const os = offerings.filter((o) => o.group === group);
+        if (!os.length) return null;
+        return (
+          <section key={group} aria-label={group === 'O.L.' ? 'O.L.' : 'A.S. / A.L.'} className="space-y-3">
+            <h2 className="font-display text-base font-semibold text-foreground" dir="ltr">{group === 'O.L.' ? 'O.L.' : 'A.S. / A.L.'}</h2>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {os.map((o) => (
+                <SubjectCard key={o.id} o={o} lang={lang} words={words} viewer={viewer} studentId={studentId} draft={draft} held={held}
+                  disabled={closedSession || pending} problems={problems} refusal={refusal}
+                  onPick={setPick} onReveal={() => patch({ reveal: { ...draft.reveal, [o.id]: true } })}
+                  onAnswer={(id, v) => { setProblems(({ [`q:${id}`]: _gone, ...rest }) => rest); patch({ answers: { ...draft.answers, [id]: v } }); }} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      <section aria-labelledby={domId(studentId, 'summary')} className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id={domId(studentId, 'summary')} className="font-display text-base font-semibold text-foreground">
+            {childName ? <><span>Reserving for</span> <bdi data-i18n-skip="true">{childName}</bdi></> : <span>Your choices</span>}
+          </h2>
           <p className="text-base font-semibold text-foreground">
-            <span>{chosen.length}</span> <span>{chosen.length === 1 ? 'reservation' : 'reservations'}</span> · <Money amount={total} />
-          </p>
-          <p className="text-xs text-muted-foreground">
-            <span>Due</span> <Day iso={typeof data.session.paymentDueAt === 'string' ? data.session.paymentDueAt : null} />
-            {provisionalTotal > 0 && <> · <span>on a provisional board fee:</span> <Money amount={provisionalTotal} /> <span>(payable once confirmed)</span></>}
+            <span>{chosen.length}</span> <span>{chosen.length === 1 ? 'subject' : 'subjects'}</span> · <span>Total</span> <Money amount={total} />
           </p>
         </div>
-        {bySeries.size > 1 && (
-          <div className="text-xs text-muted-foreground">
-            <span>Paid per entry deadline:</span>{' '}
-            {[...bySeries.values()].map((s, i) => (
-              <span key={`${s.name}|${s.retake}`}>{i > 0 && ' · '}<bdi data-i18n-skip="true">{s.name}</bdi>{s.retake && <> <span>(retake deadline)</span></>} <Money amount={s.amount} />{s.provisional && ' ⓟ'}</span>
+        {chosen.length ? (
+          <ul className="divide-y divide-border text-sm">
+            {chosen.map((c) => (
+              <li key={c.key} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
+                <span className="min-w-0">
+                  <bdi className="font-medium text-foreground" data-i18n-skip="true">{c.o.name}</bdi>{' '}
+                  <span className="text-muted-foreground" data-i18n-skip="true">{c.option.label[lang]}</span>
+                </span>
+                <Money amount={c.option.price?.total} />
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-muted-foreground">Nothing picked yet.</p>}
+        {!pricesFinal && chosen.length > 0 && <p className="text-xs text-muted-foreground">Prices are not final yet: you can reserve now and pay once the school confirms them.</p>}
+
+        {data.session.questions.length > 0 && (
+          <div className="space-y-2 border-t border-border pt-3">
+            <p className="text-sm font-medium text-foreground">A few questions from the school</p>
+            {data.session.questions.map((q) => (
+              <QuestionField key={q.id} q={q} id={domId(studentId, `q:${q.id}`)} value={draft.answers[q.id] ?? ''} problem={problems[`q:${q.id}`] ?? (refusal?.key === `q:${q.id}` ? refusal.sentence : undefined)}
+                disabled={pending} onChange={(v) => { setProblems(({ [`q:${q.id}`]: _gone, ...rest }) => rest); patch({ answers: { ...draft.answers, [q.id]: v } }); }} />
             ))}
           </div>
         )}
-        {chosen.some((c) => c.missing) && <p className="text-xs text-destructive">Name the earlier sitting on each retake</p>}
 
         <div className="space-y-2 border-t border-border pt-3 text-sm">
           {desk ? (
-            <label className="flex items-start gap-2">
-              <input type="checkbox" className="mt-0.5 h-4 w-4" checked={deskTick} onChange={(e) => setDeskTick(e.target.checked)} />
-              <span>{DESK_CONSENT_TEXT}</span>
-            </label>
+            <>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={draft.desk} onChange={(e) => patch({ desk: e.target.checked })} />
+                <span>{DESK_CONSENT_TEXT}</span>
+              </label>
+              <p className="text-xs text-muted-foreground"><span>{consentSentence(data.session.refundSentence)}</span> <span>{data.session.declaration}</span></p>
+            </>
           ) : (
             <>
               <label className="flex items-start gap-2">
-                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={refundTick} disabled={!terms.ready} onChange={(e) => setRefundTick(e.target.checked)} />
-                <RefundTermsSentence state={terms} />
+                <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={draft.refund} onChange={(e) => patch({ refund: e.target.checked })} />
+                <span>{consentSentence(data.session.refundSentence)}</span>
               </label>
               <label className="flex items-start gap-2">
-                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={declTick} onChange={(e) => setDeclTick(e.target.checked)} />
-                <span>{DECLARATION_TEXT}</span>
+                <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={draft.decl} onChange={(e) => patch({ decl: e.target.checked })} />
+                <span>{data.session.declaration}</span>
               </label>
             </>
           )}
         </div>
 
-        <ErrorLine message={failure} />
+        {Object.keys(problems).some((k) => k !== 'page') && <ErrorLine message="Some choices are not finished: they are marked in red above." />}
+        <ErrorLine message={pageProblem} />
 
         {desk ? (
           <div className="flex flex-wrap items-end gap-3">
-            <Button variant="outline" disabled={!ready || pending} onClick={() => { setFailure(null); deskMutation.mutate(false); }}>Reserve only</Button>
+            <Button variant="outline" disabled={pending || closedSession} onClick={() => submit(() => deskMutation.mutate(false))}>Reserve only</Button>
             <div>
-              <label htmlFor="desk-instrument" className="mb-1 block text-xs font-medium text-foreground">Paid with</label>
-              <select id="desk-instrument" className={INPUT_CLASS.replace('w-full', 'w-36')} value={instrument} onChange={(e) => setInstrument(e.target.value as typeof instrument)}>
+              <label htmlFor={domId(studentId, 'instrument')} className="mb-1 block text-xs font-medium text-foreground">Paid with</label>
+              <select id={domId(studentId, 'instrument')} className={cn(INPUT_CLASS, 'w-44')} value={instrument} onChange={(e) => setInstrument(e.target.value as typeof instrument)}>
                 {IN_SCHOOL_INSTRUMENTS.map((i) => <option key={i} value={i}>{IN_SCHOOL_INSTRUMENT_LABELS[i]}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="desk-escrow" className="mb-1 block text-xs font-medium text-foreground">Balance to use (EGP)</label>
-              <input id="desk-escrow" type="number" min="0" step="0.01" inputMode="decimal" className={INPUT_CLASS.replace('w-full', 'w-32')} value={escrow} onChange={(e) => setEscrow(e.target.value)} placeholder="0" />
+              <label htmlFor={domId(studentId, 'escrow')} className="mb-1 block text-xs font-medium text-foreground">Balance to use (EGP)</label>
+              <input id={domId(studentId, 'escrow')} type="number" min="0" step="0.01" inputMode="decimal" className={cn(INPUT_CLASS, 'w-32')} value={escrow} onChange={(e) => setEscrow(e.target.value)} placeholder="0" />
             </div>
-            <Button disabled={!ready || pending || total - provisionalTotal <= 0} onClick={() => { setFailure(null); deskMutation.mutate(true); }}>
-              <span>Reserve and collect</span> <Money amount={payableNow} />{provisionalTotal > 0 && <> <span>now</span></>}
+            <Button disabled={pending || closedSession || !pricesFinal || (chosen.length > 0 && total <= 0)} onClick={() => submit(() => deskMutation.mutate(true))}>
+              <span>Reserve and collect</span> <Money amount={payableNow} />
             </Button>
+            {!pricesFinal && <p className="w-full text-xs text-muted-foreground">Prices are not final yet: reserve now, and collect once they are.</p>}
           </div>
         ) : (
-          <Button disabled={!ready || pending} onClick={() => { setFailure(null); familyMutation.mutate(); }}>
-            {pending ? 'Reserving…' : viewer === 'student' ? 'Send to my parent' : <><span>Reserve</span>{chosen.length > 0 && <> <span dir="ltr">({chosen.length})</span></>}</>}
+          <Button className="w-full sm:w-auto" disabled={pending || closedSession} onClick={() => submit(() => familyMutation.mutate())}>
+            {pending ? 'Reserving…' : viewer === 'student' ? 'Send to my parent' : <><span>Reserve now</span>{chosen.length > 0 && <> <span dir="ltr">({chosen.length})</span></>}</>}
           </Button>
         )}
-      </div>
+      </section>
     </div>
   );
 }
 
-/**
- * One subject's rows on the Reserve page. `preview` (the Session screen's "Preview the family's form",
- * F6a): every choice shown open — each item with its entry, teacher and sitting choices and the price
- * of the chosen entry — read-only, nothing to tick; the family's page passes none and is unchanged.
- */
-export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings, preview = false }: {
-  o: Offer; desk: boolean; coreLocked: boolean; sittings: Sitting[];
-  pickOf: (it: Item) => Pick; setPick: (it: Item, patch: Partial<Pick>) => void; toggle: (o: Offer, it: Item, on: boolean) => void;
-  preview?: boolean;
+/** The refund-policy tick, from the session's policy sentence (the terms a reservation freezes). */
+function consentSentence(refundSentence: string | null) {
+  return refundSentence
+    ? `I confirm that I have read the refund policy: of the course fee, ${refundSentence}, counted from the first lesson.`
+    : 'I confirm that I have read the refund policy.';
+}
+
+// ─── One subject ─────────────────────────────────────────────────────────────
+
+type HeldLine = { status: string; attempt: string; mode: string };
+
+function SubjectCard({ o, lang, words, viewer, studentId, draft, held, disabled, problems, refusal, onPick, onReveal, onAnswer }: {
+  o: Offering; lang: 'en' | 'ar'; words: (typeof WORDS)[Viewer]; viewer: Viewer; studentId: string; draft: ReserveDraft;
+  held: Map<string, HeldLine>; disabled: boolean; problems: Record<string, string>;
+  refusal: { sentence: string; code: RefusalCode | undefined; key: string | null } | null;
+  onPick: (key: string, p: Pick | null) => void; onReveal: () => void; onAnswer: (id: string, v: string) => void;
 }) {
-  // The sitting under each paper only where the subject's papers sit in more than one (an IAL subject
-  // across November, January and June); otherwise it is the session's own and said once by the
-  // session's name — "Cambridge International June 2027" under every row was noise (F6).
-  const manySittings = new Set(o.items.map((i) => i.series?.id ?? null)).size > 1;
+  const groups = groupsOf(o);
+  const picks = groups.map((g) => draft.picks[g.key]).filter((p): p is Pick => !!p);
+  const known = o.rows.some((r) => r.knownSitting);
+  const hasFirst = o.rows.some((r) => r.options.some((x) => x.attempt === 'first'));
+  const hasRetake = o.rows.some((r) => r.options.some((x) => x.attempt === 'retake'));
+  // F2: a student with no record sees first entries; "Sat it before?" shows the retakes (never hidden for good).
+  const showRetakes = known || !hasFirst || !!draft.reveal[o.id] || picks.some((p) => p.attempt === 'retake');
+  const allOnline = o.rows.every((r) => r.options.every((x) => x.mode !== 'in_school' || (x.teachers.length > 0 && x.teachers.every((t) => t.online))))
+    && o.rows.some((r) => r.options.some((x) => x.mode === 'in_school' && x.teachers.length > 0));
+  const several = groups.length > 1;
+  const anyProblem = groups.some((g) => problems[g.key] || refusal?.key === g.key);
   return (
-    <>
-      <tr className="border-t border-border max-sm:block">
-        <td colSpan={5} className="px-3 pt-3 pb-1 max-sm:block">
-          <span className="font-semibold text-foreground"><bdi data-i18n-skip="true">{o.subject.name}</bdi></span>{' '}
-          <span className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{o.subject.boardName}</bdi></span>
-          {o.grade10Core && <> <Badge tone="info">grade-10 core</Badge></>}
-          {o.availability !== 'open' && AVAILABILITY[o.availability] && <> <Badge tone="warning">{AVAILABILITY[o.availability]}</Badge></>}
-        </td>
-      </tr>
-      {o.items.map((it) => {
-        const p = pickOf(it);
-        // The preview lists every entry the item takes, open now or not (the series may have no dates yet).
-        const options = preview ? it.prices.filter((x) => !x.noFee) : it.prices.filter(usable);
-        const unavailable = !preview && (!reservable(it) || !!it.held || options.length === 0);
-        const [attempt, mode] = (p.entry ?? '|').split('|');
-        const price = it.prices.find((x) => entryKey(x) === p.entry && !x.noFee) ?? null;
-        const needsSitting = p.on && (attempt === 'retake' || it.needsPriorSeries) && !isKnown(it);
-        const noFee = it.prices.length > 0 && it.prices.every((x) => x.noFee);
-        return (
-          <tr key={it.id} className={cn(unavailable && 'text-muted-foreground', 'max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)]')}>
-            <td className="px-3 py-2 align-top">
-              <input type="checkbox" className="h-4 w-4" aria-label={`${o.subject.name}: ${itemDisplayLabel(it)}`}
-                checked={preview ? false : p.on} disabled={preview || unavailable || (coreLocked && p.on)} onChange={(e) => toggle(o, it, e.target.checked)} />
-            </td>
-            <td className="px-3 py-2 align-top">
-              <span>{itemDisplayLabel(it)}</span>
-              {it.availability !== 'open' && AVAILABILITY[it.availability] && <> <Badge tone="warning">{AVAILABILITY[it.availability]}</Badge></>}
-              {isKnown(it) && <> <Badge tone="info"><span>{KNOWN_WORD[knownOf(it)[0]!.source] ?? 'sat'}</span>&nbsp;<bdi data-i18n-skip="true">{knownOf(it)[0]!.series}</bdi>{knownOf(it)[0]!.source === 'result' && <>&nbsp;<span>(result on record)</span></>}</Badge></>}
-              {it.held && <> <Badge tone="success">already reserved</Badge></>}
-              {!reservable(it) && !it.held && <> <Badge tone="neutral">closed for new entries</Badge></>}
-              {!it.open.first && it.open.retake && !it.held && <> <Badge tone="warning">retakes of the previous sitting only</Badge></>}
-              {noFee && <> <Badge tone="warning">board fee not set yet</Badge></>}
-              {/* A retake or a carry-forward whose sitting the system does not know is declared: the school verifies it. */}
-              {needsSitting && <> <Badge tone="warning">{desk ? 'declared — listed to verify' : 'to be verified by the school'}</Badge></>}
-              {it.series && manySittings && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}
-            </td>
-            <td className={cn('px-3 py-2 align-top max-sm:col-start-2 max-sm:py-1', !p.on && 'max-sm:hidden')}>
-              {p.on && (mode === 'self_study' ? <span className="text-muted-foreground">— self-study</span>
-                : it.teachers.length > 1 ? (
-                  <select aria-label="Teacher" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-48')} value={p.teacherId ?? ''} onChange={(e) => setPick(it, { teacherId: e.target.value || null })}>
-                    <option value="">No preference</option>
-                    {it.teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.mode === 'online' ? ' (online)' : ''}{qualificationOfTeacher(o, it)}</option>)}
-                  </select>
-                ) : it.teachers.length === 1 ? <bdi data-i18n-skip="true">{it.teachers[0]!.name}{it.teachers[0]!.mode === 'online' ? ' (online)' : ''}{qualificationOfTeacher(o, it)}</bdi> : <span className="text-muted-foreground">—</span>)}
-            </td>
-            <td className={cn('px-3 py-2 align-top max-sm:col-start-2 max-sm:py-1', !p.on && 'max-sm:hidden')}>
-              {p.on && (
-                <div className="space-y-1.5">
-                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-80')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
-                    {options.map((x) => <option key={entryKey(x)} value={entryKey(x)}>{entryLabel(x, isKnown(it), !it.constraints.selfStudyOnly)}</option>)}
-                  </select>
-                  {needsSitting && (
-                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-full sm:w-80')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
-                      <option value="">{it.needsPriorSeries ? 'Carried from the sitting…' : 'From the sitting…'}</option>
-                      {sittings.map((s) => <option key={sittingValue(s)} value={sittingValue(s)}>{sittingName(s)}</option>)}
-                    </select>
-                  )}
-                  {/* The preview lists every entry with its price, as the Google Form lists its options. */}
-                  {preview && options.length > 0 && (
-                    <ul className="space-y-0.5 text-xs text-muted-foreground">
-                      {options.map((x) => (
-                        <li key={entryKey(x)}><span>{entryLabel(x, isKnown(it), !it.constraints.selfStudyOnly)}</span> · <Money amount={x.total} />{x.provisional && ' ⓟ'}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </td>
-            <td className={cn('px-3 py-2 text-end align-top max-sm:col-start-2 max-sm:py-1 max-sm:text-start', !(p.on && price) && 'max-sm:hidden')}>
-              {p.on && price && (
-                <span title={`course ${price.courseFee?.toLocaleString('en-US')} + board ${price.registrationFee?.toLocaleString('en-US')}`}>
-                  <Money amount={price.total} />{price.provisional && <> <Badge tone="warning">ⓟ</Badge></>}
-                </span>
-              )}
-            </td>
-          </tr>
-        );
-      })}
-    </>
+    <article className={cn('rounded-xl border bg-card p-4 shadow-sm', picks.length ? 'border-primary ring-1 ring-primary' : 'border-border', anyProblem && 'border-destructive ring-1 ring-destructive')}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h3 className="font-display text-base font-semibold text-foreground">
+          <bdi data-i18n-skip="true">{o.name}</bdi> <span className="text-xs font-normal text-muted-foreground"><bdi data-i18n-skip="true">{o.board}</bdi></span>
+        </h3>
+        {allOnline && <Badge tone="info">Taught online</Badge>}
+      </div>
+      {o.note && <p className="mt-1 text-sm text-muted-foreground"><bdi data-i18n-skip="true">{o.note}</bdi></p>}
+      {!o.accepting && <p className="mt-2 text-sm text-muted-foreground">Not taking new reservations.</p>}
+      {known && <p className="mt-2 text-sm text-muted-foreground">Sat before: only the retake choices are shown.</p>}
+      {groups.map((g) => (
+        <GroupPicker key={g.key} g={g} o={o} lang={lang} words={words} viewer={viewer} studentId={studentId} pick={draft.picks[g.key] ?? null}
+          held={held} legend={several && g.rows.length === 1 && !g.rows[0]!.exclusiveGroup ? g.rows[0]!.label[lang] : words.what}
+          showRetakes={showRetakes} disabled={disabled || !o.accepting} problem={problems[g.key]}
+          refusal={refusal?.key === g.key ? refusal : null} onPick={(p) => onPick(g.key, p)} />
+      ))}
+      {hasFirst && hasRetake && !showRetakes && (
+        <p className="mt-2"><button type="button" className="text-sm text-primary underline-offset-4 hover:underline" onClick={onReveal}>Sat it before? Show the retake choices</button></p>
+      )}
+      {picks.length > 0 && o.questions.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {o.questions.map((q) => (
+            <QuestionField key={q.id} q={q} id={domId(studentId, `q:${q.id}`)} value={draft.answers[q.id] ?? ''} disabled={disabled}
+              problem={problems[`q:${q.id}`] ?? (refusal?.key === `q:${q.id}` ? refusal.sentence : undefined)} onChange={(v) => onAnswer(q.id, v)} />
+          ))}
+        </div>
+      )}
+    </article>
   );
 }
 
-/**
- * One subject's part of the family's form as staff preview it (F6a: the Session screen's "Preview the
- * family's form"): the Reserve page's own rows, from the family read with no student
- * (`GET /registrations/offers/preview`), every item open with its entry, teacher and sitting choices
- * and the price of the chosen entry, then the refund policy sentence and the declaration. Read-only:
- * the choices can be looked through, nothing is ticked and nothing is reserved from here.
- */
-export function ReservePreview({ offer, sittings, terms }: { offer: Offer; sittings: Sitting[]; terms: RefundTermsState }) {
-  const [picks, setPicks] = useState<Record<string, Pick>>({});
-  const firstEntry = (it: Item) => {
-    const p = it.prices.find((x) => !x.noFee);
-    return p ? entryKey(p) : null;
-  };
-  const pickOf = (it: Item): Pick => picks[it.id] ?? { on: true, entry: firstEntry(it), teacherId: undefined, sitting: '' };
-  const setPick = (it: Item, patch: Partial<Pick>) => setPicks((prev) => ({ ...prev, [it.id]: { ...pickOf(it), ...patch } }));
+function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend, showRetakes, disabled, problem, refusal, onPick }: {
+  g: Group; o: Offering; lang: 'en' | 'ar'; words: (typeof WORDS)[Viewer]; viewer: Viewer; studentId: string; pick: Pick | null;
+  held: Map<string, HeldLine>; legend: string; showRetakes: boolean; disabled: boolean; problem: string | undefined;
+  refusal: { sentence: string; code: RefusalCode | undefined } | null; onPick: (p: Pick | null) => void;
+}) {
+  const id = domId(studentId, g.key);
+  const heldRow = g.rows.find((r) => held.has(r.id));
+  if (heldRow) {
+    const line = held.get(heldRow.id)!;
+    const option = heldRow.options.find((x) => optionKey(x) === optionKey(line));
+    return (
+      <div id={id} className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+        <Badge tone={line.status === 'confirmed' ? 'success' : 'warning'}>Already reserved</Badge>{' '}
+        <span className="text-foreground" data-i18n-skip="true">{option ? option.label[lang] : heldRow.label[lang]}</span>{' '}
+        <span className="text-muted-foreground">· <span>{line.status === 'pending_approval' ? words.approval : HELD_STATUS[line.status] ?? ''}</span></span>
+      </div>
+    );
+  }
+  const opts = g.rows.flatMap((r) => r.options.filter((x) => x.attempt === 'first' || showRetakes).map((x) => ({ r, x })));
+  if (!opts.length) return null;
+  const name = `${id}-pick`;
+  const picked = pick ? opts.find(({ r, x }) => r.id === pick.rowId && optionKey(x) === optionKey(pick)) ?? null : null;
+  const message = problem ?? refusal?.sentence;
   return (
-    <div className="space-y-4">
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
-              <th className="px-3 py-2 text-start font-medium">Teacher</th>
-              <th className="px-3 py-2 text-start font-medium">Entry</th>
-              <th className="px-3 py-2 text-end font-medium">Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            <OfferRows o={offer} desk={false} coreLocked={false} pickOf={pickOf} setPick={setPick} toggle={() => undefined} sittings={sittings} preview />
-          </tbody>
-        </table>
+    <fieldset id={id} className="mt-3 min-w-0" aria-invalid={message ? true : undefined}>
+      <legend className="mb-1 text-sm font-medium text-foreground"><span data-i18n-skip={legend === words.what ? undefined : 'true'}>{legend}</span></legend>
+      <div className="space-y-1.5">
+        <OptionLine name={name} checked={!pick} disabled={disabled} onChange={() => onPick(null)}>
+          <span className="text-muted-foreground">Not taking it</span>
+        </OptionLine>
+        {opts.map(({ r, x }) => {
+          const on = !!picked && picked.r.id === r.id && optionKey(picked.x) === optionKey(x);
+          const off = r.closed || !x.price;
+          return (
+            <div key={`${r.id}|${optionKey(x)}`}>
+              <OptionLine name={name} checked={on} disabled={disabled || off}
+                onChange={() => onPick({ rowId: r.id, attempt: x.attempt, mode: x.mode, teacherId: '', earlier: '' })}
+                end={x.price ? <Money amount={x.price.total} className="font-semibold" /> : <span className="text-xs text-muted-foreground">price not set yet</span>}>
+                <span data-i18n-skip="true">{x.label[lang]}</span>
+                {r.closed && <> <span className="text-xs text-muted-foreground">(closed to new reservations)</span></>}
+                {r.payBy && <span className="block text-xs text-muted-foreground"><span>Pay by</span> <Day iso={String(r.payBy)} /></span>}
+              </OptionLine>
+              {on && pick && <PickDetails o={o} r={r} x={x} lang={lang} words={words} viewer={viewer} pick={pick} id={id} disabled={disabled} problem={message} onChange={onPick} />}
+            </div>
+          );
+        })}
       </div>
-      <div className="space-y-2 rounded-xl border border-border bg-card p-4 text-sm shadow-sm">
-        <label className="flex items-start gap-2">
-          <input type="checkbox" className="mt-0.5 h-4 w-4" disabled checked={false} readOnly />
-          <RefundTermsSentence state={terms} />
-        </label>
-        <label className="flex items-start gap-2">
-          <input type="checkbox" className="mt-0.5 h-4 w-4" disabled checked={false} readOnly />
-          <span>{DECLARATION_TEXT}</span>
-        </label>
-      </div>
+      {message && (
+        <div role="alert" className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <p>{message}</p>
+          {refusal?.code && TAKE_OFF.includes(refusal.code) && (
+            <button type="button" className="mt-1 text-sm font-medium underline underline-offset-4" onClick={() => onPick(null)}>Take it off the choices</button>
+          )}
+          {refusal?.code === 'PRICE_CHANGED' && <p className="mt-1">The price shown is now up to date: reserve again.</p>}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+function OptionLine({ name, checked, disabled, onChange, end, children }: {
+  name: string; checked: boolean; disabled: boolean; onChange: () => void; end?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <label className={cn('flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm', checked ? 'border-primary bg-accent' : 'border-border bg-card', disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-primary/50')}>
+      <input type="radio" name={name} className="h-4 w-4 shrink-0" checked={checked} disabled={disabled} onChange={onChange} />
+      <span className="min-w-0 flex-1">{children}</span>
+      {end && <span className="shrink-0">{end}</span>}
+    </label>
+  );
+}
+
+function PickDetails({ o, r, x, lang, words, pick, id, disabled, problem, onChange }: {
+  o: Offering; r: OfferRow; x: RowOption; lang: 'en' | 'ar'; words: (typeof WORDS)[Viewer]; viewer: Viewer; pick: Pick; id: string;
+  disabled: boolean; problem: string | undefined; onChange: (p: Pick) => void;
+}) {
+  const earlier = earlierOf(r, x);
+  const teacherWanted = choosesTeacher(o, x);
+  return (
+    <div className="space-y-2 px-3 pb-1 pt-2 text-sm">
+      {x.mode === 'in_school' && (
+        o.teacherTbc || (!x.teachers.length && o.teacherChoice === 'families') ? <p className="text-muted-foreground">Teacher to be announced</p>
+          : o.teacherChoice === 'school' ? <p className="text-muted-foreground">The school assigns the teacher</p>
+            : x.teachers.length === 1 ? (
+              <p className="text-foreground"><span>Teacher:</span> <bdi data-i18n-skip="true">{x.teachers[0]!.name}</bdi>{x.teachers[0]!.online && <> <span className="text-muted-foreground">(online)</span></>}</p>
+            ) : teacherWanted ? (
+              <div>
+                <label htmlFor={`${id}-teacher`} className="mb-1 block text-xs font-medium text-foreground">Teacher</label>
+                <select id={`${id}-teacher`} className={cn(INPUT_CLASS, 'sm:w-72', problem === 'Choose the teacher' && !pick.teacherId && 'border-destructive')}
+                  aria-invalid={problem === 'Choose the teacher' && !pick.teacherId ? true : undefined}
+                  value={pick.teacherId} disabled={disabled} onChange={(e) => onChange({ ...pick, teacherId: e.target.value })}>
+                  <option value="">Choose the teacher…</option>
+                  {x.teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.online ? ' (online)' : ''}</option>)}
+                </select>
+              </div>
+            ) : null
+      )}
+      {r.knownSitting && (x.attempt === 'retake' || x.needsCarriedFrom) && (
+        <p className="text-foreground"><span>Sat in</span> <span data-i18n-skip="true">{r.knownSitting.label[lang]}</span></p>
+      )}
+      {earlier.asks && (
+        <div>
+          <label htmlFor={`${id}-earlier`} className="mb-1 block text-xs font-medium text-foreground">{r.kind === 'a2' ? words.whenAS : words.when}</label>
+          <select id={`${id}-earlier`} className={cn(INPUT_CLASS, 'sm:w-72', problem === 'Choose the earlier exam' && !pick.earlier && 'border-destructive')}
+            aria-invalid={problem === 'Choose the earlier exam' && !pick.earlier ? true : undefined}
+            value={pick.earlier} disabled={disabled} onChange={(e) => onChange({ ...pick, earlier: e.target.value })}>
+            <option value="">Choose…</option>
+            {earlier.choices.map((c) => <option key={c.value} value={c.value} data-i18n-skip="true">{c.label[lang]}</option>)}
+          </select>
+        </div>
+      )}
+      {x.price && (
+        <p className="text-xs text-muted-foreground">
+          <span>Exam fee</span> <Money amount={x.price.examFee} /> · <span>Course fee</span> <Money amount={x.price.courseFee} />
+        </p>
+      )}
+    </div>
+  );
+}
+
+function QuestionField({ q, id, value, problem, disabled, onChange }: {
+  q: Question; id: string; value: string; problem: string | undefined; disabled: boolean; onChange: (v: string) => void;
+}) {
+  const invalid = problem ? true : undefined;
+  return (
+    <div id={`${id}-box`} className="space-y-1">
+      <label htmlFor={id} className="block text-sm text-foreground">
+        <bdi data-i18n-skip="true">{q.prompt}</bdi>{q.required && <span aria-hidden className="text-destructive"> *</span>}
+      </label>
+      {q.kind === 'yes_no' ? (
+        <select id={id} className={cn(INPUT_CLASS, 'sm:w-60')} value={value} disabled={disabled} aria-invalid={invalid} aria-required={q.required || undefined} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      ) : q.kind === 'choice' ? (
+        <select id={id} className={cn(INPUT_CLASS, 'sm:w-72')} value={value} disabled={disabled} aria-invalid={invalid} aria-required={q.required || undefined} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {(q.choices ?? []).map((c) => <option key={c} value={c} data-i18n-skip="true">{c}</option>)}
+        </select>
+      ) : (
+        <input id={id} className={cn(INPUT_CLASS, 'sm:w-96')} value={value} disabled={disabled} aria-invalid={invalid} aria-required={q.required || undefined} maxLength={500} placeholder="Your answer" onChange={(e) => onChange(e.target.value)} />
+      )}
+      {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
     </div>
   );
 }
@@ -584,3 +700,6 @@ export function SlipLink({ studentId, registrationIds }: { studentId: string; re
     </Link>
   );
 }
+
+/** The type of the read, for the pages that show what it offers. */
+export type { OffersRead };

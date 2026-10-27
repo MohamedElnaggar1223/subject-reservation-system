@@ -7,8 +7,8 @@
  * The spreadsheet version: the response sheet's row per subject with the fee note typed by hand,
  * the receipt book beside it, and nothing at all for the family (no price was ever on a form).
  * Here every line shows its price and why ("course 14,000 × 50% + board 9,200 × 100%"), what was
- * paid and is still owed, when, and its receipt; the payments below it, one per entry deadline;
- * the escrow. Every number is the ledger's. Charges (step C): each one beside the lines with its
+ * paid and is still owed, its pay-by date and its last day to pay, and its receipt; the payments below it (one
+ * checkout or one desk payment covers lines of any dates; a transfer being checked says until when); the escrow. Every number is the ledger's. Charges (step C): each one beside the lines with its
  * price, paid and outstanding; a line under an instalment plan shows its instalments under it, its
  * paid part the deposits held for it — the instalments are never added to the totals again.
  */
@@ -22,7 +22,8 @@ import { Button } from '~/components/ui/button';
 import { Badge, type Tone } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, Modal, Field, INPUT_CLASS, TEXTAREA_CLASS, ErrorLine, errorText } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
-import { fetchReserveOffers } from './reserve';
+import { fetchReserveOffers, reserveOffersKey } from './offers';
+import { familyWords } from '~/lib/i18n-reservations';
 import { ClassFollowNotice } from './class-follow';
 import { followSentences, type FollowSentence } from '~/lib/groups-followed';
 import { labelFor } from '~/lib/format';
@@ -144,7 +145,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                     {money && <th className="px-3 py-2 text-end font-medium">Price</th>}
                     {money && <th className="px-3 py-2 text-end font-medium">Paid</th>}
                     {money && <th className="px-3 py-2 text-end font-medium">Outstanding</th>}
-                    {money && <th className="px-3 py-2 text-start font-medium">Due</th>}
+                    {money && <th className="px-3 py-2 text-start font-medium">Pay by</th>}
                     {money && <th className="px-3 py-2 text-start font-medium">Receipt</th>}
                     <th className="px-3 py-2 text-start font-medium">Status</th>
                     {teacherChange && <th className="px-3 py-2" />}
@@ -185,19 +186,23 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                       {money && (
                         <td className="px-3 py-2 text-end max-sm:text-start">
                           <PhoneLabel>Price</PhoneLabel>
-                          <span title={l.basisText}><Money amount={l.price} /></span>
-                          {l.provisional && <> <Badge tone="warning">ⓟ</Badge></>}
-                          <div className="text-[11px] text-muted-foreground" dir="ltr">{l.basisText}</div>
+                          <span title={familyWords(l.basisText)}><Money amount={l.price} /></span>
+                          {l.provisional && <> <Badge tone="warning">not final yet</Badge></>}
+                          <div className="text-[11px] text-muted-foreground" dir="ltr">{familyWords(l.basisText)}</div>
                         </td>
                       )}
                       {money && <td className="px-3 py-2 text-end max-sm:text-start"><PhoneLabel>Paid</PhoneLabel><Money amount={l.paid} />{l.plan?.live && l.paid > 0 && <div className="text-xs text-muted-foreground">held for it, paid in instalments</div>}{l.refunded > 0 && <div className="text-xs text-muted-foreground"><span>refunded</span> <Money amount={l.refunded} /></div>}</td>}
                       {money && <td className="px-3 py-2 text-end max-sm:text-start"><PhoneLabel>Outstanding</PhoneLabel>{l.outstanding > 0 ? <Money amount={l.outstanding} className="font-semibold text-amber-700 dark:text-amber-400" /> : <span className="text-muted-foreground">—</span>}</td>}
                       {money && (
                         <td className="px-3 py-2">
-                          <PhoneLabel>Due</PhoneLabel>
-                          <Day iso={l.dueAt} />
+                          <PhoneLabel>Pay by</PhoneLabel>
+                          {l.dueAt ? <Day iso={String(l.dueAt)} /> : <span className="text-muted-foreground">—</span>}
                           {l.overdueDays > 0 && <div><Badge tone="danger"><span>{l.overdueDays}</span>&nbsp;<span>{l.overdueDays === 1 ? 'day overdue' : 'days overdue'}</span></Badge></div>}
-                          {l.provisional && l.outstanding > 0 && <div className="text-xs text-muted-foreground">board fee provisional, confirmed before payment</div>}
+                          {/* The last moment it can be paid: due date + the session's days, never past its exam board's date (C10). */}
+                          {l.outstanding > 0 && l.deadline && !l.provisional && (l.paymentInProgress?.status === 'pending_verification'
+                            ? <div className="text-xs text-muted-foreground"><span>transfer being checked: kept until</span> <Day iso={String(l.deadline)} /></div>
+                            : <div className="text-xs text-muted-foreground"><span>last day to pay</span> <Day iso={String(l.deadline)} /></div>)}
+                          {l.provisional && l.outstanding > 0 && <div className="text-xs text-muted-foreground">prices not final yet: payable once the school confirms them</div>}
                         </td>
                       )}
                       {money && (
@@ -261,21 +266,27 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
       {money && s.payments.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Payments</h3>
-          <p className="text-xs text-muted-foreground">One payment per entry deadline: each series is paid for on its own.</p>
           <ul className="divide-y divide-border rounded-lg border border-border text-sm">
             {s.payments.map((p) => (
               <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2">
                 <div>
-                  <div><Day iso={p.at} /> · <span>{p.purpose === 'registration' ? 'Subjects' : p.purpose === 'school_fee' ? 'School fee' : p.purpose === 'remark' ? 'Remark' : p.purpose === 'preregistration' ? 'Preregistration' : p.purpose === 'charge' ? 'Charges' : p.purpose}</span>
+                  <div><Day iso={String(p.at)} /> · <span>{p.purpose === 'registration' || p.purpose === 'preregistration' ? 'Subjects' : p.purpose === 'school_fee' ? 'School fee' : p.purpose === 'remark' ? 'Remark' : p.purpose === 'charge' ? 'Charges' : p.purpose}</span>
                     {/* F8-10: how it was paid in words ("in cash at the school", "by InstaPay"), never the code. */}
                     {' '}<span className="text-muted-foreground">{paidByWords(p.method, p.instrument)}</span></div>
                   {p.covers.length > 0 && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{p.covers.map((c) => `${c.label}${c.receipt ? ` · ${c.receipt}` : ''}`).join(', ')}</bdi></div>}
-                  {p.series.length > 0 && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{p.series.join(', ')}</bdi>{p.deadline && <> · <span>deadline</span> <Day iso={p.deadline} /></>}</div>}
+                  {/* A transfer under verification is kept until the earliest exam board date among its subjects; a checkout ends
+                      at its subjects' earliest last day to pay (C10; decision 3 of the P1b review). */}
+                  {p.status === 'pending_verification' && (
+                    <div className="text-xs text-muted-foreground">
+                      <span>Your transfer is being checked by the school</span>{p.deadline && <> · <span>its subjects are kept for it until</span> <Day iso={String(p.deadline)} /></>}
+                    </div>
+                  )}
+                  {p.status === 'pending' && p.deadline && <div className="text-xs text-muted-foreground"><span>Open until</span> <Day iso={String(p.deadline)} /></div>}
                 </div>
                 <div className="text-end">
                   <Money amount={p.total} className="font-semibold" />
                   {p.escrowApplied > 0 && <div className="text-xs text-muted-foreground"><span>from the balance</span> <Money amount={p.escrowApplied} /></div>}
-                  <div><Badge tone={p.status === 'completed' ? 'success' : p.status === 'refunded' ? 'neutral' : 'warning'}>{p.status === 'completed' ? 'Paid' : p.status === 'refunded' ? 'Reversed' : 'In progress'}</Badge></div>
+                  <div><Badge tone={p.status === 'completed' ? 'success' : p.status === 'refunded' ? 'neutral' : p.status === 'pending_verification' ? 'info' : 'warning'}>{p.status === 'completed' ? 'Paid' : p.status === 'refunded' ? 'Reversed' : p.status === 'pending_verification' ? 'Being checked' : 'In progress'}</Badge></div>
                 </div>
               </li>
             ))}
@@ -294,11 +305,12 @@ const changeTeacher = (id: string, json: InferRequestType<(typeof api.v1.registr
 function TeacherModal({ line, onClose }: { line: StatementLine; onClose: () => void }) {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ['registrations', 'offers', line.session.id, line.studentId],
+    queryKey: reserveOffersKey(line.session.id, line.studentId),
     queryFn: () => fetchReserveOffers(line.session.id, line.studentId),
   });
-  const item = data?.offers.flatMap((o) => o.items).find((i) => i.id === line.offerItemId);
-  const teachers = item?.teachers ?? [];
+  // The row's in-school teachers (its own, else the subject's), from the family read (v2); a subject switched off is not listed there.
+  const row = data?.offerings.flatMap((o) => o.rows).find((r) => r.id === line.offerItemId);
+  const teachers = row?.options.find((x) => x.mode === 'in_school')?.teachers ?? [];
   const [choice, setChoice] = useState<string>(line.mode === 'self_study' ? 'self' : line.teacherId ?? '');
   const [reason, setReason] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
@@ -331,7 +343,7 @@ function TeacherModal({ line, onClose }: { line: StatementLine; onClose: () => v
           <Field label="Teacher" htmlFor="line-teacher">
             <select id="line-teacher" className={INPUT_CLASS} value={choice} onChange={(e) => setChoice(e.target.value)}>
               {line.mode !== 'self_study' && teachers.length > 1 && <option value="">No preference (the coordinator assigns)</option>}
-              {line.mode !== 'self_study' && teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.mode === 'online' ? ' (online)' : ''}</option>)}
+              {line.mode !== 'self_study' && teachers.map((t) => <option key={t.id} value={t.id} data-i18n-skip="true">{t.name}{t.online ? ' (online)' : ''}</option>)}
               <option value="self">Self-study (no teacher)</option>
             </select>
           </Field>

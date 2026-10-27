@@ -338,6 +338,10 @@ function waitAr(n: number): string {
 
 /** Sentences of these screens that carry a name, a number or a date. */
 export function translateReservationsText(text: string): string | null {
+  for (const [re, f] of FAMILY_RULES) {
+    const m = re.exec(text);
+    if (m) return f(m);
+  }
   for (const [re, f] of RULES) {
     const m = re.exec(text);
     if (m) return f(m);
@@ -356,4 +360,167 @@ export function translateReservationsText(text: string): string | null {
   const month = /^(January|June|October|November) (\d{4})$/.exec(text);
   if (month) return `${MONTHS_AR[month[1]!]} ${month[2]}`;
   return null;
+}
+
+// ─── P3: the family's and the desk's screens (COORDINATOR_REWORK.md F1–F5, §5, P3) ──────────────────────
+//
+// Words families and the desk read (the lead's "mock" row): no board jargon — no award, suite, series, sitting,
+// component, mapping, option code, provisional, cut-off or offer item, in English or Arabic; "last day to pay",
+// "prices not final yet", "the earlier exam". The parent is addressed ("your child"), the student's own view
+// addresses the student. A date not set is said plainly (موعد الدفع لم يُحدد بعد), never "pay before to be
+// announced". Subject names stay in English in Arabic (data). `apps/web/scripts/check-reservation-words.mjs`
+// checks these screens, this file and the Arabic the translator gives their phrases.
+
+/**
+ * An API sentence in the family's words: the board's words a refusal may carry (a sitting, a series, a provisional
+ * fee, an item) in theirs. Each rule is a whole word, so a subject's name or code is never touched.
+ */
+const FAMILY_WORDS: [RegExp, string][] = [
+  [/\bWhole subject\b/g, 'All papers'],
+  [/\bboard fee provisional\b/gi, 'prices not final yet'],
+  [/\bprovisional\b/gi, 'not final yet'],
+  [/\bcut-offs?\b/gi, 'last day to pay'],
+  [/\bsittings\b/gi, 'exams'],
+  [/\bsitting\b/gi, 'exam'],
+  [/\bseries\b/gi, 'exam'],
+  [/\bawards\b/gi, 'qualifications'],
+  [/\baward\b/gi, 'qualification'],
+  [/\bcomponents\b/gi, 'papers'],
+  [/\bcomponent\b/gi, 'paper'],
+  [/\bsuites\b/gi, 'sets'],
+  [/\bsuite\b/gi, 'set'],
+  [/\bmappings?\b/gi, 'links'],
+  [/\boption codes?\b/gi, 'codes'],
+  [/\boffer items?\b/gi, 'choice'],
+  [/\bThat item\b/g, 'That choice'],
+  [/\bitems\b/gi, 'choices'],
+  [/\bitem\b/gi, 'choice'],
+];
+
+export function familyWords(text: string): string {
+  let out = text;
+  for (const [re, to] of FAMILY_WORDS) out = out.replace(re, to);
+  return out;
+}
+
+/** The family's and the desk's phrases (merged after the other dictionaries in lib/i18n.tsx: these win). */
+export const familyArabic: Record<string, string> = {
+  // The reservation page
+  'Reserve now': 'احجز الآن',
+  'Reserving for': 'الحجز لـ',
+  'Your choices': 'اختياراتك',
+  'subject': 'مادة',
+  'subjects': 'مواد',
+  'Nothing picked yet.': 'لم تختر شيئًا بعد.',
+  'when the school closes them': 'حين تغلقه المدرسة',
+  'The payment date is not set yet': 'موعد الدفع لم يُحدد بعد',
+  'Every subject open to your child this session, with its choices and their prices. Pick one choice per subject; the total is at the bottom.':
+    'كل مادة متاحة لابنك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ والإجمالي في الأسفل.',
+  'Every subject open to you this session, with its choices and their prices. Pick one choice per subject; your parent approves and pays.':
+    'كل مادة متاحة لك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ يوافق ولي أمرك ويدفع.',
+  'Every subject this student may take, with only the choices open to them and their prices. Pick what the parent asks for; the total is at the bottom.':
+    'كل مادة يمكن لهذا الطالب أخذها، بالخيارات المتاحة له فقط وأسعارها. اختر ما يطلبه ولي الأمر؛ والإجمالي في الأسفل.',
+  'Reservations for this session are closed. What is already reserved can still be paid.': 'الحجز في هذه الجلسة مغلق. ما حُجز بالفعل يمكن دفعه.',
+  'Prices are not final yet: you can reserve now and pay once the school confirms them.': 'الأسعار ليست نهائية بعد: يمكنك الحجز الآن والدفع حين تؤكدها المدرسة.',
+  'Prices are not final yet: reserve now, and collect once they are.': 'الأسعار ليست نهائية بعد: احجز الآن، وحصّل حين تصبح نهائية.',
+  'Reservations have not opened yet': 'لم يُفتح الحجز بعد',
+  'Taught online': 'تُدرَّس عبر الإنترنت',
+  'Not taking new reservations.': 'لا تقبل حجوزات جديدة.',
+  'Sat before: only the retake choices are shown.': 'امتُحن فيها من قبل: تظهر خيارات الإعادة فقط.',
+  'Sat it before? Show the retake choices': 'امتُحن فيها من قبل؟ اعرض خيارات الإعادة',
+  'What will your child take?': 'ماذا سيأخذ ابنك؟',
+  'What will you take?': 'ماذا ستأخذ؟',
+  'What will the student take?': 'ماذا سيأخذ الطالب؟',
+  'When did your child sit it?': 'متى امتحن ابنك فيها؟',
+  'When did you sit it?': 'متى امتحنتَ فيها؟',
+  'When did the student sit it?': 'متى امتحن الطالب فيها؟',
+  'When did your child sit the A.S.?': 'متى امتحن ابنك في A.S.؟',
+  'When did you sit the A.S.?': 'متى امتحنتَ في A.S.؟',
+  'When did the student sit the A.S.?': 'متى امتحن الطالب في A.S.؟',
+  'Not taking it': 'لن تُؤخذ',
+  'Already reserved': 'محجوزة بالفعل',
+  'waiting for payment': 'بانتظار الدفع',
+  'waiting for your approval': 'بانتظار موافقتك',
+  "waiting for your parent's approval": 'بانتظار موافقة ولي أمرك',
+  "waiting for the parent's approval": 'بانتظار موافقة ولي الأمر',
+  'price not set yet': 'السعر لم يُحدد بعد',
+  '(closed to new reservations)': '(مغلقة أمام الحجوزات الجديدة)',
+  'Teacher to be announced': 'سيُعلَن المعلم لاحقًا',
+  'The school assigns the teacher': 'تحدد المدرسة المعلم',
+  'Teacher:': 'المعلم:',
+  '(online)': '(عبر الإنترنت)',
+  'Choose the teacher…': 'اختر المعلم…',
+  'Choose…': 'اختر…',
+  'Sat in': 'امتُحن فيها في',
+  'Take it off the choices': 'احذفها من الاختيارات',
+  'The price shown is now up to date: reserve again.': 'السعر المعروض محدَّث الآن: احجز مرة أخرى.',
+  'Choose the teacher': 'اختر المعلم',
+  'Choose the earlier exam': 'اختر الامتحان السابق',
+  'Answer this question': 'أجب عن هذا السؤال',
+  'Pick at least one subject.': 'اختر مادة واحدة على الأقل.',
+  'Tick the refund policy and the declaration.': 'حدد سياسة الاسترداد والإقرار.',
+  'Tick that the parent read and signed the refund policy and the declaration.': 'حدد أن ولي الأمر قرأ سياسة الاسترداد والإقرار ووقّع عليهما.',
+  'Some choices are not finished: they are marked in red above.': 'بعض الاختيارات لم تكتمل: معلَّمة بالأحمر أعلاه.',
+  'A few questions from the school': 'أسئلة من المدرسة',
+  'Your answer': 'إجابتك',
+  'You can pay once the school confirms its prices.': 'يمكنك الدفع حين تؤكد المدرسة أسعارها.',
+  'Not open to this student': 'غير متاح لهذا الطالب',
+  // The API's sentences with no data (after familyWords)
+  'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices':
+    'أسعار هذه الجلسة ليست نهائية بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة أسعارها',
+  'The price of one or more of these subjects changed while this was open (the exam board confirmed its fee) — look at the new price and pay again':
+    'تغيّر سعر مادة أو أكثر من هذه المواد أثناء فتح هذه الصفحة (أكّد المجلس رسومه) — انظر إلى السعر الجديد وادفع مرة أخرى',
+  'One or more registrations are not ready for payment': 'حجز واحد أو أكثر غير جاهز للدفع',
+  'That choice is not on offer in this session': 'هذا الخيار غير معروض في هذه الجلسة',
+};
+
+const MONTHS_LONG_AR: Record<string, string> = {
+  January: 'يناير', February: 'فبراير', March: 'مارس', April: 'أبريل', May: 'مايو', June: 'يونيو',
+  July: 'يوليو', August: 'أغسطس', September: 'سبتمبر', October: 'أكتوبر', November: 'نوفمبر', December: 'ديسمبر',
+};
+/** A date or an exam month the API wrote ("1 November 2026", "June 2026"), its month in Arabic. */
+const dateAr = (d: string) => d.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g, (m) => MONTHS_LONG_AR[m] ?? m);
+/** "First entry in school" and the other cells, as the API names an option. */
+const OPTION_AR: Record<string, string> = {
+  'a first entry in school': 'قيد أول في المدرسة', 'a first entry in self study': 'قيد أول دراسة ذاتية',
+  'a retake in school': 'إعادة في المدرسة', 'a retake in self study': 'إعادة دراسة ذاتية',
+};
+const countAr = (n: number, one: string, many: string) => (n === 1 ? `${one} واحد` : `${n} ${many}`);
+
+/** The family's and the desk's sentences with data: the reservation's results and the refusals they show (after familyWords). */
+const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
+  [/^Reserved: (\d+) reservations? waiting for payment\.$/, (m) => `تم الحجز: ${countAr(Number(m[1]), 'حجز', 'حجوزات')} بانتظار الدفع.`],
+  [/^Reserved: (\d+) reservations?\.$/, (m) => `تم الحجز: ${countAr(Number(m[1]), 'حجز', 'حجوزات')}.`],
+  [/^(\d+) reserved, not collected: prices are not final yet\.$/, (m) => `${countAr(Number(m[1]), 'حجز', 'حجوزات')} دون تحصيل: الأسعار ليست نهائية بعد.`],
+  [/^Collected EGP ([\d,.]+)\.$/, (m) => `تم تحصيل ${m[1]} جنيه.`],
+  // Refusals at a subject (Appendix A's codes; the sentences of window.services and line-rules.services).
+  [/^(.+) is not taking reservations \(it closed on (.+)\)$/, (m) => `${m[1]} لا تقبل حجوزات (أُغلقت في ${dateAr(m[2]!)})`],
+  [/^(.+) is not taking reservations$/, (m) => `${m[1]} لا تقبل حجوزات`],
+  [/^(.+) is not open for reservations yet$/, (m) => `${dateAr(m[1]!)} لم تُفتح للحجز بعد`],
+  [/^Choose the teacher of (.+)$/, (m) => `اختر معلم ${m[1]}`],
+  [/^Answer: (.+)$/, (m) => `أجب: ${m[1]}`],
+  [/^(.+) was sat before \((.+)\): reserve it as a retake$/, (m) => `امتُحن في ${m[1]} من قبل (${dateAr(m[2]!)}): احجزها إعادةً`],
+  [/^A retake of (.+) names the exam it follows$/, (m) => `إعادة ${m[1]} تسمّي الامتحان الذي تتبعه`],
+  [/^(.+) carries an earlier exam forward: name the one it is carried from$/, (m) => `${m[1]} تنقل نتيجة امتحان سابق: سمِّ الامتحان المنقول منه`],
+  [/^(.+) is not one of the earlier exams (.+) is carried from$/, (m) => `${dateAr(m[1]!)} ليس من الامتحانات السابقة التي تُنقل منها ${m[2]}`],
+  [/^(.+) and (.+) cannot be reserved together$/, (m) => `لا يمكن حجز ${m[1]} و${m[2]} معًا`],
+  [/^(.+) is already reserved in (.+) \((.+)\): the board takes one entry$/, (m) => `${m[1]} محجوزة بالفعل في ${dateAr(m[2]!)} (${m[3]}): يقبل المجلس قيدًا واحدًا`],
+  [/^(.+) is not offered as (a first entry in school|a first entry in self study|a retake in school|a retake in self study)$/, (m) => `${m[1]} غير معروضة ${OPTION_AR[m[2]!]}`],
+  [/^(.+) is not offered in this session$/, (m) => `${m[1]} غير معروضة في هذه الجلسة`],
+  [/^(.+) is a retake of one paper: it takes no first entry$/, (m) => `${m[1]} إعادة لورقة واحدة: لا تقبل قيدًا أول`],
+  [/^(.+): the exam board's (entry|retake) deadline \((.+)\) has passed$/, (m) => `${m[1]}: انقضى آخر موعد ${m[2] === 'retake' ? 'للإعادة' : 'للقيد'} لدى المجلس (${dateAr(m[3]!)})`],
+  [/^(.+): its exams start on (.+) and its board takes no more entries$/, (m) => `${m[1]}: تبدأ امتحاناتها في ${dateAr(m[2]!)} ولا يقبل مجلسها قيودًا أخرى`],
+  [/^(.+) was not paid by (.+), its last day to pay: it can no longer be paid — reserve it again while it is offered$/,
+    (m) => `${m[1]} لم تُدفع حتى ${dateAr(m[2]!)}، آخر يوم للدفع: لم يعد ممكنًا دفعها — احجزها من جديد ما دامت معروضة`],
+  [/^(.+)'s price is not confirmed yet: the subject is reserved, and it can be paid once the school confirms its price$/,
+    (m) => `سعر ${m[1]} لم يُؤكَّد بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة سعرها`],
+  [/^(.+) is not waiting for payment$/, (m) => `${m[1]} ليست بانتظار الدفع`],
+  [/^(.+) is in grade (\d+) in (\S+), and this session takes (.+?)(\. A coordinator can grant an exception\.)?$/,
+    (m) => `${m[1]} في الصف ${m[2]} في ${m[3]}، وهذه الجلسة تقبل ${gradesAr(m[4]!)}${m[5] ? '. يمكن للمنسق منح استثناء.' : ''}`],
+  [/^(.+) finished grade 12 in (\S+), and this session takes (.+)$/, (m) => `أنهى ${m[1]} الصف 12 في ${m[2]}، وهذه الجلسة تقبل ${gradesAr(m[3]!)}`],
+];
+
+/** "grades 11 and 12 and graduates" → Arabic, word by word. */
+function gradesAr(text: string): string {
+  return text.replace(/\bgrades?\b/g, 'الصفوف').replace(/\bgraduates\b/g, 'الخريجين').replace(/ and /g, ' و').replace(/, /g, '، ');
 }
