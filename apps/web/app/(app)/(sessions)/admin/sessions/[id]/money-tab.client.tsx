@@ -85,7 +85,7 @@ export default function MoneyTab({ session }: { session: SetupSession }): React.
         </div>
       </div>
       {data.lines.length === 0 ? <EmptyState title="No reservation here" /> : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm" role="region" aria-label="Money of the session" tabIndex={0}>
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>

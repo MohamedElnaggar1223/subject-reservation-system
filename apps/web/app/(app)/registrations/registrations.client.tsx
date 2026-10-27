@@ -5,19 +5,19 @@ import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from '@tansta
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
-import { labelFor } from '~/lib/format';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   apiResponse,
   gradeInAcademicYear,
   gradeLabel,
-  REGISTRATION_STATUS_LABELS,
   COUNCIL_LABELS,
   seriesAcademicYearStart, formatEgp,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { useSwapChoices, useSwapConsent, SwapConsent } from '~/components/reservations/swap-pick';
+import { LineStatusWords } from '~/components/reservations/statement';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 
 // ─── Types, from the fetcher (PATTERNS.md: never by hand) ────────────────────
 
@@ -130,8 +130,6 @@ function RegistrationCard({
   paymentSelected: boolean;
   onTogglePaymentSelection: (reg: Registration) => void;
 }) {
-  const statusLabel =
-    REGISTRATION_STATUS_LABELS[reg.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? reg.status;
   const councilLabel =
     COUNCIL_LABELS[reg.subject.council as keyof typeof COUNCIL_LABELS] ?? reg.subject.council;
 
@@ -165,15 +163,16 @@ function RegistrationCard({
               type="checkbox"
               checked={paymentSelected}
               onChange={() => onTogglePaymentSelection(reg)}
-              aria-label={`Select ${reg.subject.name} for payment`}
+              aria-label={`Select ${titleFor(reg.subject.name, groupOfLevel(reg.subject.qualificationLevel))} for payment`}
               className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
           )}
           <div className="min-w-0">
             {/* The whole name, wrapped (F6: "Arabic Langua…" at a phone). */}
-            <div className="font-medium text-foreground break-words">{reg.subject.name}</div>
+            {/* The subject as the reservation page names it ("Biology O.L.", "Biology A.S./A.L."): two subjects share a name. */}
+            <div className="font-medium text-foreground break-words"><bdi data-i18n-skip="true">{titleFor(reg.subject.name, groupOfLevel(reg.subject.qualificationLevel))}</bdi></div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              {reg.subject.code} · {councilLabel}
+              {!reg.subject.code.startsWith('X-') && <><span dir="ltr">{reg.subject.code}</span> · </>}{councilLabel}
             </div>
             {reg.approvalComments && (
               <div className={`text-xs mt-2 rounded p-2 ${
@@ -188,7 +187,7 @@ function RegistrationCard({
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_STYLES[reg.status] ?? 'bg-muted text-muted-foreground'}`}>
-            {statusLabel}
+            <LineStatusWords status={reg.status} />
           </span>
           <span className="text-sm font-semibold text-foreground">
             {formatEgp(reg.priceAtRegistration)}
@@ -199,7 +198,7 @@ function RegistrationCard({
       {/* Pending payment notice */}
       {reg.status === 'pending_payment' && userRole === 'student' && (
         <div className="mt-3 text-xs text-brand-700 bg-brand-50 rounded-lg p-2">
-          Approved by parent — awaiting payment.
+          Approved by your parent — waiting for payment.
         </div>
       )}
 
@@ -797,10 +796,10 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
         <div className="flex items-center justify-between flex-wrap gap-3 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">
-              {isParent ? "Children's Registrations" : 'My Registrations'}
+              {isParent ? "Children's reservations" : 'My reservations'}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {`${registrations.length} ${registrations.length === 1 ? 'registration' : 'registrations'} in all`}
+              <span>{registrations.length}</span> <span>{registrations.length === 1 ? 'reservation in all' : 'reservations in all'}</span>
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -815,7 +814,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
               <Button variant="outline" size="sm">Full History</Button>
             </Link>
             <Link href={"/register" as never}>
-              <Button size="sm">+ Register More</Button>
+              <Button size="sm">+ Reserve more</Button>
             </Link>
           </div>
         </div>
@@ -842,7 +841,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                     : 'bg-card text-muted-foreground hover:bg-muted'
                 }`}
               >
-                {s === 'all' ? 'All' : labelFor(REGISTRATION_STATUS_LABELS, s)}
+                {s === 'all' ? 'All' : <LineStatusWords status={s} />}
               </button>
             ))}
           </div>
@@ -863,7 +862,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
 
         {/* Registration Groups */}
         {grouped.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">No registrations match the selected filter.</div>
+          <div className="text-center py-8 text-muted-foreground text-sm">No reservations match this filter.</div>
         ) : (
           <div className="space-y-6">
             {grouped.map(({ session, student, regs }) => {
@@ -883,12 +882,11 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                       )}
                     </div>
                     <div className="flex items-center gap-3">
+                      {/* The session as families meet it, not its status code. */}
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        session.status === 'active' ? 'bg-brand-50 text-brand-700' :
-                        session.status === 'draft' ? 'bg-muted text-muted-foreground' :
-                        'bg-muted text-muted-foreground'
+                        session.status === 'active' ? 'bg-brand-50 text-brand-700' : 'bg-muted text-muted-foreground'
                       }`}>
-                        {session.status}
+                        {session.status === 'active' ? 'Accepting reservations' : session.status === 'draft' ? 'Not open yet' : 'Closed to new reservations'}
                       </span>
                       <span className="text-sm font-semibold text-foreground">{formatEgp(sessionTotal)}</span>
                     </div>
@@ -906,10 +904,10 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                     return (
                       <div className="px-4 py-3 bg-brand-50 border-b border-border flex items-center justify-between gap-3 flex-wrap">
                         <div className="text-xs text-brand-700">
-                          <span className="font-medium">{ppRegs.length}</span> awaiting payment
+                          <span className="font-medium">{ppRegs.length}</span> <span>waiting for payment</span>
                           {selectedRegs.length > 0 && (
                             <span>
-                              {' '}· {selectedRegs.length} selected · {formatEgp(selectedTotal)}
+                              {' '}· <span>{selectedRegs.length}</span> <span>selected</span> · <span dir="ltr">{formatEgp(selectedTotal)}</span>
                             </span>
                           )}
                         </div>
@@ -971,8 +969,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
             {/* This used to link to /approvals, which requireParent()
                 bounces a student to /unauthorized — telling them to
                 click a page they cannot open. */}
-            Waiting on your parent to approve these. They will find them under
-            &ldquo;Pending Approvals&rdquo; when they sign in — we have already notified them.
+            Waiting for your parent to approve these: they have been told, and find them under Approvals when they sign in.
           </div>
         )}
       </div>

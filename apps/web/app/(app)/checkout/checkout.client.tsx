@@ -341,8 +341,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   {result.externalReference}
                 </p>
                 <p className="text-xs text-brand-700 dark:text-brand-400 mt-3">
-                  Quote this reference (or the student&apos;s name) at the desk. Your registrations
-                  are confirmed as soon as the finance officer records your payment.
+                  Quote this reference (or the student&apos;s name) at the desk. Your reservations
+                  are paid as soon as the finance officer takes your payment.
                 </p>
               </div>
             )}
@@ -710,8 +710,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {/* Method-specific notices */}
             {selectedMethod === 'in_school' && (
               <div className="mx-4 mb-4 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-lg text-xs text-brand-700 dark:text-brand-400">
-                You&apos;ll get a payment reference to quote at the school finance desk. Pay by
-                cash, card, or InstaPay at the desk — registrations confirm on the spot.
+                You&apos;ll get a payment reference to quote at the school finance desk. Pay with
+                cash, card, or InstaPay at the desk — your reservations are paid on the spot.
               </div>
             )}
             {selectedMethod === 'instapay' && (

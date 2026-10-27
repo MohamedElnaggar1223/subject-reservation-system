@@ -83,6 +83,8 @@ export const titleFor = (name: string, group: string) => {
   return LEVEL_IN_GROUP[group]?.test(own) ? own : `${own} ${group}`;
 };
 export const subjectTitle = (o: { subject: { name: string }; group: string }) => titleFor(o.subject.name, o.group);
+/** The group of a subject's level, as the API's groupOfLevel: O.L. for IGCSE, else A.S./A.L. (for a line that carries the level only). */
+export const groupOfLevel = (level: string | null | undefined) => (level === 'igcse' ? 'O.L.' : 'A.S./A.L.');
 /** A subject's name without the level an older name ends with (shown beside it once). */
 export const ownName = (name: string, group: string) => {
   const own = LEVEL_AT_END[group];

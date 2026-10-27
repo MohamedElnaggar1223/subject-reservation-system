@@ -437,8 +437,9 @@ function CheckLine({ e, refresh, sessionId }: { e: Entry; refresh: () => Promise
         {run.error && <NotSavedLines err={run.error} sessionId={sessionId} />}
         {e.boardDate && <BoardDateForm seriesId={e.boardDate.seriesId} refresh={refresh} />}
       </div>
+      {/* On a phone the buttons take their own line under the words (beside them the words were a narrow column). */}
       {e.actions.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 ps-5 sm:w-auto sm:ps-0">
           {e.actions.map((a) => a.kind === 'link'
             ? <Button key={a.label} asChild size="sm" variant="ghost"><Link href={a.href as never}>{a.label}</Link></Button>
             : <Button key={a.label} size="sm" variant={a.primary ? 'outline' : 'ghost'} disabled={run.isPending} onClick={() => run.mutate(a)}>{a.label}</Button>)}

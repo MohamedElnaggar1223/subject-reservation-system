@@ -56,6 +56,11 @@ export const moneyArabic: Record<string, string> = {
   'Grade 10 without a core subject': 'الصف العاشر دون مادة أساسية',
   'Grade 10: sit a series other than June': 'الصف العاشر: الجلوس في دورة غير يونيو',
   'Instalment plan': 'خطة أقساط',
+  // P4a: the registry's labels left in English on the Arabic grant form.
+  'Later reserve date': 'موعد حجز لاحق',
+  'Later pay date': 'موعد دفع لاحق',
+  'An earlier exam not on the school\'s list': 'امتحان سابق ليس في قائمة المدرسة',
+  'Grade 10 where the session does not take it': 'الصف العاشر في جلسة لا تقبله',
   'not yours to grant': 'ليس من صلاحيتك منحه',
   'not applied yet': 'لا يُطبَّق بعد',
   'off (setting)': 'مُعطَّل (إعداد)',

@@ -79,7 +79,7 @@ export default function ReservationsTab({ s }: { s: SetupSession }) {
         <Button variant="outline" size="sm" disabled={exportCsv.isPending} onClick={() => exportCsv.mutate()}>Export (CSV)</Button>
       </div>
       <ErrorLine message={exportCsv.error ? refusalText(exportCsv.error) : null} />
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm" role="region" aria-label="Who reserved what" tabIndex={0}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">

@@ -19,6 +19,8 @@ import { useI18n } from '~/lib/i18n';
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money, fetchSessions, SESSIONS_KEY } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
+import { titleOf } from '~/components/reservations/reserve';
 import { dateParts, MONTHS_SHORT } from '~/app/(app)/academic/calendar/academic-shared';
 import {
   fetchStudents, fetchStudent, fetchSummary, fetchCharges, fetchOffersFor, fetchSubjects, fetchSeries,
@@ -262,7 +264,8 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.subject} htmlFor="exc-scope-subject">
                 <select id="exc-scope-subject" value={scope.subjectId ?? ''} onChange={(e) => setScopeField('subjectId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">Any</option>
-                  {(subjects.data ?? []).map((x) => <option key={x.id} value={x.id}>{`${x.name} (${x.code})`}</option>)}
+                  {/* The subject as the school names it (two share a name), its code when it has a real one. */}
+                  {(subjects.data ?? []).map((x) => <option key={x.id} value={x.id} data-i18n-skip="true">{`${titleFor(x.name, groupOfLevel(x.qualificationLevel))}${x.code.startsWith('X-') ? '' : ` (${x.code})`}`}</option>)}
                 </select>
               </Field>
             )}
@@ -270,7 +273,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.offer} htmlFor="exc-scope-offer" hint={!studentId ? 'Pick the student first.' : !offerSession ? 'Pick the session first.' : undefined}>
                 <select id="exc-scope-offer" value={scope.offerId ?? ''} disabled={!offers.data} onChange={(e) => setScopeField('offerId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">{accepts.has('offer') ? 'Any' : 'Pick the subject…'}</option>
-                  {(offers.data?.offerings ?? []).map((o) => <option key={o.id} value={o.id} data-i18n-skip="true">{o.name}</option>)}
+                  {(offers.data?.offerings ?? []).map((o) => <option key={o.id} value={o.id} data-i18n-skip="true">{titleOf(o)}</option>)}
                 </select>
               </Field>
             )}
@@ -286,7 +289,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.line} htmlFor="exc-scope-line" hint={!readsFamilies ? 'The finance desk picks a line.' : !studentId ? 'Pick the student first.' : undefined}>
                 <select id="exc-scope-line" value={scope.registrationId ?? ''} disabled={!summary.data} onChange={(e) => setScopeField('registrationId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">{policy.nullScope === null && accepts.size === 1 ? 'Pick a line…' : 'Any'}</option>
-                  {lines.map((l) => <option key={l.id} value={l.id}>{`${l.subject?.name ?? '—'} · ${l.session?.name ?? ''} · ${formatEgp(l.priceAtRegistration)}`}</option>)}
+                  {lines.map((l) => <option key={l.id} value={l.id}>{`${l.subject?.name ?? '—'}${l.subject && !l.subject.code.startsWith('X-') ? ` (${l.subject.code})` : ''} · ${l.session?.name ?? ''} · ${formatEgp(l.priceAtRegistration)}`}</option>)}
                 </select>
               </Field>
             )}

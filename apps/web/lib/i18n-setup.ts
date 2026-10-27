@@ -165,6 +165,9 @@ export const setupArabic: Record<string, string> = {
   'are older than': 'أقدم مما يحتفظ به',
   'Keep it, or untick it on the subject.': 'أبقِه، أو ألغِ تحديده في المادة.',
   'Keep it': 'أبقِه',
+  // The read-only tables, scrollable at a phone: their regions' names.
+  'Who reserved what': 'من حجز ماذا',
+  'Money of the session': 'أموال الجلسة',
   'You kept it: it is no longer on the list to check.': 'أبقيتَه: لم يعد في قائمة المراجعة.',
   'Keep it, and take it off the list to check (saved with the subject)': 'أبقِه واحذفه من قائمة المراجعة (يُحفظ مع المادة)',
   'carries a result forward. It stays, since your list wins; the board may refuse the entry.': 'من نتائج سابقة. تبقى لأن قائمتك هي المعتمدة؛ وقد يرفض المجلس القيد.',

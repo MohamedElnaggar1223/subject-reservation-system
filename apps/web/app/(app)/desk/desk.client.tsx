@@ -16,7 +16,6 @@ import { api } from '~/lib/hono';
 import {
   apiResponse,
   gradeLabel,
-  REGISTRATION_STATUS_LABELS,
   RECEIPT_STATUS_LABELS,
 
   EXCEPTION_TYPE_LABELS,
@@ -30,7 +29,7 @@ import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
 import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
 import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
-import { StatementView } from '~/components/reservations/statement';
+import { StatementView, LineStatusWords } from '~/components/reservations/statement';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { familyWords } from '~/lib/i18n-reservations';
 import { RESERVATION_CYCLE_ONLY } from '~/lib/reservation-focus';
@@ -396,7 +395,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-xs">
-                        {labelFor(REGISTRATION_STATUS_LABELS, r.status)}
+                        <LineStatusWords status={r.status} />
                         {/* A waiting subject: its last day to pay (C10), or that its prices are not final yet (E6). */}
                         {r.status === 'pending_payment' && (r.priceProvisional
                           ? <span className="block text-muted-foreground">prices not final yet</span>

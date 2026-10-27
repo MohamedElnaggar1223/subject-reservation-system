@@ -162,12 +162,15 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
       const started = owedAll.filter((l) => l.paymentInProgress?.status === 'pending');
       if (started.length) {
         const atDesk = started.every((l) => l.paymentInProgress?.method === 'in_school');
+        // The reference to quote at the desk, in front of them (the desk finds the family by it, P4a B3).
+        const refs = atDesk ? [...new Set(started.map((l) => st?.payments.find((p) => p.id === l.paymentInProgress?.paymentId)?.reference).filter((x): x is string => !!x))] : [];
         payRows.push({
           key: `started-${who}-${sess.id}`, tone: 'warning',
           body: (
             <span>
               <bdi>{sess.name}</bdi><span>:</span> <Money amount={sum(started)} />{' '}
               <span>{atDesk ? 'to pay at the finance desk, as you chose' : 'in a payment you started and have not finished'}</span>
+              {refs.length > 0 && <span className="block text-xs text-muted-foreground"><span>Quote this reference at the desk:</span> <bdi dir="ltr" className="font-mono text-foreground">{refs.join(', ')}</bdi></span>}
             </span>
           ),
           action: isParent
@@ -251,7 +254,7 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
       rows.push({
         key: `receipts-${who}`, tone: 'warning',
         body: <span><span>{c.receiptsToReturn}</span> <span>{c.receiptsToReturn === 1 ? 'receipt to bring back to the school to release the refund' : 'receipts to bring back to the school to release the refund'}</span></span>,
-        action: { label: 'My Registrations', href: '/registrations' },
+        action: { label: 'My reservations', href: '/registrations' },
       });
     }
     if (c.pendingChangeRequestCount > 0) {
@@ -327,7 +330,7 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
           {(isParent
             ? [
                 { href: '/register', label: 'Reserve subjects' },
-                { href: '/registrations', label: 'My Registrations' },
+                { href: '/registrations', label: 'My reservations' },
                 { href: '/school-fee', label: 'School Fee' },
                 { href: '/charges-due', label: 'Charges & Instalments' },
                 { href: '/escrow', label: 'Balance', extra: escrowFree > 0 ? <><Money amount={escrowFree} /> <span>available</span></> : null },
@@ -335,7 +338,7 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
               ]
             : [
                 ...(mayReserve ? [{ href: '/register', label: 'Reserve subjects' }] : []),
-                { href: '/registrations', label: 'My Registrations' },
+                { href: '/registrations', label: 'My reservations' },
                 { href: '/pending-requests', label: 'My requests' },
                 { href: '/links', label: 'Linked Parents' },
               ] as { href: string; label: string; extra?: React.ReactNode }[]
