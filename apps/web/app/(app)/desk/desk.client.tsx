@@ -187,8 +187,8 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           type="search"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setStudentId(null); }}
-          placeholder="Type a student's name, email, or ID…"
-          aria-label="Type a student's name, email, or ID…"
+          placeholder="Type a student's name, email, ID, or a payment reference…"
+          aria-label="Type a student's name, email, ID, or a payment reference…"
           className="w-full max-w-xl px-4 py-2.5 text-sm border border-border bg-background rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           autoFocus={!initialStudentId}
         />

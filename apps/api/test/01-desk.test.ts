@@ -174,3 +174,61 @@ describe('the desk', () => {
     });
   });
 });
+
+/**
+ * P4a B3 (the desk first): a family that chose "Pay at the school" at its checkout quotes the reference it was given
+ * at the desk. The officer finds the family by that reference and takes the payment there — the desk's "To collect
+ * now" confirms it with the instrument, through the officer's confirm route, as the Finance Workbench does — instead
+ * of being sent to another screen.
+ */
+describe('the desk takes a payment the family started', () => {
+  let adm: Client, officer: Client, parent: Client, studentId: string, sessionId: string, physics: string, chemistry: string;
+  let reference: string, paymentId: string;
+
+  beforeAll(async () => {
+    adm = await admin('desk-started');
+    officer = await staff(adm, 'finance_officer', 'desk-started');
+    physics = await subject(adm, 'T5625', 'Physics', { course: 1200, registration: 300 });
+    chemistry = await subject(adm, 'T5620', 'Chemistry', { course: 1200, registration: 300 });
+    sessionId = await session(adm, 'November (desk, started)', 'november', 'igcse', { ...openWindow(), activate: true });
+    ({ parent, studentId } = await onboard(officer, 'desk-started'));
+    const lines = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId, studentId, ...(await reservationOf(sessionId, [physics, chemistry])) } }));
+    const pay = await apiResponse(parent.api.v1.payments.initiate.$post({ json: { registrationIds: lines.map((l) => l.id), paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+    expect(pay).toMatchObject({ purpose: 'registration', amount: 3000, status: 'pending' });
+    reference = pay.externalReference!;
+    paymentId = pay.id!;
+    expect(reference).toMatch(/^SCH-/);
+  });
+
+  it('finds the family by the whole reference it quotes, in any case; a part of it finds nobody', async () => {
+    const byRef = await apiResponse(officer.api.v1.users.search.$get({ query: { role: 'student', search: reference.toLowerCase() } }));
+    expect(byRef.map((u) => u.id)).toEqual([studentId]);
+    const parents = await apiResponse(officer.api.v1.users.search.$get({ query: { role: 'parent', search: ` ${reference} ` } }));
+    expect(parents.map((u) => u.email)).toEqual(['parent.desk-started@test.local']);
+    expect(await apiResponse(officer.api.v1.users.search.$get({ query: { role: 'student', search: reference.slice(0, 8) } }))).toEqual([]);
+  });
+
+  it("shows the started payment on the student's summary and takes it at the desk with the instrument", async () => {
+    const summary = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: studentId } }));
+    const waiting = summary.registrations.filter((r) => r.status === 'pending_payment');
+    expect(waiting.map((r) => r.paymentInProgress)).toEqual([
+      { paymentId, status: 'pending', method: 'in_school' },
+      { paymentId, status: 'pending', method: 'in_school' },
+    ]);
+    expect(summary.payments.find((p) => p.id === paymentId)).toMatchObject({ externalReference: reference, amount: 3000, escrowAmountApplied: 0, status: 'pending' });
+    expect(summary.owingInProgress).toBe(3000);
+
+    // An in-school payment is confirmed with the instrument the officer took.
+    const bare = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: paymentId }, json: {} }));
+    expect(bare.status).toBe(400);
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: paymentId }, json: { instrumentUsed: 'card' } }));
+    const pay = await one<{ status: string; instrument: string; amount: string }>(`select status, instrument_used as instrument, amount from payment where id = $1`, [paymentId]);
+    expect({ ...pay, amount: money(pay.amount) }).toEqual({ status: 'completed', instrument: 'card', amount: 3000 });
+    const after = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: studentId } }));
+    expect(after.registrations.map((r) => [r.status, r.paymentInProgress, r.receipt?.status])).toEqual([
+      ['confirmed', null, 'pending_issue'],
+      ['confirmed', null, 'pending_issue'],
+    ]);
+    expect([after.owing, after.owingInProgress]).toEqual([0, 0]);
+  });
+});

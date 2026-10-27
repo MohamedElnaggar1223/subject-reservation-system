@@ -472,6 +472,19 @@ export const familyArabic: Record<string, string> = {
   "waiting for the parent's approval": 'بانتظار موافقة ولي الأمر',
   'price not set yet': 'السعر لم يُحدد بعد',
   '(closed to new reservations)': '(مغلقة أمام الحجوزات الجديدة)',
+  // B3 of P4a: the desk finds the family by the reference it quotes and takes the payment it started.
+  "Type a student's name, email, ID, or a payment reference…": 'اكتب اسم الطالب أو بريده أو رقمه أو مرجع دفعة…',
+  'Pay at the school, started by the family': 'الدفع في المدرسة، بدأته الأسرة',
+  'reference': 'المرجع',
+  'Take it': 'استلمها',
+  'Taking it…': 'جارٍ الاستلام…',
+  'Taken at the desk': 'استُلمت في المكتب',
+  'subject paid: its receipt is under Registrations, to hand over.': 'مادة مدفوعة: إيصالها في التسجيلات أدناه، للتسليم.',
+  'subjects paid: their receipts are under Registrations, to hand over.': 'مواد مدفوعة: إيصالاتها في التسجيلات أدناه، للتسليم.',
+  'an InstaPay transfer the family started, no reference yet': 'تحويل InstaPay بدأته الأسرة، بلا مرجع بعد',
+  // The instruments the desk takes (IN_SCHOOL_INSTRUMENT_LABELS), left in English on the Arabic desk until P4a.
+  'Credit / Debit Card': 'بطاقة ائتمان / خصم',
+  'InstaPay (at desk)': 'InstaPay (في المكتب)',
   // B5 of P4a: an option past its own board date while its row is open for the others.
   'Closed: the exam board\'s last date for this choice has passed.': 'مغلق: انقضى آخر موعد يقبله مجلس الامتحانات لهذا الاختيار.',
   'Teacher to be announced': 'سيُعلَن المعلم لاحقًا',
