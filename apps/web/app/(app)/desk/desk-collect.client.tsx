@@ -1,26 +1,27 @@
 'use client';
 
 /**
- * The desk's collection (RESERVATIONS_REWORK.md §3.10 item 1): everything the student owes now —
- * subjects waiting for payment, charges (board services, instalments, adjustments) and the year's
- * school fee, pushed or not — ticked and taken in one action, each part its own payment (lines per
- * entry deadline, charges per deadline or plan line, the school fee on its own path, first).
- * `AlsoCollect` offers the same charges and fee beside a reservation: B's Reserve sends them with
- * "Reserve and collect" (`deskExtras` → `collectNow.schoolFeeYear` / `chargeIds`), one action.
+ * The desk's collection (RESERVATIONS_REWORK.md §3.10 item 1; COORDINATOR_REWORK.md §5 "Desk", §10): everything the
+ * student owes now — subjects waiting for payment, charges (board services, instalments, adjustments) and the year's
+ * school fee — ticked and taken in one action: the subjects in one payment whatever their dates, the charges each in
+ * their own, the school fee first. `AlsoCollect` offers the same charges and fee beside a reservation (the
+ * reservation page's "Reserve and collect": `deskExtras` → `collectNow`), one action.
  *
- * Step B's rules for the lines, kept here: a line on a provisional board fee is collected once the
- * fee is confirmed (`payableNow`, §3.4), and a line the school reserved (grade 10) takes the
- * family's own consent with its collection, "read and signed by the parent" (§3.5).
+ * A subject whose prices are not final yet is reserved, not collected (E6): listed apart, collected once the school
+ * confirms them. A subject past its last day to pay is no longer payable (C10): listed apart with that day, to
+ * reserve again while it is offered. Each subject shows its last day to pay. A subject the school reserved (grade 10)
+ * takes the family's own consent with its collection, "read and signed by the parent".
  *
- * In the sheet the officer adds the columns by hand and writes one receipt per column; here the
- * ticked total is the money in hand, and each part gets its own receipt.
+ * In the sheet the officer adds the columns by hand, remembers who is late, and writes one receipt per column; here
+ * the ticked total is the money in hand, the dates are on each line, and each subject gets its own receipt.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, schoolDateString } from '@repo/validations';
+import { apiResponse, schoolDateString, refusalCodeOf } from '@repo/validations';
+import { familyWords } from '~/lib/i18n-reservations';
 import { Notice } from '~/components/ui/tone';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import {
@@ -43,7 +44,10 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     // F8-09: a line whose payment is under way (the family's transfer waiting for finance's check, a checkout
     // they started) is listed apart, never ticked: the Finance Workbench confirms or rejects that payment.
     const underWay = waiting.filter((r) => r.paymentInProgress);
-    const provisional = waiting.filter((r) => !r.payableNow && !r.paymentInProgress);
+    // E6: prices not final yet — reserved, collected once the school confirms them.
+    const provisional = waiting.filter((r) => !r.payableNow && !r.paymentInProgress && r.priceProvisional);
+    // C10: past its last day to pay — no longer payable (the cut-off sweep expires it).
+    const pastLastDay = waiting.filter((r) => !r.payableNow && !r.paymentInProgress && !r.priceProvisional);
     const payable = rows.filter((c) => c.status === 'pending_payment' && c.kind !== 'school_fee_push' && !c.openPaymentId);
     const requested = rows.filter((c) => c.status === 'requested');
     const pushes = rows.filter((c) => c.kind === 'school_fee_push' && c.status === 'pending_payment');
@@ -62,7 +66,7 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     const laterInstalments = new Set(payable
       .filter((c) => c.kind === 'instalment' && nextOfPlan.get(c.registration?.id ?? c.id) !== c.id && !(c.dueAt && schoolDateString(new Date(c.dueAt)) <= today))
       .map((c) => `c:${c.id}`));
-    return { lines, underWay, provisional, payable, requested, fees, laterInstalments, loading: charges.isLoading };
+    return { lines, underWay, provisional, pastLastDay, payable, requested, fees, laterInstalments, loading: charges.isLoading };
   }, [charges.data, charges.isLoading, summary]);
 }
 
@@ -76,6 +80,7 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   // A subject the school reserved (grade 10) carries the school's consent only: the parent's own,
   // read and signed, goes with its collection (step B, RESERVATIONS_REWORK.md §3.5).
   const [consent, setConsent] = useState(false);
+  const [refusedLine, setRefusedLine] = useState<{ id: string; sentence: string } | null>(null);
   const isOn = (key: string) => picked.get(key) ?? !owed.laterInstalments.has(key);
   const flip = (key: string) => setPicked((m) => new Map(m).set(key, !isOn(key)));
   const lineIds = owed.lines.filter((l) => isOn(`l:${l.id}`)).map((l) => l.id);
@@ -91,11 +96,21 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
       ...(fee ? { schoolFeeYear: fee.academicYear } : {}),
       ...(consent && owed.lines.some((l) => l.familyConsentNeeded && lineIds.includes(l.id)) ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
     }),
-    onSuccess: (r) => { setResult(r); setError(''); setPicked(new Map()); setConsent(false); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
-    onError: (err: Error) => setError(err.message),
+    onSuccess: (r) => { setResult(r); setError(''); setRefusedLine(null); setPicked(new Map()); setConsent(false); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
+    onError: (err: Error) => {
+      // A refusal at the subject it names (CUT_OFF_PASSED, PRICES_NOT_FINAL, NOT_WAITING…): untick it, say why there.
+      const sentence = familyWords(err.message);
+      const named = [...owed.lines].sort((a, b) => b.subject.name.length - a.subject.name.length).find((l) => sentence.includes(l.subject.name));
+      if (named && refusalCodeOf(err)) {
+        setRefusedLine({ id: named.id, sentence });
+        setPicked((m) => new Map(m).set(`l:${named.id}`, false));
+        setError('');
+        onDone();
+      } else setError(sentence);
+    },
   });
 
-  if (!owed.lines.length && !owed.underWay.length && !owed.provisional.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
+  if (!owed.lines.length && !owed.underWay.length && !owed.provisional.length && !owed.pastLastDay.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
     return result ? <Notice tone="success" title="Collected at the desk"><CollectedNotice r={result} /></Notice> : null;
   }
   return (
@@ -113,7 +128,13 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
         ))}
         {owed.lines.map((l) => (
           <Row key={`l:${l.id}`} checked={isOn(`l:${l.id}`)} onChange={() => flip(`l:${l.id}`)}
-            title={<bdi>{l.subject.name}</bdi>} detail={<><span>subject waiting for payment</span> · <bdi>{l.session.name}</bdi></>} amount={l.priceAtRegistration} />
+            title={<bdi data-i18n-skip="true">{l.subject.name}</bdi>}
+            detail={<>
+              <span>waiting for payment</span> · <bdi data-i18n-skip="true">{l.session.name}</bdi>
+              {l.cutOff && <> · <span>last day to pay</span> <Day iso={String(l.cutOff)} /></>}
+              {refusedLine?.id === l.id && <span role="alert" className="block text-destructive">{refusedLine.sentence}</span>}
+            </>}
+            amount={l.priceAtRegistration} />
         ))}
         {owed.payable.map((c) => (
           <Row key={`c:${c.id}`} checked={isOn(`c:${c.id}`)} onChange={() => flip(`c:${c.id}`)}
@@ -124,10 +145,10 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
             <span className="flex min-w-0 items-start gap-3">
               <span aria-hidden className="mt-1 h-4 w-4 shrink-0" />
               <span>
-                <span className="block font-medium text-foreground"><bdi>{l.subject.name}</bdi></span>
+                <span className="block font-medium text-foreground"><bdi data-i18n-skip="true">{l.subject.name}</bdi></span>
                 <span className="block text-xs">
                   <span>{l.paymentInProgress?.status === 'pending_verification' ? "awaiting the transfer's check" : 'a payment the family started'}</span>
-                  {' · '}<bdi>{l.session.name}</bdi>{' · '}
+                  {' · '}<bdi data-i18n-skip="true">{l.session.name}</bdi>{' · '}
                   <span>confirm or reject it on the</span> <Link href="/finance" className="text-primary underline">Finance Workbench</Link>
                 </span>
               </span>
@@ -137,9 +158,20 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
         ))}
         {owed.provisional.length > 0 && (
           <li className="px-5 py-2.5 text-xs text-muted-foreground">
-            <span>On a provisional board fee, collected once the fee is confirmed:</span> <bdi data-i18n-skip="true">{owed.provisional.map((r) => r.subject.name).join(' · ')}</bdi>
+            <span>Prices not final yet, collected once the school confirms them:</span> <bdi data-i18n-skip="true">{owed.provisional.map((r) => r.subject.name).join(' · ')}</bdi>
           </li>
         )}
+        {owed.pastLastDay.map((l) => (
+          <li key={`x:${l.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
+            <span>
+              <span className="block font-medium text-foreground"><bdi data-i18n-skip="true">{l.subject.name}</bdi></span>
+              <span className="block text-xs">
+                <span>Past its last day to pay</span>{l.cutOff && <> (<Day iso={String(l.cutOff)} />)</>}<span>: it can no longer be paid. Reserve it again while it is offered.</span>
+              </span>
+            </span>
+            <Money amount={l.priceAtRegistration} />
+          </li>
+        ))}
         {owed.requested.map((c: ChargeRow) => (
           <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
             <span><bdi>{c.description}</bdi> · <span>asked for by the family — accept it on the</span> <Link href="/charges" className="text-primary underline">Charges</Link> <span>page first</span></span>
@@ -154,7 +186,7 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
           <span>Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)</span>
         </label>
       )}
-      {error && <div className="px-5 pb-4"><Notice tone="danger">{error}</Notice></div>}
+      {error && <div className="px-5 pb-4"><Notice tone="danger">{familyWords(error)}</Notice></div>}
       {result && <div className="px-5 pb-4"><Notice tone={result.notCollected.length ? 'warning' : 'success'} title="Collected at the desk"><CollectedNotice r={result} /></Notice></div>}
     </section>
   );

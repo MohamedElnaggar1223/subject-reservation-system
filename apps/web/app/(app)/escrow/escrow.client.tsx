@@ -39,9 +39,17 @@ const REASON_LABELS: Record<string, string> = {
   late_transfer_undone: 'Transfer Recorded by Mistake — Removed',
   withdrawal_hold:     'Cash Refund Requested',
   withdrawal_rejected: 'Refund Request Declined — Returned',
-  prereg_hold:    'Held for a Preregistered Subject',
+  // Rows from before the coordinator rework (nothing is preregistered since: a draft is invisible to families).
+  prereg_hold:    'Held for a Subject',
   prereg_capture: 'Held Money Applied to Subject',
-  prereg_release: 'Preregistration Cancelled — Hold Released',
+  prereg_release: 'Hold Released',
+  // An instalment plan's deposits, held for its subject until the plan is paid (step C).
+  instalment:     'Instalment Held for a Subject',
+  plan_capture:   'Instalments Applied to Subject',
+  plan_release:   'Instalments Released',
+  plan_forfeit:   'Instalments Kept by the Plan',
+  instalment_reversed: 'Instalment Reversed',
+  charge_refund:  'Charge Refund',
 };
 
 const TRANSACTION_STYLES: Record<string, string> = {
@@ -126,7 +134,7 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
           </p>
           {heldBalance > 0 && (
             <p className="text-sm text-violet-700 dark:text-violet-400 mt-2">
-              + <Money amount={heldBalance} /> <span>held for preregistered subjects (auto-applied when their session opens)</span>
+              + <Money amount={heldBalance} /> <span>held for subjects paid in instalments (applied to them when the plan is paid)</span>
             </p>
           )}
         </div>

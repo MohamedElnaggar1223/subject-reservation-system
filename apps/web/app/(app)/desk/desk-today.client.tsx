@@ -7,7 +7,8 @@
  * session's Money tab with Remind, Charges).
  *
  * The spreadsheet version: filter the response sheet by the fee column and today's date, then add
- * up the cash book. Here it is read for them on opening the desk.
+ * up the cash book, and remember who is about to lose a place. Here it is read for them on opening the desk,
+ * with the subjects whose last day to pay is today (C10: unpaid after it, they can no longer be paid).
  *
  * Existing endpoints only: GET /v1/payments/daily-takings?date= (today, the browser's day as the
  * Daily Takings page reads it), GET /v1/sessions (each session's unpaid lines), GET
@@ -52,9 +53,11 @@ export default function DeskToday(): React.JSX.Element | null {
     const lines = money[i]?.data?.lines ?? [];
     const dueToday = lines.filter((l) => l.unpaid && isToday(l.dueAt));
     const overdue = lines.filter((l) => l.unpaid && l.overdueDays > 0);
+    const lastDay = lines.filter((l) => l.unpaid && isToday(l.deadline));
     return {
       s,
       loaded: !!money[i]?.data,
+      lastDay: lastDay.length,
       dueToday: { n: dueToday.length, amount: round2(dueToday.reduce((a, l) => a + l.outstanding, 0)), families: new Set(dueToday.map((l) => l.student.id)).size },
       overdue: { n: overdue.length, amount: round2(overdue.reduce((a, l) => a + l.outstanding, 0)), families: new Set(overdue.map((l) => l.student.id)).size },
     };
@@ -69,6 +72,7 @@ export default function DeskToday(): React.JSX.Element | null {
   const dueTodayCount = perSession.reduce((a, p) => a + p.dueToday.n, 0) + chargesToday.length;
   const overdueAmount = round2(perSession.reduce((a, p) => a + p.overdue.amount, 0) + chargesOverdue.reduce((a, c) => a + c.outstanding, 0));
   const overdueCount = perSession.reduce((a, p) => a + p.overdue.n, 0) + chargesOverdue.length;
+  const lastDayToday = perSession.reduce((a, p) => a + p.lastDay, 0);
   // What falls due next after today, so a quiet day still says what is coming.
   const ahead = [
     ...owing.flatMap((_, i) => (money[i]?.data?.lines ?? []).filter((l) => l.unpaid).map((l) => ({ due: l.dueAt, amount: l.outstanding }))),
@@ -102,7 +106,12 @@ export default function DeskToday(): React.JSX.Element | null {
           }
           cta={perSession.length === 1 ? 'Open the Money tab' : 'Charges'} tone={dueTodayCount ? 'warning' : 'neutral'} />
         <Tile href={moneyTab} label="Overdue" amount={overdueAmount}
-          detail={<><span>{overdueCount}</span> <span>{overdueCount === 1 ? 'item past its due date' : 'items past their due date'}</span></>}
+          detail={
+            <>
+              <span>{overdueCount}</span> <span>{overdueCount === 1 ? 'item past its due date' : 'items past their due date'}</span>
+              {lastDayToday > 0 && <span className="block font-medium text-foreground"><span>{lastDayToday}</span> <span>{lastDayToday === 1 ? 'reaches its last day to pay today' : 'reach their last day to pay today'}</span></span>}
+            </>
+          }
           cta={perSession.length === 1 ? (overdueCount ? 'Remind them' : 'Open the Money tab') : 'Charges'} tone={overdueCount ? 'danger' : 'neutral'} />
       </div>
       {perSession.length > 1 && (

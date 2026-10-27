@@ -95,5 +95,15 @@ jobs:
       - name: The coordinator's words - controls
         run: node --test apps/web/scripts/check-setup-words.test.mjs
 
+      # COORDINATOR_REWORK.md F3, §13 P3: none of award, suite, series, sitting, component, mapping, option code,
+      # provisional, cut-off, offer item on the family's and the desk's screens or their wording, English or Arabic.
+      - name: The family's and the desk's words
+        run: node apps/web/scripts/check-reservation-words.mjs
+
+      # Its planted-word controls: each forbidden word planted in a screen, a shared component, a dictionary and a
+      # @repo/validations sentence is caught; a value the code only tests is not; the real tree is clean.
+      - name: The family's and the desk's words - controls
+        run: node --test apps/web/scripts/check-reservation-words.test.mjs
+
       - name: Gate 3 - integration suite
         run: pnpm --filter @repo/api test

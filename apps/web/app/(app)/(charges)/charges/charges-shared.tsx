@@ -45,7 +45,8 @@ export function CollectedNotice({ r }: { r: Collected }) {
     <div className="space-y-1">
       <p><span>Collected</span> <Money amount={r.collected} /><span>.</span></p>
       {r.schoolFee && <p><span>School fee</span> <bdi dir="ltr">{r.schoolFee.academicYear}</bdi>: <Money amount={r.schoolFee.amount} /></p>}
-      {r.payments.length > 0 && <p><span>{r.payments.length}</span> <span>{r.payments.length === 1 ? 'payment' : 'payments'}</span><span>, one per deadline.</span></p>}
+      {/* The subjects in one payment (no split by deadline, COORDINATOR_REWORK.md §10); each charge group in its own. */}
+      {r.payments.length > 1 && <p><span>{r.payments.length}</span> <span>payments</span><span>: the subjects in one, the charges in their own.</span></p>}
       {r.receipts.length > 0 && <p><span>Receipts to hand over:</span> <bdi dir="ltr">{r.receipts.map((x) => x.receiptNumber).join(', ')}</bdi></p>}
       {r.notCollected.map((n, i) => (
         <p key={i} className="font-medium"><span>Not collected — hand this money back:</span> <bdi>{n.series.join(', ')}</bdi> <Money amount={n.amount} /> (<span>{n.reason}</span>)</p>

@@ -13,28 +13,9 @@ import Link from 'next/link';
 import { api } from '~/lib/hono';
 import { apiResponse, gradeLabel, formatEgp } from '@repo/validations';
 
-// Explicit type — this endpoint's RPC inference degrades in the web
-// compile (documented pattern; see PATTERNS.md)
-type ChildSummary = {
-  // Today's grade (derived from the cohort), where the student stands and
-  // this year's section (F0a).
-  student: { id: string; name: string; grade: number | null; standing: string; section: string | null };
-  owing: number;
-  owingRegistrationIds: string[];
-  escrow: { freeBalance: number; heldBalance: number };
-  schoolFee: { academicYear: string; required: boolean; waived: boolean; paid: boolean; amount: number | null };
-  pendingApprovalCount: number;
-  pendingChangeRequestCount: number;
-  receiptsToReturn: number;
-  preregisteredUnpaid: number;
-};
-
-type HomeSummary = {
-  role: 'parent' | 'student';
-  children: ChildSummary[];
-  totals: { owing: number; actionsNeeded: number };
-  openSessions: { id: string; name: string; endDate: string; qualificationLevel: string }[];
-};
+// Typed by the API (PATTERNS.md): the fetcher's own return.
+const fetchHomeSummary = () => apiResponse(api.v1.users.me['home-summary'].$get());
+type HomeSummary = Awaited<ReturnType<typeof fetchHomeSummary>>;
 
 type Action = { label: string; href: string; tone: 'pay' | 'act' | 'info' };
 
@@ -98,23 +79,15 @@ function buildActions(s: HomeSummary): Action[] {
       });
     }
 
-    if (isParent && c.preregisteredUnpaid > 0) {
-      actions.push({
-        label: `${c.preregisteredUnpaid} preregistered subject${c.preregisteredUnpaid === 1 ? '' : 's'} awaiting payment${who}`,
-        href: '/registrations',
-        tone: 'pay',
-      });
-    }
   }
 
   return actions;
 }
 
 export default function HomeSummaryCard(): React.JSX.Element | null {
-  const { data, isLoading, isError } = useQuery<HomeSummary>({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['home-summary'],
-    queryFn: async () =>
-      (await apiResponse(api.v1.users.me['home-summary'].$get())) as HomeSummary,
+    queryFn: fetchHomeSummary,
     retry: false,
   });
 
@@ -222,7 +195,7 @@ export default function HomeSummaryCard(): React.JSX.Element | null {
                 {data.children.length > 1 ? `${c.student.name}: ` : 'Balance: '}
                 {formatEgp(c.escrow.freeBalance)} available
                 {c.escrow.heldBalance > 0 && (
-                  <> · {formatEgp(c.escrow.heldBalance)} held for preregistered subjects</>
+                  <> · {formatEgp(c.escrow.heldBalance)} held</>
                 )}
               </p>
             ))}
@@ -234,7 +207,7 @@ export default function HomeSummaryCard(): React.JSX.Element | null {
         <div className="mt-3 text-xs text-muted-foreground">
           Open now:{' '}
           {data.openSessions
-            .map((s) => `${s.name} (closes ${new Date(s.endDate).toLocaleDateString()})`)
+            .map((s) => (s.endDate ? `${s.name} (closes ${new Date(s.endDate).toLocaleDateString()})` : s.name))
             .join(' · ')}
         </div>
       )}
