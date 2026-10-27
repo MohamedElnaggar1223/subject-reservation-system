@@ -16,76 +16,21 @@ import {
   seriesAcademicYearStart, formatEgp,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { useSwapChoices, useSwapConsent, SwapConsent } from '~/components/reservations/swap-pick';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types, from the fetcher (PATTERNS.md: never by hand) ────────────────────
 
-type Subject = {
-  id: string;
-  name: string;
-  code: string;
-  council: string;
-  isCore?: boolean;
-};
-
-type Session = {
-  id: string;
-  name: string;
-  sessionType: string;
-  // The exam series' year (F0a): with the type, it names the academic year.
-  seriesYear: number;
-  status: string;
-};
-
-type Student = {
-  id: string;
-  name: string;
-  // Today's grade (derived by the API) and the cohort it comes from (F0a).
-  grade: number | null;
-  cohortYear: number | null;
-  studentId: string | null;
-};
-
-type Registration = {
-  receipt?: {
-    id: string;
-    receiptNumber: string;
-    status: string;
-    refundAmountOnReturn: number | null;
-  } | null;
-  id: string;
-  studentId: string;
-  sessionId: string;
-  subjectId: string;
-  // The item the line enters (the reservations rework): a swap goes to another.
-  offerItemId: string;
-  priceAtRegistration: number;
-  // Snapshot of subject.isCore at registration time (URD CORE-002).
-  // Older rows predating the column may be missing it; fall back to subject.isCore.
-  wasCoreAtRegistration?: boolean;
-  // Attached by the registrations endpoint (M-18). When true, the user
-  // has an outstanding pending_approval change request against this
-  // registration and cannot submit another one until it's resolved.
-  hasPendingChangeRequest?: boolean;
-  status: string;
-  requestedBy: string;
-  approvedBy: string | null;
-  approvedAt: string | null;
-  approvalComments: string | null;
-  droppedAt: string | null;
-  createdAt: string;
-  subject: Subject;
-  session: Session;
-  student: Student;
-};
-
+const fetchRegistrations = () => apiResponse(api.v1.registrations.$get({ query: {} }));
+type Registration = Awaited<ReturnType<typeof fetchRegistrations>>[number];
+type Session = Registration['session'];
+type Student = Registration['student'];
 
 // ─── Status Styling ───────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
   pending_approval: 'bg-amber-50 text-amber-700',
   pending_payment:  'bg-brand-50 text-brand-700',
-  preregistered:    'bg-violet-50 text-violet-700',
   confirmed:        'bg-emerald-50 text-emerald-700',
   dropped_pending_receipt: 'bg-amber-50 text-amber-700',
   dropped:          'bg-muted text-muted-foreground',
@@ -166,8 +111,6 @@ function RegistrationCard({
   onDirectSwap,
   onRevertApproval,
   isRevertingApproval,
-  onCancelPrereg,
-  isCancellingPrereg,
   paymentSelected,
   onTogglePaymentSelection,
 }: {
@@ -181,8 +124,6 @@ function RegistrationCard({
   onDirectSwap: (reg: Registration) => void;
   onRevertApproval: (reg: Registration) => void;
   isRevertingApproval: boolean;
-  onCancelPrereg: (reg: Registration) => void;
-  isCancellingPrereg: boolean;
   paymentSelected: boolean;
   onTogglePaymentSelection: (reg: Registration) => void;
 }) {
@@ -191,7 +132,9 @@ function RegistrationCard({
   const councilLabel =
     COUNCIL_LABELS[reg.subject.council as keyof typeof COUNCIL_LABELS] ?? reg.subject.council;
 
-  const canChange = reg.status === 'confirmed' && sessionActive;
+  // F4: a paid subject can be dropped after the session closes (until the school sends the entry, the API judges);
+  // a swap goes to another subject, so only while the session takes reservations.
+  const canChange = reg.status === 'confirmed';
 
   // Core subjects in Grade 10 June sessions cannot be dropped or swapped.
   // Prefer the registration-time snapshot (wasCoreAtRegistration) so the
@@ -214,7 +157,7 @@ function RegistrationCard({
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-start gap-3">
-          {(reg.status === 'pending_payment' || reg.status === 'preregistered') && userRole === 'parent' && (
+          {reg.status === 'pending_payment' && userRole === 'parent' && (
             <input
               type="checkbox"
               checked={paymentSelected}
@@ -257,17 +200,11 @@ function RegistrationCard({
         </div>
       )}
 
-      {reg.status === 'preregistered' && userRole === 'parent' && (
-        <div className="mt-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onCancelPrereg(reg)}
-            disabled={isCancellingPrereg}
-            className="w-full"
-          >
-            {isCancellingPrereg ? 'Cancelling…' : 'Cancel Preregistration'}
-          </Button>
+      {/* A line waiting for payment: its pay-by date, and whether the school's prices are final (E6). */}
+      {reg.status === 'pending_payment' && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          {reg.dueAt && <span><span>Pay by</span> <Day iso={String(reg.dueAt)} /></span>}
+          {reg.priceProvisional && <span className="block">Prices are not final yet: it can be paid once the school confirms them.</span>}
         </div>
       )}
 
@@ -336,10 +273,10 @@ function RegistrationCard({
         </div>
       )}
 
-      {/* Session closed notice (Task 11.4) */}
+      {/* F4: after the close a drop stays possible (with its refund shown first); a swap does not. */}
       {reg.status === 'confirmed' && !sessionActive && (
         <div className="mt-3 text-xs text-muted-foreground bg-muted border border-border rounded-lg p-2">
-          Registration window is closed. Drop/swap operations are unavailable.
+          Reservations for this session are closed: swapping is no longer possible. A drop still is, with its refund shown first.
         </div>
       )}
 
@@ -356,14 +293,14 @@ function RegistrationCard({
               >
                 Request Drop
               </Button>
-              <Button
+              {sessionActive && <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onRequestSwap(reg)}
                 className="flex-1 text-primary border-primary/30 hover:bg-primary/5"
               >
                 Request Swap
-              </Button>
+              </Button>}
             </>
           )}
           {userRole === 'parent' && (
@@ -376,14 +313,14 @@ function RegistrationCard({
               >
                 Drop
               </Button>
-              <Button
+              {sessionActive && <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onDirectSwap(reg)}
                 className="flex-1 text-primary border-primary/30 hover:bg-primary/5"
               >
                 Swap
-              </Button>
+              </Button>}
             </>
           )}
         </div>
@@ -509,11 +446,12 @@ function RequestSwapModal({
           >
             <option value="">Choose what to swap to</option>
             {choices.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.label} — {formatEgp(c.price)}{c.provisional ? ' (provisional)' : ''}
+              <option key={c.key} value={c.key} data-i18n-skip="true">
+                {c.label} — {formatEgp(c.price)}
               </option>
             ))}
           </select>
+          {choices.some((c) => c.notFinal) && <p className="mt-1 text-xs text-muted-foreground">Prices are not final yet: the new subject can be paid once the school confirms them.</p>}
         </div>
 
         {choice && (
@@ -663,11 +601,12 @@ function DirectSwapModal({
           >
             <option value="">Choose what to swap to</option>
             {choices.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.label} — {formatEgp(c.price)}{c.provisional ? ' (provisional)' : ''}
+              <option key={c.key} value={c.key} data-i18n-skip="true">
+                {c.label} — {formatEgp(c.price)}
               </option>
             ))}
           </select>
+          {choices.some((c) => c.notFinal) && <p className="mt-1 text-xs text-muted-foreground">Prices are not final yet: the new subject can be paid once the school confirms them.</p>}
         </div>
 
         {choice && (
@@ -758,32 +697,6 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
     onError: (err: Error) => setActionError(err.message),
   });
 
-  const cancelPreregMutation = useMutation({
-    mutationFn: (reg: Registration) =>
-      apiResponse(
-        api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: reg.id } })
-      ),
-    onSuccess: (_data, reg) => {
-      setActionError('');
-      setSelectedPaymentIds((prev) => {
-        const next = new Set(prev);
-        next.delete(reg.id);
-        return next;
-      });
-      invalidateFinancialState(qc, { studentId: reg.studentId });
-      router.refresh();
-    },
-    onError: (err: Error) => setActionError(err.message),
-  });
-
-  const handleCancelPrereg = (reg: Registration) => {
-    const ok = window.confirm(
-      `Cancel the preregistration for ${reg.subject.name}? Held funds release per the refund policy (receipt return applies if one was issued).`
-    );
-    if (!ok) return;
-    cancelPreregMutation.mutate(reg);
-  };
-
   const handleRevertApproval = (reg: Registration) => {
     const ok = window.confirm(
       `Move ${reg.subject.name} back to pending parent approval? You can approve it again later, but it will not be included in payment right now.`
@@ -792,7 +705,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
     revertApprovalMutation.mutate(reg);
   };
 
-  const PAYABLE_STATUSES = ['pending_payment', 'preregistered'];
+  const PAYABLE_STATUSES = ['pending_payment'];
   const togglePaymentSelection = (reg: Registration) => {
     if (!PAYABLE_STATUSES.includes(reg.status)) return;
     setSelectedPaymentIds((prev) => {
@@ -814,9 +727,9 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
     });
   };
 
-  const { data: registrations = [] } = useSuspenseQuery<Registration[]>({
+  const { data: registrations = [] } = useSuspenseQuery({
     queryKey: ['registrations', 'list'],
-    queryFn: () => apiResponse(api.v1.registrations.$get({ query: {} })),
+    queryFn: fetchRegistrations,
   });
 
   const grouped = useMemo(() => {
@@ -977,7 +890,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
 
                   {/* Pending payment selection for parents */}
                   {isParent && (() => {
-                    const ppRegs = regs.filter((r) => r.status === 'pending_payment' || r.status === 'preregistered');
+                    const ppRegs = regs.filter((r) => r.status === 'pending_payment');
                     if (ppRegs.length === 0) return null;
                     const pendingIds = ppRegs.map((r) => r.id);
                     const selectedRegs = ppRegs.filter((r) => selectedPaymentIds.has(r.id));
@@ -1036,8 +949,6 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                         onDirectSwap={setDirectSwapTarget}
                         onRevertApproval={handleRevertApproval}
                         isRevertingApproval={revertApprovalMutation.isPending}
-                        onCancelPrereg={handleCancelPrereg}
-                        isCancellingPrereg={cancelPreregMutation.isPending}
                         paymentSelected={selectedPaymentIds.has(reg.id)}
                         onTogglePaymentSelection={togglePaymentSelection}
                       />
