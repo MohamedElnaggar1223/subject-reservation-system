@@ -260,16 +260,18 @@ describe('F4 on the reservations rework', () => {
   describe('carry forward from the line\'s verified prior sitting', () => {
     // P1b (D6): the board's carry-forward months only warn (the family page reads them); the line rules no longer
     // refuse a sitting outside them (they did: "outside the carry-forward period (4 months)").
-    it('the carry-forward period is the board\'s own column (exam_board), edited on the board rules', async () => {
-      await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 4, reason: 'scenario: a shorter period' } }));
-      expect((await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m).toBe(4);
+    // P1c's fix round (S3): the period is the reference data's, loaded at every start — an edit on the board rules was undone
+    // silently at the next start, so it is refused; the rest of F4's rules row is still edited there.
+    it('the carry-forward period is the board\'s own column (exam_board), the reference data\'s: the board rules refuse to edit it', async () => {
+      const { REFERENCE_RULE_REFUSAL } = await import('../src/services/setup/reference.services');
+      const before = (await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m;
+      expect(await refused(coord.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 4, reason: 'scenario: a shorter period' } })))
+        .toEqual({ status: 409, error: REFERENCE_RULE_REFUSAL('The carry-forward period') });
+      expect((await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m).toBe(before);
       const rules = await apiResponse(coord.api.v1.exams['board-rules'].$get());
-      expect(rules.find((r) => r.boardCode === 'cambridge')).toMatchObject({ carryForwardMonths: 4 });
-      await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 13, reason: 'scenario done: back to 13' } }));
-      expect((await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m).toBe(13);
-      const audit = await one<{ p: Record<string, unknown>; n: Record<string, unknown> }>(
-        `select previous_data as p, new_data as n from audit_log where entity_id = 'cambridge' and action = 'EXAM_BOARD_RULE_UPDATED' order by created_at desc limit 1`);
-      expect(audit).toMatchObject({ p: { carryForwardMonths: 4 }, n: { carryForwardMonths: 13 } });
+      expect(rules.find((r) => r.boardCode === 'cambridge')).toMatchObject({ carryForwardMonths: before });
+      expect(await one(`select count(*)::int as n from audit_log where entity_id = 'cambridge' and action = 'EXAM_BOARD_RULE_UPDATED' and new_data ? 'carryForwardMonths' and new_data->>'reason' = 'scenario: a shorter period'`))
+        .toEqual({ n: 0 });
     });
 
     it('a sitting at another centre, verified with its centre and candidate number, is carried forward with them', async () => {

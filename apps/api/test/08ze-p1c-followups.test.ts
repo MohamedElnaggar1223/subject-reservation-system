@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { apiResponse, BoardsFileSchema, SubjectsFileSchema, REFERENCE_BOARD_CODES, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, one, sql, refusedWithCode, openWindow, confirmed, lockWaiters, CONSENT, type Client, type Impact,
+  admin, staff, onboard, subject, session, one, sql, refused, refusedWithCode, openWindow, confirmed, lockWaiters, CONSENT, type Client, type Impact,
 } from './helpers';
 
 /**
@@ -14,7 +14,8 @@ import {
  *   IMPACT_CHANGED), as the session's payment due date does (§6: a line's due date is its row's pay-by if set).
  * - 7. The checkout and the desk's collection pay the price the family was shown: a re-price that lands between
  *   the page's read and the click is refused (PRICE_CHANGED), never charged.
- * - 8. The board's list (the reference data, §7) is loaded by the API's start from the repository's files.
+ * - 8. The board's list (the reference data, §7) is loaded by the API's start from the repository's files; the board's
+ *   rules it owns are no longer edited on the parked screens (8b, the fix round's S3).
  * - 9. One lock order in the session's header save: the waiting lines are locked once, in id order.
  * - 10. P2's API limits (L9): an older earlier exam she kept is not asked again after a copy; a printed code in doubt on
  *   a paper row (4MA1H, 4MA2H at 9,840 on the November 2026 list) offers its second reading, the whole qualification.
@@ -196,6 +197,31 @@ describe('08ze: P1c follow-ups', () => {
     expect(seen).toEqual({ before: 0, after: wanted, rows, loaded: { subjects: wanted.length, rows } });
     // The start's call (apps/api/src/index.ts) is the one this exercises.
     expect(readFileSync(path.resolve(here, '../src/index.ts'), 'utf8')).toMatch(/await loadReferenceFromFiles\(\)/);
+  });
+
+  it('8b. the board\'s rules are the reference data\'s (the fix round\'s S3): the start\'s load puts the file\'s back, so the catalogue refuses a one-paper fee rule change and the board rules a carry-forward change; nothing changes', async () => {
+    const { REFERENCE_RULE_REFUSAL } = await import('../src/services/setup/reference.services');
+    const before = await one<{ fee: string; months: number | null; asks: boolean }>(
+      `select one_paper_fee_key as fee, carry_forward_months as months, one_paper_asks_sitting as asks from exam_board where code = 'cambridge'`);
+    expect(await refused(adm.api.v1.catalogue.boards[':code'].$put({ param: { code: 'cambridge' }, json: { onePaperFeeKey: 'unit', reason: 'the board now prices each paper' } })))
+      .toEqual({ status: 409, error: REFERENCE_RULE_REFUSAL("The board's one-paper fee rule") });
+    expect(await refused(coordinator.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 4, reason: 'a shorter period' } })))
+      .toEqual({ status: 409, error: REFERENCE_RULE_REFUSAL('The carry-forward period') });
+    expect(await one(`select one_paper_fee_key as fee, carry_forward_months as months, one_paper_asks_sitting as asks from exam_board where code = 'cambridge'`)).toEqual(before);
+    // Why: an edit made anyway (here by SQL, as the edits allowed before did) is put back by the next start's load (in a
+    // transaction rolled back at the end).
+    const { db, sql: s } = await import('@repo/db');
+    const { loadReferenceFromFiles } = await import('../src/services/setup/reference.services');
+    const file = BoardsFileSchema.parse(JSON.parse(readFileSync(path.join(dbDir, 'reference', 'boards.json'), 'utf8'))).find((b) => b.code === 'cambridge')!;
+    class Rollback extends Error {}
+    let afterLoad: unknown = null;
+    await db.transaction(async (tx) => {
+      await tx.execute(s`update exam_board set one_paper_fee_key = 'unit', carry_forward_months = 4, one_paper_asks_sitting = false where code = 'cambridge'`);
+      await loadReferenceFromFiles(tx);
+      afterLoad = (await tx.execute(s`select one_paper_fee_key as fee, carry_forward_months as months, one_paper_asks_sitting as asks from exam_board where code = 'cambridge'`)).rows[0];
+      throw new Rollback();
+    }).catch((err) => { if (!(err instanceof Rollback)) throw err; });
+    expect(afterLoad).toEqual({ fee: file.onePaperFee === 'syllabus' ? 'qualification' : 'unit', months: file.carryForwardMonths, asks: file.onePaperAsksSitting });
   });
 
   it('9. the session\'s header save locks its waiting lines once, in id order: waiting behind a line, it holds no later line meanwhile', async () => {

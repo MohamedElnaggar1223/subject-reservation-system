@@ -18,6 +18,15 @@ import { logger } from '../../lib/logger';
 type Executor = Pick<typeof db, 'select'>;
 
 /**
+ * A board's rule that the reference data owns (packages/db/reference/boards.json: one-paper fee, whether a one-paper
+ * retake asks its sitting, carry-forward months): the API loads it at every start (loadReferenceFromFiles), so an edit
+ * made on a screen would be undone silently at the next start. Refused where the parked screens still offered it (the
+ * fix round's S3; §7: staff read the reference data, never edit it — the admin's missing board date is the one exception).
+ */
+export const REFERENCE_RULE_REFUSAL = (what: string) =>
+  `${what} is the board's rule in our reference data, loaded at every start: it is changed there (we maintain it), not here`;
+
+/**
  * The board's list loaded from the repository's reference files (packages/db/reference, §7) — what
  * `pnpm --filter @repo/db seed:reference` loads — read through P0's schemas. The API runs it at its start (P1c,
  * apps/api/src/index.ts): nothing else loaded the list, so a database copied from an older one, or the deployed demo

@@ -43,6 +43,7 @@ import { lineItemsFor } from './line.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 import { effectiveDeadlinesOf, effectiveDeadlineFor, redateLines } from './deadline.services';
 import { PricingError } from './pricing.services';
+import { REFERENCE_RULE_REFUSAL } from './setup/reference.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -171,14 +172,11 @@ export async function getCatalogue() {
 // ─── Boards ──────────────────────────────────────────────────────────────────
 
 export async function updateBoard(code: string, data: UpdateBoardType, actorId: string, actorRole: string | null | undefined, ctx?: AuditContext) {
-  // The one-paper fee rule decides what every new one-paper retake of the board costs: the admin's alone, with a
-  // reason (the review of 744e553, item 1), as the board's entry deadline is (MO-10). The rest of the board is the
-  // coordinator's and the admin's, as before.
+  // The one-paper fee rule is the reference data's (P1c's fix round, S3): loaded at every start, an edit here would be
+  // undone silently, so it is refused, unchanged, whoever asks (it was the admin's alone, with a reason). The rest of the
+  // board stays the admin's to edit, as before (its series months are unioned with the reference's, never dropped).
   const { reason, ...fields } = data;
-  if (fields.onePaperFeeKey !== undefined) {
-    if (actorRole !== ROLES.ADMIN) throw new CatalogueError("Only an admin changes a board's one-paper fee rule: it decides what every new one-paper retake costs", 403);
-    if (!reason) throw new CatalogueError("Say why the board's one-paper fee rule changes");
-  }
+  if (fields.onePaperFeeKey !== undefined) throw new CatalogueError(REFERENCE_RULE_REFUSAL("The board's one-paper fee rule"), 409);
   return db.transaction(async (tx) => {
     const [b] = await tx.select().from(examBoard).where(eq(examBoard.code, code)).for('update');
     if (!b) throw new CatalogueError('Board not found', 404);
