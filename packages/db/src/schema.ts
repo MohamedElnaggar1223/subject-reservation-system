@@ -3228,12 +3228,13 @@ export const reminderRule = pgTable(
   "reminder_rule",
   {
     id: text("id").primaryKey(),
-    // 'payment_due' | 'session_closing' | 'entry_deadline' | 'school_fee_due' | 'declared_retakes_to_verify'
+    // 'payment_due' | 'session_closing' | 'school_fee_due' | 'declared_retakes_to_verify' (the staff's board-deadline
+    // kind, 'entry_deadline', retired by P1c: migration 0071)
     kind: text("kind").notNull(),
     sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "restrict" }),
     offsetsDays: integer("offsets_days").array().notNull(),
     repeatEveryDays: integer("repeat_every_days"),
-    // 'paid' | 'closed' | 'deadline' | 'verified' (the kind's)
+    // 'paid' | 'closed' | 'verified' (the kind's)
     until: text("until").notNull(),
     channels: text("channels").array().notNull(),
     templateId: text("template_id").notNull().references(() => messageTemplate.id, { onDelete: "restrict" }),
@@ -3252,8 +3253,10 @@ export const reminderRule = pgTable(
   (table) => [
     uniqueIndex("reminderRule_global_idx").on(table.kind).where(sql`session_id IS NULL`),
     uniqueIndex("reminderRule_session_idx").on(table.kind, table.sessionId).where(sql`session_id IS NOT NULL`),
-    check("reminder_rule_kind_valid", sql`${table.kind} IN ('payment_due', 'session_closing', 'entry_deadline', 'school_fee_due', 'declared_retakes_to_verify')`),
-    check("reminder_rule_until_valid", sql`${table.until} IN ('paid', 'closed', 'deadline', 'verified')`),
+    // P1c: the staff's board-deadline kind is retired — a rule of it that sent reminders stays switched off, for the
+    // messages it sent (message_reminder_has_rule); none is made or read again.
+    check("reminder_rule_kind_valid", sql`${table.kind} IN ('payment_due', 'session_closing', 'school_fee_due', 'declared_retakes_to_verify') OR (${table.kind} = 'entry_deadline' AND NOT ${table.active})`),
+    check("reminder_rule_until_valid", sql`${table.until} IN ('paid', 'closed', 'verified') OR (${table.kind} = 'entry_deadline' AND ${table.until} = 'deadline')`),
     check("reminder_rule_offsets_valid", sql`cardinality(${table.offsetsDays}) BETWEEN 1 AND 12`),
     check("reminder_rule_repeat_valid", sql`${table.repeatEveryDays} IS NULL OR ${table.repeatEveryDays} BETWEEN 1 AND 60`),
     check("reminder_rule_channels_valid", sql`cardinality(${table.channels}) > 0 AND ${table.channels} <@ ARRAY['in_app', 'email', 'whatsapp']::text[]`),

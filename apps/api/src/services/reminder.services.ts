@@ -6,8 +6,9 @@
  * how often after the last of them until its target is done, on which channels and with which
  * text. The anchors are the dates the system already keeps current: a line's `due_at` (A's
  * `dueDateFor`, re-dated by `redateLines`), a charge's `due_at` (C's `chargeDueAt`; an instalment's
- * is its date), a session's end, a series' entry and retake deadlines, a declared sitting's
- * effective deadline (A's `effectiveDeadlinesOf`, B's To verify list).
+ * is its date), a session's end, a declared sitting's effective deadline (A's `effectiveDeadlinesOf`, B's To
+ * verify list). A series' entry and retake deadlines are no longer an anchor: the staff's board-deadline reminder
+ * left with P1c (the board deadline acts through each line's cut-off, whose reminders are the payment ones).
  *
  * The step, every minute: for each target, the latest day of its rule whose send hour (Cairo) has
  * come — never earlier, and once: a target already claimed for that day, or already reminded today
@@ -38,13 +39,12 @@ import { deliverInTx, MessageError, type DeliveryTarget } from './message.servic
 import { familyMembers, broadcastMembers, type Owed, type AudienceMember } from './message-audience.services';
 import { linePayableNowSql, chargeOpenSql, chargePayableNow } from './payable-now.services';
 import { effectiveDeadlinesOf } from './deadline.services';
-import { formatSeriesName } from './statement.services';
 import { logger } from '../lib/logger';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Rule = typeof reminderRule.$inferSelect;
 
-type TargetKind = 'line' | 'charge' | 'session' | 'series_entry' | 'series_retake' | 'verification';
+type TargetKind = 'line' | 'charge' | 'session' | 'verification';
 type Candidate = {
   targetKind: TargetKind; targetId: string; anchor: Date; since: Date;
   studentId: string | null; sessionId: string | null;
@@ -57,13 +57,9 @@ const NOTIFICATION_TYPE: Record<ReminderKind, NotificationType> = {
   payment_due: 'PAYMENT_REMINDER',
   school_fee_due: 'PAYMENT_REMINDER',
   session_closing: 'SESSION_CLOSING_SOON',
-  entry_deadline: 'STAFF_REMINDER',
   declared_retakes_to_verify: 'STAFF_REMINDER',
 };
 
-const WAITING_LINE = sql`(r.status in ('pending_approval', 'pending_payment') or (r.status = 'preregistered' and not exists (
-  select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')))`;
-const DEADLINE = sql.raw('line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)');
 const ids = (xs: string[]) => sql.join(xs.map((x) => sql`${x}`), sql`, `);
 
 const asDate = (v: unknown) => (v instanceof Date ? v : new Date(String(v)));
@@ -97,10 +93,6 @@ async function candidates(kind: ReminderKind, now: Date): Promise<Candidate[]> {
       const rows = (await db.execute(sql`select id, end_date, created_at, reminder_sent_at from registration_session where status = 'active' and end_date > ${now} order by id`)).rows as Record<string, unknown>[];
       return rows.map((s) => ({ targetKind: 'session' as const, targetId: s.id as string, anchor: asDate(s.end_date), since: asDate(s.created_at), studentId: null, sessionId: s.id as string, legacyClosingSent: s.reminder_sent_at != null }));
     }
-    case 'entry_deadline':
-      // The coordinator rework (§9.2): board deadlines are reference data, not staff's to act on — their reminders
-      // go (the kind stays for the rules already stored; it finds nothing to remind of).
-      return [];
     case 'declared_retakes_to_verify': {
       const rows = (await db.execute(sql`
         select r.id, r.student_id, r.session_id, r.created_at from registration r
@@ -132,7 +124,6 @@ function groupKey(kind: ReminderKind, d: Due) {
     case 'payment_due':
     case 'school_fee_due': return `${d.rule.id}|${d.templateId}`;
     case 'session_closing': return `${d.rule.id}|${d.targetId}|${d.offset}`;
-    case 'entry_deadline': return `${d.rule.id}|${d.targetKind}|${d.targetId}|${d.offset}`;
     case 'declared_retakes_to_verify': return `${d.rule.id}|${d.sessionId}`;
   }
 }
@@ -274,9 +265,6 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
     const [s] = (await tx.execute(sql`select status, end_date from registration_session where id = ${item.targetId}`)).rows as { status: string; end_date: unknown }[];
     if (s?.status === 'active' && asDate(s.end_date) > now) live.push({ item, amount: 0, label: '', dueAt: item.anchor, sessionName: null });
   }
-  for (const item of items.filter((i) => i.targetKind === 'series_entry' || i.targetKind === 'series_retake')) {
-    if (item.anchor > now) live.push({ item, amount: 0, label: '', dueAt: item.anchor, sessionName: null });
-  }
   return live;
 }
 
@@ -362,16 +350,6 @@ async function targetsOf(tx: Tx, kind: ReminderKind, won: Live[], overdueText = 
     const extra = { en: { session: s.name, closes: messageDate(s.endDate, 'en') }, ar: { session: s.name, closes: messageDate(s.endDate, 'ar') } };
     return people.map((member) => ({ member, extra }));
   }
-  if (kind === 'entry_deadline') {
-    const l = won[0]!;
-    const [s] = (await tx.execute(sql`select bs.month, bs.year, bs.label, b.name as "boardName",
-        (select count(*)::int from registration r where r.board_series_id = bs.id and ${WAITING_LINE} and ${DEADLINE} = ${l.item.anchor}) as waiting
-      from board_series bs left join exam_board b on b.code = bs.board_code where bs.id = ${l.item.targetId}`)).rows as { month: string; year: number; label: string | null; boardName: string | null; waiting: number }[];
-    const series = formatSeriesName({ boardName: s!.boardName, month: s!.month, year: Number(s!.year), label: s!.label });
-    const count = String(s!.waiting);
-    const extra = { en: { series, count, closes: messageDate(l.item.anchor, 'en') }, ar: { series, count, closes: messageDate(l.item.anchor, 'ar') } };
-    return (await staff(tx, [ROLES.ADMIN, ROLES.COORDINATOR, ROLES.FINANCE_ADMIN, ROLES.FINANCE_OFFICER])).map((member) => ({ member, extra }));
-  }
   // declared_retakes_to_verify: the coordinators (the admin when there is none), once per session.
   const sessionId = won[0]!.item.sessionId!;
   const [s] = await tx.select({ name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, sessionId));
@@ -397,6 +375,8 @@ export async function listRules() {
   }).from(reminderRule)
     .leftJoin(registrationSession, eq(registrationSession.id, reminderRule.sessionId))
     .leftJoin(user, eq(user.id, reminderRule.updatedBy))
+    // A retired kind's rule (the board-deadline reminder, kept switched off for what it sent: 0071) is not a rule to set.
+    .where(inArray(reminderRule.kind, [...REMINDER_KINDS]))
     .orderBy(asc(reminderRule.kind), asc(sql`${reminderRule.sessionId} is not null`), asc(registrationSession.name));
   const settings = { enabled: await getSetting('reminders.enabled'), sendAtHour: await getSetting('reminders.sendAtHour') };
   return { rules: rows.filter((r) => !r.inheritsAt), settings };

@@ -129,7 +129,11 @@ describe('08s: messages and reminders', () => {
     const global = Object.fromEntries(rules.filter((r) => r.sessionId === null).map((r) => [r.kind, r]));
     expect(global.payment_due).toMatchObject({ offsetsDays: [-7, -3, 0, 3], repeatEveryDays: 3, until: 'paid', channels: ['in_app', 'email'], templateId: TPL.paymentDue, overdueTemplateId: TPL.paymentOverdue, active: true });
     expect(global.session_closing).toMatchObject({ offsetsDays: [-14, -7, -1], repeatEveryDays: null, until: 'closed' });
-    expect(global.entry_deadline).toMatchObject({ offsetsDays: [-14, -1], channels: ['in_app'], until: 'deadline' });
+    // P1c: the staff's board-deadline kind is retired (0071 deleted its seeded rule, which never sent anything here, and
+    // switched its template off); there is no rule of it to set.
+    expect(Object.keys(global).sort()).toEqual(['declared_retakes_to_verify', 'payment_due', 'school_fee_due', 'session_closing']);
+    expect(await sql(`select id from reminder_rule where kind = 'entry_deadline'`)).toEqual([]);
+    expect(await one(`select active from message_template where key = 'entry_deadline'`)).toEqual({ active: false });
     expect(global.school_fee_due).toMatchObject({ offsetsDays: [-14, -7, 0], repeatEveryDays: 7, until: 'paid' });
     expect(global.declared_retakes_to_verify).toMatchObject({ offsetsDays: [-14, -7, -3, -1], until: 'verified' });
     expect(installed).toEqual({ enabled: false, sendAtHour: 9 });

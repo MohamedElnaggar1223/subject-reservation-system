@@ -25,7 +25,7 @@ import {
 } from './messages-shared';
 import { Deliveries } from './log.client';
 
-const KINDS: ReminderKind[] = ['payment_due', 'school_fee_due', 'session_closing', 'entry_deadline', 'declared_retakes_to_verify'];
+const KINDS: ReminderKind[] = ['payment_due', 'school_fee_due', 'session_closing', 'declared_retakes_to_verify'];
 
 /** "−7, −3, 0, +3" → [-7, -3, 0, 3]; null when a part is not a whole number. */
 function parseDays(text: string): number[] | null {
