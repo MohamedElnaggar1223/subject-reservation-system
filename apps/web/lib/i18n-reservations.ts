@@ -472,6 +472,8 @@ export const familyArabic: Record<string, string> = {
   "waiting for the parent's approval": 'بانتظار موافقة ولي الأمر',
   'price not set yet': 'السعر لم يُحدد بعد',
   '(closed to new reservations)': '(مغلقة أمام الحجوزات الجديدة)',
+  // B5 of P4a: an option past its own board date while its row is open for the others.
+  'Closed: the exam board\'s last date for this choice has passed.': 'مغلق: انقضى آخر موعد يقبله مجلس الامتحانات لهذا الاختيار.',
   'Teacher to be announced': 'سيُعلَن المعلم لاحقًا',
   'The school assigns the teacher': 'تحدد المدرسة المعلم',
   'Teacher:': 'المعلم:',
@@ -700,6 +702,7 @@ const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^(.+) is not taking reservations$/, (m) => `${m[1]} لا تقبل حجوزات`],
   [/^(.+): no longer taking reservations\.$/, (m) => `${m[1]}: لم تعد تقبل حجوزات.`],
   [/^(.+): this choice is no longer offered\.$/, (m) => `${m[1]}: لم يعد هذا الخيار متاحًا.`],
+  [/^(.+): the exam board's last date for this choice has passed\.$/, (m) => `${m[1]}: انقضى آخر موعد يقبله مجلس الامتحانات لهذا الاختيار.`],
   [/^(.+) is not open for reservations yet$/, (m) => `${dateAr(m[1]!)} لم تُفتح للحجز بعد`],
   [/^Choose the teacher of (.+)$/, (m) => `اختر معلم ${m[1]}`],
   [/^Answer: (.+)$/, (m) => `أجب: ${m[1]}`],

@@ -245,7 +245,10 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
       if (!row) return [{ key, p, why: `${p.title}: no longer taking reservations.` }];
       // Reserved meanwhile (the student's request, the desk, another tab): the group shows it as held.
       if (groups.find((g) => g.key === key)?.rows.some((r) => held.has(r.id))) return [{ key, p, why: `${p.title}: already reserved.` }];
-      return row.options.some((x) => optionKey(x) === optionKey(p)) ? [] : [{ key, p, why: `${p.title}: this choice is no longer offered.` }];
+      const option = row.options.find((x) => optionKey(x) === optionKey(p));
+      if (!option) return [{ key, p, why: `${p.title}: this choice is no longer offered.` }];
+      // Its board date passed while the page was open (C6): it would be refused.
+      return option.closed && !row.closed ? [{ key, p, why: `${p.title}: the exam board's last date for this choice has passed.` }] : [];
     }).map(({ key, p, why }) => [key, p, why] as const);
     if (!missing.length) return;
     setGone((g) => [...g, ...missing.map(([key, , why]) => ({
@@ -593,7 +596,8 @@ function SubjectCard({ o, lang, words, viewer, studentId, draft, held, disabled,
   const groups = groupsOf(o);
   const picks = groups.map((g) => draft.picks[g.key]).filter((p): p is Pick => !!p);
   const known = o.rows.some((r) => r.knownSitting);
-  const hasFirst = o.rows.some((r) => r.options.some((x) => x.attempt === 'first'));
+  // A first entry still open (not past its board date): when none is, the retakes are shown at once.
+  const hasFirst = o.rows.some((r) => !r.closed && r.options.some((x) => x.attempt === 'first' && !x.closed));
   const hasRetake = o.rows.some((r) => r.options.some((x) => x.attempt === 'retake'));
   // F2 as the lead decided on P2's mock (26 Oct 2026, coordinator-rework.tsv; the coordinator's preview shows the same):
   // a student with no record sees first entries, and "Sat it before?" shows the retakes — one click, never hidden for
@@ -667,7 +671,9 @@ function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend,
         </OptionLine>
         {opts.map(({ r, x }) => {
           const on = !!picked && picked.r.id === r.id && optionKey(picked.x) === optionKey(x);
-          const off = r.closed || !x.price;
+          // Closed at its own board date (C6), its row still open for the others (a retake after the entry deadline).
+          const past = !r.closed && x.closed;
+          const off = r.closed || x.closed || !x.price;
           return (
             <div key={`${r.id}|${optionKey(x)}`}>
               <OptionLine name={name} checked={on} disabled={disabled || off}
@@ -676,6 +682,7 @@ function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend,
                 end={x.price ? <Money amount={x.price.total} className="font-semibold" /> : <span className="text-xs text-muted-foreground">price not set yet</span>}>
                 <span data-i18n-skip="true">{x.label[lang]}</span>
                 {r.closed && <> <span className="text-xs text-muted-foreground">(closed to new reservations)</span></>}
+                {past && <span className="block text-xs text-muted-foreground">Closed: the exam board&apos;s last date for this choice has passed.</span>}
                 {r.payBy && <span className="block text-xs text-muted-foreground"><span>Pay by</span> <Day iso={String(r.payBy)} /></span>}
               </OptionLine>
               {on && pick && <PickDetails o={o} r={r} x={x} lang={lang} words={words} viewer={viewer} pick={pick} id={id} disabled={disabled} problem={message} onChange={onPick} />}
