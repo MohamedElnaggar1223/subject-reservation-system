@@ -1019,6 +1019,9 @@ export const sessionOfferItem = pgTable(
     referenceCodes: text("reference_codes").array().notNull().default(sql`'{}'::text[]`),
     // D6: the sittings (board_series ids) a retake or an A.2. may carry from — her list.
     allowedPriorSeriesIds: text("allowed_prior_series_ids").array().notNull().default(sql`'{}'::text[]`),
+    // D6 (P1c, P2's L9): of those, the ones older than the board carries a result forward that she kept on purpose
+    // (the check list's "Keep it"): no check item for them again, and a copy keeps them so, rolled forward with the list.
+    keptPriorSeriesIds: text("kept_prior_series_ids").array().notNull().default(sql`'{}'::text[]`),
     // D12: a winter row's own close date and pay-by date.
     closesAt: timestamp("closes_at", { withTimezone: true }),
     payBy: timestamp("pay_by", { withTimezone: true }),

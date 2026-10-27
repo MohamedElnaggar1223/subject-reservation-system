@@ -155,4 +155,15 @@ export function defaultSessionDates(type: string, year: number): { courseStartsO
 }
 
 /** D10: the order of rows inside a subject — all papers, one-paper rows, units in order, A.S., A.2., A.L., then the rest. */
+/** A sitting's place in time, in months (the school's months: October counts as October). */
+const monthIndex = (month: string, year: number) => year * 12 + ({ january: 1, june: 6, october: 10, november: 11 }[month] ?? 0);
+
+/**
+ * D6: an earlier exam older than the board carries a result forward (its months from the row's own sitting): a
+ * warning, never a refusal. False when the board sets no limit or the row has no sitting.
+ */
+export function beyondCarryForward(row: { month: string; year: number } | null | undefined, prior: { month: string; year: number }, carryForwardMonths: number | null | undefined) {
+  return !!(row && carryForwardMonths && monthIndex(row.month, row.year) - monthIndex(prior.month, prior.year) > carryForwardMonths);
+}
+
 export const KIND_ORDER: Record<string, number> = { all_papers: 0, paper: 1, unit: 2, as: 3, a2: 4, al: 5, qualification: 6, custom: 7 };

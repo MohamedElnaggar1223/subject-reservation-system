@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { apiResponse, BoardsFileSchema, SubjectsFileSchema, REFERENCE_BOARD_CODES } from '@repo/validations';
+import { apiResponse, BoardsFileSchema, SubjectsFileSchema, REFERENCE_BOARD_CODES, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, one, sql, refusedWithCode, openWindow, confirmed, lockWaiters, CONSENT, type Client, type Impact,
 } from './helpers';
@@ -16,6 +16,8 @@ import {
  *   the page's read and the click is refused (PRICE_CHANGED), never charged.
  * - 8. The board's list (the reference data, §7) is loaded by the API's start from the repository's files.
  * - 9. One lock order in the session's header save: the waiting lines are locked once, in id order.
+ * - 10. P2's API limits (L9): an older earlier exam she kept is not asked again after a copy; a printed code in doubt on
+ *   a paper row (4MA1H, 4MA2H at 9,840 on the November 2026 list) offers its second reading, the whole qualification.
  *
  * Money and dates are read back from the database.
  */
@@ -211,5 +213,101 @@ describe('08ze: P1c follow-ups', () => {
     // Released, the save answers its impact (nothing written until confirmed).
     expect(await save).toMatchObject({ saved: false });
     expect(new Date((await one<{ due: string }>(`select payment_due_at as due from registration_session where id = $1`, [june])).due).getTime()).toBe(new Date(due.due).getTime());
+  });
+
+  describe('10. P2\'s API limits (L9), on the reference files\' boards and subjects', () => {
+    const Y = academicYearStartOf() + 1;
+    const label = `ze08-l9-${RUN}`;
+    const file = <T,>(rel: string) => JSON.parse(readFileSync(path.join(dbDir, 'reference', rel), 'utf8')) as T;
+
+    beforeAll(async () => {
+      // The files' subjects and Pearson's rules and aliases (4MA1H and 4MA2H to check); no sitting of the files is loaded,
+      // so no board date another scenario's series holds moves (as 08zb).
+      const { db, loadReference } = await import('@repo/db');
+      const boards = BoardsFileSchema.parse(file('boards.json')).filter((b) => b.code === 'pearson_edexcel').map((b) => ({ ...b, sittings: [] }));
+      await loadReference(db, {
+        boards,
+        subjects: { cambridge: SubjectsFileSchema.parse(file('subjects/cambridge.json')), pearson_edexcel: SubjectsFileSchema.parse(file('subjects/pearson_edexcel.json')) },
+      });
+    });
+
+    const view = (sessionId: string, offeringId: string) =>
+      apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$get({ param: { id: sessionId, offeringId } }));
+    const tooOld = async (sessionId: string) =>
+      (await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: sessionId } }))).checkList.filter((c) => c.code === 'carried_from_too_old').map((c) => c.message);
+
+    it('an earlier exam older than the board carries forward, kept on purpose ("Keep it"), leaves the check list and is not asked again after a copy; one added later is asked', async () => {
+      const a = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y, label } }));
+      const bio = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: a.id }, json: { referenceCode: '0970' } }));
+      const paper = bio.rows.find((r) => r.kind === 'paper')!;
+      expect(paper.needsCarriedFrom).toBe(true);
+      // Her list: June of last year and November two years back (19 months before June: older than Cambridge's 13).
+      const rows = (extra: Record<string, unknown> = {}) => bio.rows.map((r) => ({
+        id: r.id, kind: r.kind as 'all_papers', cells: r.cells,
+        ...(r.id === paper.id ? { allowedPriorSittings: [{ month: 'june' as const, year: Y - 1 }, { month: 'november' as const, year: Y - 2 }], ...extra } : {}),
+      }));
+      await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: a.id, offeringId: bio.id }, json: { rows: rows() } }));
+      const listed = (await view(a.id, bio.id)).rows.find((r) => r.id === paper.id)!.allowedPriorSittings;
+      expect(listed.map((p) => [p.month, p.year, p.beyondCarryForward, p.kept])).toEqual([['june', Y - 1, false, false], ['november', Y - 2, true, false]]);
+      expect(await tooOld(a.id)).toEqual([expect.stringContaining(`November ${Y - 2} is older than the board carries a result forward`)]);
+      // "Keep it": kept, audited; the check list no longer asks; the editor's read still marks it older.
+      expect(await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: a.id, offeringId: bio.id }, json: { olderSittingsKept: true } })))
+        .toMatchObject({ saved: true });
+      const kept = (await view(a.id, bio.id)).rows.find((r) => r.id === paper.id)!.allowedPriorSittings;
+      expect(kept.map((p) => [p.month, p.year, p.beyondCarryForward, p.kept])).toEqual([['june', Y - 1, false, false], ['november', Y - 2, true, true]]);
+      expect(await tooOld(a.id)).toEqual([]);
+      expect(await one(`select new_data->>'via' as via from audit_log where action = 'OFFER_ITEM_UPDATED' and entity_id = $1 and new_data ? 'keptPriorSeriesIds'`, [paper.id]))
+        .toEqual({ via: 'the check list (keep it)' });
+
+      // Next year's session copied from it: the list moved a year, the kept exam kept — not asked again.
+      const b = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y + 1, label, copyFromSessionId: a.id } }));
+      const copied = (await apiResponse(coordinator.api.v1.sessions[':id'].$get({ param: { id: b.id } }))).offerings.find((o) => o.referenceCode === '0970')!;
+      const moved = copied.rows.find((r) => r.kind === 'paper')!;
+      expect(moved.allowedPriorSittings.map((p) => [p.month, p.year, p.beyondCarryForward, p.kept])).toEqual([['june', Y, false, false], ['november', Y - 1, true, true]]);
+      expect(await tooOld(b.id)).toEqual([]);
+
+      // An older one she adds later is a new question: asked until she keeps it too.
+      await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: b.id, offeringId: copied.id }, json: {
+        rows: copied.rows.map((r) => ({ id: r.id, kind: r.kind as 'all_papers', cells: r.cells,
+          ...(r.id === moved.id ? { allowedPriorSittings: [{ month: 'june' as const, year: Y }, { month: 'november' as const, year: Y - 1 }, { month: 'june' as const, year: Y - 1 }] } : {}) })),
+      } }));
+      expect(await tooOld(b.id)).toEqual([expect.stringContaining(`June ${Y - 1} is older than the board carries a result forward`)]);
+    });
+
+    it('a printed code in doubt on a paper row (4MA1H, 4MA2H at 9,840) is offered both readings; read as the whole qualification it prices all papers and the papers keep their fees', async () => {
+      const s = await apiResponse(coordinator.api.v1.sessions.$post({ json: { type: 'june', year: Y, label: `${label}-ma` } }));
+      const ma = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({ param: { id: s.id }, json: { referenceCode: '4MA1' } }));
+      const key = (k: string) => ma.rows.find((r) => r.referenceKey === k)!.id;
+      // June's list: 4,600 a paper, so all papers 9,200 (the sum of its papers).
+      for (const k of ['paper-1h', 'paper-2h']) {
+        await apiResponse(coordinator.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: s.id, rowId: key(k) }, json: { amount: 4600 } }));
+      }
+      const fees = async () => Object.fromEntries((await apiResponse(coordinator.api.v1.sessions[':id'].prices.$get({ param: { id: s.id } }))).rows
+        .filter((r) => r.offeringId === ma.id).map((r) => [ma.rows.find((x) => x.id === r.rowId)!.referenceKey, [r.examFee, r.examFeeSource]]));
+      expect(await fees()).toEqual({ 'all-papers': [9200, 'units_sum'], 'paper-1h': [4600, 'typed'], 'paper-2h': [4600, 'typed'] });
+
+      const text = '4MA1H    Mathematics A Paper 1H     9,840\n4MA2H    Mathematics A Paper 2H     9,840';
+      const parsed = await apiResponse(coordinator.api.v1.sessions[':id']['price-lists'].parse.$post({ param: { id: s.id }, json: { board: 'pearson_edexcel', text } }));
+      expect(parsed.rows.map((r) => [r.code, r.amount, r.matches.map((m) => [m.matchedKey, m.toCheck, m.readings?.map((x) => [x.reading, x.matchedKey, x.rowIds])])])).toEqual([
+        ['4MA1H', 9840, [['4MA1:paper-1h', true, [['paper', '4MA1:paper-1h', [key('paper-1h')]], ['whole', '4MA1:all-papers', [key('all-papers')]]]]]],
+        ['4MA2H', 9840, [['4MA1:paper-2h', true, [['paper', '4MA1:paper-2h', [key('paper-2h')]], ['whole', '4MA1:all-papers', [key('all-papers')]]]]]],
+      ]);
+      const lines = parsed.rows.map((r) => ({ lineNo: r.lineNo, code: r.code, name: r.name, amount: r.amount }));
+      // Not read yet: shown with both readings, nothing applied.
+      const unread = await apiResponse(coordinator.api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: { board: 'pearson_edexcel', name: `Edexcel November 2026 ${RUN}`, rows: lines } }));
+      expect(unread.toConfirm.map((t) => [t.code, t.readings?.map((x) => x.reading)])).toEqual([['4MA1H', ['paper', 'whole']], ['4MA2H', ['paper', 'whole']]]);
+      expect(await fees()).toEqual({ 'all-papers': [9200, 'units_sum'], 'paper-1h': [4600, 'typed'], 'paper-2h': [4600, 'typed'] });
+      // Read as the whole qualification: all papers 9,840 from the list; the papers keep June's fees.
+      const whole = await apiResponse(coordinator.api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: {
+        board: 'pearson_edexcel', name: `Edexcel November 2026 ${RUN}`, rows: lines.map((l) => ({ ...l, reading: 'whole' as const })),
+      } }));
+      expect(whole).toMatchObject({ saved: true, matched: 2, toConfirm: [] });
+      expect(await fees()).toEqual({ 'all-papers': [9840, 'list'], 'paper-1h': [4600, 'typed'], 'paper-2h': [4600, 'typed'] });
+      // Read per paper instead (her other choice): each paper 9,840; all papers, now hers from the list, stays.
+      await apiResponse(coordinator.api.v1.sessions[':id']['price-lists'].$post({ param: { id: s.id }, json: {
+        board: 'pearson_edexcel', name: `Edexcel November 2026 per paper ${RUN}`, rows: lines.map((l) => ({ ...l, reading: 'paper' as const })),
+      } }));
+      expect(await fees()).toEqual({ 'all-papers': [9840, 'list'], 'paper-1h': [9840, 'list'], 'paper-2h': [9840, 'list'] });
+    });
   });
 });

@@ -443,7 +443,8 @@ export async function checkListOf(executor: Executor, s: SessionRow): Promise<Ch
           });
         }
       }
-      for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward)) {
+      // One she kept on purpose ("Keep it", carried by a copy) is not asked again (P2's L9); the editor still warns.
+      for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward && !x.kept)) {
         items.push({
           code: 'carried_from_too_old', severity: 'look', offeringId: o.id, rowId: r.id,
           message: `${name} — ${r.label}: ${p.month.charAt(0).toUpperCase()}${p.month.slice(1)} ${p.year} is older than the board carries a result forward (kept: her list)`,

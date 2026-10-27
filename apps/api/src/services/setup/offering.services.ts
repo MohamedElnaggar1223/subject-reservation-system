@@ -40,7 +40,7 @@ import { rowLabel, labelRowOf } from './labels';
 import { WHOLE_ITEM_LABEL } from '@repo/validations';
 import {
   availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
-  NO_CELLS, isLiveStatus, LIVE_LINE_STATUSES, type Cells,
+  NO_CELLS, isLiveStatus, LIVE_LINE_STATUSES, beyondCarryForward, type Cells,
 } from './model';
 import {
   planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact, type RepricedLine,
@@ -317,7 +317,7 @@ type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: 
  */
 async function writeRow(
   tx: Tx, c: RowContext, input: OfferingRowInputType, existing: ItemRow | null, sortOrder: number, lines: Awaited<ReturnType<typeof linesOfRows>>,
-  opts: { defaultsReviewed?: boolean; cellsByDefault?: string[] } = {},
+  opts: { defaultsReviewed?: boolean; cellsByDefault?: string[]; keptPriorSittings?: { month: string; year: number }[] } = {},
 ): Promise<RowWrite> {
   const now = new Date();
   const kind = input.kind;
@@ -370,6 +370,13 @@ async function writeRow(
   const needsPrior = needsPriorFor(kind, c.board.onePaperAsksSitting);
   const priorList = input.allowedPriorSittings ?? (!existing && needsPrior ? await defaultPriorSittings(tx, c, seriesId!) : undefined);
   const priors = await priorSittings(tx, c, priorList, seriesId!);
+  // The older earlier exams she kept on purpose (D6, P2's L9): only ones still on the list; a copy names its own.
+  const allowedNow = priors ?? existing?.allowedPriorSeriesIds ?? [];
+  let keptPriors = (existing?.keptPriorSeriesIds ?? []).filter((id) => allowedNow.includes(id));
+  if (opts.keptPriorSittings && allowedNow.length) {
+    const listed = await tx.select({ id: boardSeries.id, month: boardSeries.month, year: boardSeries.year }).from(boardSeries).where(inArray(boardSeries.id, allowedNow));
+    keptPriors = allowedNow.filter((id) => listed.some((p) => p.id === id && opts.keptPriorSittings!.some((k) => k.month === p.month && k.year === p.year)));
+  }
   const closesAt = input.closesAt !== undefined ? input.closesAt : existing?.closesAt ?? null;
   const payBy = input.payBy !== undefined ? input.payBy : existing?.payBy ?? null;
   // The exam fee: typed, or the board rule / sum of units filled in (price-list.services fills those).
@@ -396,6 +403,7 @@ async function writeRow(
     needsPriorSeries: needsPrior,
     exclusiveGroup: exclusiveGroupFor(kind),
     allowedPriorSeriesIds: priors ?? existing?.allowedPriorSeriesIds ?? [],
+    keptPriorSeriesIds: keptPriors,
     sortOrder,
     cellsByDefault,
   };
@@ -415,7 +423,8 @@ async function writeRow(
     label: existing.label, kind: existing.kind, referenceKey: existing.referenceKey, referenceCodes: existing.referenceCodes, boardSeriesId: existing.boardSeriesId,
     closesAt: existing.closesAt, payBy: existing.payBy, examFee: existing.examFee, examFeeSource: existing.examFeeSource, priceListRowId: existing.priceListRowId,
     courseFee: existing.courseFee, selfStudyFee: existing.selfStudyFee, ...cellsOf(existing), availability: existing.availability,
-    needsPriorSeries: existing.needsPriorSeries, exclusiveGroup: existing.exclusiveGroup, allowedPriorSeriesIds: existing.allowedPriorSeriesIds, sortOrder: existing.sortOrder,
+    needsPriorSeries: existing.needsPriorSeries, exclusiveGroup: existing.exclusiveGroup, allowedPriorSeriesIds: existing.allowedPriorSeriesIds,
+    keptPriorSeriesIds: existing.keptPriorSeriesIds, sortOrder: existing.sortOrder,
     cellsByDefault: existing.cellsByDefault,
   };
   const diff = Object.fromEntries(Object.entries(values).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify((before as Record<string, unknown>)[k])));
@@ -585,7 +594,10 @@ export async function copyOfferingInto(tx: Tx, session: SessionRow, src: OfferRo
       sitting, closesAt: roll(r.closesAt), payBy: roll(r.payBy), courseFee: r.courseFee, selfStudyFee: r.selfStudyFee, cells: cellsOf(r),
       allowedPriorSittings: priors.map((p) => ({ month: p.month as 'june', year: p.year + years })),
       teachers: ownTeachers.length ? ownTeachers.map((t) => ({ teacherId: t.teacherId, online: t.mode === 'online', external: false })) : null,
-    }, null, r.sortOrder, []);
+    }, null, r.sortOrder, [], {
+      // The older earlier exams she kept stay kept, moved the same years (the mock's decision 4; P2's L9).
+      keptPriorSittings: priors.filter((p) => r.keptPriorSeriesIds.includes(p.id)).map((p) => ({ month: p.month, year: p.year + years })),
+    });
     // Last cycle's exam fee and where it came from (a list's row stays with its own session).
     if (r.examFee !== null) {
       await tx.update(sessionOfferItem).set({ examFee: r.examFee, examFeeSource: r.examFeeSource ?? 'typed' }).where(eq(sessionOfferItem.id, written.id));
@@ -712,6 +724,23 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         }
         await detachUnusedSeries(tx, sessionId);
       }
+      // Her "Keep it" (D6, P2's L9): every earlier exam older than the board carries a result forward, on the rows as
+      // saved now, kept on purpose — the check list leaves it, and a copy keeps it so.
+      if (data.olderSittingsKept) {
+        const nowRows = await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offeringId)).orderBy(asc(sessionOfferItem.id));
+        const sIds = [...new Set(nowRows.flatMap((r) => [r.boardSeriesId, ...r.allowedPriorSeriesIds]).filter((x): x is string => !!x))];
+        const sittings = new Map((sIds.length ? await tx.select({ id: boardSeries.id, month: boardSeries.month, year: boardSeries.year }).from(boardSeries).where(inArray(boardSeries.id, sIds)) : [])
+          .map((x) => [x.id, x]));
+        for (const r of nowRows) {
+          const here = r.boardSeriesId ? sittings.get(r.boardSeriesId) : undefined;
+          const older = r.allowedPriorSeriesIds.filter((id) => { const p = sittings.get(id); return !!p && beyondCarryForward(here, p, board.carryForwardMonths); });
+          const kept = r.allowedPriorSeriesIds.filter((id) => r.keptPriorSeriesIds.includes(id) || older.includes(id));
+          if (JSON.stringify(kept) === JSON.stringify(r.keptPriorSeriesIds)) continue;
+          await tx.update(sessionOfferItem).set({ keptPriorSeriesIds: kept, updatedAt: now }).where(eq(sessionOfferItem.id, r.id));
+          await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', r.id, { keptPriorSeriesIds: r.keptPriorSeriesIds }, { keptPriorSeriesIds: kept, via: 'the check list (keep it)' }, ctx, tx);
+          changed = true;
+        }
+      }
       // Her "Looks right" on the default ticks with no rows sent: every row's are hers now.
       if (data.defaultsReviewed && !data.rows) {
         for (const r of rows.filter((x) => x.cellsByDefault.length)) {
@@ -833,7 +862,6 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
     }).concat('__none__'))),
   ]);
   const seriesById = new Map(series.map((s) => [s.id, s]));
-  const order = (m: string, y: number) => y * 12 + ({ january: 1, june: 6, october: 10, november: 11 }[m] ?? 0);
   return offers.map(({ offer, subject: s, boardName, onePaperFeeKey, carryForwardMonths }) => {
     const mine = rows.filter((r) => r.offerId === offer.id);
     const view = mine.map((r) => {
@@ -843,8 +871,9 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
       const priors = r.allowedPriorSeriesIds.map((id) => seriesById.get(id)).filter((x): x is NonNullable<typeof x> => !!x)
         .map((p) => ({
           id: p.id, month: p.month, year: p.year,
-          // D6: older than the board's carry-forward period is a warning, not a refusal.
-          beyondCarryForward: !!(here && carryForwardMonths && order(here.month, here.year) - order(p.month, p.year) > carryForwardMonths),
+          // D6: older than the board's carry-forward period is a warning, not a refusal; kept: she said keep it (L9).
+          beyondCarryForward: beyondCarryForward(here, p, carryForwardMonths),
+          kept: r.keptPriorSeriesIds.includes(p.id),
         }));
       return {
         // As screens show it (D9): "All papers", "Paper 41/42 only"; in Arabic too.

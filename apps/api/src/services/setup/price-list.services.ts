@@ -66,7 +66,7 @@ async function referenceFor(executor: Executor, sessionId: string, board: string
     : [];
   const refs = rowRows.map((r) => {
     const s = subjectRows.find((x) => x.id === r.referenceSubjectId)!;
-    return { subjectCode: s.code, subjectName: s.name, key: r.key, label: r.labelEn };
+    return { subjectCode: s.code, subjectName: s.name, key: r.key, label: r.labelEn, kind: r.kind };
   });
   const subjects: SubjectsFile = subjectRows.map((s) => ({
     code: s.code, name: s.name, group: s.group as 'O.L.' | 'A.S./A.L.', level: s.level as 'igcse' | 'as_al', confirmed: s.confirmed,
@@ -83,8 +83,13 @@ async function referenceFor(executor: Executor, sessionId: string, board: string
   return { refs, subjects, aliases: b?.aliases ?? [], rows };
 }
 
-/** A line's match: the reference row and the session's rows of it; `toCheck` (an alias in doubt) is applied only when confirmed. */
-type Target = { matchedKey: string; label: string; rowIds: string[]; toCheck?: true; note?: string };
+/**
+ * A line's match: the reference row and the session's rows of it; `toCheck` (an alias in doubt) is applied only when
+ * confirmed. A paper row's code in doubt has a second reading (P2's L9, the mock's decision 5): the whole
+ * qualification — its subject's all-papers row — as the November 2026 list's 4MA1H / 4MA2H at 9,840 may mean.
+ */
+type Reading = { reading: 'paper' | 'whole'; matchedKey: string; label: string; rowIds: string[] };
+type Target = { matchedKey: string; label: string; rowIds: string[]; toCheck?: true; note?: string; readings?: Reading[] };
 
 /**
  * What a printed code reaches: the reference rows P0's matcher finds through the printed price codes and the
@@ -102,7 +107,21 @@ function targetsOf(printed: string, ref: Reference): Target[] {
     };
   };
   const matches = matchPrintedCode(printed, { aliases: ref.aliases }, ref.subjects);
-  if (matches.length) return matches.map((m) => target(m.subject, m.row, m.toCheck ? { toCheck: true as const, note: m.note } : {}));
+  if (matches.length) {
+    return matches.map((m) => {
+      if (!m.toCheck) return target(m.subject, m.row);
+      const own = target(m.subject, m.row);
+      const kind = ref.refs.find((x) => x.subjectCode === m.subject && x.key === m.row)?.kind;
+      const whole = kind === 'paper' ? ref.refs.find((x) => x.subjectCode === m.subject && x.kind === 'all_papers') : undefined;
+      const wholeTarget = whole ? target(m.subject, whole.key) : null;
+      // Two readings only where there is a second one (a paper row of a subject with an all-papers row).
+      const readings: Reading[] | undefined = wholeTarget ? [
+        { reading: 'paper', matchedKey: own.matchedKey, label: own.label, rowIds: own.rowIds },
+        { reading: 'whole', matchedKey: wholeTarget.matchedKey, label: `${wholeTarget.label} (the whole qualification)`, rowIds: wholeTarget.rowIds },
+      ] : undefined;
+      return { ...own, toCheck: true as const, note: m.note, ...(readings ? { readings } : {}) };
+    });
+  }
   const wanted = new Set(printedCodeCandidates(printed));
   const byOwnCode = ref.subjects.flatMap((s) => s.rows.filter((r) => r.codes.some((c) => wanted.has(normalizePrintedCode(c)))).map((r) => ({ subject: s.code, key: r.key })));
   if (byOwnCode.length === 1) return [target(byOwnCode[0]!.subject, byOwnCode[0]!.key)];
@@ -244,14 +263,27 @@ export async function applyPriceList(sessionId: string, input: ApplyPriceListTyp
       const priceRows = new Set<string>();
       let matched = 0;
       const unmatched: { code: string; name: string; amount: number }[] = [];
-      // A match through an alias in doubt (toCheck) is shown for her to confirm, never applied silently.
-      const toConfirm: { code: string; name: string; amount: number; label: string; note: string | null }[] = [];
+      // A match through an alias in doubt (toCheck) is shown for her to confirm, never applied silently; once she
+      // reads it, per paper (its own row) or as the whole qualification (the all-papers row: P2's L9).
+      const toConfirm: { code: string; name: string; amount: number; label: string; note: string | null; readings?: Reading[] }[] = [];
+      const wholeAmounts = new Map<string, { code: string; amount: number }>();
       for (const [i, r] of input.rows.entries()) {
         const line = { lineNo: r.lineNo ?? i + 1, code: r.code, name: r.name, amount: r.amount };
-        const all = targetsOf(r.code, ref);
-        const doubtful = all.filter((t) => t.toCheck && !r.confirmed);
+        const reading = r.reading ?? (r.confirmed ? 'paper' : null);
+        const all = targetsOf(r.code, ref).map((t) => {
+          if (!t.toCheck || reading !== 'whole') return t;
+          const whole = t.readings?.find((x) => x.reading === 'whole');
+          if (!whole) throw new SetupError(`${r.code} has no other reading: it is ${t.label}`);
+          for (const id of whole.rowIds) {
+            const before = wholeAmounts.get(id);
+            if (before && before.amount !== r.amount) throw new SetupError(`${before.code} and ${r.code} are read as the whole qualification at different amounts: read them per paper, or leave one out`, 409);
+            wholeAmounts.set(id, { code: r.code, amount: r.amount });
+          }
+          return { matchedKey: whole.matchedKey, label: whole.label, rowIds: whole.rowIds };
+        });
+        const doubtful = all.filter((t) => t.toCheck && !reading);
         for (const t of doubtful) {
-          toConfirm.push({ code: r.code, name: r.name, amount: r.amount, label: t.label, note: t.note ?? null });
+          toConfirm.push({ code: r.code, name: r.name, amount: r.amount, label: t.label, note: t.note ?? null, ...(t.readings ? { readings: t.readings } : {}) });
           await tx.insert(priceListRow).values({ id: randomUUID(), priceListId: listId, lineNo: line.lineNo, code: r.code, name: r.name, amount: r.amount, matchedKey: t.matchedKey, matchedItemId: null });
         }
         const targets = all.filter((t) => !doubtful.includes(t));
@@ -286,7 +318,7 @@ export async function applyPriceList(sessionId: string, input: ApplyPriceListTyp
     return { saved: true, impact: out.impact, listId: out.listId, matched: out.matched, unmatched: out.unmatched, toConfirm: out.toConfirm, rowsPriced: out.rowsPriced };
   } catch (err) {
     if (err instanceof ImpactPending) {
-      return { saved: false, impact: err.impact, listId: null, matched: 0, unmatched: [] as { code: string; name: string; amount: number }[], toConfirm: [] as { code: string; name: string; amount: number; label: string; note: string | null }[], rowsPriced: 0 };
+      return { saved: false, impact: err.impact, listId: null, matched: 0, unmatched: [] as { code: string; name: string; amount: number }[], toConfirm: [] as { code: string; name: string; amount: number; label: string; note: string | null; readings?: Reading[] }[], rowsPriced: 0 };
     }
     setupRethrow(err);
   }
