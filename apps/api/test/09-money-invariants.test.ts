@@ -1299,8 +1299,10 @@ describe('money invariants over the whole database', () => {
   it("every line's basis matches its row's fees: the exam fee and the course fee it was priced from, unless a later change left it to finance (§6, E7) or a move took it to another row", async () => {
     // A row's fee changed after a line was reserved re-prices the line (its basis follows) or, with a payment
     // history, lists it for finance and leaves it as it was; a line no longer live keeps what it had. P1c: a line the
-    // admin's move or a series correction took to a row of another sitting keeps its price (§12: "matches its row's
-    // fees at reservation"; a move re-prices nothing since the series' fee grid left) — its move's audit row says so.
+    // admin's move took to a row of another sitting keeps its price (§12: "matches its row's fees at reservation"; a
+    // move re-prices nothing since the series' fee grid left) — its move's audit row says so, naming both rows — until
+    // a later change of that row's fees re-prices it (LINE_REPRICED). A series correction (LINE_SERIES_MOVED) and a
+    // subject's board change keep the line on its row: those lines match their row like any other (the fix round's L1).
     const broken = await sql(`
       select r.id, r.status, (r.pricing_basis->>'examFee')::numeric as basis_exam, i.exam_fee,
         (r.pricing_basis->>'courseFeeBase')::numeric as basis_course,
@@ -1313,7 +1315,9 @@ describe('money invariants over the whole database', () => {
              ${cents("case when r.mode = 'self_study' and i.self_study_fee is not null then i.self_study_fee else coalesce(i.course_fee, o.course_fee) end")})
         and not exists (select 1 from audit_log a where a.action = 'ROWS_REPRICED'
           and exists (select 1 from jsonb_array_elements(a.new_data->'listedForFinance') l where l->>'id' = r.id))
-        and not exists (select 1 from audit_log a where a.entity_id = r.id and a.action in ('REGISTRATION_SERIES_MOVED', 'LINE_SERIES_MOVED'))
+        and not exists (select 1 from audit_log a where a.entity_id = r.id and a.action = 'REGISTRATION_SERIES_MOVED'
+          and a.previous_data->>'offerItemId' is distinct from a.new_data->>'offerItemId'
+          and not exists (select 1 from audit_log p where p.entity_id = r.id and p.action = 'LINE_REPRICED' and p.created_at > a.created_at))
     `);
     expect(broken).toEqual([]);
   });

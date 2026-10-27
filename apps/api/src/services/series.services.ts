@@ -510,7 +510,8 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       }
       await logActions(moving.map((r) => ({
         userId: actorId, action: 'REGISTRATION_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: r.id,
-        previousData: { boardSeriesId: r.boardSeriesId, offerItemId: r.offerItemId }, newData: { boardSeriesId: target.id, reason: data.reason },
+        previousData: { boardSeriesId: r.boardSeriesId, offerItemId: r.offerItemId },
+        newData: { boardSeriesId: target.id, offerItemId: siblings.get(r.offerItemId) ?? null, reason: data.reason },
       })), tx);
       await redateLines(tx, moving.map((r) => r.id), actorId, 'moved to another series');
 
