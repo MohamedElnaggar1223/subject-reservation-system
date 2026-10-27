@@ -310,10 +310,8 @@ describe('08t: the rework races', () => {
     commit();
     const r = await reserving;
     expect(r.ok).toBe(true);
-    const c = await changing;
-    expect(c.status).toBe(200);
     // It waited for the line (on the offering) and counts it: answered (A3), nothing written until she confirms.
-    expect((await c.json() as { data: { saved: boolean; impact: Impact } }).data).toMatchObject({ saved: false, impact: { repriced: 1, listedForFinance: 0 } });
+    expect(await apiResponse(changing)).toMatchObject({ saved: false, impact: { repriced: 1, listedForFinance: 0 } });
     const [line] = await live(f.studentId, `offer_item_id = '${o.items[0]}'`);
     expect(await one(`select exam_fee::float as fee from session_offer_item where id = $1`, [o.items[0]])).toEqual({ fee: 700 });
     expect(await one(`select price_provisional as p, price_at_registration::float as price from registration where id = $1`, [line!.id])).toEqual({ p: false, price: 1700 });
@@ -344,7 +342,7 @@ describe('08t: the rework races', () => {
     it("the checkout lands first: it pays the price it read; the change, its counts no longer true, is refused (IMPACT_CHANGED) — confirmed again, it lists the line and leaves it", async () => {
       const { line, row, checkout, reprice, setFee } = await setUp('a');
       const release = await holdRowLock('registration', line);
-      let pay: Promise<Res> | undefined;
+      let pay: ReturnType<typeof checkout> | undefined;
       let rp: Promise<Res> | undefined;
       try {
         pay = checkout();
@@ -356,7 +354,7 @@ describe('08t: the rework races', () => {
       }
       const [p, r] = await Promise.all([pay!, rp!]);
       expect(p.status).toBe(201);
-      const paymentId = (await p.json() as { data: { id: string } }).data.id;
+      const paymentId = (await apiResponse(Promise.resolve(p))).id;
       // The line it would have re-priced has a payment now: the counts she confirmed moved, nothing is written.
       expect(await refusedWithCode(Promise.resolve(r))).toMatchObject({ status: 409, code: 'IMPACT_CHANGED' });
       expect(await one(`select exam_fee::float as fee from session_offer_item where id = $1`, [row])).toEqual({ fee: 600 });
@@ -373,8 +371,8 @@ describe('08t: the rework races', () => {
     it('the change lands first: the line re-priced; the checkout that read the old price is refused, nothing is charged', async () => {
       const { line, row, checkout, reprice } = await setUp('b');
       const release = await holdRowLock('registration', line);
-      let rp: Promise<Res> | undefined;
-      let pay: Promise<Res> | undefined;
+      let rp: ReturnType<typeof reprice> | undefined;
+      let pay: ReturnType<typeof checkout> | undefined;
       try {
         rp = reprice();
         await lockWaiters(1);
@@ -384,12 +382,10 @@ describe('08t: the rework races', () => {
         await release();
       }
       const [r, p] = await Promise.all([rp!, pay!]);
-      expect(r.status).toBe(200);
-      expect((await r.json() as { data: { saved: boolean; impact: Impact } }).data).toMatchObject({ saved: true, impact: { repriced: 1, listedForFinance: 0 } });
+      expect(await apiResponse(Promise.resolve(r))).toMatchObject({ saved: true, impact: { repriced: 1, listedForFinance: 0 } });
       expect((await batchOf(row)).repriced.map((x) => x.id)).toEqual([line]);
       const { PRICE_CHANGED_REFUSAL } = await import('../src/services/pricing.services');
-      expect(p.status).toBeGreaterThanOrEqual(400);
-      expect((await p.json() as { error: string }).error).toBe(PRICE_CHANGED_REFUSAL);
+      expect(await refusedWithCode(Promise.resolve(p))).toMatchObject({ status: 400, error: PRICE_CHANGED_REFUSAL, code: 'PRICE_CHANGED' });
       expect(await sql(`select 1 from payment_registration where registration_id = $1`, [line])).toEqual([]);
       expect(money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [line])).p)).toBe(1650);
     });
@@ -807,6 +803,9 @@ describe('08t: the rework races', () => {
       made.push(...r.made);
       expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
       expect(await one(`select series_year as y from registration_session where id = $1`, [sc])).toEqual({ y: Y + 1 });
+      // Nothing changed, the student's line included: its sitting and its price (course 1,000 + exam fee 500).
+      expect(await one(`select board_series_id as s, price_at_registration::float as price from registration where student_id = $1 and session_id = $2`, [f.studentId, sc]))
+        .toEqual({ s: from, price: 1500 });
     });
 
     // "a board change from the Subjects form" and "a board change from the Catalogue" retired (P1c): every subject is
