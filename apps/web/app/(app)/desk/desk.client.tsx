@@ -365,12 +365,12 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground font-display">Registrations</h3>
+              <h3 id="desk-registrations" className="text-sm font-semibold text-foreground font-display">Registrations</h3>
             </div>
             {summary.registrations.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No registrations yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" role="region" aria-labelledby="desk-registrations" tabIndex={0}>
               <table className="w-full min-w-[720px] text-sm">
                 <tbody className="divide-y divide-border">
                   {summary.registrations.map((r) => (
@@ -447,12 +447,12 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           {/* Recent payments */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground font-display">Recent payments</h3>
+              <h3 id="desk-payments" className="text-sm font-semibold text-foreground font-display">Recent payments</h3>
             </div>
             {summary.payments.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No payments yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" role="region" aria-labelledby="desk-payments" tabIndex={0}>
               <table className="w-full min-w-[720px] text-sm">
                 <tbody className="divide-y divide-border">
                   {summary.payments.slice(0, 10).map((p) => (
