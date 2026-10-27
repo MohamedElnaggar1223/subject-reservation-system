@@ -118,6 +118,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
 
       return initiatePayment({
         registrationIds: payableIds,
+        // The prices this page shows: a re-price landing since it was read is refused (PRICE_CHANGED), not charged.
+        expectedPrices: (summary?.registrations ?? []).filter((r) => payableIds.includes(r.id)).map((r) => ({ registrationId: r.id, price: r.priceAtRegistration })),
         paymentMethod: selectedMethod,
         escrowAmountToApply: escrowToApply,
         ...(summary?.familyConsentNeeded.length ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),

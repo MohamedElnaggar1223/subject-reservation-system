@@ -23,7 +23,7 @@
 import {
   db, examBoard, qualification, examUnit, qualificationUnit, qualificationOption, qualificationOptionUnit,
   subject, subjectUnit, registration, boardSeries, user,
-  sessionOfferItem, sessionOfferItemUnit, sessionOfferItemFeeKey, boardFee,
+  sessionOfferItem, sessionOfferItemUnit,
   eq, and, inArray, notInArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -42,9 +42,8 @@ import { attachSeries, detachUnusedSeries, defaultSeriesFor, findOrCreateSeries 
 import { lineItemsFor } from './line.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 import { effectiveDeadlinesOf, effectiveDeadlineFor, redateLines } from './deadline.services';
-import { itemBoardFees, PricingError } from './pricing.services';
-import { lockFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
-import { lockFeeGrids } from '../lib/fee-grid-lock';
+import { PricingError } from './pricing.services';
+import { REFERENCE_RULE_REFUSAL } from './setup/reference.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -173,14 +172,11 @@ export async function getCatalogue() {
 // ─── Boards ──────────────────────────────────────────────────────────────────
 
 export async function updateBoard(code: string, data: UpdateBoardType, actorId: string, actorRole: string | null | undefined, ctx?: AuditContext) {
-  // The one-paper fee rule decides what every new one-paper retake of the board costs: the admin's alone, with a
-  // reason (the review of 744e553, item 1), as the board's entry deadline is (MO-10). The rest of the board is the
-  // coordinator's and the admin's, as before.
+  // The one-paper fee rule is the reference data's (P1c's fix round, S3): loaded at every start, an edit here would be
+  // undone silently, so it is refused, unchanged, whoever asks (it was the admin's alone, with a reason). The rest of the
+  // board stays the admin's to edit, as before (its series months are unioned with the reference's, never dropped).
   const { reason, ...fields } = data;
-  if (fields.onePaperFeeKey !== undefined) {
-    if (actorRole !== ROLES.ADMIN) throw new CatalogueError("Only an admin changes a board's one-paper fee rule: it decides what every new one-paper retake costs", 403);
-    if (!reason) throw new CatalogueError("Say why the board's one-paper fee rule changes");
-  }
+  if (fields.onePaperFeeKey !== undefined) throw new CatalogueError(REFERENCE_RULE_REFUSAL("The board's one-paper fee rule"), 409);
   return db.transaction(async (tx) => {
     const [b] = await tx.select().from(examBoard).where(eq(examBoard.code, code)).for('update');
     if (!b) throw new CatalogueError('Board not found', 404);
@@ -409,7 +405,6 @@ export async function updateOption(id: string, data: UpdateQualificationOptionTy
  */
 export async function mapRegistrable(subjectId: string, data: MapRegistrableType, actorId: string, ctx?: AuditContext) {
   const names = await boardNames();
-  let repricedOut: RepricedLine[] = [];
   const result = await withStudentsFirst((extra) => db.transaction(async (tx) => {
     const locked = await lockStudentsOfSubject(tx, subjectId, extra);
     const [s] = await tx.select().from(subject).where(eq(subject.id, subjectId)).for('update');
@@ -447,9 +442,8 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
 
     const before = await tx.select({ unitId: subjectUnit.unitId }).from(subjectUnit).where(eq(subjectUnit.subjectId, subjectId));
     // The board changes: its live registrations follow it (IS-14).
-    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names, ctx) : { moved: [], repriced: [] as RepricedLine[] };
+    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names, ctx) : { moved: [] };
     const moved = change.moved;
-    repricedOut = change.repriced;
     await tx.update(subject).set({ qualificationId: q?.id ?? null, updatedAt: new Date() }).where(eq(subject.id, subjectId));
     await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, subjectId));
     if (data.unitIds.length) await tx.insert(subjectUnit).values(data.unitIds.map((unitId) => ({ subjectId, unitId })));
@@ -460,7 +454,6 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
       ctx, tx);
     return { subjectId, boardCode: data.boardCode, qualificationId: q?.id ?? null, unitIds: data.unitIds, registrationsMoved: moved.length };
   }));
-  await tellBoardChangePrices(repricedOut);
   return result;
 }
 
@@ -478,14 +471,13 @@ export const BOARD_CHANGE_REFUSAL = (subjectName: string, sessionName: string) =
  * REWORK.md §3.3): each item of an open or draft session moves to the default series of the new
  * board for its session (created with no dates when not on record) with its live lines, and —
  * the old board's award and units being cleared — enters the subject row itself until it is
- * mapped again (its fee read for the row). Every move is audited. Refused, with nothing
- * changed, by followBoardChange's rules (MO-10: a board change never moves an entry across
- * deadlines). The subject screen's board field and the Catalogue's mapping both come here.
+ * mapped again. Every move is audited; a moved line keeps its price (P1c: lines are priced by
+ * their row, the series' fee grid and its carried fees left). Refused, with nothing changed, by
+ * followBoardChange's rules (MO-10: a board change never moves an entry across deadlines). The
+ * subject screen's board field and the Catalogue's mapping both come here.
  *
  * Locks, in order: the subject (caller), the affected students (FOR NO KEY UPDATE, as a
- * reservation takes them), the items, the subject's fee rows in the series they go to (FOR SHARE,
- * after the old board's fee is carried there: Confirm's order, fee rows then lines — the review of
- * 40c1447), the lines (id order), the series involved.
+ * reservation takes them), the items, the lines (id order), the series involved.
  */
 export async function applyBoardChange(
   tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, locked: Set<string>, names?: Map<string, string>, ctx?: AuditContext,
@@ -513,20 +505,15 @@ export async function applyBoardChange(
   for (const it of plan.items) {
     await attachSeries(tx, it.sessionId, it.to, actorId);
     await tx.delete(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, it.id));
-    await tx.delete(sessionOfferItemFeeKey).where(eq(sessionOfferItemFeeKey.itemId, it.id));
-    await tx.insert(sessionOfferItemFeeKey).values({ id: randomUUID(), itemId: it.id, keyKind: 'subject', subjectId: s.id });
     await tx.update(sessionOfferItem).set({ boardSeriesId: it.to, entersKind: 'subject', qualificationId: null, qualificationOptionId: null, updatedAt: now })
       .where(eq(sessionOfferItem.id, it.id));
   }
   for (const m of plan.moved) {
     await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: now }).where(eq(registration.id, m.id));
   }
-  // Each student's lines checked again where they now are (§6), then priced from the new board's
-  // grid (the old board's fee came across provisional above where finance has none).
-  let repriced: RepricedLine[] = [];
+  // Each student's lines checked again where they now are (§6).
   try {
     await recheckLines(tx, plan.moved.map((m) => m.id));
-    repriced = await repriceMovedLines(tx, plan.moved.map((m) => m.id), actorId, why);
   } catch (err) {
     if (err instanceof LineRuleError || err instanceof PricingError) throw new CatalogueError(err.message, 409);
     throw err;
@@ -550,12 +537,8 @@ export async function applyBoardChange(
       previousData: { boardSeriesId: i.from }, newData: { boardSeriesId: i.to, reason: why },
     })), tx);
   }
-  return { moved: plan.moved, repriced };
+  return { moved: plan.moved };
 }
-
-/** After a board change commits: each family whose price it changed is told. */
-export const tellBoardChangePrices = (repriced: RepricedLine[]) =>
-  tellPriceChanged(repriced, "The subject's exam board changed, and with it the board fee");
 
 const sameDeadline = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
 const deadlineText = (d: Date | null) => (d ? schoolDate(d) : 'none set');
@@ -617,7 +600,7 @@ async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoar
   // while the change waited for the subject sends it round again with that student first.
   assertStudentsLocked(locked, live.map((l) => l.studentId));
   await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(inArray(sessionOfferItem.id, items.map((i) => i.id))).orderBy(sessionOfferItem.id).for('update');
-  // Where each item goes, and the fee it will read there, before the lines (Confirm's order).
+  // Where each item goes, before the lines.
   const level = s.qualificationLevel === 'igcse' ? 'igcse' : s.qualificationLevel === 'as_level' ? 'as' : 'a_level';
   const targets = new Map<string, string>();
   for (const it of items) {
@@ -628,28 +611,6 @@ async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoar
       throw new CatalogueError(`${it.sessionName}: ${err instanceof Error ? err.message : 'no series of the new board fits'}`);
     }
   }
-  // The subject stays reservable in the new board's series: its fee there, when finance has not
-  // set one, is the old board's amount, **provisional** — priced, not payable until finance
-  // confirms the new board's fee on the Fees tab (RESERVATIONS_REWORK.md §3.4). Then the
-  // subject's row in each of those series is held FOR SHARE: a Confirm of it waits for the change
-  // and reaches the moved lines, or lands first and is read confirmed (the review of 40c1447).
-  const why = `The subject's board changed to ${boardName(names, newBoard)}`;
-  await lockFeeGrids(tx, targets.values(), 'shared');
-  const oldFees = await itemBoardFees(tx, items.map((i) => i.id));
-  for (const it of items) {
-    const to = targets.get(it.id)!;
-    const was = oldFees.get(it.id)?.amount;
-    if (was === null || was === undefined) continue;
-    const [carried] = await tx.insert(boardFee).values({
-      id: randomUUID(), boardSeriesId: to, keyKind: 'subject', subjectId: s.id, amount: was, provisional: true,
-      zeroReason: was === 0 ? 'Carried by a board change' : null, createdBy: actorId,
-    }).onConflictDoNothing().returning({ id: boardFee.id });
-    if (carried) {
-      await logAction(actorId, 'BOARD_FEES_SET', 'board_fee', carried.id, null,
-        { boardSeriesId: to, keyKind: 'subject', keyId: s.id, amount: was, provisional: true, reason: `${why}: the old board's fee, provisional until confirmed` }, undefined, tx);
-    }
-  }
-  await lockFeeRows(tx, [...new Set(targets.values())].map((seriesId) => ({ seriesId, keyKind: 'subject', keyId: s.id })));
   const lines = live.length ? await tx.select().from(registration).where(inArray(registration.id, live.map((l) => l.id))).orderBy(registration.id).for('update') : [];
   const now = new Date();
   const current = await effectiveDeadlinesOf(tx, lines.map((l) => l.id));

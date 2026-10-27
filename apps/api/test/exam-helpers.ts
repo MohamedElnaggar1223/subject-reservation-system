@@ -4,9 +4,10 @@
  * with a Cambridge AS syllabus (three components, two option codes) and a Pearson IAL award (two W
  * units and the cash-in), a winter session whose offers' items enter them — the Cambridge syllabus
  * whole (an award item, in Cambridge's November), Pearson's P1 (a units item, in Pearson's January)
- * and the whole Pearson award (an award item) — each with its board fee in its series' grid,
- * families reserved and paid at the desk (lines and consent), and the teachers who teach them.
- * Everything goes through the API.
+ * and the whole Pearson award (an award item) — each at its exam fee of 500 (its row's own since P1c: the
+ * series' fee grid left), families reserved and paid at the desk (lines and consent), and the teachers who
+ * teach them. Everything goes through the API but what a row enters with the board: no route sets it since
+ * the links sheet's item routes left with P1c, so it is written as converted data holds it (0066 kept it).
  *
  * Every code carries the suite's tag, so suites sharing the database never collide in the
  * catalogue; the session and the series carry it as their label. Subjects are made through the
@@ -14,7 +15,7 @@
  */
 import { expect } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import { admin, staff, onboard, one, CONSENT, type Client } from './helpers';
+import { admin, staff, onboard, one, sql, CONSENT, type Client } from './helpers';
 
 const DAY = 24 * 60 * 60 * 1000;
 const cairoDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
@@ -86,7 +87,7 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
   await map(sp1, 'pearson_edexcel', pAward.id, [pu1]);
   await map(spx, 'pearson_edexcel', pAward.id, []);
 
-  // ─── The series, their fee grids, and the session's offers ───────────────
+  // ─── The series and the session's offers ─────────────────────────────────
   const now = Date.now();
   const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', month: 'november' | 'january', deadlineDays: number) =>
     (await apiResponse(adm.api.v1['board-series'].$post({ json: {
@@ -94,22 +95,43 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
     } }))).id;
   const cambridgeNov = await mkSeries('cambridge', 'november', 5);
   const pearsonJan = await mkSeries('pearson_edexcel', 'january', 6);
-  const fee = (seriesId: string, keyKind: 'qualification' | 'unit', keyId: string) =>
-    apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind, keyId, amount: 500, provisional: false }] } }));
-  await fee(cambridgeNov, 'qualification', cSyllabus.id);
-  await fee(pearsonJan, 'unit', pu1);
-  await fee(pearsonJan, 'qualification', pAward.id);
   const sessionId = (await apiResponse(adm.api.v1.sessions.$post({ json: {
     type, year: seriesYearInAcademicYear('november', Y), label: `exams ${tag}`,
     startDate: new Date(now - DAY).toISOString(), endDate: new Date(now + 3 * DAY).toISOString(),
     courseStartsOn: cairoDate(new Date(now)), paymentDueAt: new Date(now + 3 * DAY).toISOString(),
   } })))!.id;
+  // Its prices final (E6), as the suites' sessions are (helpers.session): the rows' fees are the school's own.
+  await apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: sessionId }, json: { final: true } }));
   type ItemIn = { label: string; kind: 'whole' | 'unit'; enters: { kind: 'award'; qualificationId: string } | { kind: 'units'; unitIds: string[] }; boardSeriesId: string };
-  const offerOf = async (subjectId: string, teachers: string[], item: ItemIn) =>
-    (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: sessionId },
-      json: { subjectId, courseFee: 1000, teachers: teachers.map((t) => ({ teacherId: t, mode: 'in_school' as const })), items: [{ ...item, availability: 'open' as const, requiredInSeries: false }] },
-    })))!.items[0]!;
+  /** A subject offered through the coordinator's routes: one row in the item's sitting at an exam fee of 500, what it enters set as data. */
+  const offerOf = async (subjectId: string, teachers: string[], item: ItemIn) => {
+    const subj = await one<{ name: string; code: string; council: 'cambridge' | 'pearson_edexcel' }>(`select name, code, council from subject where id = $1`, [subjectId]);
+    const made = await apiResponse(adm.api.v1.sessions[':id'].offerings.$post({
+      param: { id: sessionId }, json: { custom: { board: subj.council, name: subj.name, level: 'as_al', group: 'A.S./A.L.', code: subj.code } },
+    }));
+    const month = (await one<{ month: string }>(`select month from board_series where id = $1`, [item.boardSeriesId])).month;
+    await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: sessionId, offeringId: made.id },
+      json: {
+        accepting: true, courseFee: 1000, teachers: teachers.map((teacherId) => ({ teacherId, online: false, external: false })),
+        rows: [{
+          kind: item.kind === 'unit' ? 'unit' : 'all_papers', ...(item.kind === 'unit' ? { name: item.label } : {}), sitting: month === 'january' ? 'january' : 'november',
+          examFee: 500, cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false },
+        }],
+      },
+    }));
+    const row = await one<{ id: string; series: string }>(`select id, board_series_id as series from session_offer_item where offer_id = $1`, [made.id]);
+    expect(row.series).toBe(item.boardSeriesId);
+    // (helpers.sql binds its values in the order the placeholders appear, so they are written in that order.)
+    if (item.enters.kind === 'award') {
+      await sql(`update session_offer_item set enters_kind = 'award', qualification_id = $1 where id = $2`, [item.enters.qualificationId, row.id]);
+    } else {
+      // A units row enters its subject's award's units, as the old route set it.
+      await sql(`update session_offer_item set enters_kind = 'units', qualification_id = (select qualification_id from subject where id = $1) where id = $2`, [subjectId, row.id]);
+      for (const unitId of item.enters.unitIds) await sql(`insert into session_offer_item_unit (item_id, unit_id) values ($1, $2)`, [row.id, unitId]);
+    }
+    return row.id;
+  };
   const items = {
     sc: await offerOf(sc, [teacherId, teacher2Id], { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: cSyllabus.id }, boardSeriesId: cambridgeNov }),
     sp1: await offerOf(sp1, [teacherId], { label: 'P1', kind: 'unit', enters: { kind: 'units', unitIds: [pu1] }, boardSeriesId: pearsonJan }),

@@ -324,7 +324,7 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
   const items = sessionId ? v.mapping.sessionItems[sessionId] ?? [] : [];
   const [sitting, setSitting] = useState(() => edits.priorSitting ?? (first?.priorSitting ? { month: first.priorSitting.month, year: first.priorSitting.year } : { month: 'june', year: new Date().getFullYear() }));
   const teacherName = (id: string | null) => (id ? v.options.teachers.find((t) => t.id === id)?.name ?? null : null);
-  const itemOption = (it: (typeof items)[number]) => `${it.subjectName} — ${it.label}${it.series ? ` · ${it.series}` : ''}${it.availability === 'closed' ? ' · closed' : ''}`;
+  const itemOption = (it: (typeof items)[number]) => `${it.subjectName} — ${it.label}${it.series ? ` · ${it.series}` : ''}${it.closed ? ' · closed' : ''}`;
   // The forms' "One paper ONLY" is always a retake: the plan makes a one-paper line one whatever is chosen
   // (F6a, the lead's decision of 11 Oct 2026), so "First entry" on it selected and changed nothing (F6a's
   // review). When every line is one paper there is no entry to choose; a split with other items keeps it.

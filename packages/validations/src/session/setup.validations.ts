@@ -215,6 +215,9 @@ export const UpdateOffering = z.object({
   notesReviewed: z.literal(true).optional(),
   // Her "Looks right" on the cells a default ticked: they are hers now (changing a row's cells does it for that row).
   defaultsReviewed: z.literal(true).optional(),
+  // Her "Keep it" on an earlier exam older than the board carries a result forward (D6, P2's L9): every such exam on
+  // the subject's rows, as saved, is kept on purpose — not a check item again, and a copy keeps it so.
+  olderSittingsKept: z.literal(true).optional(),
   expected: ImpactSchema.optional(),
 });
 export type UpdateOfferingType = z.infer<typeof UpdateOffering>;
@@ -244,6 +247,9 @@ export const PriceListRowInput = z.object({
   amount: Money,
   // A line matched through an alias in doubt (the reference's toCheck) is applied only once she confirms it.
   confirmed: z.boolean().optional(),
+  // How she reads a line in doubt (P2's L9; the mock's "Read it as"): per paper — its own row, as `confirmed` — or
+  // the whole qualification — the subject's all-papers row (the papers keep their fees). Either confirms it.
+  reading: z.enum(['paper', 'whole']).optional(),
 });
 
 /** POST /sessions/:id/price-lists — applied: matched rows take the amounts, unpaid lines re-priced. */

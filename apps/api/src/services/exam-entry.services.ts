@@ -58,6 +58,7 @@ import {
   type Executor, type SeriesRow, type Tx,
 } from './exam-shared';
 import { boardSeriesName } from './series.services';
+import { REFERENCE_RULE_REFUSAL } from './setup/reference.services';
 
 /** D7 (COORDINATOR_REWORK.md): a declared sitting is entered as declared — the setting verification.unverifiedAtDeadline left with P1b. */
 const UNVERIFIED_AT_DEADLINE = 'enter_as_declared';
@@ -77,28 +78,27 @@ export async function listBoardRules() {
 }
 
 /**
- * Change a board's entry rules (the coordinator's answers: data, not code). The carry-forward
- * period is written to the board's own column (`exam_board.carry_forward_months`, the reservations
- * rework's step A), which the line rules' gate.priorSeries reads too; the rest to F4's rules row.
- * One audit row in the transaction.
+ * Change a board's entry rules (the coordinator's answers: data, not code) — F4's rules row. The
+ * carry-forward period (`exam_board.carry_forward_months`) is the reference data's since P1c's fix
+ * round and refused here (REFERENCE_RULE_REFUSAL). One audit row in the transaction.
  */
 export async function updateBoardRule(boardCode: string, data: UpdateBoardRuleType, actorId: string, ctx?: AuditContext) {
   const names = await boardNameMap();
   if (!names.has(boardCode)) throw new ExamError('Board not found', 404);
   const { reason, carryForwardMonths, ...fields } = data;
+  // The carry-forward period is the reference data's (P1c's fix round, S3): loaded at every start, an edit here would be
+  // undone silently, so it is refused; the rest of the board's entry rules stay F4's rules row, edited here.
+  if (carryForwardMonths !== undefined) throw new ExamError(REFERENCE_RULE_REFUSAL('The carry-forward period'), 409);
   const values = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-  if (!Object.keys(values).length && carryForwardMonths === undefined) throw new ExamError('Nothing to change', 400);
+  if (!Object.keys(values).length) throw new ExamError('Nothing to change', 400);
   return db.transaction(async (tx) => {
     // The board row first (a rules change and a line's gate.priorSeries read it), then the rules row.
     await tx.select({ code: examBoard.code }).from(examBoard).where(eq(examBoard.code, boardCode)).for('update');
     const before = await boardRulesFor(boardCode, tx);
-    if (carryForwardMonths !== undefined) {
-      await tx.update(examBoard).set({ carryForwardMonths, updatedAt: new Date() }).where(eq(examBoard.code, boardCode));
-    }
     await tx.insert(examBoardRule)
       .values({ boardCode, ...values, updatedBy: actorId })
       .onConflictDoUpdate({ target: examBoardRule.boardCode, set: { ...values, updatedBy: actorId, updatedAt: new Date() } });
-    const changed = { ...values, ...(carryForwardMonths !== undefined ? { carryForwardMonths } : {}) };
+    const changed = values;
     const pick = (o: Record<string, unknown>) => Object.fromEntries(Object.keys(changed).map((k) => [k, o[k] ?? null]));
     await logAction(actorId, 'EXAM_BOARD_RULE_UPDATED', 'exam_board_rule', boardCode, pick(before), { ...pick(changed), reason }, ctx, tx);
     return boardRulesFor(boardCode, tx);

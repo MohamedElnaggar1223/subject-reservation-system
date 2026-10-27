@@ -19,8 +19,8 @@
  * rests on them (a line released in full is paid in full at whatever it costs then).
  *
  * Every path that re-prices a waiting line asks this first and lists the line instead of
- * re-pricing it: the board fee's re-price (`repriceLines`), a series move (`repriceMovedLines`),
- * and a price exception on one line granted or revoked (exception.services).
+ * re-pricing it: a row's price change (setup/reprice.services planReprice) and a price exception on one
+ * line granted or revoked (exception.services). (The fee grid's re-price and a series move's left with P1c.)
  */
 
 import { db, sql } from '@repo/db';

@@ -5,14 +5,39 @@
  * (`loadReference`, @repo/db), never edited by staff.
  */
 
-import { db, examBoard, boardSeries, referenceSubject, referenceRow, sessionBoardSeries, registrationSession, referenceDeadline, and, eq, inArray, asc, sql } from '@repo/db';
-import type { EnterBoardDateType } from '@repo/validations';
+import {
+  db, examBoard, boardSeries, referenceSubject, referenceRow, sessionBoardSeries, registrationSession, referenceDeadline, loadReference, readReferenceDataFiles,
+  and, eq, inArray, asc, sql,
+} from '@repo/db';
+import { BoardsFileSchema, SubjectsFileSchema, REFERENCE_BOARD_CODES, type EnterBoardDateType } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
 import { redateSeriesLines } from '../deadline.services';
 import { SetupError, setupRethrow } from './offering.services';
 import { logger } from '../../lib/logger';
 
 type Executor = Pick<typeof db, 'select'>;
+
+/**
+ * A board's rule that the reference data owns (packages/db/reference/boards.json: one-paper fee, whether a one-paper
+ * retake asks its sitting, carry-forward months): the API loads it at every start (loadReferenceFromFiles), so an edit
+ * made on a screen would be undone silently at the next start. Refused where the parked screens still offered it (the
+ * fix round's S3; §7: staff read the reference data, never edit it — the admin's missing board date is the one exception).
+ */
+export const REFERENCE_RULE_REFUSAL = (what: string) =>
+  `${what} is the board's rule in our reference data, loaded at every start: it is changed there (we maintain it), not here`;
+
+/**
+ * The board's list loaded from the repository's reference files (packages/db/reference, §7) — what
+ * `pnpm --filter @repo/db seed:reference` loads — read through P0's schemas. The API runs it at its start (P1c,
+ * apps/api/src/index.ts): nothing else loaded the list, so a database copied from an older one, or the deployed demo
+ * after its boot migration, had an empty "Pick from the board's list…". Idempotent (loadReference): the same files
+ * change nothing the second time; a date the admin entered from the check list is kept.
+ */
+export async function loadReferenceFromFiles(executor: Parameters<typeof loadReference>[0] = db) {
+  const raw = readReferenceDataFiles(REFERENCE_BOARD_CODES);
+  const subjects = Object.fromEntries(REFERENCE_BOARD_CODES.map((code) => [code, SubjectsFileSchema.parse(raw.subjects[code])]));
+  return loadReference(executor, { boards: BoardsFileSchema.parse(raw.boards), subjects });
+}
 
 const MONTH_NUMBER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 

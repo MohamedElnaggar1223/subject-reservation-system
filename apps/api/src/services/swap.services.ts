@@ -64,7 +64,7 @@ import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
 import { withdrawEntriesOfLineInTx, tellWithdrawn } from './exam-entry.services';
 import { priceLine, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { holdNewLines } from './line.services';
-import { resolveItem, availabilityConstraints } from './offer.services';
+import { resolveItem, cellConstraints, cellsOfRow } from './offer.services';
 import { reserveLines, inheritConsents, writeConsents } from './reservation.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { schoolDate } from './window.services';
@@ -127,7 +127,7 @@ async function storedSwapLine(cr: { newOfferItemId: string | null; newSubjectId:
         .then((i) => (i && i.sessionId === sessionId ? { item: i, offer: i.offer } : null))
     : null;
   const resolved = r ?? (await resolveItem(db, sessionId, cr.newSubjectId!));
-  const c = availabilityConstraints(resolved.offer.availability, resolved.item.availability);
+  const c = cellConstraints(cellsOfRow(resolved.item), resolved.offer.accepting);
   return { offerItemId: resolved.item.id, attempt: 'first', mode: c.selfStudyOnly ? 'self_study' : 'in_school', teacherId: null };
 }
 
@@ -521,8 +521,10 @@ export async function approveChangeRequest(
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
     if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
-    // The new line's series, items, fee grid and fee rows before the old line (§2.1: a Confirm holds
-    // its rows and then wants the lines priced from them, this old line among them).
+    // The new line's session, offering and row before the old line (§2.1): a change that holds them and then wants
+    // the lines priced from what it changed — a price list over both subjects' rows, the session's self-study share,
+    // its prices-final switch — reaches this old line after the new line's row; taken the other way round, the two
+    // would wait on each other (08t "a swap approved while the exam fee of the row it swaps to changes").
     if (cr.type === 'swap' && swap) await holdNewLines(tx, { studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, lines: [swap.line] });
     // Asked again under the line's lock, with its series held: a deadline moved at the same moment
     // waits. The line's receipt first (MA-16's order: a reversal takes the receipt, then the line).

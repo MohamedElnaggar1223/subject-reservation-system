@@ -1,34 +1,19 @@
 /**
- * What a student can reserve in a session — the family's and the desk's read
- * (`GET /v1/registrations/offers`, RESERVATIONS_REWORK.md §5; docs/features/RESERVATIONS.md §2.9).
+ * What a student can reserve in a session — the family's and the desk's read (`GET /v1/registrations/offers`,
+ * COORDINATOR_REWORK.md F1–F3, Appendix A), and the coordinator's live preview of it (`GET /sessions/:id/preview`).
  *
- * Per offer: the subject, its board, availability and teachers; per item: what it enters, its
- * series with the deadline a first entry and a qualifying retake would have, the student's known
- * sittings of what it enters, whether the student already holds a live line on it, and the price
- * of each allowed (attempt, mode), provisional or not. Plus the board's sittings of the last two
- * years for a declared retake. Step B's Reserve pages read it; nothing here writes.
- *
- * Staff's preview of the family's form (F6a, `GET /v1/registrations/offers/preview`, admin and
- * coordinator) is the same read with no student: no eligibility, no earlier sittings, no held line,
- * the deadlines of the series alone, and each price without any family's exception (a first entry
- * in school, a retake in school, a retake in self-study at the settings' shares). Nothing in it is a
- * student's.
- *
- * A one-paper item ("One paper ONLY" on the forms) is always a retake: it offers no first entry
- * (the lead's decision of 11 Oct 2026; assertLineRules refuses one too). Nor does a subject the links
- * sheet gives as "Retake (Self Study ONLY)", or a unit or route marked self study only: retakes in
- * self-study only, but for an item that carries an earlier sitting forward (the A.2. carry forward, its
- * own entry after the AS) — the lead's decisions of 16 Oct 2026, FEATURES_PLAN.md §6, 1; a first entry
- * in self-study elsewhere is the student's exception, asked by assertLineRules.
+ * The family payload: the session's terms, the student's eligibility for new reservations, and one entry per subject
+ * the session offers families, each row's options from its ticked cells with the price beside each (see
+ * familyOfferings). The version-1 read it stood beside — per offer its availability and items, per item its series
+ * and deadlines, the boards' declarable sittings — and staff's v1 preview of the family's form
+ * (`GET /registrations/offers/preview`, F6a) left with P1c. Nothing here writes.
  */
 
-import { db, sql, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc } from '@repo/db';
-import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, IGCSE_NEVER_MONTHS, IAL_UNIT_MONTHS, type SeriesMonth } from '@repo/validations';
+import { db, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc, sql } from '@repo/db';
+import { sessionSeriesMonths, IGCSE_NEVER_MONTHS, IAL_UNIT_MONTHS, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
-import { availabilityConstraints } from './offer.services';
 import { priceLine, PricingError } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
-import { examSittingsOf, examKeysOf } from './reservation.services';
 import { studentRecordOf, knownSittingOf } from './known-sittings.services';
 import { getSetting } from './settings.services';
 import { lineExceptions, coversScope } from './line-exceptions';
@@ -38,212 +23,16 @@ import { optionLabel, rowLabel, sittingLabel, labelRowOf, both } from './setup/l
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
-/** What a student can reserve in a session (the family's and the desk's read). */
+/**
+ * What a student can reserve in a session — the family's and the desk's read (`GET /registrations/offers`): the
+ * session's terms, the student's eligibility for new reservations, and the family payload (`offerings → rows →
+ * options`, below). Its version-1 part (`offers`, `availability`, `grade10Core`, `declarableSittings`) left with P1c:
+ * no screen read it after the exceptions grant form moved to the offerings.
+ */
 export async function offersForStudent(studentId: string, sessionId: string) {
-  const read = await readOffers(sessionId, studentId);
+  const read = await familyOfferings(sessionId, { studentId });
   if (!read) return null;
-  const { preview: _p, ...rest } = read;
-  return { ...rest, eligibility: read.eligibility! };
-}
-
-/** What a family sees in a session, with no student (staff's preview; F6a). */
-export async function offersPreview(sessionId: string) {
-  const read = await readOffers(sessionId, null);
-  if (!read) return null;
-  const { eligibility: _e, ...rest } = read;
-  return rest;
-}
-
-async function readOffers(sessionId: string, studentId: string | null) {
-  const [session] = await db.execute(sql`
-    select id, name, session_type as "sessionType", series_year as "seriesYear", status, start_date as "startDate", end_date as "endDate",
-      payment_due_at as "paymentDueAt", refund_policy as "refundPolicy", course_starts_on as "courseStartsOn"
-    from registration_session where id = ${sessionId}`).then((r) => r.rows as {
-      id: string; name: string; sessionType: string; seriesYear: number; status: string; startDate: Date; endDate: Date;
-      paymentDueAt: Date; refundPolicy: unknown; courseStartsOn: string;
-    }[]);
-  if (!session) return null;
-  const eligibility = studentId ? await mayRegisterFor(studentId, sessionId) : null;
-  const offers = await db.execute(sql`
-    select o.id, o.availability, o.grade10_core as "grade10Core", o.course_fee as "courseFee", o.notes,
-      s.id as "subjectId", s.name as "subjectName", s.code as "subjectCode", s.council as "boardCode", b.name as "boardName",
-      s.qualification_level as "level", s.qualification_id as "subjectQualificationId",
-      coalesce((select array_agg(su.unit_id order by su.unit_id) from subject_unit su where su.subject_id = s.id), '{}') as "subjectUnits"
-    from session_offer o join subject s on s.id = o.subject_id join exam_board b on b.code = s.council
-    where o.session_id = ${sessionId} and o.availability <> 'closed' and s.is_active
-    order by o.sort_order, s.name`).then((r) => r.rows as {
-      id: string; availability: string; grade10Core: boolean; courseFee: string; notes: string | null; subjectId: string; subjectName: string;
-      subjectCode: string; boardCode: string; boardName: string; level: string; subjectQualificationId: string | null; subjectUnits: string[];
-    }[]);
-  const offerIds = offers.map((o) => o.id);
-  const items = offerIds.length ? await db.execute(sql`
-    select i.id, i.offer_id as "offerId", i.label, i.kind, i.enters_kind as "entersKind", i.qualification_id as "qualificationId",
-      i.qualification_option_id as "optionId", i.board_series_id as "seriesId", i.availability, i.exclusive_group as "exclusiveGroup",
-      i.required_in_series as "requiredInSeries", i.needs_prior_series as "needsPriorSeries", i.sort_order as "sortOrder",
-      bs.month, bs.year, bs.label as "seriesLabel", bs.entry_deadline as "entryDeadline", bs.retake_deadline as "retakeDeadline", bs.exams_start as "examsStart",
-      coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units,
-      coalesce((select json_agg(json_build_object('code', eu.code, 'shortCode', eu.short_code, 'level', eu.unit_level) order by eu.code)
-        from session_offer_item_unit u join exam_unit eu on eu.id = u.unit_id where u.item_id = i.id), '[]') as "unitCodes",
-      q.code as "qualificationCode"
-    from session_offer_item i left join board_series bs on bs.id = i.board_series_id left join qualification q on q.id = i.qualification_id
-    where i.offer_id in (${sql.join(offerIds.map((id) => sql`${id}`), sql`, `)}) and i.availability <> 'closed'
-    order by i.sort_order, i.label`).then((r) => r.rows as Record<string, unknown>[]) : [];
-  const teachers = offerIds.length ? await db.execute(sql`
-    select ot.offer_id as "offerId", null as "itemId", t.id, t.name, t.kind, ot.mode, ot.sort_order as "sortOrder" from session_offer_teacher ot join teacher t on t.id = ot.teacher_id
-    where ot.offer_id in (${sql.join(offerIds.map((id) => sql`${id}`), sql`, `)}) and t.is_active
-    union all
-    select null, it.item_id, t.id, t.name, t.kind, it.mode, it.sort_order from session_offer_item_teacher it join teacher t on t.id = it.teacher_id
-    join session_offer_item i on i.id = it.item_id
-    where i.offer_id in (${sql.join(offerIds.map((id) => sql`${id}`), sql`, `)}) and t.is_active`).then((r) => r.rows as { offerId: string | null; itemId: string | null; id: string; name: string; kind: string; mode: string; sortOrder: number }[]) : [];
-  // The student's lines, every session: what they hold here and what they sat before (none in a preview).
-  const history = !studentId ? [] : await db.execute(sql`
-    select r.id, r.session_id as "sessionId", r.offer_item_id as "itemId", r.status, r.board_series_id as "seriesId", r.subject_id as "subjectId",
-      i.enters_kind as "entersKind", i.qualification_id as "qualificationId", rs.name as "sessionName",
-      coalesce((select array_agg(u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units,
-      bs.month, bs.year, b.name as "boardName"
-    from registration r join session_offer_item i on i.id = r.offer_item_id join registration_session rs on rs.id = r.session_id
-    left join board_series bs on bs.id = r.board_series_id left join exam_board b on b.code = bs.board_code
-    where r.student_id = ${studentId}`).then((r) => r.rows as {
-      id: string; sessionId: string; itemId: string; status: string; seriesId: string | null; subjectId: string; entersKind: string;
-      qualificationId: string | null; sessionName: string; units: string[]; month: string | null; year: number | null; boardName: string | null;
-    }[]);
-  const keysOf = (x: { entersKind: string; qualificationId: string | null; subjectId: string; units: string[] }) =>
-    x.entersKind === 'award' || x.entersKind === 'option'
-      ? (x.qualificationId ? [`q:${x.qualificationId}`] : [`s:${x.subjectId}`])
-      : x.entersKind === 'units' ? x.units.map((u) => `u:${u}`) : [`s:${x.subjectId}`];
-  // F4's results and sent entries of this student (step B's known sittings, RESERVATIONS_LINES.md §3.1).
-  const exams = studentId ? await examSittingsOf(studentId) : [];
-  // The student's exceptions "self-study on a first entry", read once for the whole read and matched to each
-  // item below (the decisions' review, low note 2: the check ran a query per item).
-  const firstEntryGates = studentId ? await lineExceptions.held(db, studentId, ['gate.selfStudyFirstEntry']) : [];
-  const now = new Date();
-  const outOffers = [];
-  for (const o of offers) {
-    const its = [];
-    for (const i of items.filter((x) => x.offerId === o.id)) {
-      const c = availabilityConstraints(o.availability, i.availability as string);
-      const seriesId = i.seriesId as string | null;
-      const keys = keysOf({ entersKind: i.entersKind as string, qualificationId: i.qualificationId as string | null, subjectId: o.subjectId, units: i.units as string[] });
-      // An earlier sitting the record knows: a confirmed line only. A dropped line was never sat (B's
-      // review): the family may still declare it, and the school then verifies it.
-      const fromLines = history
-        .filter((h) => h.sessionId !== sessionId && h.status === 'confirmed' && h.seriesId)
-        .filter((h) => keysOf(h).some((k) => keys.includes(k)) || h.subjectId === o.subjectId)
-        .map((h) => ({
-          registrationId: h.id as string | null, sessionName: h.sessionName as string | null, seriesId: h.seriesId!,
-          series: `${h.boardName} ${SERIES_MONTH_LABELS[h.month as SeriesMonth] ?? h.month} ${h.year}`, status: h.status,
-          source: 'line' as 'line' | 'result' | 'entry', month: h.month as string, year: Number(h.year), grade: null as string | null,
-        }));
-      // A result on record or an entry sent to the board for what the item enters (step B, from F4).
-      const examKeys = examKeysOf({ entersKind: i.entersKind as string, qualificationId: i.qualificationId as string | null, units: i.units as string[], subjectQualificationId: o.subjectQualificationId, subjectUnits: o.subjectUnits });
-      // Only those before this item's series: F4 holds entries of this series and later ones too.
-      const here = i.year ? Number(i.year) * 12 + (MONTH_ORDER[i.month as string] ?? 0) : null;
-      const fromExams = exams.filter((e) => examKeys.includes(e.key))
-        .filter((e) => here === null || e.year * 12 + (MONTH_ORDER[e.month] ?? 0) < here).map((e) => ({
-        registrationId: null as string | null, sessionName: null as string | null, seriesId: e.seriesId, series: e.series, status: e.source as string,
-        source: e.source as 'line' | 'result' | 'entry', month: e.month as string, year: e.year, grade: e.grade,
-      }));
-      // Latest first.
-      const known = [...fromLines, ...fromExams]
-        .sort((a, b) => (b.year * 12 + (MONTH_ORDER[b.month] ?? 0)) - (a.year * 12 + (MONTH_ORDER[a.month] ?? 0)));
-      const held = history.find((h) => h.itemId === i.id && h.sessionId === sessionId && !['rejected', 'expired', 'dropped'].includes(h.status));
-      const combos: { attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study' }[] = [];
-      // A one-paper item is a retake only (the forms' "One paper ONLY").
-      const firstEntries = !c.retakeOnly && i.kind !== 'paper';
-      if (!c.closed) {
-        if (firstEntries && !c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'in_school' });
-        // Self study is a second entry ("Self Study 50% … ONLY 2nd entry", decision 1 of 16 Oct 2026): a first
-        // entry in self-study only where the item carries an earlier sitting forward (the A.2. carry forward).
-        if (firstEntries && c.selfStudyOnly && i.needsPriorSeries) combos.push({ attempt: 'first', mode: 'self_study' });
-        if (!c.selfStudyOnly) combos.push({ attempt: 'retake', mode: 'in_school' });
-        combos.push({ attempt: 'retake', mode: 'self_study' });
-      }
-      // The student's exception "self-study on a first entry" — decision 1's only way past the rule — offers the
-      // choice where it covers the item, so a family or the desk can take it from the screen (the review of
-      // dd68598, item 2). Read without locking (a GET marks nothing used); the reservation asks it again, under
-      // its lock, through assertLineRules. A preview (no student) offers no family's exception.
-      if (studentId && !c.closed && firstEntries && !combos.some((k) => k.attempt === 'first' && k.mode === 'self_study')) {
-        const scope = { sessionId, subjectId: o.subjectId, offerId: o.id, offerItemId: i.id as string, ...(seriesId ? { boardSeriesId: seriesId } : {}) };
-        if (firstEntryGates.some((e) => coversScope(e, scope))) combos.splice(combos.some((k) => k.attempt === 'first') ? 1 : 0, 0, { attempt: 'first', mode: 'self_study' });
-      }
-      // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
-      // exams' start with none); a retake of the board's previous sitting until the retake deadline
-      // where the board gives one. A retake of an older sitting is a first entry's date.
-      const firstDeadline = seriesId
-        ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, ...(studentId ? { studentId } : {}) })
-        : { at: null, kind: null };
-      // The later of the retake deadline and a first entry's (a late board entry, Q-20, can be later).
-      const retakeDeadline = i.retakeDeadline ? new Date(i.retakeDeadline as string) : null;
-      const retakeUntil = retakeDeadline && (!firstDeadline.at || retakeDeadline > firstDeadline.at) ? retakeDeadline : firstDeadline.at;
-      const openFor = { first: !!firstDeadline.at && firstDeadline.at > now, retake: !!retakeUntil && retakeUntil > now };
-      const prices = [];
-      for (const k of combos) {
-        try {
-          // A preview prices for no family: no exception applies (exceptionIds: none).
-          const p = studentId
-            ? await priceLine(db, { item: { id: i.id as string }, attempt: k.attempt, mode: k.mode, studentId, sessionId })
-            : await priceLine(db, { item: { id: i.id as string }, attempt: k.attempt, mode: k.mode, studentId: '', sessionId }, { exceptionIds: [] });
-          prices.push({ ...k, open: openFor[k.attempt], total: p.total, courseFee: p.courseFee, registrationFee: p.registrationFee, provisional: p.provisional, noFee: false });
-        } catch {
-          prices.push({ ...k, open: openFor[k.attempt], total: null, courseFee: null, registrationFee: null, provisional: false, noFee: true });
-        }
-      }
-      const ownTeachers = teachers.filter((t) => t.itemId === i.id);
-      its.push({
-        id: i.id as string,
-        label: i.label as string,
-        kind: i.kind as string,
-        enters: { kind: i.entersKind as string, units: i.unitCodes as { code: string; shortCode: string | null; level: string }[] },
-        // The award it enters, by the board's code (Arabic A Level's two: "YAA01", "9AA0"): the family's form names it
-        // beside the teacher who teaches it (the lead's decision of 16 Oct 2026, FEATURES_PLAN.md §6, 3).
-        qualification: i.qualificationCode ? { code: i.qualificationCode as string } : null,
-        series: seriesId ? {
-          id: seriesId, month: i.month as string, year: i.year as number, label: i.seriesLabel as string,
-          entryDeadline: i.entryDeadline as Date | null, retakeDeadline: i.retakeDeadline as Date | null, examsStart: i.examsStart as string | null,
-        } : null,
-        // A first entry's cut-off, and a qualifying retake's; whether each is still open.
-        firstEntryDeadline: firstDeadline.at,
-        retakeDeadline: retakeUntil,
-        open: openFor,
-        availability: i.availability as string,
-        constraints: c,
-        exclusiveGroup: i.exclusiveGroup as string | null,
-        requiredInSeries: i.requiredInSeries as boolean,
-        needsPriorSeries: i.needsPriorSeries as boolean,
-        teachers: (ownTeachers.length ? ownTeachers : teachers.filter((t) => t.offerId === o.id)).sort((a, b) => a.sortOrder - b.sortOrder).map(({ id, name, kind, mode }) => ({ id, name, kind, mode })),
-        knownSittings: known,
-        held: held ? { registrationId: held.id, status: held.status } : null,
-        prices,
-      });
-    }
-    outOffers.push({
-      id: o.id, availability: o.availability, grade10Core: o.grade10Core, notes: o.notes,
-      subject: { id: o.subjectId, name: o.subjectName, code: o.subjectCode, boardCode: o.boardCode, boardName: o.boardName, level: o.level },
-      items: its,
-    });
-  }
-  // The boards' sittings of the last two years, for a declared retake (step B creates a series
-  // row with no dates when the family names one not on record). A preview lists them too: they are
-  // the sitting choices the family's form shows, not the student's.
-  const boards = [...new Set(offers.map((o) => o.boardCode))];
-  const boardRows = boards.length ? await db.execute(sql`select code, name, series_months from exam_board where code in (${sql.join(boards.map((b) => sql`${b}`), sql`, `)})`)
-    .then((r) => r.rows as { code: string; name: string; series_months: string[] }[]) : [];
-  const first = sessionSeriesMonths(session.sessionType, session.seriesYear)[0]!;
-  const here = first.year * 12 + MONTH_ORDER[first.month]!;
-  const onRecord = boards.length ? await db.execute(sql`select id, board_code, month, year from board_series where label = '' and board_code in (${sql.join(boards.map((b) => sql`${b}`), sql`, `)})`)
-    .then((r) => r.rows as { id: string; board_code: string; month: string; year: number }[]) : [];
-  const declarable = boardRows.flatMap((b) => {
-    const out: { boardCode: string; boardName: string; month: string; year: number; seriesId: string | null }[] = [];
-    for (let y = first.year - 2; y <= first.year; y++) {
-      for (const m of b.series_months) {
-        const at = y * 12 + (MONTH_ORDER[m] ?? 0);
-        if (at >= here || here - at > 24) continue;
-        out.push({ boardCode: b.code, boardName: b.name, month: m, year: y, seriesId: onRecord.find((s) => s.board_code === b.code && s.month === m && s.year === y)?.id ?? null });
-      }
-    }
-    return out.sort((x, y) => (y.year * 12 + MONTH_ORDER[y.month]!) - (x.year * 12 + MONTH_ORDER[x.month]!));
-  });
-  return { session, eligibility, preview: !studentId, offers: outOffers, declarableSittings: declarable };
+  return { session: read.session, eligibility: await mayRegisterFor(studentId, sessionId), offerings: read.offerings };
 }
 
 // ─── Version 2: the family payload (COORDINATOR_REWORK.md F1–F3, Appendix A) ─────────────────────
@@ -316,6 +105,18 @@ export async function familyOfferings(
     }
     return out.sort((a, b) => order(b.month, b.year) - order(a.month, a.year));
   };
+  // C6, a retake's later deadline (the review of P1c, (a)): a retake of the board's previous sitting enters until the
+  // series' retake deadline (line_effective_deadline), so each row's series' retake deadline and previous sitting,
+  // read once.
+  const rowSeriesIds = [...new Set(all.flatMap((o) => o.rows.map((r) => r.series?.id).filter((x): x is string => !!x)))];
+  const retakeDates = new Map((rowSeriesIds.length ? (await db.execute(sql`
+    select b.id, b.retake_deadline as retake, prev.month, prev.year from board_series b
+    cross join lateral board_previous_sitting(b.board_code, b.month, b.year) prev
+    where b.id in (${sql.join(rowSeriesIds.map((id) => sql`${id}`), sql`, `)})`)).rows as { id: string; retake: string | Date | null; month: string; year: number }[] : [])
+    .map((x) => [x.id, { retake: x.retake ? new Date(x.retake) : null, previous: { month: x.month, year: Number(x.year) } }]));
+  // Decision 1's exception (gate.selfStudyFirstEntry, the line rules' only way to a first entry in self study the row
+  // does not tick): the student's, read once (without locking: a GET marks nothing used; the reservation asks again).
+  const firstEntryGates = studentId ? await lineExceptions.held(db, studentId, ['gate.selfStudyFirstEntry']) : [];
   const offerings = [];
   for (const o of all) {
     if (!preview && !o.offeredToFamilies) continue;
@@ -326,6 +127,13 @@ export async function familyOfferings(
     for (const r of o.rows) {
       const ticked = (Object.keys(r.cells) as (keyof typeof r.cells)[]).filter((k) => r.cells[k]);
       if (!ticked.length) continue;
+      // A student holding decision 1's exception for the row is offered the first entry in self study it does not tick
+      // (a one-paper row is a retake only): what the version-1 read offered, kept when P1c removed it (08p).
+      const excepted = !!studentId && r.kind !== 'paper' && !r.cells.firstSelfStudy && firstEntryGates.some((e) => coversScope(e, {
+        sessionId, subjectId: o.subject.id, offerId: o.id, offerItemId: r.id, ...(r.series?.id ? { boardSeriesId: r.series.id } : {}),
+      }));
+      const cellsOffered: (keyof typeof r.cells)[] = !excepted ? ticked
+        : ticked.includes('firstInSchool') ? ['firstInSchool', 'firstSelfStudy', ...ticked.filter((k) => k !== 'firstInSchool')] : ['firstSelfStudy', ...ticked];
       // F2: the latest sitting on record of the subject before this row's, by the row's codes where both name them.
       const known = record
         ? knownSittingOf(record, { subjectId: o.subject.id, subjectQualificationId: subj?.qualificationId ?? null, referenceCodes: r.referenceCodes, month: r.series?.month ?? null, year: r.series?.year ?? null })
@@ -337,9 +145,28 @@ export async function familyOfferings(
       const rowTeachers = (r.teachers.length ? r.teachers : o.teachers).map((t) => ({ id: t.teacherId, name: t.name, online: t.online }));
       const options = [];
       // Options past their board deadline (C6: nothing lifts it): a row whose every option is past reads closed, so a
-      // family cannot keep picking it and keep being refused (BOARD_DEADLINE_PASSED).
+      // family cannot keep picking it and keep being refused (BOARD_DEADLINE_PASSED). A first entry's deadline is the
+      // series' entry deadline; a retake's is the latest any earlier sitting it may follow would give (the row's list
+      // when it carries one, else the board's exams it may name): the retake deadline for the board's previous
+      // sitting, the entry deadline for an older one — so a retake of last June still reads open after the November
+      // entry deadline, until the retake deadline (the review of P1c, (a)).
+      const entryAt = r.series?.id
+        ? (await effectiveDeadlineFor(db, { boardSeriesId: r.series.id, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false })).at
+        : null;
+      const retakeAt = (() => {
+        const dates = r.series?.id ? retakeDates.get(r.series.id) : undefined;
+        if (!dates?.retake) return entryAt;
+        const follows = r.needsCarriedFrom && allowedSittings.length
+          ? r.allowedPriorSittings.map((p) => priors.get(p.id)).filter((p): p is NonNullable<typeof p> => !!p).map((p) => ({ month: p.month, year: p.year }))
+          : retakeFromOf(o.board.code, o.group, r.series);
+        const previous = follows.some((p) => p.month === dates.previous.month && p.year === dates.previous.year);
+        const older = follows.some((p) => p.month !== dates.previous.month || p.year !== dates.previous.year);
+        if (!previous) return entryAt;
+        if (!older || !entryAt) return older ? null : dates.retake;
+        return dates.retake > entryAt ? dates.retake : entryAt;
+      })();
       let pastBoard = 0;
-      for (const cell of ticked) {
+      for (const cell of cellsOffered) {
         const attempt = cell === 'firstInSchool' || cell === 'firstSelfStudy' ? 'first' as const : 'retake' as const;
         const mode = cell === 'firstInSchool' || cell === 'retakeInSchool' ? 'in_school' as const : 'self_study' as const;
         // F2: a student known to have sat it sees the retake options only (a row that carries an earlier exam
@@ -356,15 +183,16 @@ export async function familyOfferings(
           if (!(err instanceof PricingError)) throw err;
           price = null;
         }
-        if (r.series?.id) {
-          const d = await effectiveDeadlineFor(db, { boardSeriesId: r.series.id, attempt, priorSittingSeriesId: null, declarationRejected: false });
-          if (d.at && d.at <= now) pastBoard++;
-        }
+        const deadline = attempt === 'retake' ? retakeAt : entryAt;
+        const closed = !!deadline && deadline <= now;
+        if (closed) pastBoard++;
         // D6 with an emptied list: the coordinator saved no earlier exam to carry from, and the line rules then take any
         // earlier exam of the board (line-rules.services, "row with no list"): the family picks among the board's.
         const carriesFromAny = r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2') && !allowedSittings.length;
         options.push({
           attempt, mode,
+          // Past its board deadline (C6): picked, it is refused (BOARD_DEADLINE_PASSED).
+          closed,
           label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), { attempt, mode }, { selfStudyShare: r.selfStudyFee !== null ? null : s.selfStudyPercent, lang })),
           price,
           // D6: an A.2. and a one-paper retake (where the board asks) name the sitting they carry from.

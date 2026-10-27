@@ -20,7 +20,7 @@
 
 import {
   db, registration, registrationSession, subject, boardSeries, sessionBoardSeries, sessionOffer, sessionOfferItem,
-  sessionOfferTeacher, sessionOfferItemTeacher, sessionOfferItemFeeKey, boardFee, teacher,
+  sessionOfferTeacher, sessionOfferItemTeacher, teacher,
   examBoard, examUnit, qualification, qualificationOption, qualificationOptionUnit, qualificationUnit,
   and, eq, or, inArray, sql,
 } from '@repo/db';
@@ -30,13 +30,12 @@ import {
   type Eligibility, type LineInputType, type Attempt, type LineMode, type LevelCodeReading, type UnitLevel,
 } from '@repo/validations';
 import { boardSeriesName } from './series.services';
-import { lockFeeGrids } from '../lib/fee-grid-lock';
 import { assertLineRules } from './line-rules.services';
 import { priceLine } from './pricing.services';
 import { computeDueAt, effectiveDeadlineFor } from './deadline.services';
 import { lineExceptions } from './line-exceptions';
 import { getSetting } from './settings.services';
-import { resolveItem, availabilityConstraints, OfferError } from './offer.services';
+import { resolveItem, OfferError } from './offer.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -89,26 +88,20 @@ async function lockForLines(tx: Tx, sessionId: string, itemIds: string[]) {
   // takes a series FOR UPDATE, and it holds no item, so this later share lock waits on no cycle.
   const moved = [...new Set(held.map((i) => i.seriesId).filter((x): x is string => !!x && !seriesIds.includes(x)))].sort();
   if (moved.length) await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, moved)).orderBy(boardSeries.id).for('share');
-  // The series' fee grids, shared, before the rows (§2.1; lib/fee-grid-lock.ts): a fee write or a
-  // Confirm of this series waits for the line, or the line for it.
-  await lockFeeGrids(tx, held.map((i) => i.seriesId), 'shared');
-  const keys = itemIds.length ? await tx.select().from(sessionOfferItemFeeKey).where(inArray(sessionOfferItemFeeKey.itemId, itemIds)) : [];
-  const feeConds = keys.flatMap((k) => {
-    const it = held.find((i) => i.id === k.itemId);
-    return it?.seriesId ? [and(eq(boardFee.boardSeriesId, it.seriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId))] : [];
-  });
-  if (feeConds.length) await tx.select({ id: boardFee.id }).from(boardFee).where(or(...feeConds)).orderBy(boardFee.id).for('share');
+  // The series' fee grids and fee rows, once held here, left with P1c: a line is priced by its row's own fees.
 }
 
 /**
  * For a path that holds a line before it makes new ones (a swap drops the old line — its receipt,
  * then the line — and then makes the new one): what making the new lines will lock, taken first,
- * in §2.1's order — the subjects, the session's series links, the series, the offers, the items,
- * the fee grids (shared) and the fee rows, then the student's price exceptions (FOR SHARE, as
- * `priceLine` takes them). A Confirm or a grid save holds its fee rows and then wants the lines
- * priced from them, the old line among them; taken after the old line, the new line's rows closed
- * that cycle (the review of B, on the swap approval). insertLines takes the same locks again,
- * already held. Call after the student lock (`assertMayRegisterForInTx`).
+ * in §2.1's order — the subjects, the session's series links, the series, the session, the offers, the
+ * items, then the student's price exceptions (FOR SHARE, as `priceLine` takes them): a change that holds
+ * the session or the rows and then wants the lines priced from them, the old line among them (a price list
+ * over both subjects, the session's self-study share or prices-final switch), would otherwise close a cycle
+ * against the new line's row taken after the old line (the review of B, on the swap approval; P1c: it was
+ * the series' fee row, which left with the grid).
+ * insertLines takes the same locks again, already held. Call after the student lock
+ * (`assertMayRegisterForInTx`).
  */
 export async function holdNewLines(tx: Tx, a: { studentId: string; sessionId: string; lines: { offerItemId: string; attempt: Attempt; mode: LineMode }[] }) {
   const itemIds = [...new Set(a.lines.map((l) => l.offerItemId))];

@@ -27,7 +27,7 @@ import { exceptionsOfLines } from './line-exceptions-read.services';
 import { lineDepositsSql } from './escrow.services';
 import { mayReserveSession, subjectsOfItems, assertMayPay, cutOffsOf, reserveRefusal } from './window.services';
 import { coded } from '../lib/refusal';
-import { PRICE_CHANGED_REFUSAL } from './pricing.services';
+import { PRICE_CHANGED_REFUSAL, assertExpectedPrices } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow, InsufficientBalanceError } from './escrow.services';
 import { confirmPayment, failPayment, assertNoLivePlan, createChargePaymentsInTx } from './payment.services';
@@ -526,7 +526,9 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
       if (locked.length !== lineIds.length || locked.some((r) => r.status !== 'pending_payment')) {
         throw coded(new Error('One or more subjects are not waiting for payment'), 'NOT_WAITING');
       }
-      // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
+      // The prices the desk's screen showed (P1c) and the prices read before the lock still hold: a re-price may
+      // have committed since the screen was read, or in between (§3.4).
+      assertExpectedPrices(locked, data.expectedPrices);
       if (locked.some((l) => l.price !== prices.get(l.id))) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
       // May pay, asked again under the lines' locks (L2 of the P1b review): the cut-off may have passed, or the
       // student left, since the check above.

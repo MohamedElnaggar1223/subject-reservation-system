@@ -4,7 +4,6 @@
  * Handles the full subject registration lifecycle:
  *
  * GET  /registrations/offers        - What a student can reserve in a session (the Reserve pages, §4.3–§4.4)
- * GET  /registrations/offers/preview - What a family sees in a session, no student (admin, coordinator; F6a)
  * GET  /registrations/pending       - Pending approval requests for a parent's children (parent/admin)
  * GET  /registrations/history       - Full registration history across all sessions (own or child)
  * GET  /registrations               - Registrations with optional filters (role-aware)
@@ -28,7 +27,6 @@ import { zValidator } from '@hono/zod-validator';
 import {
   RequestRegistration,
   DirectRegistration,
-  PreregisterRegistration,
   DeskRegistration,
   DeskCollect,
   ApproveRegistrations,
@@ -41,7 +39,6 @@ import {
   STUDENT_RECORD_ROLES,
   EligibilityQuery,
   OffersQuery,
-  OffersPreviewQuery,
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -58,11 +55,10 @@ import {
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as registrationService from '../services/registration.services';
-import * as preregService from '../services/prereg.services';
 import * as deskService from '../services/desk.services';
 import * as linkService from '../services/link.services';
 import { mayRegisterFor } from '../services/eligibility.services';
-import { offersForStudent, offersPreview, familyOfferings } from '../services/offers-read.services';
+import { offersForStudent } from '../services/offers-read.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { isInsufficientBalance } from '../services/escrow.services';
 
@@ -131,37 +127,14 @@ export const registrations = new Hono<HonoEnv>()
         return error(c, 'Forbidden', 403);
       }
       try {
+        // The coordinator rework (Appendix A): one page per child — the session's terms, the student's eligibility and
+        // `offerings → rows → options` (the version-1 read beside it left with P1c).
         const offers = await offersForStudent(studentId, q.sessionId);
-        if (!offers) return error(c, 'Session not found', 404);
-        // The coordinator rework (Appendix A): the family payload beside today's read (`offers`, the Reserve
-        // page P3 replaces): one page per child — `offerings` and the session's terms.
-        const v2 = await familyOfferings(q.sessionId, { studentId });
-        return success(c, { ...offers, session: { ...offers.session, ...v2!.session }, offerings: v2!.offerings });
-      } catch (err) {
-        const message = clientMessage(err, 'Failed to load the offers');
-        return error(c, message, message.includes('not found') ? 404 : 400, codeOf(err));
-      }
-    }
-  )
-
-  /**
-   * GET /registrations/offers/preview?sessionId= (F6a, docs/features/SESSION_WORDS.md)
-   *
-   * What a family sees for each subject of a session, for the Session screen's "Preview the
-   * family's form": the same read as /offers with no student — no eligibility, no earlier sittings,
-   * no held lines, each price with no family's exception. Admin and coordinator only: it is the links
-   * sheet's preview, not a family's read.
-   */
-  .get('/offers/preview',
-    requireRole(ROLES.ADMIN, ROLES.COORDINATOR),
-    zValidator('query', OffersPreviewQuery),
-    async (c) => {
-      try {
-        const offers = await offersPreview(c.req.valid('query').sessionId);
         if (!offers) return error(c, 'Session not found', 404);
         return success(c, offers);
       } catch (err) {
-        return error(c, clientMessage(err, 'Failed to load the preview'), 400, codeOf(err));
+        const message = clientMessage(err, 'Failed to load the offers');
+        return error(c, message, message.includes('not found') ? 404 : 400, codeOf(err));
       }
     }
   )
@@ -433,66 +406,6 @@ export const registrations = new Hono<HonoEnv>()
         const status =
           message.includes('in progress') ? 409 :
           message.includes('not open') || isInsufficientBalance(err) ? 422 : 400;
-        return error(c, message, status, codeOf(err));
-      }
-    }
-  )
-
-  /**
-   * POST /registrations/preregister
-   *
-   * V3 §6.8: parent preregisters subjects for a DRAFT (future) session.
-   * Price locks now; payment funds the held wallet; the scheduler
-   * captures on activation. Parent only.
-   */
-  .post('/preregister',
-    requireParent(),
-    zValidator('json', PreregisterRegistration),
-    async (c) => {
-      const user = c.get('user')!;
-      const data = c.req.valid('json');
-
-      try {
-        const created = await preregService.createPreregistration(user.id, data);
-        const auditCtx = extractAuditContext(c);
-        for (const reg of created) {
-          await logAction(user.id, 'PREREG_CREATED', 'registration', reg.id, null, reg as Record<string, unknown>, auditCtx)
-            .catch((err) => console.error('[audit] PREREG_CREATED failed:', err));
-        }
-        return success(c, created, 201);
-      } catch (err) {
-        const message = clientMessage(err, 'Failed to preregister');
-        const status =
-          message.includes('not linked') ? 403 :
-          message.includes('already') || message.includes('Already') ? 409 : 400;
-        return error(c, message, statusOf(err, status), codeOf(err));
-      }
-    }
-  )
-
-  /**
-   * POST /registrations/:id/cancel-prereg
-   *
-   * Parent cancels a preregistration before the session opens (D-J).
-   * Held funds release; the refundable portion (per refund windows)
-   * walks the receipt-gated path back to the free balance.
-   */
-  .post('/:id/cancel-prereg',
-    requireParent(),
-    zValidator('param', RegistrationId),
-    async (c) => {
-      const user = c.get('user')!;
-      const { id } = c.req.valid('param');
-
-      try {
-        const result = await preregService.cancelPreregistration(id, user.id, extractAuditContext(c));
-        return success(c, result);
-      } catch (err) {
-        const message = clientMessage(err, 'Failed to cancel preregistration');
-        const status =
-          message.includes('not linked') ? 403 :
-          message.includes('already opened') || message.includes('Only preregistered') ? 409 :
-          message.includes('not found') ? 404 : 400;
         return error(c, message, status, codeOf(err));
       }
     }

@@ -168,8 +168,8 @@ describe('08p: pricing policies on pricing v2', () => {
     const f = await onboard(officer, `p08-d1x-${RUN}`, 11);
     const other = await onboard(officer, `p08-d1y-${RUN}`, 11);
     const offered = async (who: Client, studentId: string, rowId: string) =>
-      (await apiResponse(who.api.v1.registrations.offers.$get({ query: { sessionId: session, studentId } }))).offers.flatMap((o) => o.items)
-        .find((i) => i.id === rowId)!.prices.map((p) => `${p.attempt} ${p.mode} ${p.total}`);
+      (await apiResponse(who.api.v1.registrations.offers.$get({ query: { sessionId: session, studentId } }))).offerings.flatMap((o) => o.rows)
+        .find((i) => i.id === rowId)!.options.map((p) => `${p.attempt} ${p.mode} ${p.price?.total}`);
     expect(await offered(f.parent, f.studentId, untaught)).toEqual(['retake self_study 16200']);
     const gate = await firstInSelfStudy(f.studentId);
     for (const who of [f.parent, officer]) expect(await offered(who, f.studentId, untaught)).toEqual(['first self_study 16200', 'retake self_study 16200']);
@@ -265,16 +265,16 @@ describe('08p: pricing policies on pricing v2', () => {
       '[{"id": "a-confirmed-grid-row", "keyKind": "subject", "keyId": "x", "amount": 9200, "provisional": false}]'::jsonb) where id = $1`, [legacy!.id]);
     // And a legacy line priced from a provisional grid row that the old Confirm later confirmed at the amount it recorded
     // (P1b fix 1): the Confirm cleared its mark weeks ago, its basis still saying provisional; 0066 then stamped the
-    // session prices-final. Its price stopped being provisional at the confirmation, not at the stamp.
+    // session prices-final. Its price stopped being provisional at the confirmation, not at the stamp. P1c dropped the
+    // grid (0072): the line keeps the Confirm's time on its basis (`feeConfirmedAt`, the grid's last word as 0072 wrote
+    // it), which is what the due-date rule reads now in place of the grid row.
     const k = await onboard(officer, `p08-prov-v1c-${RUN}`, 11);
     const [cleared] = await reserve(k, [{ offerItemId: taughtAll, attempt: 'first', mode: 'in_school', teacherId }]);
     const feeRowId = `p08-confirmed-grid-row-${RUN}`;
-    await sql(`insert into board_fee (id, board_series_id, key_kind, subject_id, amount, provisional, confirmed_at)
-      select $1, i.board_series_id, 'subject', o.subject_id, 9200, false, now() - interval '30 days'
-      from session_offer_item i join session_offer o on o.id = i.offer_id where i.id = $2`, [feeRowId, taughtAll]);
-    await sql(`update registration set price_provisional = false, created_at = now() - interval '40 days', pricing_basis = jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
-      jsonb_build_array(jsonb_build_object('id', $1::text, 'keyKind', 'subject', 'keyId', 'x', 'amount', 9200, 'provisional', true))) where id = $2`, [feeRowId, cleared!.id]);
-    expect(await priceOf(cleared!.id)).toMatchObject({ provisional: false, basis: { v: 1, feeRows: [{ id: feeRowId, provisional: true }] } });
+    await sql(`update registration set price_provisional = false, created_at = now() - interval '40 days', pricing_basis = jsonb_set(jsonb_set(jsonb_set(pricing_basis, '{v}', '1'), '{feeRows}',
+      jsonb_build_array(jsonb_build_object('id', $1::text, 'keyKind', 'subject', 'keyId', 'x', 'amount', 9200, 'provisional', true))),
+      '{feeConfirmedAt}', to_jsonb(now() - interval '30 days')) where id = $2`, [feeRowId, cleared!.id]);
+    expect(await priceOf(cleared!.id)).toMatchObject({ provisional: false, basis: { v: 1, feeRows: [{ id: feeRowId, provisional: true }], feeConfirmedAt: expect.any(String) } });
     const waiting = Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and status = 'pending_payment' and price_provisional`, [session])).n);
     const dueBefore = new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line!.id])).d).getTime();
     const switchedAt = Date.now();

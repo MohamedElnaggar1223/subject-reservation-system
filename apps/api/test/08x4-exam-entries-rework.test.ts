@@ -50,17 +50,90 @@ describe('F4 on the reservations rework', () => {
   const entryList = (boardSeriesId: string) => apiResponse(coord.api.v1.exams['entry-lists'].$get({ query: { boardSeriesId } }));
   const lineOf = (id: string) => one<{ status: string; outcome: string | null; prior_centre: string | null; prior_candidate_number: string | null; declaration_rejected: boolean }>(
     `select status, prior_sitting_verified_outcome as outcome, prior_centre, prior_candidate_number, declaration_rejected from registration where id = $1`, [id]);
-  const offer = async (sessionId: string, subjectId: string, courseFee: number, teachers: string[], items: Record<string, unknown>[]) =>
-    (await apiResponse(w.adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: sessionId },
-      json: { subjectId, courseFee, teachers: teachers.map((teacherId) => ({ teacherId, mode: 'in_school' as const })), items: items as never },
-    })))!.items;
+  /**
+   * An item as the links sheet made it, restated for the coordinator's routes (P1c): its row's kind ('al' and 'a2' are
+   * the old routes' "A Level" and "A2, carry forward"), the name it is labelled with, its series, the exam fee the
+   * series' grid held for what it enters (the grid left with P1c: the same amount on the row), what it enters with the
+   * board, its own teachers. `seriesBySql`: a second row of the subject in another series of the same sitting (below).
+   */
+  type ItemIn = {
+    label: string; kind: 'all_papers' | 'unit' | 'al' | 'a2'; boardSeriesId: string; examFee: number; teachers?: string[]; seriesBySql?: true;
+    enters: { kind: 'award'; qualificationId: string } | { kind: 'option'; optionId: string } | { kind: 'units'; unitIds: string[] };
+  };
+  const KIND_ORDER: Record<ItemIn['kind'], number> = { all_papers: 0, unit: 2, a2: 4, al: 5 };
+  const sittingOf = (month: string) => (month === 'june' ? 'june' as const : month === 'january' ? 'january' as const : 'november' as const);
+  /**
+   * A subject offered in a session through the coordinator's routes (P1c: the links sheet's offer and item routes and
+   * the series' fee grids left): its course fee and teachers on the offering; one row per item in its series' sitting,
+   * at the item's exam fee, with the cells the old "open" was converted to (first entry in school, retake in school
+   * and in self study). What a row enters with the board — an award, an option code, units — no route sets since P1c:
+   * it is written as converted data holds it (0066 kept it), as exam-helpers' offerOf does. A row the coordinator's
+   * routes cannot place — a second row of the subject in another series of the same sitting, as a converted second
+   * cycle holds one — is placed there the same way, its series linked to the session. Returns the rows' ids in the
+   * order given.
+   */
+  const offer = async (sessionId: string, subjectId: string, courseFee: number, teachers: string[], items: ItemIn[]) => {
+    const subj = await one<{ name: string; code: string; council: 'cambridge' | 'pearson_edexcel'; q: string | null }>(
+      `select name, code, council, qualification_id as q from subject where id = $1`, [subjectId]);
+    const made = await apiResponse(w.adm.api.v1.sessions[':id'].offerings.$post({
+      param: { id: sessionId }, json: { custom: { board: subj.council, name: subj.name, level: 'as_al', group: 'A.S./A.L.', code: subj.code } },
+    }));
+    const months = await Promise.all(items.map(async (it) => (await one<{ month: string }>(`select month from board_series where id = $1`, [it.boardSeriesId])).month));
+    const named = (ids: string[]) => ids.map((teacherId) => ({ teacherId, online: false, external: false }));
+    await apiResponse(w.adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: sessionId, offeringId: made.id },
+      json: {
+        // Added to an open session it starts switched off until reviewed: offered at once, as the old route's offer was.
+        accepting: true, courseFee, teachers: named(teachers),
+        rows: items.map((it, i) => ({
+          kind: it.kind, name: it.label, sitting: sittingOf(months[i]!), examFee: it.examFee,
+          cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false },
+          ...(it.teachers ? { teachers: named(it.teachers) } : {}),
+        })),
+      },
+    }));
+    // The rows in D10's order (by kind, then as sent), matched back to the items.
+    const rows = await sql<{ id: string; series: string }>(`select id, board_series_id as series from session_offer_item where offer_id = $1 order by sort_order`, [made.id]);
+    expect(rows).toHaveLength(items.length);
+    const ids: string[] = [];
+    const order = items.map((it, i) => ({ it, i })).sort((a, b) => KIND_ORDER[a.it.kind] - KIND_ORDER[b.it.kind] || a.i - b.i);
+    for (const [pos, { it, i }] of order.entries()) {
+      const row = rows[pos]!;
+      // (The suite's `sql` binds its values in the order the placeholders appear: each statement names them in that order.)
+      if (it.seriesBySql) {
+        await sql(`insert into session_board_series (id, session_id, board_series_id, board_code, is_default)
+          select gen_random_uuid()::text, $1, bs.id, bs.board_code, false from board_series bs where bs.id = $2 on conflict do nothing`, [sessionId, it.boardSeriesId]);
+        await sql(`update session_offer_item set board_series_id = $1 where id = $2`, [it.boardSeriesId, row.id]);
+      } else {
+        expect(row.series).toBe(it.boardSeriesId);
+      }
+      if (it.enters.kind === 'award') {
+        await sql(`update session_offer_item set enters_kind = 'award', qualification_id = $1 where id = $2`, [it.enters.qualificationId, row.id]);
+      } else if (it.enters.kind === 'option') {
+        await sql(`update session_offer_item set enters_kind = 'option', qualification_option_id = $1,
+          qualification_id = (select qualification_id from qualification_option where id = $2) where id = $3`, [it.enters.optionId, it.enters.optionId, row.id]);
+      } else {
+        // A units item's qualification is its subject's (the old route's checkEnters).
+        await sql(`update session_offer_item set enters_kind = 'units', qualification_id = $1 where id = $2`, [subj.q, row.id]);
+        for (const unitId of it.enters.unitIds) await sql(`insert into session_offer_item_unit (item_id, unit_id) values ($1, $2)`, [row.id, unitId]);
+      }
+      ids[i] = row.id;
+    }
+    return ids;
+  };
+  /** A session made by the legacy dated create (the suites' contract), its prices final: what the old fee grids' confirmed rows were. */
+  const dated = async (json: { type: 'june' | 'winter'; year: number; label: string; courseStartsOn: string; endsIn: number }) => {
+    const id = (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
+      type: json.type, year: json.year, label: json.label, startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + json.endsIn * DAY).toISOString(),
+      courseStartsOn: json.courseStartsOn, paymentDueAt: new Date(Date.now() + json.endsIn * DAY).toISOString(),
+    } })))!.id;
+    await apiResponse(w.adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id }, json: { final: true } }));
+    return id;
+  };
   const subject = async (code: string, name: string, council: 'cambridge' | 'pearson_edexcel', level: 'as_level' | 'a_level') =>
     (await apiResponse(w.adm.api.v1.subjects.$post({ json: {
       name: `${name} ${T}`, code: `${T}-${code}`, council, courseFee: 1000, registrationFee: 500, isOfferedAtSchool: true, isCore: false, qualificationLevel: level,
     } })))!.id;
-  const fee = (seriesId: string, keyKind: 'qualification' | 'unit' | 'option', keyId: string, amount = 500) =>
-    apiResponse(w.adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind, keyId, amount, provisional: false }] } }));
   const reserve = async (f: Family, ls: Line[], sessionId?: string) => (await w.reserve(f, ls, true, sessionId)).map((r) => r.id);
   const refundPreview = (f: Family, registrationId: string) => apiResponse(f.parent.api.v1.receipts['refund-preview'].$get({ query: { registrationId } }));
   /** What the line's refunds credited to the family's escrow. */
@@ -95,10 +168,10 @@ describe('F4 on the reservations rework', () => {
     // Mathematics as the rework shapes it: one subject, P1 and P2 each an item with its own teacher.
     pMaths = await subject('MU', 'Mathematics units', 'pearson_edexcel', 'as_level');
     await apiResponse(w.adm.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: pMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: w.catalogue.pAward, unitIds: [] } }));
-    await fee(w.series.pearsonJan, 'unit', w.catalogue.pu2);
+    // Each unit at the 500 the January grid held for it (its row's exam fee since P1c).
     [itemP1, itemP2] = await offer(w.sessionId, pMaths, 1000, [w.teacherId, w.teacher2Id], [
-      { label: 'P1', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu1] }, boardSeriesId: w.series.pearsonJan, availability: 'open', requiredInSeries: false, teachers: [{ teacherId: w.teacherId, mode: 'in_school' }] },
-      { label: 'P2', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu2] }, boardSeriesId: w.series.pearsonJan, availability: 'open', requiredInSeries: false, teachers: [{ teacherId: w.teacher2Id, mode: 'in_school' }] },
+      { label: 'P1', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu1] }, boardSeriesId: w.series.pearsonJan, examFee: 500, teachers: [w.teacherId] },
+      { label: 'P2', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu2] }, boardSeriesId: w.series.pearsonJan, examFee: 500, teachers: [w.teacher2Id] },
     ]) as [string, string];
 
     // A Cambridge A Level syllabus: AS components 1-2, A2 components 4-5; A Level (AX) and A2 carried forward (BY).
@@ -112,16 +185,15 @@ describe('F4 on the reservations rework', () => {
     asSyllabus = (await apiResponse(cat.qualifications.$post({ json: { boardCode: 'cambridge', code: `${T}9700`, title: `Biology ${T} (AS)`, level: 'as_level', suite: 'Cambridge International AS & A Level', subjectArea: `Biology ${T}`, entryMethod: 'syllabus_option' } }))).id;
     const al = await subject('BIOAL', 'Biology A Level', 'cambridge', 'a_level');
     await apiResponse(cat.registrable[':subjectId'].$put({ param: { subjectId: al }, json: { boardCode: 'cambridge', qualificationId: alSyllabus, unitIds: [] } }));
-    await fee(w.series.cambridgeNov, 'option', optAX, 900);
-    await fee(w.series.cambridgeNov, 'option', optBY, 600);
-    await fee(w.series.cambridgeNov, 'qualification', alSyllabus, 900);
+    // The two routes (D8 puts an A.L. and an A.2. row in one exclusive group, as the old items' 'route' group), each at
+    // the November grid's fee for its option code: AX 900, BY 600 (the A.2. row carries the AS forward, D6).
     [itemAL, itemCF] = await offer(w.sessionId, al, 1000, [w.teacherId], [
-      { label: 'A Level', kind: 'route', enters: { kind: 'option', optionId: optAX }, boardSeriesId: w.series.cambridgeNov, availability: 'open', requiredInSeries: false, exclusiveGroup: 'route' },
-      { label: 'A2, carry forward', kind: 'route', enters: { kind: 'option', optionId: optBY }, boardSeriesId: w.series.cambridgeNov, availability: 'open', requiredInSeries: false, exclusiveGroup: 'route' },
+      { label: 'A Level', kind: 'al', enters: { kind: 'option', optionId: optAX }, boardSeriesId: w.series.cambridgeNov, examFee: 900 },
+      { label: 'A2, carry forward', kind: 'a2', enters: { kind: 'option', optionId: optBY }, boardSeriesId: w.series.cambridgeNov, examFee: 600 },
     ]) as [string, string];
     const wholeAl = await subject('BIOALW', 'Biology A Level (whole)', 'cambridge', 'a_level');
     [itemWholeAL] = await offer(w.sessionId, wholeAl, 1000, [w.teacherId], [
-      { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: alSyllabus }, boardSeriesId: w.series.cambridgeNov, availability: 'open', requiredInSeries: false },
+      { label: 'Whole subject', kind: 'all_papers', enters: { kind: 'award', qualificationId: alSyllabus }, boardSeriesId: w.series.cambridgeNov, examFee: 900 },
     ]) as [string];
   }, 180_000);
 
@@ -188,16 +260,18 @@ describe('F4 on the reservations rework', () => {
   describe('carry forward from the line\'s verified prior sitting', () => {
     // P1b (D6): the board's carry-forward months only warn (the family page reads them); the line rules no longer
     // refuse a sitting outside them (they did: "outside the carry-forward period (4 months)").
-    it('the carry-forward period is the board\'s own column (exam_board), edited on the board rules', async () => {
-      await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 4, reason: 'scenario: a shorter period' } }));
-      expect((await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m).toBe(4);
+    // P1c's fix round (S3): the period is the reference data's, loaded at every start — an edit on the board rules was undone
+    // silently at the next start, so it is refused; the rest of F4's rules row is still edited there.
+    it('the carry-forward period is the board\'s own column (exam_board), the reference data\'s: the board rules refuse to edit it', async () => {
+      const { REFERENCE_RULE_REFUSAL } = await import('../src/services/setup/reference.services');
+      const before = (await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m;
+      expect(await refused(coord.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 4, reason: 'scenario: a shorter period' } })))
+        .toEqual({ status: 409, error: REFERENCE_RULE_REFUSAL('The carry-forward period') });
+      expect((await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m).toBe(before);
       const rules = await apiResponse(coord.api.v1.exams['board-rules'].$get());
-      expect(rules.find((r) => r.boardCode === 'cambridge')).toMatchObject({ carryForwardMonths: 4 });
-      await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'].$put({ param: { boardCode: 'cambridge' }, json: { carryForwardMonths: 13, reason: 'scenario done: back to 13' } }));
-      expect((await one<{ m: number }>(`select carry_forward_months as m from exam_board where code = 'cambridge'`)).m).toBe(13);
-      const audit = await one<{ p: Record<string, unknown>; n: Record<string, unknown> }>(
-        `select previous_data as p, new_data as n from audit_log where entity_id = 'cambridge' and action = 'EXAM_BOARD_RULE_UPDATED' order by created_at desc limit 1`);
-      expect(audit).toMatchObject({ p: { carryForwardMonths: 4 }, n: { carryForwardMonths: 13 } });
+      expect(rules.find((r) => r.boardCode === 'cambridge')).toMatchObject({ carryForwardMonths: before });
+      expect(await one(`select count(*)::int as n from audit_log where entity_id = 'cambridge' and action = 'EXAM_BOARD_RULE_UPDATED' and new_data ? 'carryForwardMonths' and new_data->>'reason' = 'scenario: a shorter period'`))
+        .toEqual({ n: 0 });
     });
 
     it('a sitting at another centre, verified with its centre and candidate number, is carried forward with them', async () => {
@@ -407,23 +481,25 @@ describe('F4 on the reservations rework', () => {
   });
 
   describe('"mark as sent" is what makes a line\'s board fee sent for its refund (step C\'s refundFor)', () => {
-    let refunds: string, itemPair: string;
+    let refunds: string, itemPair: string, refundsJan: string;
     beforeAll(async () => {
       // A session of its own whose course started 15 days ago: week 3 of the winter policy (50% of the course fee).
-      refunds = (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
-        type: 'winter', year: Y, label: 'exams xw refunds', startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + 3 * DAY).toISOString(),
-        courseStartsOn: cairoDate(new Date(Date.now() - 15 * DAY)), paymentDueAt: new Date(Date.now() + 3 * DAY).toISOString(),
-      } })))!.id;
+      refunds = await dated({ type: 'winter', year: Y, label: 'exams xw refunds', courseStartsOn: cairoDate(new Date(Date.now() - 15 * DAY)), endsIn: 3 });
+      // P1c: its rows sit in its own January (a session's label names its sittings), dated as the world's is; the
+      // pair was entered in the world's January before, whose fee grid held 500 a unit — its row's exam fee is 1,000.
+      refundsJan = (await apiResponse(w.adm.api.v1['board-series'].$post({ json: {
+        boardCode: 'pearson_edexcel', month: 'january', year: Y + 1, label: 'exams xw refunds', entryDeadline: new Date(Date.now() + 6 * DAY),
+      } }))).id;
       const pair = await subject('PAIR', 'Pure units', 'pearson_edexcel', 'as_level');
       [itemPair] = await offer(refunds, pair, 1000, [w.teacherId], [
-        { label: 'P1 and P2', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu1, w.catalogue.pu2] }, boardSeriesId: w.series.pearsonJan, availability: 'open', requiredInSeries: false },
+        { label: 'P1 and P2', kind: 'unit', enters: { kind: 'units', unitIds: [w.catalogue.pu1, w.catalogue.pu2] }, boardSeriesId: refundsJan, examFee: 1000 },
       ]) as [string];
       fam.r1 = await onboard(w.officer, 'x-xw-r1', 12);
       fam.r2 = await onboard(w.officer, 'x-xw-r2', 12);
       lines.r1 = (await reserve(fam.r1, [{ offerItemId: itemPair, attempt: 'first', mode: 'in_school' }], refunds))[0]!;
       lines.r2 = (await reserve(fam.r2, [{ offerItemId: itemPair, attempt: 'first', mode: 'in_school' }], refunds))[0]!;
-      await derive(w.series.pearsonJan, fam.r1.studentId);
-      await derive(w.series.pearsonJan, fam.r2.studentId);
+      await derive(refundsJan, fam.r1.studentId);
+      await derive(refundsJan, fam.r2.studentId);
     });
     const preview = (f: Family, registrationId: string) => apiResponse(f.parent.api.v1.receipts['refund-preview'].$get({ query: { registrationId } }));
 
@@ -431,7 +507,7 @@ describe('F4 on the reservations rework', () => {
       const before = await preview(fam.r1!, lines.r1!);
       expect(before).toMatchObject({ fullPrice: 2000, percentage: 50, coursePart: 500, boardPart: 1000, amount: 1500, boardSent: false, sentEntries: [] });
       expect(before.boardNote).toBe('The board fee comes back: the entry has not been sent to the board.');
-      const [u1] = await entriesOf(w.series.pearsonJan, fam.r1!.studentId);
+      const [u1] = await entriesOf(refundsJan, fam.r1!.studentId);
       await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [u1!.id] } }));
       const sentAt = new Date((await one<{ at: string }>(`select submitted_at as at from exam_entry where id = $1`, [u1!.id])).at);
       const after = await preview(fam.r1!, lines.r1!);
@@ -449,7 +525,7 @@ describe('F4 on the reservations rework', () => {
       expect((await withdrawnWithLine(lines.r1!, 'the family dropped the subject')).map((e) => [e.entry_code, !!e.submitted_at]))
         .toEqual([[`${T}WMA11`, true], [`${T}WMA12`, false]]);
       expect((await notified('parent.x-xw-r1@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
-        .toBe(`${T}WMA11 Pure Mathematics 1 was withdrawn from Pearson Edexcel January ${Y + 1} (exams xw): the family dropped the subject`);
+        .toBe(`${T}WMA11 Pure Mathematics 1 was withdrawn from Pearson Edexcel January ${Y + 1} (exams xw refunds): the family dropped the subject`);
     });
 
     it('the same line with none sent: the board fee comes back in full', async () => {
@@ -461,7 +537,7 @@ describe('F4 on the reservations rework', () => {
       expect(money((await one<{ b: string }>(`select balance as b from escrow where student_id = $1`, [fam.r2!.studentId])).b)).toBe(was + 1500);
       // Its drafts withdrawn with it: the family refunded 1,500 has nothing left to be sent (item 1).
       expect((await withdrawnWithLine(lines.r2!, 'the family dropped the subject')).map((e) => e.entry_code)).toEqual([`${T}WMA11`, `${T}WMA12`]);
-      expect(await entriesOf(w.series.pearsonJan, fam.r2!.studentId)).toEqual([]);
+      expect(await entriesOf(refundsJan, fam.r2!.studentId)).toEqual([]);
       expect(await notificationsFor('parent.x-xw-r2@test.local', 'EXAM_ENTRY_WITHDRAWN')).toEqual([]);
     });
   });
@@ -923,14 +999,11 @@ describe('F4 on the reservations rework', () => {
       juneSeries = (await apiResponse(w.adm.api.v1['board-series'].$post({ json: {
         boardCode: 'cambridge', month: 'june', year: Y + 1, label: 'exams xw june', entryDeadline: new Date(Date.now() + 5 * DAY), retakeDeadline: new Date(Date.now() + 10 * DAY),
       } }))).id;
-      await fee(juneSeries, 'qualification', w.catalogue.cSyllabus);
-      june = (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
-        type: 'june', year: Y + 1, label: 'exams xw june', startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + 3 * DAY).toISOString(),
-        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + 3 * DAY).toISOString(),
-      } })))!.id;
+      june = await dated({ type: 'june', year: Y + 1, label: 'exams xw june', courseStartsOn: cairoDate(new Date()), endsIn: 3 });
       const bio = await subject('BIOJ', 'Biology June', 'cambridge', 'as_level');
+      // At the 500 June's grid held for the syllabus (its row's exam fee since P1c).
       const [item] = await offer(june, bio, 1000, [w.teacherId], [
-        { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId: juneSeries, availability: 'open', requiredInSeries: false },
+        { label: 'Whole subject', kind: 'all_papers', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId: juneSeries, examFee: 500 },
       ]) as [string];
       for (const k of ['j1', 'j2', 'j3', 'j4']) jf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
       [j1] = await reserve(jf.j1!, [{ offerItemId: item, attempt: 'first', mode: 'in_school' }], june) as [string];
@@ -1003,12 +1076,12 @@ describe('F4 on the reservations rework', () => {
     const at = (n: number) => new Date(Date.now() + n * DAY);
     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', year: number, label: string, entryDeadline: Date) =>
       (await apiResponse(w.adm.api.v1['board-series'].$post({ json: { boardCode, month: 'june', year, label, entryDeadline } }))).id;
-    const mkSession = async (label: string) => (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
-      type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - DAY).toISOString(), endDate: at(3).toISOString(),
-      courseStartsOn: cairoDate(new Date()), paymentDueAt: at(3).toISOString(),
-    } })))!.id;
-    const whole = (boardSeriesId: string, label = 'Whole subject') =>
-      ({ label, kind: 'whole', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId, availability: 'open', requiredInSeries: false });
+    // P1c: a session's rows sit in the sittings its label names, so each session takes the label of the series its
+    // lines start in; a second row in another series of the same June (a converted second cycle's) is placed by SQL.
+    const mkSession = (label: string) => dated({ type: 'june', year: Y + 1, label, courseStartsOn: cairoDate(new Date()), endsIn: 3 });
+    // At the 500 each June grid held for the syllabus (its row's exam fee since P1c).
+    const whole = (boardSeriesId: string, label = 'Whole subject', seriesBySql?: true): ItemIn =>
+      ({ label, kind: 'all_papers', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId, examFee: 500, ...(seriesBySql ? { seriesBySql } : {}) });
     const draftIn = async (seriesId: string, f: Family) => { await derive(seriesId, f.studentId); return (await entriesOf(seriesId, f.studentId))[0]!; };
     const sentIn = async (seriesId: string, f: Family) => {
       const e = await draftIn(seriesId, f);
@@ -1032,10 +1105,9 @@ describe('F4 on the reservations rework', () => {
       const deadline = at(20);
       const from = await mkSeries('cambridge', Y + 1, 'exams xw move a', deadline);
       const to = await mkSeries('cambridge', Y + 1, 'exams xw move b', deadline);
-      for (const s of [from, to]) await fee(s, 'qualification', w.catalogue.cSyllabus);
-      const sess = await mkSession('exams xw moves');
+      const sess = await mkSession('exams xw move a');
       const bio = await subject('BIOMV', 'Biology moves', 'cambridge', 'as_level');
-      const [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from), whole(to, 'Whole subject, the other series')]) as [string, string];
+      const [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from), whole(to, 'Whole subject, the other series', true)]) as [string, string];
       const p = await pair('mv', sess, item, from);
       const move = (id: string) => w.adm.api.v1.sessions[':id']['board-series'].move.$post({
         param: { id: sess }, json: { registrationIds: [id], boardSeriesId: to, reason: 'sat in the other series (scenario)' },
@@ -1050,53 +1122,23 @@ describe('F4 on the reservations rework', () => {
       expect((await entriesOf(to, p.fd.studentId)).map((e) => [e.entry_code, e.status, e.registration_id])).toEqual([[`${T}97`, 'draft', p.ld]]);
     });
 
-    it("an item's series change: refused while a line of it has a sent entry; once that is withdrawn, the lines move and the drafts go with them", async () => {
-      const deadline = at(20);
-      const from = await mkSeries('cambridge', Y + 1, 'exams xw item a', deadline);
-      const to = await mkSeries('cambridge', Y + 1, 'exams xw item b', deadline);
-      for (const s of [from, to]) await fee(s, 'qualification', w.catalogue.cSyllabus);
-      const sess = await mkSession('exams xw items');
-      const bio = await subject('BIOIT', 'Biology item moves', 'cambridge', 'as_level');
-      const [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from)]) as [string];
-      const offerId = (await one<{ o: string }>(`select offer_id as o from session_offer_item where id = $1`, [item])).o;
-      const p = await pair('it', sess, item, from);
-      const change = () => w.adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
-        param: { id: sess, offerId, itemId: item }, json: { boardSeriesId: to, reason: 'sat in the other series (scenario)' },
-      });
-      expect(await refused(change())).toEqual({ status: 409, error: refusal('it', `Cambridge International June ${Y + 1} (exams xw item a)`) });
-      expect([await seriesOfLine(p.ld), await seriesOfLine(p.ls), await statusOf(p.draft.id)]).toEqual([from, from, 'draft']);
-      await byHand(p.sent.id);
-      await apiResponse(change());
-      expect([await seriesOfLine(p.ld), await seriesOfLine(p.ls)]).toEqual([to, to]);
-      await withdrawnWithLine(p.ld, "the line's item moved to another series");
-      expect(await derive(to, p.fd.studentId)).toMatchObject({ created: 1 });
-    });
+    // Retired by name (P1c): "an item's series change: refused while a line of it has a sent entry; once that is withdrawn,
+    // the lines move and the drafts go with them" drove the links sheet's item route (PUT …/offers/:offerId/items/:itemId with
+    // a boardSeriesId), which left with P1c: a row's sitting no longer changes while reservations use it (§6: close the row
+    // and add another; 08y-setup). The drafts following a moved line stay proven by the admin's move above, the board change
+    // and the series correction below. No money: both series held the syllabus at 500 and the lines kept their price.
 
-    it("a subject's board change: refused while a line has a sent entry; once that is withdrawn, the lines move to the new board's series and the drafts are withdrawn", async () => {
-      const deadline = at(20);
-      const from = await mkSeries('cambridge', Y + 1, 'exams xw board', deadline);
-      // The new board's series of the same month, year and label, with the same deadline (MO-10).
-      const to = await mkSeries('pearson_edexcel', Y + 1, 'exams xw board', deadline);
-      await fee(from, 'qualification', w.catalogue.cSyllabus);
-      const sess = await mkSession('exams xw board');
-      const bio = await subject('BIOBC', 'Biology board change', 'cambridge', 'as_level');
-      const [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from)]) as [string];
-      const p = await pair('bc', sess, item, from);
-      const change = () => w.adm.api.v1.subjects[':id'].$put({ param: { id: bio }, json: { council: 'pearson_edexcel' } });
-      // The subject form's route answers each of its refusals 400 (the Catalogue's mapping, the same change, 409).
-      expect(await refused(change())).toEqual({ status: 400, error: refusal('bc', `Cambridge International June ${Y + 1} (exams xw board)`) });
-      expect(await seriesOfLine(p.ld)).toBe(from);
-      await byHand(p.sent.id);
-      await apiResponse(change());
-      expect([await seriesOfLine(p.ld), await seriesOfLine(p.ls)]).toEqual([to, to]);
-      await withdrawnWithLine(p.ld, "the subject's board changed");
-    });
+    // Retired by name (P1c): "a subject's board change: refused while a line has a sent entry; once that is withdrawn, the
+    // lines move to the new board's series and the drafts are withdrawn". A subject set up in a session with its rows' own
+    // exam fees — every subject the coordinator's routes offer — no longer changes board under its lines: the change is
+    // refused before anything moves (catalogue.services BOARD_CHANGE_REFUSAL; 08y-setup "reservations are protected: … its
+    // board does not change under it"). The drafts following a moved line stay proven by the admin's move and the series
+    // correction. No money: the lines kept their price.
 
     it("a session's series correction: refused while a line has a sent entry; once that is withdrawn, the lines go to the corrected series and the drafts are withdrawn", async () => {
       const from = await mkSeries('cambridge', Y + 1, 'exams xw corr', at(20));
       // The corresponding series of the corrected year: the same board, month and label.
       const to = await mkSeries('cambridge', Y + 2, 'exams xw corr', at(380));
-      for (const s of [from, to]) await fee(s, 'qualification', w.catalogue.cSyllabus);
       const sess = await mkSession('exams xw corr');
       const bio = await subject('BIOCR', 'Biology correction', 'cambridge', 'as_level');
       const [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from)]) as [string];
@@ -1122,15 +1164,13 @@ describe('F4 on the reservations rework', () => {
       const mk = async (label: string) => (await apiResponse(w.adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, entryDeadline: deadline } }))).id;
       from = await mk('exams xw after a');
       to = await mk('exams xw after b');
-      for (const s of [from, to]) await fee(s, 'qualification', w.catalogue.cSyllabus);
-      sess = (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
-        type: 'june', year: Y + 1, label: 'exams xw after', startDate: new Date(Date.now() - DAY).toISOString(), endDate: at(3).toISOString(),
-        courseStartsOn: cairoDate(new Date()), paymentDueAt: at(3).toISOString(),
-      } })))!.id;
+      // P1c: the session takes the label of the series its lines start in; the row in the other series is placed by SQL
+      // (as the moves above), each at the 500 its June grid held for the syllabus.
+      sess = await dated({ type: 'june', year: Y + 1, label: 'exams xw after a', courseStartsOn: cairoDate(new Date()), endsIn: 3 });
       const bio = await subject('BIOAF', 'Biology after moves', 'cambridge', 'as_level');
-      const whole = (boardSeriesId: string, label: string) =>
-        ({ label, kind: 'whole', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId, availability: 'open', requiredInSeries: false });
-      [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from, 'Whole subject'), whole(to, 'Whole subject, the other series')]) as [string, string];
+      const whole = (boardSeriesId: string, label: string, seriesBySql?: true): ItemIn =>
+        ({ label, kind: 'all_papers', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId, examFee: 500, ...(seriesBySql ? { seriesBySql } : {}) });
+      [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from, 'Whole subject'), whole(to, 'Whole subject, the other series', true)]) as [string, string];
     });
     const move = (id: string) => apiResponse(w.adm.api.v1.sessions[':id']['board-series'].move.$post({
       param: { id: sess }, json: { registrationIds: [id], boardSeriesId: to, reason: 'sat in the other series (scenario)' },

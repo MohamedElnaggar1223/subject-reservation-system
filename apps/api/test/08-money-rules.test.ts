@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited, takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler, expireByHand, feedSeries, seriesOfSession, sessionName, runSessionRecovery, type Client, reservationOf, swapTo, passCutOff } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited, takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler, expireByHand, seriesOfSession, sessionName, runSessionRecovery, type Client, reservationOf, swapTo, passCutOff } from './helpers';
 import { schoolDate } from '../src/services/window.services';
 
 /**
@@ -58,10 +58,9 @@ describe('money rules', () => {
       ['ECO', 'Economics'], ['ART', 'Art'], ['MUS', 'Music'], ['FRE', 'French'], ['GER', 'German'],
     ] as const) {
       // Entered with Pearson Edexcel (F0b): its IAL sits January, June and
-      // October, so the January and June windows below can feed a real board
-      // series (Cambridge sits no January series). Offered the old way (priced from the grid): feeding a series
-      // moves rows with their lines, which a subject set up through the subject editor refuses (§6; P1b retires it).
-      subj[code] = await subject(adm, `MR-${code}`, `${name} (AS, money rules)`, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
+      // October, so the January window below sits a real January series (Cambridge sits no January series).
+      // Priced by its row (P1c: the fee grid left): the row's exam fee is the 500 the grid row carried.
+      subj[code] = await subject(adm, `MR-${code}`, `${name} (AS, money rules)`, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
     }
     sessionId = await session(adm, 'January (AS, money rules)', 'january', 'as_level', { ...openWindow(), activate: true });
   });

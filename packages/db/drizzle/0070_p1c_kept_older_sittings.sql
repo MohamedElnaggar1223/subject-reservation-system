@@ -1,0 +1,1 @@
+ALTER TABLE "session_offer_item" ADD COLUMN "kept_prior_series_ids" text[] DEFAULT '{}'::text[] NOT NULL;

@@ -338,25 +338,26 @@ export const TemplateId = z.object({ id: id });
 
 // ─── Reminder rules ──────────────────────────────────────────────────────────
 
-export const REMINDER_KINDS = ['payment_due', 'session_closing', 'entry_deadline', 'school_fee_due', 'declared_retakes_to_verify'] as const;
+// The staff's board-entry-deadline kind left with P1c (COORDINATOR_REWORK.md §9.2: board deadlines are reference data and
+// act through each line's cut-off, whose reminders are the payment ones); migration 0071 removed its stored rule.
+export const REMINDER_KINDS = ['payment_due', 'session_closing', 'school_fee_due', 'declared_retakes_to_verify'] as const;
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
-export const REMINDER_UNTIL = ['paid', 'closed', 'deadline', 'verified'] as const;
+export const REMINDER_UNTIL = ['paid', 'closed', 'verified'] as const;
 export type ReminderUntil = (typeof REMINDER_UNTIL)[number];
-/** What stops each kind: its target paid, the session closed, the deadline passed, the sitting verified. */
+/** What stops each kind: its target paid, the session closed, the sitting verified. */
 export const REMINDER_KIND_UNTIL: Record<ReminderKind, ReminderUntil> = {
-  payment_due: 'paid', session_closing: 'closed', entry_deadline: 'deadline', school_fee_due: 'paid', declared_retakes_to_verify: 'verified',
+  payment_due: 'paid', session_closing: 'closed', school_fee_due: 'paid', declared_retakes_to_verify: 'verified',
 };
 export const REMINDER_KIND_LABELS: Record<ReminderKind, string> = {
   payment_due: 'Payment due (lines, instalments, charges)',
   session_closing: 'Reservations closing',
-  entry_deadline: 'Board entry deadline (staff)',
   school_fee_due: 'School fee due',
   declared_retakes_to_verify: 'Declared retakes to verify (coordinator)',
 };
 export const REMINDER_UNTIL_LABELS: Record<ReminderUntil, string> = {
-  paid: 'until paid', closed: 'until the session closes', deadline: 'until the deadline', verified: 'until verified',
+  paid: 'until paid', closed: 'until the session closes', verified: 'until verified',
 };
-/** Kinds a session may override (the school fee and the series' deadlines are not a session's). */
+/** Kinds a session may override (the school fee is not a session's). */
 export const SESSION_REMINDER_KINDS: readonly ReminderKind[] = ['payment_due', 'session_closing', 'declared_retakes_to_verify'];
 /** Kinds that may run after their date (a debt still owed). */
 export const OVERDUE_REMINDER_KINDS: readonly ReminderKind[] = ['payment_due', 'school_fee_due'];

@@ -14,49 +14,22 @@
  *    preregs fall back to pending_payment.
  * 4. Cancellation before activation releases held funds and walks the
  *    normal receipt-gated refund path with refund windows applied (D-J).
+ *
+ * Since the coordinator rework a draft is invisible to families (C4): no preregistration is made, and P1c removed
+ * the routes that made and cancelled one (POST /registrations/preregister, /:id/cancel-prereg) with their services.
+ * What stays serves preregistrations made before: the capture at opening and the settlement at a line's deadline.
  */
 
 import { db, registration, auditLog, eq, and, sql, notInArray } from '@repo/db';
-import type { PreregisterRegistrationType } from '@repo/validations';
 import { assertSchoolFeeGate } from './registration.services';
-import { reserveLines } from './reservation.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
-import { refundFor } from './refund.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterForInTx } from './eligibility.services';
 import { notifyFinanceOfHeldPreregistration, notifyPreregistrationsRefundedAtDeadline } from './notification.services';
 import { logger } from '../lib/logger';
-import { coded } from '../lib/refusal';
-import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-async function validateParentStudentLink(parentId: string, studentId: string): Promise<boolean> {
-  const link = await db.query.parentStudentLink.findFirst({
-    where: (l, { eq, and }) =>
-      and(eq(l.parentId, parentId), eq(l.studentId, studentId), eq(l.status, 'approved')),
-    columns: { id: true },
-  });
-  return !!link;
-}
-
-/** C4 (COORDINATOR_REWORK.md): a draft is invisible to families — no preregistration; a session takes reservations once it opens. */
-export const PREREGISTRATION_GONE_REFUSAL = 'Reservations open when the session opens: a session that is not open yet takes none';
-
-/**
- * Parent creates preregistrations against a draft session — refused since the coordinator rework (C4): a draft is
- * invisible to families. The rest of this module (capture at opening, the held wallet) stays for preregistrations
- * made before it, out of the reservation path.
- */
-export async function createPreregistration(parentId: string, data: PreregisterRegistrationType): Promise<Awaited<ReturnType<typeof reserveLines>>> {
-  const linked = await validateParentStudentLink(parentId, data.studentId);
-  if (!linked) throw new Error('You are not linked to this student');
-  throw coded(new Error(PREREGISTRATION_GONE_REFUSAL), 'PREREGISTRATION_GONE');
-}
+import { logAction, logActions, expiryEntries } from './audit.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -75,87 +48,6 @@ async function preregPaymentState(registrationId: string, executor: typeof db | 
     funded: links.some((l) => l.payment.status === 'completed'),
     open: links.some((l) => l.payment.status === 'pending' || l.payment.status === 'pending_verification'),
   };
-}
-
-/**
- * Parent cancels a preregistration before the session opens (D-J):
- * held funds release and the refund walks the normal receipt-gated
- * path with refund windows applied at cancellation time.
- */
-export async function cancelPreregistration(registrationId: string, parentId: string, auditCtx?: AuditContext) {
-  const reg = await db.query.registration.findFirst({
-    where: (r, { eq }) => eq(r.id, registrationId),
-    with: {
-      session: { columns: { id: true, status: true } },
-      // Its line's own deadline decides (MO-10, per line since the rework).
-    },
-  });
-  if (!reg) throw new Error('Registration not found');
-  if (reg.status !== 'preregistered') {
-    throw new Error('Only preregistered subjects can be cancelled this way');
-  }
-  if (reg.session.status !== 'draft') {
-    throw new Error('The session has already opened — use a normal drop instead');
-  }
-
-  const linked = await validateParentStudentLink(parentId, reg.studentId);
-  if (!linked) throw new Error('You are not linked to this student');
-
-  // Past the board's deadline the series never opens: the full price back, as
-  // the deadline sweep gives — the refund windows are for a family's own
-  // drop (MO-21; review of ae4f88b, flag 1).
-  const deadline = await effectiveDeadlineFor(db, reg);
-  const pastDeadline = !!deadline.at && deadline.at <= new Date();
-  // Before it, the family's own drop: the line's refund (refundFor, §3.9) — a preregistration was
-  // never confirmed, so its board fee was never sent and comes back in full.
-  const quote = pastDeadline ? null : await refundFor(db, registrationId, new Date());
-  const pct = quote ? quote.percent : 100;
-
-  const result = await db.transaction(async (tx) => {
-    // Lock the row, then decide. A payment still open for it means money may
-    // be on its way: cancelling now dropped the row with nothing refunded and
-    // left finance unable to confirm the transfer. Its receipt first (MA-16's order).
-    await lockReceiptOf(tx, registrationId);
-    await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, registrationId)).for('update');
-    const { funded, open } = await preregPaymentState(registrationId, tx);
-    if (open) {
-      throw new Error('A payment for this subject is in progress — cancel that checkout first, or wait for the finance office to confirm or reject the transfer');
-    }
-    const refundAmount = funded ? (quote ? quote.amount : round2(reg.priceAtRegistration)) : 0;
-
-    // Release the full held amount; the refundable portion re-enters the
-    // free balance (receipt-gated); the remainder is retained per the
-    // refund windows.
-    if (funded) {
-      await debitHeld(
-        {
-          studentId: reg.studentId,
-          amount: reg.priceAtRegistration,
-          reason: 'prereg_release',
-          initiatedBy: parentId,
-          relatedRegistrationId: registrationId,
-        },
-        tx
-      );
-    }
-
-    const dropOutcome = await executeReceiptGatedDrop(tx, {
-      registrationId,
-      studentId: reg.studentId,
-      refundAmount,
-      refundReason: 'drop',
-      initiatedBy: parentId,
-      fromStatus: 'preregistered',
-    });
-
-    const outcome = { success: true, funded, refundPercentage: funded ? pct : 0, ...dropOutcome };
-    // The release, the refund and their audit row commit together (MO-1).
-    await logAction(parentId, 'PREREG_CANCELLED', 'registration', registrationId, { status: 'preregistered' },
-      { ...outcome, heldReleased: funded ? reg.priceAtRegistration : 0 }, auditCtx, tx);
-    return outcome;
-  });
-
-  return result;
 }
 
 /**

@@ -10,7 +10,9 @@
  * own row for a converted line over an enrolment from before the rework (`lineEnrolmentUnits`) —
  * takes the new teacher and mode, or is made, through F0b's `upsertEnrolments(source:
  * 'registrations', follow)`; the teaching group follows it there (F1's `followEnrolments`, in this
- * transaction). A whole offer's teacher who leaves is A's `POST …/offers/:offerId/replace-teacher`.
+ * transaction). A whole subject's teacher who leaves is swapped in the coordinator's subject editor, then each of
+ * their lines moved here (P1c removed A's replace-teacher route with the links sheet; 08s6 "a teacher replaced on a
+ * subject").
  * `changeLineTeacherTx` is the same change inside a caller's transaction (F1's "no preference"
  * assigned on Teaching groups).
  */
@@ -23,7 +25,7 @@ import type { ChangeLineTeacherType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { upsertEnrolments, lineEnrolmentUnits, groupFollowNotices, type EnrolmentChange } from './enrolment.services';
 import type { FollowOutcome } from './group.services';
-import { availabilityConstraints } from './offer.services';
+import { cellConstraints } from './offer.services';
 import { lineExceptions } from './line-exceptions';
 
 export class LineTeacherError extends Error {
@@ -69,13 +71,15 @@ export async function changeLineTeacherTx(
     if (!CHANGEABLE.includes(line.status)) throw new LineTeacherError('This line is no longer reserved: its teacher cannot be changed', 409);
     const [facts] = await tx.execute(sql`
       select i.id as "itemId", i.offer_id as "offerId", i.enters_kind as "entersKind", s.name as "subjectName", i.label, i.kind,
-        o.subject_id as "subjectId", o.availability as "offerAvailability", i.availability as "itemAvailability", i.board_series_id as "boardSeriesId", i.session_id as "sessionId",
+        o.subject_id as "subjectId", o.accepting, i.first_in_school as "firstInSchool", i.retake_in_school as "retakeInSchool",
+        i.retake_self_study as "retakeSelfStudy", i.first_self_study as "firstSelfStudy", i.board_series_id as "boardSeriesId", i.session_id as "sessionId",
         rs.session_type as "sessionType", rs.series_year as "seriesYear",
         coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units
       from session_offer_item i join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id
       join registration_session rs on rs.id = i.session_id where i.id = ${line.offerItemId}`).then((r) => r.rows as {
         itemId: string; offerId: string; entersKind: string; subjectName: string; label: string; kind: string; sessionType: string; seriesYear: number; units: string[];
-        subjectId: string; offerAvailability: string; itemAvailability: string; boardSeriesId: string | null; sessionId: string;
+        subjectId: string; accepting: boolean; firstInSchool: boolean; retakeInSchool: boolean; retakeSelfStudy: boolean; firstSelfStudy: boolean;
+        boardSeriesId: string | null; sessionId: string;
       }[]);
     if (!facts) throw new LineTeacherError('Registration not found', 404);
     const name = facts.kind === 'all_papers' ? facts.subjectName : `${facts.subjectName} — ${facts.label}`;
@@ -90,7 +94,7 @@ export async function changeLineTeacherTx(
     // assertLineRules asks it: the exception row FOR UPDATE, a one-shot one marked used here.
     const firstEntry = line.attempt === 'first' || line.declarationRejected;
     if (mode === 'self_study' && line.mode === 'in_school' && firstEntry
-      && !availabilityConstraints(facts.offerAvailability, facts.itemAvailability).selfStudyOnly) {
+      && !cellConstraints(facts, facts.accepting).selfStudyOnly) {
       const held = await lineExceptions.active(tx, line.studentId, ['gate.selfStudyFirstEntry'], {
         sessionId: facts.sessionId, subjectId: facts.subjectId, offerId: facts.offerId, offerItemId: facts.itemId, registrationId: line.id,
         ...(facts.boardSeriesId ? { boardSeriesId: facts.boardSeriesId } : {}),
@@ -126,7 +130,7 @@ export async function changeLineTeacherTx(
 
     // The enrolment follows (§10): this academic year's open enrolment of the student in what the
     // line enters — one per unit for an item entering units, or the subject's own row for a converted
-    // line over an enrolment from before the rework (lineEnrolmentUnits, as A's replace-teacher) —
+    // line over an enrolment from before the rework (lineEnrolmentUnits) —
     // updated, or made from the line, through upsertEnrolments; the teaching group follows it there.
     const [year] = await tx.execute(sql`select id from academic_year where start_year = school_series_academic_year_start(${facts.sessionType}, ${facts.seriesYear})`)
       .then((r) => r.rows as { id: string }[]);

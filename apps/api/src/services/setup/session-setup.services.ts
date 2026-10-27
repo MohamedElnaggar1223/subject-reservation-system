@@ -195,12 +195,15 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
           oldValue: JSON.stringify({ paymentDueAt: current.paymentDueAt, courseStartsOn: current.courseStartsOn }), newValue: 'true', reason: data.reason ?? undefined,
         });
       }
-      // The unpaid lines' cut-offs before the change (D1 of the P1b review): the days and the due date move them.
-      // The lines locked in id order after the session (the re-date below takes the same order).
-      const unpaid = 'unpaidCancelDays' in next || 'paymentDueAt' in next
-        ? (await tx.select({ id: registration.id }).from(registration)
-          .where(and(eq(registration.sessionId, id), eq(registration.status, 'pending_payment'))).orderBy(registration.id).for('update')).map((l) => l.id)
+      // The waiting lines, locked once in id order after the session: the unpaid ones among them have their
+      // cut-offs counted (D1 of the P1b review: the days and the due date move them), and every one is re-dated
+      // below when the due date moves. One pass over the superset (P1c): locking the unpaid subset and then the
+      // waiting superset could deadlock with a transaction locking an interleaved set in id order.
+      const waitingLines = 'unpaidCancelDays' in next || 'paymentDueAt' in next
+        ? await tx.select({ id: registration.id, status: registration.status }).from(registration)
+          .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING))).orderBy(registration.id).for('update')
         : [];
+      const unpaid = waitingLines.filter((l) => l.status === 'pending_payment').map((l) => l.id);
       const cutOffsBefore = await cutOffsOf(tx, unpaid);
       if (Object.keys(next).length || datesConfirmed) {
         await tx.update(registrationSession).set({
@@ -216,9 +219,7 @@ export async function updateSetupSession(id: string, data: UpdateSessionType, ac
       // The payment due date moved: the waiting lines' due dates follow — counted with the rest, answered first.
       let dueMoved = 0;
       if (next.paymentDueAt) {
-        const waiting = await tx.select({ id: registration.id }).from(registration)
-          .where(and(eq(registration.sessionId, id), inArray(registration.status, WAITING))).orderBy(registration.id).for('update');
-        dueMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s payment due date changed');
+        dueMoved = await redateLines(tx, waitingLines.map((w) => w.id), actorId, 'the session\'s payment due date changed');
       }
       // The cut-offs after it (line_cut_off reads the session as this transaction now has it).
       const cutOffsAfter = await cutOffsOf(tx, unpaid);
@@ -330,9 +331,10 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
         await logAction(actorId, 'SESSION_PRICES_FINAL', 'session', id, { pricesFinal: true }, { pricesFinal: false }, ctx, tx);
         return { saved: true, impact: NO_IMPACT, dueDatesMoved: 0 };
       }
-      // A waiting line priced from a fee not confirmed, on a row with no exam fee of its own (an older line priced
-      // from the deprecated fee grid): switching final would leave it unpayable under a session that reads "prices
-      // final". Refused, its rows named, until their exam fees are set (L-lead of the P1b review).
+      // A waiting line priced from a fee not confirmed, on a row with no exam fee of its own (a line priced from the
+      // fee grid before P1c dropped it, on a row whose grid rows were missing): switching final would leave it unpayable
+      // under a session that reads "prices final". Refused, its rows named, until their exam fees are set (L-lead of
+      // the P1b review).
       const unpriced = await tx.select({ subject: subject.name, kind: sessionOfferItem.kind, label: sessionOfferItem.label, lines: sql<number>`count(*)::int` })
         .from(registration)
         .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
@@ -442,7 +444,8 @@ export async function checkListOf(executor: Executor, s: SessionRow): Promise<Ch
           });
         }
       }
-      for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward)) {
+      // One she kept on purpose ("Keep it", carried by a copy) is not asked again (P2's L9); the editor still warns.
+      for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward && !x.kept)) {
         items.push({
           code: 'carried_from_too_old', severity: 'look', offeringId: o.id, rowId: r.id,
           message: `${name} — ${r.label}: ${p.month.charAt(0).toUpperCase()}${p.month.slice(1)} ${p.year} is older than the board carries a result forward (kept: her list)`,

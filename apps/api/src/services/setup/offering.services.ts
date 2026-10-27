@@ -10,10 +10,8 @@
  * (D6) and the row's own teachers (D4).
  *
  * The system derives the rest (A3): the label (D9), the exclusive group (D8), whether the sitting
- * carried from is asked (D6, the board rule), the row's board series (created when not on record and
- * linked to the session), and — until P1b drops them — today's columns kept in step: the offer's and
- * the row's availability from the switch and the cells, so the reservation path P1b has not replaced
- * yet offers what the cells allow.
+ * carried from is asked (D6, the board rule) and the row's board series (created when not on record and
+ * linked to the session). The availability columns once kept in step with the switch and the cells left with P1c.
  *
  * Locks (§9.2): the session FOR SHARE, the offering FOR UPDATE, its rows FOR UPDATE in id order, then
  * (planReprice) the lines FOR UPDATE and their payment history. A price change answers its impact
@@ -30,6 +28,8 @@ import type {
   AddOfferingType, UpdateOfferingType, OfferingRowInputType, OfferingTeacherInputType, QuestionInputType, Sitting,
 } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
+import { redateLines } from '../deadline.services';
+import { cutOffsOf } from '../window.services';
 import { findOrCreateSeries, attachSeries, detachUnusedSeries, OfferError } from '../offer.services';
 import { seriesRuleSentence } from '../series.services';
 import { teacherDuplicates, duplicateTeacherRefusal } from './teacher-names';
@@ -38,8 +38,8 @@ import { deriveFollowingFees } from './price-list.services';
 import { rowLabel, labelRowOf } from './labels';
 import { WHOLE_ITEM_LABEL } from '@repo/validations';
 import {
-  availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
-  NO_CELLS, isLiveStatus, type Cells,
+  exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
+  NO_CELLS, isLiveStatus, LIVE_LINE_STATUSES, beyondCarryForward, type Cells,
 } from './model';
 import {
   planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact, type RepricedLine,
@@ -47,6 +47,9 @@ import {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
+
+/** The lines waiting to be paid (or approved) whose due date a row's pay-by makes (deadline.services redateLines). */
+const WAITING_STATUSES = ['pending_approval', 'pending_payment', 'preregistered'];
 
 export class SetupError extends Error {
   constructor(message: string, public readonly status: 400 | 403 | 404 | 409 = 400) {
@@ -116,13 +119,8 @@ const CELL_OPTION: Record<keyof Cells, { attempt: 'first' | 'retake'; mode: 'in_
   firstSelfStudy: { attempt: 'first', mode: 'self_study', words: 'first entry in self study' },
 };
 
-/** The offer's availability kept in step with its switch and close date (today's line rules read it until P1b). */
-const offerAvailability = (accepting: boolean, closesAt: Date | null, now = new Date()) =>
-  accepting && !(closesAt && closesAt <= now) ? 'open' : 'closed';
-
-/** A row's availability kept in step with its cells and close date. */
-const rowAvailability = (cells: Cells, closesAt: Date | null, now = new Date()) =>
-  closesAt && closesAt <= now ? 'closed' : availabilityOf(cells);
+/** Whether a subject takes reservations: its switch on and its close date, if any, not reached (C4). */
+const subjectOpen = (accepting: boolean, closesAt: Date | null, now = new Date()) => accepting && !(closesAt && closesAt <= now);
 
 // ─── Teachers (D4) ───────────────────────────────────────────────────────────
 
@@ -304,7 +302,7 @@ async function linesOfRows(executor: Executor, itemIds: string[]) {
     .groupBy(registration.offerItemId, registration.attempt, registration.mode, registration.status);
 }
 
-type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: boolean; closedNow: boolean };
+type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: boolean; closedNow: boolean; payByChanged: boolean };
 
 /**
  * Create or change one row in the caller's transaction (the offering and its rows held). Only what
@@ -313,7 +311,7 @@ type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: 
  */
 async function writeRow(
   tx: Tx, c: RowContext, input: OfferingRowInputType, existing: ItemRow | null, sortOrder: number, lines: Awaited<ReturnType<typeof linesOfRows>>,
-  opts: { defaultsReviewed?: boolean; cellsByDefault?: string[] } = {},
+  opts: { defaultsReviewed?: boolean; cellsByDefault?: string[]; keptPriorSittings?: { month: string; year: number }[] } = {},
 ): Promise<RowWrite> {
   const now = new Date();
   const kind = input.kind;
@@ -366,6 +364,13 @@ async function writeRow(
   const needsPrior = needsPriorFor(kind, c.board.onePaperAsksSitting);
   const priorList = input.allowedPriorSittings ?? (!existing && needsPrior ? await defaultPriorSittings(tx, c, seriesId!) : undefined);
   const priors = await priorSittings(tx, c, priorList, seriesId!);
+  // The older earlier exams she kept on purpose (D6, P2's L9): only ones still on the list; a copy names its own.
+  const allowedNow = priors ?? existing?.allowedPriorSeriesIds ?? [];
+  let keptPriors = (existing?.keptPriorSeriesIds ?? []).filter((id) => allowedNow.includes(id));
+  if (opts.keptPriorSittings && allowedNow.length) {
+    const listed = await tx.select({ id: boardSeries.id, month: boardSeries.month, year: boardSeries.year }).from(boardSeries).where(inArray(boardSeries.id, allowedNow));
+    keptPriors = allowedNow.filter((id) => listed.some((p) => p.id === id && opts.keptPriorSittings!.some((k) => k.month === p.month && k.year === p.year)));
+  }
   const closesAt = input.closesAt !== undefined ? input.closesAt : existing?.closesAt ?? null;
   const payBy = input.payBy !== undefined ? input.payBy : existing?.payBy ?? null;
   // The exam fee: typed, or the board rule / sum of units filled in (price-list.services fills those).
@@ -388,10 +393,10 @@ async function writeRow(
     label, kind, referenceKey: ref?.key ?? (input.referenceKey === null ? null : existing?.referenceKey ?? null), referenceCodes: codes,
     boardSeriesId: seriesId, closesAt, payBy, examFee, examFeeSource, priceListRowId, courseFee, selfStudyFee,
     ...cells,
-    availability: rowAvailability(cells, closesAt, now),
     needsPriorSeries: needsPrior,
     exclusiveGroup: exclusiveGroupFor(kind),
     allowedPriorSeriesIds: priors ?? existing?.allowedPriorSeriesIds ?? [],
+    keptPriorSeriesIds: keptPriors,
     sortOrder,
     cellsByDefault,
   };
@@ -405,20 +410,21 @@ async function writeRow(
     });
     if (own?.length) await writeRowTeachers(tx, id, own);
     await logAction(c.actorId, 'OFFER_ITEM_CREATED', 'offer_item', id, null, { offerId: c.offer.id, ...values, teachers: own ?? [], via: 'the subject editor' }, undefined, tx);
-    return { id, created: true, priceChanged: false, changed: true, closedNow: false };
+    return { id, created: true, priceChanged: false, changed: true, closedNow: false, payByChanged: false };
   }
   const before = {
     label: existing.label, kind: existing.kind, referenceKey: existing.referenceKey, referenceCodes: existing.referenceCodes, boardSeriesId: existing.boardSeriesId,
     closesAt: existing.closesAt, payBy: existing.payBy, examFee: existing.examFee, examFeeSource: existing.examFeeSource, priceListRowId: existing.priceListRowId,
-    courseFee: existing.courseFee, selfStudyFee: existing.selfStudyFee, ...cellsOf(existing), availability: existing.availability,
-    needsPriorSeries: existing.needsPriorSeries, exclusiveGroup: existing.exclusiveGroup, allowedPriorSeriesIds: existing.allowedPriorSeriesIds, sortOrder: existing.sortOrder,
+    courseFee: existing.courseFee, selfStudyFee: existing.selfStudyFee, ...cellsOf(existing),
+    needsPriorSeries: existing.needsPriorSeries, exclusiveGroup: existing.exclusiveGroup, allowedPriorSeriesIds: existing.allowedPriorSeriesIds,
+    keptPriorSeriesIds: existing.keptPriorSeriesIds, sortOrder: existing.sortOrder,
     cellsByDefault: existing.cellsByDefault,
   };
   const diff = Object.fromEntries(Object.entries(values).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify((before as Record<string, unknown>)[k])));
   const currentTeachers = (await tx.select().from(sessionOfferItemTeacher).where(eq(sessionOfferItemTeacher.itemId, existing.id)).orderBy(asc(sessionOfferItemTeacher.sortOrder)))
     .map((t) => ({ teacherId: t.teacherId, mode: t.mode }));
   const teachersChange = own !== undefined && !sameTeachers(own, currentTeachers);
-  if (!Object.keys(diff).length && !teachersChange) return { id: existing.id, created: false, priceChanged: false, changed: false, closedNow: false };
+  if (!Object.keys(diff).length && !teachersChange) return { id: existing.id, created: false, priceChanged: false, changed: false, closedNow: false, payByChanged: false };
   if (Object.keys(diff).length) await tx.update(sessionOfferItem).set({ ...diff, updatedAt: now }).where(eq(sessionOfferItem.id, existing.id));
   if (teachersChange) await writeRowTeachers(tx, existing.id, own!);
   await logAction(c.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', existing.id,
@@ -426,7 +432,8 @@ async function writeRow(
     { ...diff, ...(teachersChange ? { teachers: own } : {}), via: 'the subject editor' }, undefined, tx);
   const priceChanged = 'examFee' in diff || 'courseFee' in diff || 'selfStudyFee' in diff;
   const closedNow = !!(closesAt && closesAt <= now) && !(existing.closesAt && existing.closesAt <= now);
-  return { id: existing.id, created: false, priceChanged, changed: true, closedNow };
+  // D12, §6: a row's pay-by is its waiting lines' due date — the caller re-dates them (P1c).
+  return { id: existing.id, created: false, priceChanged, changed: true, closedNow, payByChanged: 'payBy' in diff };
 }
 
 /** A row left out of the set: removed when nothing ever used it, closed (kept for its history) when only history does; refused with live lines. */
@@ -435,8 +442,8 @@ async function removeRow(tx: Tx, c: RowContext, row: ItemRow, lines: Awaited<Ret
   const live = mine.filter((l) => isLiveStatus(l.status)).reduce((a, l) => a + l.n, 0);
   if (live) throw new SetupError(`${row.label} has ${live} reservation${live === 1 ? '' : 's'}: a row with reservations is not removed — close it instead (they stand)`, 409);
   if (mine.length) {
-    await tx.update(sessionOfferItem).set({ ...NO_CELLS, availability: 'closed', closesAt: row.closesAt ?? new Date(), updatedAt: new Date() }).where(eq(sessionOfferItem.id, row.id));
-    await logAction(c.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', row.id, { ...cellsOf(row), availability: row.availability }, { ...NO_CELLS, availability: 'closed', reason: 'Removed from the subject: kept closed for its history' }, undefined, tx);
+    await tx.update(sessionOfferItem).set({ ...NO_CELLS, closesAt: row.closesAt ?? new Date(), updatedAt: new Date() }).where(eq(sessionOfferItem.id, row.id));
+    await logAction(c.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', row.id, { ...cellsOf(row) }, { ...NO_CELLS, reason: 'Removed from the subject: kept closed for its history' }, undefined, tx);
     return;
   }
   await tx.delete(sessionOfferItem).where(eq(sessionOfferItem.id, row.id));
@@ -501,7 +508,7 @@ export async function addOffering(sessionId: string, input: AddOfferingType, act
       // fees the board rule fills reach no family before then; the check list says so).
       const accepting = !takesReservations(session);
       const [offer] = await tx.insert(sessionOffer).values({
-        id, sessionId, subjectId: subjectRow.id, availability: accepting ? 'open' : 'closed', courseFee: null, referenceCode, teacherChoice: 'families', teacherTbc: false,
+        id, sessionId, subjectId: subjectRow.id, courseFee: null, referenceCode, teacherChoice: 'families', teacherTbc: false,
         accepting, closesAt: null, sortOrder: n, createdBy: actorId,
       }).returning();
       // The reference's suggested rows (D2), no cell ticked: she ticks what the school offers.
@@ -551,7 +558,7 @@ export async function copyOfferingInto(tx: Tx, session: SessionRow, src: OfferRo
   };
   const id = randomUUID();
   const [offer] = await tx.insert(sessionOffer).values({
-    id, sessionId: session.id, subjectId: s.id, availability: takesReservations(session) ? 'closed' : 'open', courseFee: src.courseFee, courseStartsOn: null, grade10Core: false, notes: src.notes,
+    id, sessionId: session.id, subjectId: s.id, courseFee: src.courseFee, courseStartsOn: null, grade10Core: false, notes: src.notes,
     referenceCode: src.referenceCode, teacherChoice: src.teacherChoice, teacherTbc: src.teacherTbc, accepting: !takesReservations(session), closesAt: roll(src.closesAt),
     sortOrder: src.sortOrder ?? n, createdBy: actorId,
   }).returning();
@@ -580,7 +587,10 @@ export async function copyOfferingInto(tx: Tx, session: SessionRow, src: OfferRo
       sitting, closesAt: roll(r.closesAt), payBy: roll(r.payBy), courseFee: r.courseFee, selfStudyFee: r.selfStudyFee, cells: cellsOf(r),
       allowedPriorSittings: priors.map((p) => ({ month: p.month as 'june', year: p.year + years })),
       teachers: ownTeachers.length ? ownTeachers.map((t) => ({ teacherId: t.teacherId, online: t.mode === 'online', external: false })) : null,
-    }, null, r.sortOrder, []);
+    }, null, r.sortOrder, [], {
+      // The older earlier exams she kept stay kept, moved the same years (the mock's decision 4; P2's L9).
+      keptPriorSittings: priors.filter((p) => r.keptPriorSeriesIds.includes(p.id)).map((p) => ({ month: p.month, year: p.year + years })),
+    });
     // Last cycle's exam fee and where it came from (a list's row stays with its own session).
     if (r.examFee !== null) {
       await tx.update(sessionOfferItem).set({ examFee: r.examFee, examFeeSource: r.examFeeSource ?? 'typed' }).where(eq(sessionOfferItem.id, written.id));
@@ -607,8 +617,9 @@ export type OfferingSave = { saved: boolean; impact: Impact; repriced: RepricedL
  * course fee, who chooses the teacher, the teachers, the rows (the whole set when sent) and the
  * subject's questions. Only what differs is written, each change with its audit row; the same body
  * twice writes nothing. A price change (the course fee, a row's exam fee, course fee or self-study
- * amount) re-prices the unpaid lines it reaches and lists the rest for finance; closing the subject or
- * a row counts the reservations that stand. Answered first when it affects families (`expected`).
+ * amount) re-prices the unpaid lines it reaches and lists the rest for finance; a row's pay-by moved re-dates
+ * its waiting lines (dueDatesMoved, as the session's payment due date does); closing the subject or a row counts
+ * the reservations that stand. Answered first when it affects families (`expected`).
  */
 export async function updateOffering(sessionId: string, offeringId: string, data: UpdateOfferingType, actorId: string, ctx?: AuditContext): Promise<OfferingSave> {
   try {
@@ -635,13 +646,13 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       if (data.courseFee !== undefined && data.courseFee !== offer.courseFee) next.courseFee = data.courseFee;
       const accepting = next.accepting ?? offer.accepting;
       const closesAt = next.closesAt !== undefined ? next.closesAt : offer.closesAt;
-      const availability = offerAvailability(accepting, closesAt ?? null, now);
-      if (availability !== offer.availability) next.availability = availability;
+      const wasOpen = subjectOpen(offer.accepting, offer.closesAt, now);
+      const isOpen = subjectOpen(accepting, closesAt ?? null, now);
       // Her "Looks right": the pre-load's notes leave the check list (an unrelated save keeps them).
       if (data.notesReviewed && offer.checkNotes.length) next.checkNotes = [];
       const live = (ids: string[]) => lines.filter((l) => ids.includes(l.itemId) && isLiveStatus(l.status)).reduce((a, l) => a + l.n, 0);
       // Closing the subject (its switch off, or a close date reached): the reservations that stand are counted.
-      if (offer.availability !== 'closed' && availability === 'closed') linesAffected += live(rows.map((r) => r.id));
+      if (wasOpen && !isOpen) linesAffected += live(rows.map((r) => r.id));
       if (Object.keys(next).length) {
         await tx.update(sessionOffer).set({ ...next, updatedAt: now }).where(eq(sessionOffer.id, offeringId));
         await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offeringId,
@@ -663,6 +674,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
 
       // The rows: each sent changed or made; each left out removed or closed.
       const priceRows = new Set<string>();
+      const payByRows = new Set<string>();
       if (data.rows) {
         const ids = data.rows.map((r) => r.id).filter((x): x is string => !!x);
         if (new Set(ids).size !== ids.length) throw new SetupError('A row is sent twice');
@@ -696,6 +708,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
           const w = await writeRow(tx, c, r, r.id ? byId.get(r.id)! : null, pos, lines, { defaultsReviewed: !!data.defaultsReviewed });
           if (w.changed) changed = true;
           if (w.priceChanged) priceRows.add(w.id);
+          if (w.payByChanged) payByRows.add(w.id);
           if (w.closedNow) linesAffected += live([w.id]);
         }
         for (const r of rows.filter((x) => !ids.includes(x.id))) {
@@ -703,6 +716,23 @@ export async function updateOffering(sessionId: string, offeringId: string, data
           changed = true;
         }
         await detachUnusedSeries(tx, sessionId);
+      }
+      // Her "Keep it" (D6, P2's L9): every earlier exam older than the board carries a result forward, on the rows as
+      // saved now, kept on purpose — the check list leaves it, and a copy keeps it so.
+      if (data.olderSittingsKept) {
+        const nowRows = await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offeringId)).orderBy(asc(sessionOfferItem.id));
+        const sIds = [...new Set(nowRows.flatMap((r) => [r.boardSeriesId, ...r.allowedPriorSeriesIds]).filter((x): x is string => !!x))];
+        const sittings = new Map((sIds.length ? await tx.select({ id: boardSeries.id, month: boardSeries.month, year: boardSeries.year }).from(boardSeries).where(inArray(boardSeries.id, sIds)) : [])
+          .map((x) => [x.id, x]));
+        for (const r of nowRows) {
+          const here = r.boardSeriesId ? sittings.get(r.boardSeriesId) : undefined;
+          const older = r.allowedPriorSeriesIds.filter((id) => { const p = sittings.get(id); return !!p && beyondCarryForward(here, p, board.carryForwardMonths); });
+          const kept = r.allowedPriorSeriesIds.filter((id) => r.keptPriorSeriesIds.includes(id) || older.includes(id));
+          if (JSON.stringify(kept) === JSON.stringify(r.keptPriorSeriesIds)) continue;
+          await tx.update(sessionOfferItem).set({ keptPriorSeriesIds: kept, updatedAt: now }).where(eq(sessionOfferItem.id, r.id));
+          await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', r.id, { keptPriorSeriesIds: r.keptPriorSeriesIds }, { keptPriorSeriesIds: kept, via: 'the check list (keep it)' }, ctx, tx);
+          changed = true;
+        }
       }
       // Her "Looks right" on the default ticks with no rows sent: every row's are hers now.
       if (data.defaultsReviewed && !data.rows) {
@@ -736,9 +766,38 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         priceRows.add(id);
         changed = true;
       }
+      // A row's pay-by moved (D12): its waiting lines' due dates follow, as the session's payment due date does
+      // (§6: the row's pay-by if set, else the session's). Their lines and the re-priced rows' are locked in one
+      // pass, in id order, after the rows (§9.2), so neither pass waits on the other's set.
+      if (payByRows.size) {
+        await tx.select({ id: registration.id }).from(registration)
+          .where(and(inArray(registration.offerItemId, [...new Set([...priceRows, ...payByRows])]), inArray(registration.status, [...LIVE_LINE_STATUSES])))
+          .orderBy(asc(registration.id)).for('update');
+      }
       const plan = await planReprice(tx, { rowIds: [...priceRows] });
       const { told: repriced, impact: priced } = await applyReprice(tx, plan, { actorId, reason: `${subjectRow.name}: its price changed in ${session.name}`, entity: { type: 'session_offer', id: offeringId }, ctx });
-      const impact = addImpact(priced, { linesAffected });
+      let dueDatesMoved = 0;
+      let cutOffsEarlier = 0;
+      let cutOffsPassed = 0;
+      if (payByRows.size) {
+        const waiting = await tx.select({ id: registration.id, status: registration.status }).from(registration)
+          .where(and(inArray(registration.offerItemId, [...payByRows]), inArray(registration.status, WAITING_STATUSES))).orderBy(asc(registration.id));
+        // The unpaid lines' last day to pay follows their due date (C10: due + the session's days, capped by the board
+        // deadline): one brought forward, or already past (the sweep expires it at its next tick), is counted as the
+        // session's due date counts it (the fix round's S2; session-setup.services updateSetupSession).
+        const unpaid = waiting.filter((w) => w.status === 'pending_payment').map((w) => w.id);
+        const cutOffsBefore = await cutOffsOf(tx, unpaid);
+        dueDatesMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, `the pay-by date of a row of ${subjectRow.name} changed`);
+        const cutOffsAfter = await cutOffsOf(tx, unpaid);
+        for (const lineId of unpaid) {
+          const was = cutOffsBefore.get(lineId)?.cutOff;
+          const is = cutOffsAfter.get(lineId)?.cutOff;
+          if (!was || !is || is >= was) continue;
+          cutOffsEarlier++;
+          if (is <= now && was > now) cutOffsPassed++;
+        }
+      }
+      const impact = addImpact(priced, { linesAffected, dueDatesMoved, cutOffsEarlier, cutOffsPassed });
       settleImpact(impact, data.expected);
       return { saved: true, impact: changed || plan.repriced.length ? impact : NO_IMPACT, repriced, subjectName: subjectRow.name, sessionName: session.name };
     });
@@ -811,7 +870,6 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
     }).concat('__none__'))),
   ]);
   const seriesById = new Map(series.map((s) => [s.id, s]));
-  const order = (m: string, y: number) => y * 12 + ({ january: 1, june: 6, october: 10, november: 11 }[m] ?? 0);
   return offers.map(({ offer, subject: s, boardName, onePaperFeeKey, carryForwardMonths }) => {
     const mine = rows.filter((r) => r.offerId === offer.id);
     const view = mine.map((r) => {
@@ -821,8 +879,9 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
       const priors = r.allowedPriorSeriesIds.map((id) => seriesById.get(id)).filter((x): x is NonNullable<typeof x> => !!x)
         .map((p) => ({
           id: p.id, month: p.month, year: p.year,
-          // D6: older than the board's carry-forward period is a warning, not a refusal.
-          beyondCarryForward: !!(here && carryForwardMonths && order(here.month, here.year) - order(p.month, p.year) > carryForwardMonths),
+          // D6: older than the board's carry-forward period is a warning, not a refusal; kept: she said keep it (L9).
+          beyondCarryForward: beyondCarryForward(here, p, carryForwardMonths),
+          kept: r.keptPriorSeriesIds.includes(p.id),
         }));
       return {
         // As screens show it (D9): "All papers", "Paper 41/42 only"; in Arabic too.
@@ -842,8 +901,6 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
         teachers: rowTeachers.filter((t) => t.itemId === r.id).map(({ teacherId, name, kind, mode }) => ({ teacherId, name, external: kind === 'provider', online: mode === 'online' })),
         sortOrder: r.sortOrder,
         cellsByDefault: r.cellsByDefault,
-        // A row made by the deprecated routes keeps its fee keys until P1b (priced from the fee grid).
-        legacyFeeKeys: r.examFee === null && r.entersKind !== 'subject',
         lines: {
           live: counts.filter((x) => isLiveStatus(x.status)).reduce((a, x) => a + x.n, 0),
           all: counts.reduce((a, x) => a + x.n, 0),

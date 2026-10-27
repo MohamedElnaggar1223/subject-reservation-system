@@ -7,7 +7,8 @@ import {
 
 /**
  * The reservations rework, step 1 (RESERVATIONS_REWORK.md §3.1–§3.3, §4.1, §8): sessions, their
- * offers and items, the series attached by item, and the per-line cut-off.
+ * offerings and rows, the sitting of each row, and the per-line cut-off — every scenario set up through
+ * the coordinator's routes since P1c removed the links sheet's offers, items and form routes and the fee grid.
  *
  * - A June session set up from scratch and the next June copied from it — rewritten for P1a on the
  *   coordinator's routes (COORDINATOR_REWORK.md C1–C6, D1–D3, E6): the derived name, the refund
@@ -16,16 +17,20 @@ import {
  *   Its third set-up scenario (an IGCSE award's one-paper retake items from the Catalogue, keyed to
  *   their board's fee) is retired: rows come from the reference list (08y) and a one-paper retake's
  *   exam fee follows its board's rule (08za).
- * - The scenarios below still set up through the deprecated offers/items routes and the fee grid
- *   (kept compiling, kept in step with the cells): they exercise today's line rules, deadlines,
- *   sweeps and capture, which P1b replaces (line rules v2, the cut-off sweep) and re-states.
- * - A winter session open across several deadlines: each item cut off at its own; a Cambridge
- *   retake of the previous June reservable until the retake deadline; the sweep closing only the
- *   series whose deadline passed; IGCSE never in October or January; the defaults per board.
- * - Capture asks each preregistration its deadline first (MO-21, flags 42, 48, 58).
- * - The line rules (§3.5): exclusive groups, the same entry once across sessions, required
- *   items, the carry-forward period, self-study on a first entry, a retake's sitting.
- * - Grade 10 in bulk (A-15); due dates (§3.1).
+ * - The scenarios below were restated for P1c (offerIn): each subject an offering with its rows, each row
+ *   in the session's own sitting of its board (the session's label names its sittings, so a test that dates
+ *   a sitting makes it first and the row lands in it) and priced by its exam fee — the grid's old fee at the
+ *   same amount; the session's prices made final. What a row enters (units, an award) and the grade-10 core
+ *   flag are written by SQL as converted data holds them: no route sets them since P1c.
+ * - A winter session open across several deadlines: each row cut off at its own; a Cambridge retake of
+ *   the previous June reservable until the retake deadline; the sweep closing only the sitting whose
+ *   deadline passed; IGCSE never in January; a winter row's November per board; the admin's move at a
+ *   deadline, and a move keeping each line's price.
+ * - The line rules (§3.5, v2): exclusive groups, the same entry once in a sitting across sessions, a
+ *   carried row's earlier exam, self-study on a first entry, a retake's sitting.
+ * - Grade 10 in bulk (A-15); due dates (§3.1); the Money tab; the known sitting on the family's read.
+ * - Retired with their machinery (P1c): the fee grid's Confirm and re-pricing from a target series' grid
+ *   (a move, the series correction, a board change); replace teacher's route; the item route's series change.
  *
  * Lines are made the way the reservation paths make them: `insertLines` inside a transaction
  * after `assertMayRegisterForInTx` (docs/features/RESERVATIONS.md §2.2) — step B's `lines` input
@@ -59,6 +64,38 @@ const lineOf = async (id: string) => one<{
   status: string; board_series_id: string; price: string; course: string; board: string; due_at: string; attempt: string; mode: string; provisional: boolean;
 }>(`select status, board_series_id, price_at_registration as price, course_fee_at_registration as course, registration_fee_at_registration as board,
     due_at, attempt, mode, price_provisional as provisional from registration where id = $1`, [id]);
+
+type OfferingBody = Parameters<Client['api']['v1']['sessions'][':id']['offerings'][':offeringId']['$put']>[0]['json'];
+type RowBody = NonNullable<OfferingBody['rows']>[number];
+/** The usual cells (D4): first entry in school, retake in school and in self study. */
+const OPEN = { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false };
+
+/**
+ * Offer a subject this file made in a session the way the coordinator does (P1c: the offers, items and form routes
+ * and the fee grid left): the subject "not on the list" by its code, switched on (added to an open session it starts
+ * off), its course fee, its teachers and its rows. A row lands in the session's own sitting of its board — the one a
+ * test dated beforehand with `board-series`, else one made with no dates. Returns the offering, its rows as saved,
+ * a row's id by its label, and the first row's id.
+ */
+async function offerIn(who: Client, sessionId: string, subjectId: string, o: { courseFee: number; teachers?: string[]; rows: RowBody[] }) {
+  const s = await one<{ council: 'cambridge' | 'pearson_edexcel' | 'oxford'; name: string; code: string; level: string }>(
+    `select council, name, code, qualification_level as level from subject where id = $1`, [subjectId]);
+  const igcse = s.level === 'igcse';
+  const made = await apiResponse(who.api.v1.sessions[':id'].offerings.$post({
+    param: { id: sessionId }, json: { custom: { board: s.council, name: s.name, level: igcse ? 'igcse' : 'as_al', group: igcse ? 'O.L.' : 'A.S./A.L.', code: s.code } },
+  }));
+  const saved = await apiResponse(who.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+    param: { id: sessionId, offeringId: made.id },
+    json: { accepting: true, courseFee: o.courseFee, teachers: (o.teachers ?? []).map((teacherId) => ({ teacherId, online: false, external: false })), rows: o.rows },
+  }));
+  expect(saved.saved).toBe(true);
+  const rows = saved.offering.rows;
+  return { id: made.id, rows, first: rows[0]!.id, row: (label: string) => rows.find((r) => r.label === label)!.id };
+}
+
+/** The session's prices made final (E6), its counts sent back when it answers them first: its lines are payable. */
+const pricesFinal = (who: Client, sessionId: string) =>
+  confirmed((expected?: Impact) => apiResponse(who.api.v1.sessions[':id']['prices-final'].$put({ param: { id: sessionId }, json: { final: true, ...(expected ? { expected } : {}) } })));
 
 describe('08n: sessions and offerings, set up as the coordinator sets them up', () => {
   let adm: Client, coordinator: Client;
@@ -153,25 +190,21 @@ describe('08n: sessions and offerings, set up as the coordinator sets them up', 
     expect((await refused(coordinator.api.v1.sessions.$post({ json: { type: 'winter', year: Y + 1, label, copyFromSessionId: june1 } }))).status).toBe(400);
   });
 });
-
-describe('08n: a winter session, each item cut off at its own deadline (§3.3)', () => {
+describe('08n: a winter session, each row cut off at its own deadline (§3.3)', () => {
   let adm: Client, officer: Client;
   let teacherId: string;
   let w: string;
   let ial: string, phys: string, igEn: string, igPea: string;
-  let oct: string, camNov: string, jan: string, camJune: string, camNovBefore: string;
-  let ialOct: string, ialJan: string, physNov: string, enNov: string;
+  let peaNov: string, camNov: string, jan: string, camJune: string, camNovBefore: string, peaOct: string;
+  let ialOffering: string, physOffering: string;
+  let ialNov: string, ialJan: string, physNov: string, enNov: string;
   let retakeLine: string;
 
+  /** A sitting of this session's label (its own sittings), dated: a row of the session placed in that sitting lands in it. */
   const series = async (boardCode: 'cambridge' | 'pearson_edexcel', month: 'june' | 'october' | 'november' | 'january', year: number, dates: { entryDeadline?: Date; retakeDeadline?: Date; examsStart?: string } = {}) =>
     (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month, year, label: `n08w-${RUN}`, ...dates } })))!.id;
-  const item = async (offerId: string, label: string, boardSeriesId: string, fee: { subjectId: string; amount: number }) => {
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: boardSeriesId }, json: { rows: [{ keyKind: 'subject', keyId: fee.subjectId, amount: fee.amount, provisional: false }] } }));
-    const r = await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items.$post({
-      param: { id: w, offerId }, json: { label, kind: 'whole', enters: { kind: 'subject' }, boardSeriesId, availability: 'open', requiredInSeries: false },
-    }));
-    return r!.id;
-  };
+  const seriesOfRow = async (itemId: string) => (await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [itemId])).s;
+  const view = (offeringId: string) => apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$get({ param: { id: w, offeringId } }));
 
   beforeAll(async () => {
     adm = await admin('n08w');
@@ -192,36 +225,47 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
     expect(s.status).toBe('active');
     expect(s.name).toBe(`November ${Y} – January ${Y + 1} — n08w-${RUN}`);
     const now = Date.now();
-    oct = await series('pearson_edexcel', 'october', Y, { entryDeadline: new Date(now + days(5)) });
+    peaNov = await series('pearson_edexcel', 'november', Y, { entryDeadline: new Date(now + days(5)) });
     camNov = await series('cambridge', 'november', Y, { entryDeadline: new Date(now + days(6)), retakeDeadline: new Date(now + days(20)) });
     jan = await series('pearson_edexcel', 'january', Y + 1, { entryDeadline: new Date(now + days(30)) });
-    // Two Cambridge sittings on record before November: June (the previous sitting) and the November before.
+    // Two Cambridge sittings on record before November: June (the previous sitting) and the November before; and
+    // Pearson's October, the sitting before its November.
     camJune = await series('cambridge', 'june', Y);
     camNovBefore = await series('cambridge', 'november', Y - 1);
-    const offer = async (subjectId: string, courseFee: number) => (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: w }, json: { subjectId, courseFee, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'placeholder', kind: 'whole', enters: { kind: 'subject' }, availability: 'closed', requiredInSeries: false }] },
-    })))!.id;
-    const ialOffer = await offer(ial, 2000);
-    ialOct = await item(ialOffer, 'IAL October', oct, { subjectId: ial, amount: 800 });
-    ialJan = await item(ialOffer, 'IAL January', jan, { subjectId: ial, amount: 800 });
-    physNov = await item(await offer(phys, 1500), 'Physics AS', camNov, { subjectId: phys, amount: 600 });
-    enNov = await item(await offer(igEn, 1000), 'English', camNov, { subjectId: igEn, amount: 300 });
+    peaOct = await series('pearson_edexcel', 'october', Y);
+    // IAL Maths as the coordinator sets it up: a row in November and one in January, each at the grid's old fee as its
+    // exam fee. (Its "November" is Pearson's October where the reference data says the board sits A.S./A.L. in October —
+    // 08u "decision 2 in her words"; this file loads no reference sitting for the year, so the row sits Pearson's
+    // November: the two sittings and their deadlines are what this scenario needs, as October and January were.)
+    const ialO = await offerIn(adm, w, ial, { courseFee: 2000, teachers: [teacherId], rows: [
+      { kind: 'custom', name: 'IAL November', sitting: 'november', examFee: 800, cells: OPEN },
+      { kind: 'custom', name: 'IAL January', sitting: 'january', examFee: 800, cells: OPEN },
+    ] });
+    [ialOffering, ialNov, ialJan] = [ialO.id, ialO.row('IAL November'), ialO.row('IAL January')];
+    const physO = await offerIn(adm, w, phys, { courseFee: 1500, teachers: [teacherId], rows: [{ kind: 'all_papers', sitting: 'november', examFee: 600, cells: OPEN }] });
+    [physOffering, physNov] = [physO.id, physO.first];
+    enNov = (await offerIn(adm, w, igEn, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', sitting: 'november', examFee: 300, cells: OPEN }] })).first;
+    // Each row sits in the session's sitting dated above.
+    expect([await seriesOfRow(ialNov), await seriesOfRow(ialJan), await seriesOfRow(physNov), await seriesOfRow(enNov)]).toEqual([peaNov, jan, camNov, camNov]);
+    await pricesFinal(adm, w);
   });
 
-  it('an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October', async () => {
-    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: w }, json: { subjectId: igPea, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] },
-    })))!;
-    // Its default: Pearson's November (IGCSE sits June and November).
-    expect(await one(`select bs.month from session_offer_item i join board_series bs on bs.id = i.board_series_id where i.id = $1`, [o.items[0]]))
-      .toEqual({ month: 'november' });
-    for (const s of [oct, jan]) {
-      const r = await refused(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
-        param: { id: w, offerId: o.id, itemId: o.items[0]! }, json: { boardSeriesId: s, reason: 'try another series' },
-      }));
-      expect(r).toEqual({ status: 400, error: expect.stringMatching(/IGCSE/) });
-    }
-    // The per-board defaults of an AS item in a winter session (§3.3).
+  it("an O.L. row is refused January (IGCSE sits neither October nor January); each winter row sits in the session's November or January sitting of its board; the defaults per board", async () => {
+    const o = await offerIn(adm, w, igPea, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', cells: OPEN }] });
+    // Its default: Pearson's November (an O.L. subject sits June and November).
+    const row = o.rows[0]!;
+    expect([row.sitting, row.series?.month]).toEqual(['november', 'november']);
+    const r = await refused(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: w, offeringId: o.id }, json: { rows: [{ id: row.id, kind: 'all_papers', sitting: 'january', cells: OPEN }] },
+    }));
+    expect(r).toEqual({ status: 409, error: expect.stringMatching(/IGCSE/) });
+    expect(await one(`select bs.month from session_offer_item i join board_series bs on bs.id = i.board_series_id where i.id = $1`, [row.id])).toEqual({ month: 'november' });
+    // The coordinator's November and January, each the session's sitting of the row's board (dated in beforeAll).
+    expect((await view(ialOffering)).rows.map((x) => [x.label, x.sitting, x.series?.month, x.series?.id])).toEqual([
+      ['IAL November', 'november', 'november', peaNov], ['IAL January', 'january', 'january', jan],
+    ]);
+    expect((await view(physOffering)).rows.map((x) => [x.sitting, x.series?.month, x.series?.id])).toEqual([['november', 'november', camNov]]);
+    // The per-board defaults of an AS item in a winter session (§3.3; the series correction still places by them).
     const { db } = await import('@repo/db');
     const { defaultSeriesFor } = await import('../src/services/offer.services');
     const monthOf = async (board: string) => {
@@ -233,34 +277,33 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
     expect(await monthOf('oxford')).toBe('november');
   });
 
-  it("October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only", async () => {
+  it("November's deadline passes inside the open session: November's row takes no new line, January's does; the family's read shows November's row closed and January's open at its price; the sweep closes November's waiting lines only", async () => {
     const a = await onboard(officer, `n08w-oct-a-${RUN}`, 12);
     const b = await onboard(officer, `n08w-oct-b-${RUN}`, 12);
-    const [aOct] = await reserve(a.studentId, w, [{ offerItemId: ialOct, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [aNov] = await reserve(a.studentId, w, [{ offerItemId: ialNov, attempt: 'first', mode: 'in_school', teacherId }]);
     const [bJan] = await reserve(b.studentId, w, [{ offerItemId: ialJan, attempt: 'first', mode: 'in_school', teacherId }]);
     // A deadline before the session's end is accepted (the rule that refused it is gone).
     const end = new Date((await one<{ end: string }>(`select end_date as "end" from registration_session where id = $1`, [w])).end);
-    await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: oct }, json: { entryDeadline: new Date(Date.now() + days(4)), reason: 'board key dates' } }));
-    expect(new Date((await one<{ d: string }>(`select entry_deadline as d from board_series where id = $1`, [oct])).d).getTime()).toBeLessThan(end.getTime());
-    // October's deadline passes (moved with SQL: the API takes only future deadlines).
-    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [oct]);
+    await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: peaNov }, json: { entryDeadline: new Date(Date.now() + days(4)), reason: 'board key dates' } }));
+    expect(new Date((await one<{ d: string }>(`select entry_deadline as d from board_series where id = $1`, [peaNov])).d).getTime()).toBeLessThan(end.getTime());
+    // November's deadline passes (moved with SQL: the API takes only future deadlines).
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [peaNov]);
     const c = await onboard(officer, `n08w-oct-c-${RUN}`, 12);
-    await expect(reserve(c.studentId, w, [{ offerItemId: ialOct, attempt: 'first', mode: 'in_school', teacherId }]))
+    await expect(reserve(c.studentId, w, [{ offerItemId: ialNov, attempt: 'first', mode: 'in_school', teacherId }]))
       .rejects.toThrow(/deadline/);
     const [cJan] = await reserve(c.studentId, w, [{ offerItemId: ialJan, attempt: 'first', mode: 'in_school', teacherId }]);
     expect((await lineOf(cJan!.id)).board_series_id).toBe(jan);
-    // The family's subject list (the offers read, §5) shows October closed and January open, each
-    // with its own cut-off and its price.
-    const offers = await apiResponse(c.parent.api.v1.registrations.offers.$get({ query: { sessionId: w, studentId: c.studentId } }));
-    const ialItems = offers!.offers.find((o) => o.subject.id === ial)!.items;
-    const byLabel = new Map(ialItems.map((i) => [i.label, i]));
-    expect(byLabel.get('IAL October')).toMatchObject({ open: { first: false, retake: false }, series: { id: oct } });
-    expect(byLabel.get('IAL January')).toMatchObject({ open: { first: true, retake: true }, series: { id: jan } });
-    expect(byLabel.get('IAL January')!.prices.find((p) => p.attempt === 'first' && p.mode === 'in_school')).toMatchObject({ total: 2800, provisional: false });
-    // The sweep: October's waiting line expires at its deadline; January's stay.
+    // The family's read (offerings → rows, P1c): November's row closed, January's open, each in its sitting, with its price.
+    const read = await apiResponse(c.parent.api.v1.registrations.offers.$get({ query: { sessionId: w, studentId: c.studentId } }));
+    expect(read.session.pricesFinal).toBe(true);
+    const byLabel = new Map(read.offerings.find((o) => o.id === ialOffering)!.rows.map((r) => [r.label.en, r]));
+    expect(byLabel.get('IAL November')).toMatchObject({ id: ialNov, sitting: 'november', closed: true });
+    expect(byLabel.get('IAL January')).toMatchObject({ id: ialJan, sitting: 'january', closed: false });
+    expect(byLabel.get('IAL January')!.options.find((p) => p.attempt === 'first' && p.mode === 'in_school')!.price).toEqual({ total: 2800, examFee: 800, courseFee: 2000 });
+    // The sweep: November's waiting line expires at its deadline; January's stay.
     await runPaymentDeadlines();
-    expect((await lineOf(aOct!.id)).status).toBe('expired');
-    expect(await one(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [aOct!.id])).toEqual({ reason: 'entry_deadline' });
+    expect((await lineOf(aNov!.id)).status).toBe('expired');
+    expect(await one(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [aNov!.id])).toEqual({ reason: 'entry_deadline' });
     expect((await lineOf(bJan!.id)).status).toBe('pending_payment');
     expect((await lineOf(cJan!.id)).status).toBe('pending_payment');
   });
@@ -273,9 +316,13 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
       .rejects.toThrow(/deadline/);
     const [line] = await reserve(f.studentId, w, [{ offerItemId: physNov, attempt: 'retake', mode: 'in_school', teacherId, priorSittingSeriesId: camJune, priorSittingSource: 'declared_by_desk' }]);
     retakeLine = line!.id;
-    // The family's list says it per attempt: a first entry closed here, a retake of June open.
+    // The family's read (offerings → rows, P1c) closes an option at its board deadline: the first entry at the entry
+    // deadline, a retake at the latest deadline an earlier sitting it may follow gives — the retake deadline, as a retake
+    // of the previous June is still taken until then (above). The row reads open (the review of P1c, (a)).
     const listed = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: w, studentId: f.studentId } }));
-    expect(listed!.offers.find((o) => o.subject.id === phys)!.items.find((i) => i.id === physNov)).toMatchObject({ open: { first: false, retake: true } });
+    const row = listed.offerings.find((o) => o.id === physOffering)!.rows.find((r) => r.id === physNov)!;
+    expect(row).toMatchObject({ sitting: 'november', closed: false });
+    expect(row.options.map((o) => [o.attempt, o.mode, o.closed])).toEqual([['first', 'in_school', true], ['retake', 'in_school', false], ['retake', 'self_study', false]]);
     const l = await lineOf(line!.id);
     expect([l.status, l.attempt, l.board_series_id]).toEqual(['pending_payment', 'retake', camNov]);
     const retake = new Date((await one<{ d: string }>(`select retake_deadline as d from board_series where id = $1`, [camNov])).d);
@@ -309,35 +356,40 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
 
   // P1b (§9.2 insertLines: the "no deadline" refusal replaced by mayReserve): with no board date there is none to pass,
   // so the line is taken; its cut-off is its due date + the session's unpaid-cancel days (it was refused).
-  it('a series with neither an entry deadline nor an exam start takes a line, cut off at its due date + the session\'s days', async () => {
-    const bare = await series('pearson_edexcel', 'january', Y + 1).catch(() => null);
-    // Another bare January series of this label cannot exist twice; reuse the one above if so.
-    const id = bare ?? (await one<{ id: string }>(`select id from board_series where board_code = 'pearson_edexcel' and month = 'january' and year = $1 and label = $2`, [Y + 1, `n08w-${RUN}`])).id;
-    await sql(`update board_series set entry_deadline = null, exams_start = null where id = $1 and id <> $2`, [id, jan]);
-    const offerId = (await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [w, ial])).id;
-    const bareSeries = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'january', year: Y + 1, label: `n08w-bare-${RUN}` } })))!.id;
-    const bareItem = await item(offerId, 'IAL January (no dates)', bareSeries, { subjectId: ial, amount: 800 });
+  it("a sitting with neither an entry deadline nor an exam start takes a line, cut off at its due date + the session's days", async () => {
+    // A winter session of its own label: its January sitting is made with no dates when its row lands in it.
+    const bare = (await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'winter', year: Y, label: `n08w-bare-${RUN}`, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
+      },
+    })))!.id;
+    const o = await offerIn(adm, bare, ial, { courseFee: 2000, teachers: [teacherId], rows: [{ kind: 'custom', name: 'IAL January (no dates)', sitting: 'january', examFee: 800, cells: OPEN }] });
+    expect(o.rows[0]!.series).toMatchObject({ month: 'january', year: Y + 1, label: `n08w-bare-${RUN}`, entryDeadline: null, examsStart: null });
+    await pricesFinal(adm, bare);
     const f = await onboard(officer, `n08w-bare-${RUN}`, 12);
-    const [line] = await reserve(f.studentId, w, [{ offerItemId: bareItem, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [line] = await reserve(f.studentId, bare, [{ offerItemId: o.first, attempt: 'first', mode: 'in_school', teacherId }]);
     const cut = await one<{ cut: string; due: string; days: number }>(`select line_cut_off(r.due_at, r.session_id, r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as cut,
       r.due_at as due, s.unpaid_cancel_days as days from registration r join registration_session s on s.id = r.session_id where r.id = $1`, [line!.id]);
     expect(new Date(cut.cut).getTime()).toBe(new Date(cut.due).getTime() + cut.days * days(1));
   });
 
-  it("the admin's move takes a retake into a series past its entry deadline while the retake deadline is ahead; a first entry not", async () => {
-    const camNovB = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'november', year: Y, label: `n08w-b-${RUN}`, entryDeadline: new Date(Date.now() + days(15)) } })))!.id;
-    const physOffer = (await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [w, phys])).id;
-    const itemB = await item(physOffer, 'Physics AS (B)', camNovB, { subjectId: phys, amount: 600 });
+  // Restated on Pearson's sittings (P1c): a row's sitting is the session's own, so one subject has rows in two sittings
+  // only where its board sits twice in the session (IAL: November and January), and the move goes between them.
+  it("the admin's move takes a retake into a sitting past its entry deadline while the retake deadline is ahead; a first entry not; the moved line keeps its price", async () => {
+    // November's entry deadline passed above; a retake of Pearson's previous sitting (October) goes in until a later date.
+    await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: peaNov }, json: { retakeDeadline: new Date(Date.now() + days(15)), reason: 'retakes of October go in later' } }));
     const h = await onboard(officer, `n08w-mv-${RUN}`, 12);
     const k = await onboard(officer, `n08w-mv2-${RUN}`, 12);
-    const [retake] = await reserve(h.studentId, w, [{ offerItemId: itemB, attempt: 'retake', mode: 'in_school', teacherId, priorSittingSeriesId: camJune, priorSittingSource: 'declared_by_desk' }]);
-    const [first] = await reserve(k.studentId, w, [{ offerItemId: itemB, attempt: 'first', mode: 'in_school', teacherId }]);
-    const move = (id: string) => adm.api.v1.sessions[':id']['board-series'].move.$post({ param: { id: w }, json: { registrationIds: [id], boardSeriesId: camNov, reason: 'sat with the others in November' } });
+    const [retake] = await reserve(h.studentId, w, [{ offerItemId: ialJan, attempt: 'retake', mode: 'in_school', teacherId, priorSittingSeriesId: peaOct, priorSittingSource: 'declared_by_desk' }]);
+    const [first] = await reserve(k.studentId, w, [{ offerItemId: ialJan, attempt: 'first', mode: 'in_school', teacherId }]);
+    const move = (id: string) => adm.api.v1.sessions[':id']['board-series'].move.$post({ param: { id: w }, json: { registrationIds: [id], boardSeriesId: peaNov, reason: 'sat with the others in November' } });
     expect(await apiResponse(move(retake!.id))).toMatchObject({ moved: 1 });
-    expect((await lineOf(retake!.id)).board_series_id).toBe(camNov);
+    expect(await one(`select board_series_id as s, offer_item_id as item, price_at_registration::float as price from registration where id = $1`, [retake!.id]))
+      .toEqual({ s: peaNov, item: ialNov, price: 2800 });
     const r = await refused(move(first!.id));
     expect(r).toEqual({ status: 400, error: expect.stringMatching(/^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/) });
-    expect((await lineOf(first!.id)).board_series_id).toBe(camNovB);
+    expect((await lineOf(first!.id)).board_series_id).toBe(jan);
   });
 
   // P1b (C7): A-12's switch is gone; the winter session's grade list takes graduates.
@@ -355,6 +407,11 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
     await sql(`update board_series set retake_deadline = now() - interval '1 minute' where id = $1`, [camNov]);
     await runPaymentDeadlines();
     expect((await lineOf(retakeLine)).status).toBe('expired');
+    // Past the retake deadline too, every option of the row is past: it reads closed.
+    const h = await onboard(officer, `n08w-closed-${RUN}`, 12);
+    const listed = await apiResponse(h.parent.api.v1.registrations.offers.$get({ query: { sessionId: w, studentId: h.studentId } }));
+    const row = listed.offerings.find((o) => o.id === physOffering)!.rows.find((r) => r.id === physNov)!;
+    expect([row.closed, row.options.map((o) => o.closed)]).toEqual([true, [true, true, true]]);
     expect(await one(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [retakeLine])).toEqual({ reason: 'entry_deadline' });
   });
 });
@@ -366,71 +423,52 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
 describe('08n: the line rules (§3.5)', () => {
   let adm: Client, officer: Client;
   let teacherId: string;
-  let june: string, juneOther: string;
+  let june: string;
+  let phys: string;
   let camJune: string, camNovEarly: string, camNovRecent: string;
-  let physOffer: string, physAs: string, physAl: string, physA2: string, physAsOther: string;
-  let artsOffer: string, artsCore: string, artsOption: string;
+  let physAs: string, physAl: string, physA2: string;
   let selfOnly: string, taught: string;
+
+  const mkSession = async (label: string) => (await apiResponse(adm.api.v1.sessions.$post({
+    json: {
+      type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+      courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
+    },
+  })))!.id;
+  const physCodes = { as: [`RWN-RPH-${RUN}-AS`], al: [`RWN-RPH-${RUN}-AL`], a2: [`RWN-RPH-${RUN}-A2`] };
 
   beforeAll(async () => {
     adm = await admin('n08r');
     officer = await staff(adm, 'finance_officer', 'n08r');
     teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher R (08n ${RUN})` } })))!.id;
-    const mkSession = async (label: string) => (await apiResponse(adm.api.v1.sessions.$post({
-      json: {
-        type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
-        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
-      },
-    })))!.id;
     june = await mkSession(`n08r-${RUN}`);
-    juneOther = await mkSession(`n08r2-${RUN}`);
     camJune = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08r-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
-    camNovEarly = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'november', year: Y - 1, label: `n08r-${RUN}` } })))!.id;
     camNovRecent = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'november', year: Y, label: `n08r-${RUN}` } })))!.id;
 
-    // Cambridge Physics (as the forms have it): AS in school; A Level; A2 carried forward,
-    // self-study only, needing the AS sitting; AS and A Level one exclusive group.
-    const phys = await subject(adm, `RWN-RPH-${RUN}`, `Physics (08n rules ${RUN})`, { course: 1500, registration: 600 }, { qualificationLevel: 'a_level' });
-    const fee = async (seriesId: string, subjectId: string) =>
-      apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 600, provisional: false }] } }));
-    await fee(camJune, phys);
-    const it = (label: string, extra: Record<string, unknown> = {}) => ({ label, kind: 'route' as const, enters: { kind: 'subject' as const }, boardSeriesId: camJune, availability: 'open' as const, requiredInSeries: false, ...extra });
-    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: june }, json: {
-        subjectId: phys, courseFee: 1500, teachers: [{ teacherId, mode: 'in_school' }],
-        items: [it('AS', { exclusiveGroup: 'award' }), it('A Level', { exclusiveGroup: 'award' }), it('A2 carry forward', { availability: 'self_study_only', needsPriorSeries: true })],
-      },
-    })))!;
-    physOffer = o.id;
-    [physAs, physAl, physA2] = o.items as [string, string, string];
-    // The same subject in another session of the same June, entering the same in the same series.
-    physAsOther = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: juneOther }, json: { subjectId: phys, courseFee: 1500, teachers: [{ teacherId, mode: 'in_school' }], items: [it('AS')] },
-    })))!.items[0]!;
+    // Cambridge Physics (as the forms have it): A.S. in school; A.L.; the A.2. carried forward in self study, naming the
+    // exam it carries — her list for it (D6) reaching back to November Y − 1, past the board's 13 months. A.S., A.2. and A.L.
+    // are one exclusive group (D8). Each row at the grid's old fee as its exam fee.
+    phys = await subject(adm, `RWN-RPH-${RUN}`, `Physics (08n rules ${RUN})`, { course: 1500, registration: 600 }, { qualificationLevel: 'a_level' });
+    const o = await offerIn(adm, june, phys, { courseFee: 1500, teachers: [teacherId], rows: [
+      { kind: 'as', referenceCodes: physCodes.as, examFee: 600, cells: OPEN },
+      { kind: 'al', referenceCodes: physCodes.al, examFee: 600, cells: OPEN },
+      { kind: 'a2', referenceCodes: physCodes.a2, examFee: 600, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: true },
+        allowedPriorSittings: [{ month: 'november', year: Y }, { month: 'june', year: Y }, { month: 'november', year: Y - 1 }] },
+    ] });
+    const byKind = (k: string) => o.rows.find((r) => r.kind === k)!;
+    [physAs, physAl, physA2] = [byKind('as').id, byKind('al').id, byKind('a2').id];
+    expect(byKind('as').series!.id).toBe(camJune);
+    // Her list's sittings are the board's own: November Y − 1 is the earliest, beyond the carry-forward months (a warning).
+    const early = byKind('a2').allowedPriorSittings.find((p) => p.month === 'november' && p.year === Y - 1)!;
+    expect(early.beyondCarryForward).toBe(true);
+    camNovEarly = early.id;
 
-    // A subject with a required paper (a first entry includes it) and an optional one, each its own unit.
-    const arts = await subject(adm, `RWN-ART-${RUN}`, `Arts (08n rules ${RUN})`, { course: 1000, registration: 300 });
-    const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `${code}-${RUN}`, title: code, unitLevel: 'igcse', kind: 'component' } })))!.id;
-    const [u1, u2] = [await unit('ART1'), await unit('ART2')];
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: camJune }, json: { rows: [u1, u2].map((keyId) => ({ keyKind: 'unit' as const, keyId, amount: 150, provisional: false })) } }));
-    const paper = (label: string, unitId: string, required: boolean) => ({ ...it(label, { requiredInSeries: required }), kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unitId] } });
-    const a = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: june }, json: { subjectId: arts, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [paper('Core paper', u1, true), paper('Option paper', u2, false)] },
-    })))!;
-    artsOffer = a.id;
-    [artsCore, artsOption] = a.items as [string, string];
-
-    // Self-study: one subject the school does not teach this cycle, one it teaches.
+    // Self-study: one subject the school does not teach this cycle ("Retake (Self Study ONLY)"), one it teaches.
     const notTaught = await subject(adm, `RWN-NT-${RUN}`, `Not taught (08n rules ${RUN})`, { course: 800, registration: 300 });
     const isTaught = await subject(adm, `RWN-TA-${RUN}`, `Taught (08n rules ${RUN})`, { course: 800, registration: 300 });
-    await fee(camJune, notTaught);
-    await fee(camJune, isTaught);
-    selfOnly = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: june }, json: { subjectId: notTaught, courseFee: 800, availability: 'self_study_only', teachers: [], items: [{ ...it('Whole subject'), kind: 'whole' }] },
-    })))!.items[0]!;
-    taught = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: june }, json: { subjectId: isTaught, courseFee: 800, teachers: [{ teacherId, mode: 'in_school' }], items: [{ ...it('Whole subject'), kind: 'whole' }] },
-    })))!.items[0]!;
+    selfOnly = (await offerIn(adm, june, notTaught, { courseFee: 800, rows: [{ kind: 'all_papers', examFee: 600, cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: false } }] })).first;
+    taught = (await offerIn(adm, june, isTaught, { courseFee: 800, teachers: [teacherId], rows: [{ kind: 'all_papers', examFee: 600, cells: OPEN }] })).first;
+    await pricesFinal(adm, june);
   });
 
   it('AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can', async () => {
@@ -444,13 +482,6 @@ describe('08n: the line rules (§3.5)', () => {
     await expect(reserve(f.studentId, june, [{ offerItemId: physAl, attempt: 'first', mode: 'in_school', teacherId }])).rejects.toThrow(/cannot be reserved together/);
   });
 
-  it('the same entry twice in one series across two sessions is refused: the board takes one entry', async () => {
-    const f = await onboard(officer, `n08r-once-${RUN}`, 12);
-    await reserve(f.studentId, june, [{ offerItemId: physAs, attempt: 'first', mode: 'in_school', teacherId }]);
-    await expect(reserve(f.studentId, juneOther, [{ offerItemId: physAsOther, attempt: 'first', mode: 'in_school', teacherId }]))
-      .rejects.toThrow(/is already reserved in .+: the board takes one entry/);
-  });
-
   // 'a first entry without its required item is refused' retired: required items left with line rules v2 (trail row
   // "retired 08n required item"). No money.
 
@@ -461,9 +492,7 @@ describe('08n: the line rules (§3.5)', () => {
     await expect(reserve(f.studentId, june, [{ offerItemId: physA2, attempt: 'first', mode: 'self_study' }]))
       .rejects.toThrow(/carries an earlier exam forward: name the one it is carried from/);
     const [line] = await reserve(f.studentId, june, [{ offerItemId: physA2, attempt: 'first', mode: 'self_study', priorSittingSeriesId: camNovEarly, priorSittingSource: 'declared_by_desk' }]);
-    expect((await lineOf(line!.id)).mode).toBe('self_study');
-    expect(physOffer).toBeTruthy();
-    expect(camNovRecent).toBeTruthy();
+    expect(await one(`select mode, prior_sitting_series_id as prior from registration where id = $1`, [line!.id])).toEqual({ mode: 'self_study', prior: camNovEarly });
   });
 
   it('self-study on a first entry is refused where the school teaches the subject, and where it is "Retake (Self Study ONLY)" (the lead\'s decision of 16 Oct 2026); a retake in self-study is taken there; a retake names its sitting', async () => {
@@ -482,35 +511,51 @@ describe('08n: the line rules (§3.5)', () => {
     const [retake] = await reserve(f.studentId, june, [{ offerItemId: taught, attempt: 'retake', mode: 'self_study', priorSittingSeriesId: camNovRecent, priorSittingSource: 'declared_by_desk' }]);
     expect((await lineOf(retake!.id)).attempt).toBe('retake');
   });
+
+  // Last: it closes this describe's session. Two sessions meet in one sitting only when they share it — the next session
+  // of the same June (its label) opened after the first closed (one open per cycle); the first's lines stand.
+  it('the same entry twice in one sitting across two sessions is refused: the board takes one entry', async () => {
+    const f = await onboard(officer, `n08r-once-${RUN}`, 12);
+    await reserve(f.studentId, june, [{ offerItemId: physAs, attempt: 'first', mode: 'in_school', teacherId }]);
+    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: june }, json: { reason: 'the first round of June reservations is over' } }));
+    const juneOther = await mkSession(`n08r-${RUN}`);
+    const other = await offerIn(adm, juneOther, phys, { courseFee: 1500, teachers: [teacherId], rows: [{ kind: 'as', referenceCodes: physCodes.as, examFee: 600, cells: OPEN }] });
+    expect(other.rows[0]!.series!.id).toBe(camJune);
+    await pricesFinal(adm, juneOther);
+    await expect(reserve(f.studentId, juneOther, [{ offerItemId: other.first, attempt: 'first', mode: 'in_school', teacherId }]))
+      .rejects.toThrow(/is already reserved in .+: the board takes one entry/);
+  });
 });
 
 describe("08n: past a line's own deadline (flags 59, 60)", () => {
-  it("a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day", async () => {
+  it("a family's drop of a paid line whose deadline passed is refused and sent to the desk; a sitting with no entry deadline is cut off at the start of its exams' day", async () => {
     const adm = await admin('n08x');
     const officer = await staff(adm, 'finance_officer', 'n08x');
     const teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher X (08n ${RUN})` } })))!.id;
+    const label = `n08x-${RUN}`;
     const june = (await apiResponse(adm.api.v1.sessions.$post({
       json: {
-        type: 'june', year: Y + 1, label: `n08x-${RUN}`, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+        type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
         courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
       },
     })))!.id;
-    const mk = async (label: string, dates: { entryDeadline?: Date; examsStart?: string }) =>
-      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, ...dates } })))!.id;
-    const dated = await mk(`n08x-${RUN}`, { entryDeadline: new Date(Date.now() + days(20)) });
-    const examsLater = await mk(`n08x-exams-${RUN}`, { examsStart: cairoDate(new Date(Date.now() + days(10))) });
-    const examsToday = await mk(`n08x-today-${RUN}`, { examsStart: cairoDate(new Date()) });
-    const offerIn = async (code: string, seriesId: string) => {
-      const sub = await subject(adm, `RWN-X${code}-${RUN}`, `Cut-off ${code} (08n ${RUN})`, { course: 1000, registration: 300 });
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
-      const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-        param: { id: june }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }] },
-      })))!;
-      return { sub, item: o.items[0]! };
+    // The session's June sitting of each board, dated three ways: Cambridge's with an entry deadline, Pearson's with only
+    // its exams' start, OxfordAQA's exams starting today.
+    const mk = async (boardCode: 'cambridge' | 'pearson_edexcel' | 'oxford', dates: { entryDeadline?: Date; examsStart?: string }) =>
+      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'june', year: Y + 1, label, ...dates } })))!.id;
+    const dated = await mk('cambridge', { entryDeadline: new Date(Date.now() + days(20)) });
+    const examsLater = await mk('pearson_edexcel', { examsStart: cairoDate(new Date(Date.now() + days(10))) });
+    const examsToday = await mk('oxford', { examsStart: cairoDate(new Date()) });
+    const offerOn = async (code: string, council: 'cambridge' | 'pearson_edexcel' | 'oxford', seriesId: string) => {
+      const sub = await subject(adm, `RWN-X${code}-${RUN}`, `Cut-off ${code} (08n ${RUN})`, { course: 1000, registration: 300 }, { council });
+      const o = await offerIn(adm, june, sub, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', examFee: 300, cells: OPEN }] });
+      expect(o.rows[0]!.series!.id).toBe(seriesId);
+      return { sub, item: o.first };
     };
-    const a = await offerIn('A', dated);
-    const b = await offerIn('B', examsLater);
-    const c = await offerIn('C', examsToday);
+    const a = await offerOn('A', 'cambridge', dated);
+    const b = await offerOn('B', 'pearson_edexcel', examsLater);
+    const c = await offerOn('C', 'oxford', examsToday);
+    await pricesFinal(adm, june);
 
     // A family reserves and pays A; the board's deadline then passes: the entry is the board's.
     const f = await onboard(officer, `n08x-${RUN}`, 11);
@@ -522,7 +567,7 @@ describe("08n: past a line's own deadline (flags 59, 60)", () => {
     expect(drop.error).toMatch(/^The entry is with the board \(its deadline, .+, has passed\): ask the finance desk to drop it$/);
     expect((await one<{ status: string }>(`select status from registration where id = $1`, [line!.id])).status).toBe('confirmed');
 
-    // B's series has no entry deadline: its exams' start (Cairo) is the cut-off, and the due date is capped by it.
+    // B's sitting has no entry deadline: its exams' start (Cairo) is the cut-off, and the due date is capped by it.
     const g = await onboard(officer, `n08x-b-${RUN}`, 11);
     const [lb] = await reserve(g.studentId, june, [{ offerItemId: b.item, attempt: 'first', mode: 'in_school', teacherId }]);
     const startOfExams = (await one<{ at: string }>(`select line_effective_deadline('first', null, $1) as at`, [examsLater])).at;
@@ -535,7 +580,7 @@ describe("08n: past a line's own deadline (flags 59, 60)", () => {
 });
 
 describe('08n: the enrolment per unit (§3.2, §10: F1 reads it)', () => {
-  it("a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit", async () => {
+  it("a line of a row entering units is enrolled per unit with its row's teacher; the teaching demand groups per unit", async () => {
     const adm = await admin('n08u');
     const officer = await staff(adm, 'finance_officer', 'n08u');
     const t1 = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher U1 (08n ${RUN})` } })))!.id;
@@ -546,24 +591,29 @@ describe('08n: the enrolment per unit (§3.2, §10: F1 reads it)', () => {
         courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
       },
     })))!.id;
-    const series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08u-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
+    await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08u-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } }));
     const sub = await subject(adm, `RWN-UNI-${RUN}`, `Units subject (08n ${RUN})`, { course: 1000, registration: 300 });
     const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `${code}-${RUN}`, title: code, unitLevel: 'igcse', kind: 'component' } })))!.id;
     const [u1, u2] = [await unit('UNI1'), await unit('UNI2')];
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [u1, u2].map((keyId) => ({ keyKind: 'unit' as const, keyId, amount: 150, provisional: false })) } }));
-    const paper = (label: string, unitId: string, teacherId: string) => ({
-      label, kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unitId] }, boardSeriesId: series, availability: 'open' as const, requiredInSeries: false,
-      teachers: [{ teacherId, mode: 'in_school' as const }],
-    });
-    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: june }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId: t1, mode: 'in_school' }, { teacherId: t2, mode: 'in_school' }], items: [paper('P1', u1, t1), paper('P2', u2, t2)] },
-    })))!;
+    // Two papers, each with its own teacher (D4: a row's teachers), at the grid's old fee per unit as its exam fee.
+    const teacher = (teacherId: string) => [{ teacherId, online: false, external: false }];
+    const o = await offerIn(adm, june, sub, { courseFee: 1000, teachers: [t1, t2], rows: [
+      { kind: 'unit', name: 'P1', examFee: 150, cells: OPEN, teachers: teacher(t1) },
+      { kind: 'unit', name: 'P2', examFee: 150, cells: OPEN, teachers: teacher(t2) },
+    ] });
+    const [p1, p2] = [o.row('P1'), o.row('P2')];
+    // What each paper enters, written as converted data holds it (no route sets it since P1c).
+    for (const [itemId, unitId] of [[p1, u1], [p2, u2]] as const) {
+      await sql(`update session_offer_item set enters_kind = 'units' where id = $1`, [itemId]);
+      await sql(`insert into session_offer_item_unit (item_id, unit_id) values ($1, $2)`, [itemId, unitId]);
+    }
+    await pricesFinal(adm, june);
     const f = await onboard(officer, `n08u-${RUN}`, 11);
     // Each paper names its own teacher; a paper's line may not name the other's.
-    await expect(reserve(f.studentId, june, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId: t2 }])).rejects.toThrow(/The chosen teacher is not linked to/);
+    await expect(reserve(f.studentId, june, [{ offerItemId: p1, attempt: 'first', mode: 'in_school', teacherId: t2 }])).rejects.toThrow(/The chosen teacher is not linked to/);
     await reserve(f.studentId, june, [
-      { offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId: t1 },
-      { offerItemId: o.items[1]!, attempt: 'first', mode: 'in_school', teacherId: t2 },
+      { offerItemId: p1, attempt: 'first', mode: 'in_school', teacherId: t1 },
+      { offerItemId: p2, attempt: 'first', mode: 'in_school', teacherId: t2 },
     ]);
     const years = await apiResponse(adm.api.v1.academic.years.$get());
     const yearId = years.find((y) => y.startYear === Y)?.id
@@ -595,16 +645,16 @@ describe('08n: grade 10 in bulk (A-15) and due dates (§3.1)', () => {
         courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
       },
     }));
-    const series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08g-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
+    await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `n08g-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } }));
     const core: string[] = [];
     for (const n of ['Maths', 'English']) {
       const sub = await subject(adm, `RWN-G${n}-${RUN}`, `${n} core (08n ${RUN})`, { course: 1000, registration: 300 }, { isCore: true });
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
-      await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({
-        param: { id: s.id }, json: { subjectId: sub, courseFee: 1000, grade10Core: true, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
-      }));
+      const o = await offerIn(coordinator, s.id, sub, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', examFee: 300, cells: OPEN }] });
+      // The grade-10 core flag the bulk registration reads: a parked feature no route sets since P1c, written as converted data holds it.
+      await sql(`update session_offer set grade10_core = true where id = $1`, [o.id]);
       core.push(sub);
     }
+    await pricesFinal(coordinator, s.id);
     const a = await onboard(officer, `n08g-a-${RUN}`, 10);
     const b = await onboard(officer, `n08g-b-${RUN}`, 10);
     const lone = await onboard(officer, `n08g-lone-${RUN}`, 10);
@@ -633,28 +683,30 @@ describe('08n: grade 10 in bulk (A-15) and due dates (§3.1)', () => {
     expect(Number((await one<{ n: string }>(`select count(*) as n from registration where session_id = $1 and student_id <> $2`, [s.id, lone.studentId])).n)).toBe(4);
   });
 
-  it("a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace", async () => {
+  it("a line is due at the session's payment date, capped by its sitting's deadline; one reserved after the payment date gets the grace", async () => {
     const adm = await admin('n08d');
     const officer = await staff(adm, 'finance_officer', 'n08d');
     const teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher D (08n ${RUN})` } })))!.id;
     const payDue = new Date(Date.now() + days(20));
+    const label = `n08d-${RUN}`;
     const s = await apiResponse(adm.api.v1.sessions.$post({
       json: {
-        type: 'june', year: Y + 1, label: `n08d-${RUN}`, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+        type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
         courseStartsOn: cairoDate(new Date()), paymentDueAt: payDue.toISOString(),
       },
     }));
-    const mk = async (label: string, entryDeadline: Date) => (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, entryDeadline } })))!.id;
-    const late = await mk(`n08d-late-${RUN}`, new Date(Date.now() + days(50)));
-    const early = await mk(`n08d-early-${RUN}`, new Date(Date.now() + days(10)));
+    // Two sittings of the session (its June per board): Cambridge's deadline after the payment date, Pearson's before it.
+    const mk = async (boardCode: 'cambridge' | 'pearson_edexcel', entryDeadline: Date) => (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'june', year: Y + 1, label, entryDeadline } })))!.id;
+    const late = await mk('cambridge', new Date(Date.now() + days(50)));
+    const early = await mk('pearson_edexcel', new Date(Date.now() + days(10)));
     const items: string[] = [];
-    for (const [i, seriesId] of [late, early].entries()) {
-      const sub = await subject(adm, `RWN-D${i}-${RUN}`, `Due ${i} (08n ${RUN})`, { course: 1000, registration: 300 });
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
-      items.push((await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-        param: { id: s.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }] },
-      })))!.items[0]!);
+    for (const [i, [council, seriesId]] of ([['cambridge', late], ['pearson_edexcel', early]] as const).entries()) {
+      const sub = await subject(adm, `RWN-D${i}-${RUN}`, `Due ${i} (08n ${RUN})`, { course: 1000, registration: 300 }, { council });
+      const o = await offerIn(adm, s.id, sub, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', examFee: 300, cells: OPEN }] });
+      expect(o.rows[0]!.series!.id).toBe(seriesId);
+      items.push(o.first);
     }
+    await pricesFinal(adm, s.id);
     const f = await onboard(officer, `n08d-${RUN}`, 11);
     const [onTime, capped] = await reserve(f.studentId, s.id, [
       { offerItemId: items[0]!, attempt: 'first', mode: 'in_school', teacherId },
@@ -684,52 +736,56 @@ describe('08n: grade 10 in bulk (A-15) and due dates (§3.1)', () => {
 });
 
 describe('08n: the reviews of 977848d and 40c1447', () => {
-  let adm: Client, officer: Client, finadmin: Client, coordinator: Client;
-  let teacherId: string, teacher2: string;
+  let adm: Client, officer: Client, finadmin: Client;
+  let teacherId: string;
   let june: string, series: string;
 
-  const mkJune = async (label: string, opts: { draft?: boolean } = {}) => (await apiResponse(adm.api.v1.sessions.$post({
-    json: {
-      type: 'june', year: Y + 1, label,
-      startDate: new Date(Date.now() + (opts.draft ? days(90) : -days(1))).toISOString(), endDate: new Date(Date.now() + (opts.draft ? days(150) : days(60))).toISOString(),
-      courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
-    },
-  })))!.id;
-  const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', month: 'june' | 'october' | 'january', year: number, label: string, dates: { entryDeadline?: Date; examsStart?: string } = {}) =>
+  /** A June session of its own label (its own sittings), prices final. */
+  const mkJune = async (label: string) => {
+    const id = (await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
+      },
+    })))!.id;
+    await pricesFinal(adm, id);
+    return id;
+  };
+  /** The winter session of this academic year, of its own label, prices final. */
+  const mkWinter = async (label: string) => {
+    const id = (await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'winter', year: Y, label, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
+      },
+    })))!.id;
+    await pricesFinal(adm, id);
+    return id;
+  };
+  const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', month: 'june' | 'october' | 'november' | 'january', year: number, label: string, dates: { entryDeadline?: Date; examsStart?: string } = {}) =>
     (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month, year, label, ...dates } })))!.id;
-  const fee = (seriesId: string, keyKind: 'subject' | 'unit' | 'qualification', keyId: string, amount: number, provisional = false) =>
-    apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind, keyId, amount, provisional }] } }));
-  const whole = (boardSeriesId: string) => ({ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId, availability: 'open' as const, requiredInSeries: false });
-  const offer = async (sessionId: string, subjectId: string, items: Record<string, unknown>[], teachers = [{ teacherId, mode: 'in_school' as const }]) =>
-    (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: { subjectId, courseFee: 1000, teachers, items: items as never } })))!;
+  /** A subject offered in a session: its all-papers row in the session's own sitting, at the grid's old fee as its exam fee. */
+  const offerSub = (sessionId: string, subjectId: string) =>
+    offerIn(adm, sessionId, subjectId, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', examFee: 300, cells: OPEN }] });
   const pay = async (f: { parent: Client }, ids: string[]) => {
     const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
     await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));
   };
   const statusOf = async (id: string) => (await one<{ status: string }>(`select status from registration where id = $1`, [id])).status;
-  /** A line's price, its mark, its series and the fee rows its basis names. */
-  const priceOf = async (id: string) => one<{ price: number; provisional: boolean; series: string; rows: string[] }>(
-    `select price_at_registration::float as price, price_provisional as provisional, board_series_id as series,
-       (select array_agg(fr->>'id') from jsonb_array_elements(pricing_basis->'feeRows') fr) as rows from registration where id = $1`, [id]);
-  const subjectRow = async (seriesId: string, subjectId: string) => one<{ id: string; amount: number; provisional: boolean; copied: string | null }>(
-    `select id, amount::float as amount, provisional, copied_from_fee_id as copied from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id = $2`, [seriesId, subjectId]);
   const studentEmail = (tag: string) => `student.${tag}@test.local`;
 
   beforeAll(async () => {
     adm = await admin('n08v');
     officer = await staff(adm, 'finance_officer', 'n08v');
     finadmin = await staff(adm, 'finance_admin', 'n08v');
-    coordinator = await staff(adm, 'coordinator', 'n08v');
     teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher V1 (08n ${RUN})` } })))!.id;
-    teacher2 = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher V2 (08n ${RUN})` } })))!.id;
-    june = await mkJune(`n08v-${RUN}`);
     series = await mkSeries('cambridge', 'june', Y + 1, `n08v-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
+    june = await mkJune(`n08v-${RUN}`);
   });
 
   it("flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's", async () => {
     const sub = await subject(adm, `RWN-V1-${RUN}`, `Approve after deadline (08n ${RUN})`, { course: 1000, registration: 300 });
-    await fee(series, 'subject', sub, 300);
-    await offer(june, sub, [whole(series)]);
+    expect((await offerSub(june, sub)).rows[0]!.series!.id).toBe(series);
     const f = await onboard(officer, `n08v-drop-${RUN}`, 11);
     const [line] = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, ...(await reservationOf(june, [sub])), studentId: f.studentId } })))!;
     await pay(f, [line!.id]);
@@ -745,70 +801,21 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     }
   });
 
-  it("flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable", async () => {
-    const winter = (await apiResponse(adm.api.v1.sessions.$post({
-      json: {
-        type: 'winter', year: Y, label: `n08v-w-${RUN}`, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
-        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
-      },
-    })))!.id;
-    const oct = await mkSeries('pearson_edexcel', 'october', Y, `n08v-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    const jan = await mkSeries('pearson_edexcel', 'january', Y + 1, `n08v-${RUN}`, { entryDeadline: new Date(Date.now() + days(45)) });
-    const bio = await subject(adm, `RWN-VBIO-${RUN}`, `Biology IAL (08n ${RUN})`, { course: 2000, registration: 4800 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}-${RUN}`, title: code, unitLevel: 'as', kind: 'unit' } })))!.id;
-    const [u1, u2] = [await unit('WBI11'), await unit('WBI12')];
-    // October's fees typed before the board publishes (provisional); January's for one unit only.
-    await fee(oct, 'unit', u1, 4800, true);
-    await fee(oct, 'unit', u2, 4800, true);
-    await fee(jan, 'unit', u1, 5000, true);
-    const paper = (label: string, unitId: string) => ({ label, kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unitId] }, boardSeriesId: oct, availability: 'open' as const, requiredInSeries: false });
-    const o = await offer(winter, bio, [paper('WBI11', u1), paper('WBI12', u2)]);
-    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: winter, offerId: o.id }, json: { courseFee: 2000 } }));
-    const f = await onboard(officer, `n08v-bio-${RUN}`, 12);
-    const [l1, l2] = await reserve(f.studentId, winter, [
-      { offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }, { offerItemId: o.items[1]!, attempt: 'first', mode: 'in_school', teacherId },
-    ]);
-    const priced = async (id: string) => one<{ price: number; provisional: boolean; series: string; rows: string[] }>(
-      `select price_at_registration::float as price, price_provisional as provisional, board_series_id as series,
-         (select array_agg(fr->>'id') from jsonb_array_elements(pricing_basis->'feeRows') fr) as rows from registration where id = $1`, [id]);
-    expect(await priced(l1!.id)).toMatchObject({ price: 6800, provisional: true, series: oct });
-    // The coordinator puts both papers in January (the design's case): their lines go too.
-    for (const itemId of o.items) {
-      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
-        param: { id: winter, offerId: o.id, itemId: itemId! }, json: { boardSeriesId: jan, reason: 'Biology papers are sat in January' },
-      }));
-    }
-    const janRow = async (unitId: string) => one<{ id: string; amount: number; provisional: boolean; copied: string | null }>(
-      `select id, amount::float as amount, provisional, copied_from_fee_id as copied from board_fee where board_series_id = $1 and key_kind = 'unit' and key_id = $2`, [jan, unitId]);
-    const [j1, j2] = [await janRow(u1), await janRow(u2)];
-    // WBI12 had no January fee: October's came across, provisional.
-    expect(j2).toMatchObject({ amount: 4800, provisional: true });
-    expect(j2.copied).not.toBeNull();
-    // Each line now reads January's rows: WBI11 at January's fee.
-    expect(await priced(l1!.id)).toEqual({ price: 7000, provisional: true, series: jan, rows: [j1.id] });
-    expect(await priced(l2!.id)).toEqual({ price: 6800, provisional: true, series: jan, rows: [j2.id] });
-    await audited([l1!.id], ['LINE_REPRICED']);
-    // Still provisional: no checkout yet.
-    // P1b (mayPay): a line whose price is not final is refused with PRICES_NOT_FINAL.
-    const { PRICES_NOT_FINAL_REFUSAL: PROVISIONAL_REFUSAL } = await import('../src/services/window.services');
-    expect((await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [l1!.id, l2!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).error).toBe(PROVISIONAL_REFUSAL);
-    // January's board publishes: Confirm reaches both lines.
-    const c = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: jan }, json: { rows: [{ feeId: j1.id }, { feeId: j2.id }], reason: 'January published' } }));
-    expect(c).toMatchObject({ confirmed: 2, linesNoLongerProvisional: 2 });
-    const payment = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [l1!.id, l2!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!;
-    expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [payment.id!])).amount)).toBe(13800);
-    // October's grid no longer counts them.
-    const octGrid = await apiResponse(finadmin.api.v1['board-fees'].$get({ query: { seriesId: oct } }));
-    expect(octGrid!.rows.map((r) => r.lines)).toEqual([0, 0]);
-  });
+  // 'flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's
+  // grid, so January's Confirm makes them payable' retired with the fee grid (P1c: board_fee, its Confirm and re-pricing
+  // a moved line from the target series' grid are gone). Its money outcomes now: a moved line keeps its price (this
+  // file's "the admin's move keeps each line's price …"); lines made payable when the prices are final (08y "prices
+  // final (E6): a line reserved before is not payable; switched on, …").
 
-  it('a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)', async () => {
-    const s = await mkSeries('cambridge', 'june', Y + 1, `n08v-ex-${RUN}`, { examsStart: cairoDate(new Date(Date.now() + days(10))) });
+  it('a sitting with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)', async () => {
+    const label = `n08v-ex-${RUN}`;
+    const s = await mkSeries('cambridge', 'june', Y + 1, label, { examsStart: cairoDate(new Date(Date.now() + days(10))) });
+    const ex = await mkJune(label);
     const sub = await subject(adm, `RWN-VEX-${RUN}`, `Exams start sweep (08n ${RUN})`, { course: 1000, registration: 300 });
-    await fee(s, 'subject', sub, 300);
-    const item = (await offer(june, sub, [whole(s)])).items[0]!;
+    const o = await offerSub(ex, sub);
+    expect(o.rows[0]!.series!.id).toBe(s);
     const f = await onboard(officer, `n08v-ex-${RUN}`, 11);
-    const [line] = await reserve(f.studentId, june, [{ offerItemId: item, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [line] = await reserve(f.studentId, ex, [{ offerItemId: o.first, attempt: 'first', mode: 'in_school', teacherId }]);
     await runPaymentDeadlines();
     expect(await statusOf(line!.id)).toBe('pending_payment');
     await sql(`update board_series set exams_start = (now() at time zone 'Africa/Cairo')::date - 1 where id = $1`, [s]);
@@ -818,87 +825,53 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     expect(await one(`select line_effective_deadline_kind('first', null, $1) as kind`, [s])).toEqual({ kind: 'exams_start' });
   });
 
-  it("replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited", async () => {
-    const sub = await subject(adm, `RWN-VRT-${RUN}`, `Replace teacher (08n ${RUN})`, { course: 1000, registration: 300 });
-    await fee(series, 'subject', sub, 300);
-    const o = await offer(june, sub, [whole(series)], [{ teacherId, mode: 'in_school' }, { teacherId: teacher2, mode: 'in_school' }]);
-    const leaver = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher V3 (08n ${RUN})` } })))!.id;
-    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$put({
-      param: { id: june, offerId: o.id }, json: { teachers: [{ teacherId: leaver, mode: 'in_school' }, { teacherId: teacher2, mode: 'in_school' }] },
-    }));
-    const a = await onboard(officer, `n08v-rt-a-${RUN}`, 11);
-    const b = await onboard(officer, `n08v-rt-b-${RUN}`, 11);
-    const [la] = await reserve(a.studentId, june, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId: leaver }]);
-    const [lb] = await reserve(b.studentId, june, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId: teacher2 }]);
-    const years = await apiResponse(adm.api.v1.academic.years.$get());
-    const yearId = years.find((y) => y.startYear === Y)?.id
-      ?? (await apiResponse(adm.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } })))!.id;
-    await apiResponse(adm.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: [a.studentId, b.studentId], subjectMap: [], exclude: [], commit: true } }));
-    const r = await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
-      param: { id: june, offerId: o.id }, json: { fromTeacherId: leaver, toTeacherId: teacherId, reason: 'the teacher left the school' },
-    }));
-    expect(r).toMatchObject({ lines: 1, enrolments: 1 });
-    expect(await sql(`select id, teacher_id from registration where id in ($1, $2) order by id`, [la!.id, lb!.id]))
-      .toEqual([{ id: la!.id, teacher_id: teacherId }, { id: lb!.id, teacher_id: teacher2 }].sort((x, y) => x.id.localeCompare(y.id)));
-    expect((await sql<{ t: string }>(`select teacher_id as t from session_offer_teacher where offer_id = $1 order by t`, [o.id])).map((x) => x.t)).toEqual([teacherId, teacher2].sort());
-    expect(await one(`select teacher_id from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null`, [a.studentId, sub])).toEqual({ teacher_id: teacherId });
-    expect(await one(`select teacher_id from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null`, [b.studentId, sub])).toEqual({ teacher_id: teacher2 });
-    await audited([la!.id], ['LINE_TEACHER_REPLACED']);
-    await audited([o.id], ['SESSION_OFFER_TEACHER_REPLACED']);
-  });
+  // "replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited"
+  // retired with its route (P1c: POST /sessions/:id/offers/:offerId/replace-teacher left with the links sheet). No money.
 
   // 'the scheduler opens a session after one of its series has passed its deadline: capture refunds …' retired (P1b:
   // no automatic opening, C4; no preregistration; trail row "retired 08n scheduler opens"). Its money outcome — what
   // was paid for an entry the board no longer takes comes back in full — is 08z-reserve-pay's confirmation after the
   // board deadline (to the balance).
 
-  it('the same award in a converted session and a new session of one series: the board takes one entry', async () => {
+  // Restated (P1c): two sessions meet in one sitting only when they share it — the next session of the same June (its
+  // label) opened after the converted window closed. A row the coordinator makes enters by its codes; the award a
+  // converted row enters is written by SQL on both rows, as converted data and the exam fixture hold it.
+  it('the same award in a converted session and a new session of one sitting: the board takes one entry', async () => {
     const q = (await apiResponse(adm.api.v1.catalogue.qualifications.$post({
       json: { boardCode: 'cambridge', code: `V08Q-${RUN}`, title: `Converted award (08n ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: 'Test', entryMethod: 'qualification' },
     })))!.id;
     const sub = await subject(adm, `RWN-VCA-${RUN}`, `Converted award subject (08n ${RUN})`, { course: 1000, registration: 300 });
     await apiResponse(adm.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: sub }, json: { boardCode: 'cambridge', qualificationId: q, unitIds: [], reason: '08n: mapped' } }));
-    await fee(series, 'qualification', q, 300);
-    const award = { label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'award' as const, qualificationId: q }, boardSeriesId: series, availability: 'open' as const, requiredInSeries: false };
-    // A window converted by 0042 (its label, its offer and line marked as the conversion marks them).
-    const converted = await mkJune(`june-igcse-${RUN}`);
-    const oc = await offer(converted, sub, [award]);
+    const label = `n08v-conv-${RUN}`;
+    const entersAward = (itemId: string) => sql(`update session_offer_item set enters_kind = 'award', qualification_id = $1 where id = $2`, [q, itemId]);
+    // A window converted by 0042 (its offer, row and line marked as the conversion marks them).
+    const converted = await mkJune(label);
+    const oc = await offerSub(converted, sub);
+    await entersAward(oc.first);
     const f = await onboard(officer, `n08v-conv-${RUN}`, 11);
-    const [old] = await reserve(f.studentId, converted, [{ offerItemId: oc.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [old] = await reserve(f.studentId, converted, [{ offerItemId: oc.first, attempt: 'first', mode: 'in_school', teacherId }]);
     await sql(`update session_offer set legacy = '{"converted": true}'::jsonb where id = $1`, [oc.id]);
-    await sql(`update session_offer_item set legacy = '{"converted": true}'::jsonb where id = $1`, [oc.items[0]]);
+    await sql(`update session_offer_item set legacy = '{"converted": true}'::jsonb where id = $1`, [oc.first]);
     await sql(`update registration set legacy = '{"converted": true}'::jsonb, pricing_basis = null where id = $1`, [old!.id]);
-    const fresh = await mkJune(`n08v-new-${RUN}`);
-    const on = await offer(fresh, sub, [award]);
-    await expect(reserve(f.studentId, fresh, [{ offerItemId: on.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]))
+    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: converted }, json: { reason: 'the converted window is over' } }));
+    const fresh = await mkJune(label);
+    const on = await offerSub(fresh, sub);
+    await entersAward(on.first);
+    expect(on.rows[0]!.series!.id).toBe(oc.rows[0]!.series!.id);
+    await expect(reserve(f.studentId, fresh, [{ offerItemId: on.first, attempt: 'first', mode: 'in_school', teacherId }]))
       .rejects.toThrow(/is already reserved in .+: the board takes one entry/);
   });
 
-  it("flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too", async () => {
-    const sub = await subject(adm, `RWN-VSE-${RUN}`, `Same entry on a move (08n ${RUN})`, { course: 1000, registration: 300 });
-    const other = await mkSeries('cambridge', 'june', Y + 1, `n08v-se-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    await fee(series, 'subject', sub, 300);
-    await fee(other, 'subject', sub, 300);
-    const a = await mkJune(`n08v-se-a-${RUN}`);
-    const b = await mkJune(`n08v-se-b-${RUN}`);
-    const oa = await offer(a, sub, [whole(series)]);
-    const ob = await offer(b, sub, [whole(other)]);
-    const f = await onboard(officer, `n08v-se-${RUN}`, 11);
-    await reserve(f.studentId, a, [{ offerItemId: oa.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
-    const [lb] = await reserve(f.studentId, b, [{ offerItemId: ob.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
-    const r = await refused(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
-      param: { id: b, offerId: ob.id, itemId: ob.items[0]! }, json: { boardSeriesId: series, reason: 'sat in the other series' },
-    }));
-    expect(r).toEqual({ status: 409, error: expect.stringMatching(/is already reserved in .+: the board takes one entry/) });
-    expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [lb!.id])).s).toBe(other);
-  });
+  // "flag 5: moving an item into a series where the student already has the same entry from another session is
+  // refused — an unmapped subject row too" retired with the item route (P1c: PUT /sessions/:id/offers/:offerId/items/:itemId
+  // left; a row's sitting does not change while reservations use it — 08u "a row's sitting does not move while
+  // reservations use it (§6) …"). No money.
 
   // P1b (C4): no preregistration; two lines waiting for payment take the two unpaid preregistrations' places.
   it("the Money tab: unpaid counts what is owed (waiting for payment), not what waits for the parent's approval", async () => {
     const d = await mkJune(`n08v-mon-${RUN}`);
     const sub = await subject(adm, `RWN-VMO-${RUN}`, `Money tab (08n ${RUN})`, { course: 1000, registration: 300 });
-    await fee(series, 'subject', sub, 300);
-    const item = (await offer(d, sub, [whole(series)])).items[0]!;
+    const item = (await offerSub(d, sub)).first;
     const [p1, p2, p3, p4] = [await onboard(officer, `n08v-m1-${RUN}`, 11), await onboard(officer, `n08v-m2-${RUN}`, 11), await onboard(officer, `n08v-m3-${RUN}`, 11), await onboard(officer, `n08v-m4-${RUN}`, 11)];
     const line = { offerItemId: item, attempt: 'first' as const, mode: 'in_school' as const, teacherId };
     await reserve(p1.studentId, d, [line], 'pending_payment');
@@ -919,8 +892,7 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
 
   it('a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both', async () => {
     const sub = await subject(adm, `RWN-VPS-${RUN}`, `Prior sitting source (08n ${RUN})`, { course: 1000, registration: 300 });
-    await fee(series, 'subject', sub, 300);
-    const item = (await offer(june, sub, [whole(series)])).items[0]!;
+    const item = (await offerSub(june, sub)).first;
     const prior = await mkSeries('cambridge', 'june', Y, `n08v-ps-${RUN}`);
     const f = await onboard(officer, `n08v-ps-${RUN}`, 12);
     const retake = { offerItemId: item, attempt: 'retake' as const, mode: 'in_school' as const, teacherId, priorSittingSeriesId: prior };
@@ -931,188 +903,82 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       .toEqual({ attempt: 'retake', prior, source: 'declared_by_family' });
   });
 
-  it("the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price", async () => {
-    const sub = await subject(adm, `RWN-VAM-${RUN}`, `Admin move price (08n ${RUN})`, { course: 1000, registration: 300 });
-    const other = await mkSeries('cambridge', 'june', Y + 1, `n08v-am-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    await fee(series, 'subject', sub, 300);
-    await fee(other, 'subject', sub, 450);
-    const o = await offer(june, sub, [whole(series), { ...whole(other), label: 'Whole subject, the other series' }]);
-    const w = await onboard(officer, `n08v-am-w-${RUN}`, 11);
-    const p = await onboard(officer, `n08v-am-p-${RUN}`, 11);
-    const line = { offerItemId: o.items[0]!, attempt: 'first' as const, mode: 'in_school' as const, teacherId };
-    const [lw] = await reserve(w.studentId, june, [line]);
-    const [lp] = await reserve(p.studentId, june, [line]);
-    await pay(p, [lp!.id]);
+  // Restated with P1c's money rule: "the admin's move re-prices a waiting line from the target series' fee and tells the
+  // family; a paid line keeps its price" — the target series' fee grid is gone; a line is priced by its row, and a move
+  // keeps it. The same two lines (one waiting, one paid) at the same fees (300 where they are, 450 where they go).
+  it("the admin's move keeps each line's price (P1c): a waiting line and a paid one moved to a sitting whose row has another exam fee keep theirs, re-priced and told nothing", async () => {
+    const label = `n08v-am-${RUN}`;
+    await mkSeries('pearson_edexcel', 'november', Y, label, { entryDeadline: new Date(Date.now() + days(30)) });
+    const janS = await mkSeries('pearson_edexcel', 'january', Y + 1, label, { entryDeadline: new Date(Date.now() + days(45)) });
+    const winter = await mkWinter(label);
+    const sub = await subject(adm, `RWN-VAM-${RUN}`, `Admin move price (08n ${RUN})`, { course: 1000, registration: 300 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    // An IAL subject sat in November or January (the session's two Pearson sittings), each row at its own exam fee.
+    const o = await offerIn(adm, winter, sub, { courseFee: 1000, teachers: [teacherId], rows: [
+      { kind: 'custom', name: 'November', sitting: 'november', examFee: 300, cells: OPEN },
+      { kind: 'custom', name: 'January', sitting: 'january', examFee: 450, cells: OPEN },
+    ] });
+    const wf = await onboard(officer, `n08v-am-w-${RUN}`, 11);
+    const pf = await onboard(officer, `n08v-am-p-${RUN}`, 11);
+    const line = { offerItemId: o.row('November'), attempt: 'first' as const, mode: 'in_school' as const, teacherId };
+    const [lw] = await reserve(wf.studentId, winter, [line]);
+    const [lp] = await reserve(pf.studentId, winter, [line]);
+    await pay(pf, [lp!.id]);
     const r = await apiResponse(adm.api.v1.sessions[':id']['board-series'].move.$post({
-      param: { id: june }, json: { registrationIds: [lw!.id, lp!.id], boardSeriesId: other, reason: 'sat in the other series' },
+      param: { id: winter }, json: { registrationIds: [lw!.id, lp!.id], boardSeriesId: janS, reason: 'sat in the other series' },
     }));
-    expect(r).toMatchObject({ moved: 2, repriced: 1 });
-    const there = await subjectRow(other, sub);
-    // The waiting line reads the other series' row; the paid one keeps what it was paid at.
-    expect(await priceOf(lw!.id)).toEqual({ price: 1450, provisional: false, series: other, rows: [there.id] });
-    expect(await priceOf(lp!.id)).toMatchObject({ price: 1300, provisional: false, series: other });
-    expect(await one(`select previous_data->>'priceAtRegistration' as was, new_data->>'priceAtRegistration' as now, new_data->>'reason' as reason from audit_log where action = 'LINE_REPRICED' and entity_id = $1`, [lw!.id]))
-      .toEqual({ was: '1300', now: '1450', reason: 'moved to another series' });
-    expect(await sql(`select 1 from audit_log where action = 'LINE_REPRICED' and entity_id = $1`, [lp!.id])).toEqual([]);
-    const [told] = await notified(studentEmail(`n08v-am-w-${RUN}`), 'PRICE_CHANGED', 1);
-    expect(told).toEqual({
-      type: 'PRICE_CHANGED', title: `The price of Admin move price (08n ${RUN}) changed`,
-      body: `The subject is now entered in another exam series, with its own board fee. Admin move price (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`,
-    });
+    expect(r).toMatchObject({ moved: 2 });
+    const priced = (id: string) => one(`select status, board_series_id as series, offer_item_id as item, price_at_registration::float as price,
+      course_fee_at_registration::float as course, registration_fee_at_registration::float as exam from registration where id = $1`, [id]);
+    expect(await priced(lw!.id)).toEqual({ status: 'pending_payment', series: janS, item: o.row('January'), price: 1300, course: 1000, exam: 300 });
+    expect(await priced(lp!.id)).toEqual({ status: 'confirmed', series: janS, item: o.row('January'), price: 1300, course: 1000, exam: 300 });
+    expect(await sql(`select 1 from audit_log where action = 'LINE_REPRICED' and entity_id in ($1, $2)`, [lw!.id, lp!.id])).toEqual([]);
+    await audited([lw!.id], ['REGISTRATION_SERIES_MOVED']);
+    expect(await notificationsFor(studentEmail(`n08v-am-w-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
     expect(await notificationsFor(studentEmail(`n08v-am-p-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
   });
 
-  it("the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed", async () => {
-    const s = await mkJune(`n08v-cor-${RUN}`);
-    const was = await mkSeries('cambridge', 'june', Y + 1, `n08v-cor-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    const next = await mkSeries('cambridge', 'june', Y + 2, `n08v-cor-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    const subA = await subject(adm, `RWN-VCP-${RUN}`, `Correction priced (08n ${RUN})`, { course: 1000, registration: 300 });
-    const subB = await subject(adm, `RWN-VCC-${RUN}`, `Correction carried (08n ${RUN})`, { course: 1000, registration: 300 });
-    await fee(was, 'subject', subA, 300);
-    await fee(was, 'subject', subB, 300);
-    await fee(next, 'subject', subA, 450);
-    const oa = await offer(s, subA, [whole(was)]);
-    const ob = await offer(s, subB, [whole(was)]);
-    const f = await onboard(officer, `n08v-cor-${RUN}`, 11);
-    const [la, lb] = await reserve(f.studentId, s, [
-      { offerItemId: oa.items[0]!, attempt: 'first', mode: 'in_school', teacherId }, { offerItemId: ob.items[0]!, attempt: 'first', mode: 'in_school', teacherId },
-    ]);
-    const r = await apiResponse(adm.api.v1.sessions[':id'].series.$put({ param: { id: s }, json: { sessionType: 'june', seriesYear: Y + 2, reason: 'the session is for the next June' } }));
-    expect(r).toMatchObject({ seriesYear: Y + 2, registrationsExpired: 0 });
-    const [rowA, rowB] = [await subjectRow(next, subA), await subjectRow(next, subB)];
-    expect(rowB).toMatchObject({ amount: 300, provisional: true });
-    expect(rowB.copied).toBe((await subjectRow(was, subB)).id);
-    expect(await priceOf(la!.id)).toEqual({ price: 1450, provisional: false, series: next, rows: [rowA.id] });
-    expect(await priceOf(lb!.id)).toEqual({ price: 1300, provisional: true, series: next, rows: [rowB.id] });
-    await audited([la!.id, lb!.id], ['LINE_REPRICED', 'LINE_REPRICED']);
-    const because = "The session's exam series was corrected, and with it the board fee";
-    expect((await notified(studentEmail(`n08v-cor-${RUN}`), 'PRICE_CHANGED', 1))[0]!.body)
-      .toBe(`${because}. Correction priced (08n ${RUN}) was EGP 1,300 and is now EGP 1,450.`);
-    expect(await notified(studentEmail(`n08v-cor-${RUN}`), 'PRICE_TO_BE_CONFIRMED', 1)).toEqual([{
-      type: 'PRICE_TO_BE_CONFIRMED', title: `The price of Correction carried (08n ${RUN}) is to be confirmed`,
-      body: `${because}. Correction carried (08n ${RUN}) stays at EGP 1,300, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
-    }]);
-  });
+  // "the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price;
+  // where finance has none, the old fee comes provisional and the family is told it is to be confirmed" retired with the
+  // fee grid (P1c: the correction keeps each line's price — no corrected series' fee to read, nothing provisional). A
+  // price changed on reservations, unpaid lines re-priced and families told, is now the coordinator's: 08y "the course fee
+  // raised: the counts first; … unpaid lines re-priced, the paid line listed for finance, the families told".
 
-  it("a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable", async () => {
-    const sub = await subject(adm, `RWN-VBC-${RUN}`, `Board change notice (08n ${RUN})`, { course: 1000, registration: 300 }, { council: 'cambridge' });
-    const deadline = new Date(Date.now() + days(30));
-    const cam = await mkSeries('cambridge', 'june', Y + 1, `n08v-bc-${RUN}`, { entryDeadline: deadline });
-    // The new board's series of the same month, year and label, with the same deadline (MO-10).
-    const pea = await mkSeries('pearson_edexcel', 'june', Y + 1, `n08v-bc-${RUN}`, { entryDeadline: deadline });
-    await fee(cam, 'subject', sub, 300);
-    const o = await offer(june, sub, [whole(cam)]);
-    const f = await onboard(officer, `n08v-bc-${RUN}`, 11);
-    const [line] = await reserve(f.studentId, june, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
-    expect(await priceOf(line!.id)).toMatchObject({ price: 1300, provisional: false, series: cam });
-    await apiResponse(adm.api.v1.subjects[':id'].$put({ param: { id: sub }, json: { council: 'pearson_edexcel' } }));
-    const row = await subjectRow(pea, sub);
-    expect(row).toMatchObject({ amount: 300, provisional: true });
-    expect(await priceOf(line!.id)).toEqual({ price: 1300, provisional: true, series: pea, rows: [row.id] });
-    expect(await notified(studentEmail(`n08v-bc-${RUN}`), 'PRICE_TO_BE_CONFIRMED', 1)).toEqual([{
-      type: 'PRICE_TO_BE_CONFIRMED', title: `The price of Board change notice (08n ${RUN}) is to be confirmed`,
-      body: `The subject's exam board changed, and with it the board fee. Board change notice (08n ${RUN}) stays at EGP 1,300, to be confirmed: it can be paid once the school confirms the board fee in its new series.`,
-    }]);
-    expect(await notificationsFor(studentEmail(`n08v-bc-${RUN}`), 'PRICE_CHANGED')).toEqual([]);
-    // P1b (mayPay): a line whose price is not final is refused with PRICES_NOT_FINAL.
-    const { PRICES_NOT_FINAL_REFUSAL: PROVISIONAL_REFUSAL } = await import('../src/services/window.services');
-    const checkout = () => f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } });
-    expect((await refused(checkout())).error).toBe(PROVISIONAL_REFUSAL);
-    const c = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: pea }, json: { rows: [{ feeId: row.id }], reason: "the new board's fee published" } }));
-    expect(c).toMatchObject({ confirmed: 1, linesNoLongerProvisional: 1 });
-    expect((await checkout()).status).toBe(201);
-  });
+  // "a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed;
+  // the new board's Confirm makes it payable" retired with the fee grid (P1c): a subject set up with its board's rows does
+  // not change board (08y "reservations are protected: …; its board does not change under it"). No money moved.
 
-  it("replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)", async () => {
-    // IAL Biology: WBI11 sat in January (the winter session), WBI12 in June, one teacher for both.
-    const winter = (await apiResponse(adm.api.v1.sessions.$post({
-      json: {
-        type: 'winter', year: Y, label: `n08v-rtu-${RUN}`, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
-        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
-      },
-    })))!.id;
-    const jan = await mkSeries('pearson_edexcel', 'january', Y + 1, `n08v-rtu-${RUN}`, { entryDeadline: new Date(Date.now() + days(45)) });
-    const jun = await mkSeries('pearson_edexcel', 'june', Y + 1, `n08v-rtu-${RUN}`, { entryDeadline: new Date(Date.now() + days(45)) });
-    const bio = await subject(adm, `RWN-VRTU-${RUN}`, `Biology IAL units (08n ${RUN})`, { course: 2000, registration: 4800 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}-${RUN}`, title: code, unitLevel: 'as', kind: 'unit' } })))!.id;
-    const [u1, u2] = [await unit('WBI11U'), await unit('WBI12U')];
-    await fee(jan, 'unit', u1, 4800);
-    await fee(jun, 'unit', u2, 4800);
-    const both = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher V4 (08n ${RUN})` } })))!.id;
-    const paper = (label: string, unitId: string, boardSeriesId: string) => ({ label, kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unitId] }, boardSeriesId, availability: 'open' as const, requiredInSeries: false });
-    const ow = await offer(winter, bio, [paper('WBI11', u1, jan)], [{ teacherId: both, mode: 'in_school' }]);
-    const oj = await offer(june, bio, [paper('WBI12', u2, jun)], [{ teacherId: both, mode: 'in_school' }]);
-    const f = await onboard(officer, `n08v-rtu-${RUN}`, 12);
-    const [lw] = await reserve(f.studentId, winter, [{ offerItemId: ow.items[0]!, attempt: 'first', mode: 'in_school', teacherId: both }]);
-    const [lj] = await reserve(f.studentId, june, [{ offerItemId: oj.items[0]!, attempt: 'first', mode: 'in_school', teacherId: both }]);
-    const years = await apiResponse(adm.api.v1.academic.years.$get());
-    const yearId = years.find((y) => y.startYear === Y)?.id
-      ?? (await apiResponse(adm.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } })))!.id;
-    await apiResponse(adm.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: [f.studentId], subjectMap: [], exclude: [], commit: true } }));
-    const enrolments = () => sql<{ unit_id: string; teacher_id: string }>(
-      `select unit_id, teacher_id from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null order by unit_id`, [f.studentId, bio]);
-    expect(await enrolments()).toEqual([{ unit_id: u1, teacher_id: both }, { unit_id: u2, teacher_id: both }].sort((a, b) => a.unit_id.localeCompare(b.unit_id)));
-    // June's teacher changes: WBI12's line and its enrolment move; WBI11, taught in the winter session, stays.
-    const r = await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
-      param: { id: june, offerId: oj.id }, json: { fromTeacherId: both, toTeacherId: teacher2, reason: 'another teacher takes June' },
-    }));
-    expect(r).toMatchObject({ lines: 1, enrolments: 1 });
-    expect(await enrolments()).toEqual([{ unit_id: u1, teacher_id: both }, { unit_id: u2, teacher_id: teacher2 }].sort((a, b) => a.unit_id.localeCompare(b.unit_id)));
-    expect(await sql(`select id, teacher_id from registration where id in ($1, $2) order by id`, [lw!.id, lj!.id]))
-      .toEqual([{ id: lw!.id, teacher_id: both }, { id: lj!.id, teacher_id: teacher2 }].sort((a, b) => a.id.localeCompare(b.id)));
-  });
+  // "replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject
+  // taught through another session (§2.11: per unit)" and "replace teacher on a converted session: an enrolment from
+  // before the rework (no unit) under the converted item entering all the subject's units moves with its line" retired
+  // with the route (P1c: replace-teacher left with the links sheet). No money.
 
-  it("replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line", async () => {
-    // 0042's shape: the converted offer's one item enters every unit of the subject; the student's
-    // enrolment is the subject's own row (unit_id null: 0041 added the column, nothing filled it).
-    const sub = await subject(adm, `RWN-VRTC-${RUN}`, `Converted units (08n ${RUN})`, { course: 2000, registration: 4800 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
-    const jun = await mkSeries('pearson_edexcel', 'june', Y + 1, `n08v-rtc-${RUN}`, { entryDeadline: new Date(Date.now() + days(45)) });
-    const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}-${RUN}`, title: code, unitLevel: 'as', kind: 'unit' } })))!.id;
-    const [u1, u2] = [await unit('WCH11C'), await unit('WCH12C')];
-    await fee(jun, 'unit', u1, 2400);
-    await fee(jun, 'unit', u2, 2400);
-    const leaver = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher V5 (08n ${RUN})` } })))!.id;
-    const conv = await mkJune(`n08v-rtc-${RUN}`);
-    const o = await offer(conv, sub, [{ label: 'Whole subject', kind: 'unit', enters: { kind: 'units', unitIds: [u1, u2] }, boardSeriesId: jun, availability: 'open', requiredInSeries: false }],
-      [{ teacherId: leaver, mode: 'in_school' }]);
-    const f = await onboard(officer, `n08v-rtc-${RUN}`, 12);
-    const [line] = await reserve(f.studentId, conv, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId: leaver }]);
-    const years = await apiResponse(adm.api.v1.academic.years.$get());
-    const yearId = years.find((y) => y.startYear === Y)?.id
-      ?? (await apiResponse(adm.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } })))!.id;
-    await apiResponse(adm.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: [f.studentId], subjectMap: [], exclude: [], commit: true } }));
-    // Back to the pre-rework shape: one enrolment in the subject, no unit.
-    await sql(`delete from course_enrolment where student_id = $1 and subject_id = $2 and unit_id = $3`, [f.studentId, sub, u2]);
-    await sql(`update course_enrolment set unit_id = null where student_id = $1 and subject_id = $2`, [f.studentId, sub]);
-    const r = await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
-      param: { id: conv, offerId: o.id }, json: { fromTeacherId: leaver, toTeacherId: teacher2, reason: 'the teacher left the school' },
-    }));
-    expect(r).toMatchObject({ lines: 1, enrolments: 1 });
-    expect(await sql(`select unit_id, teacher_id from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null`, [f.studentId, sub]))
-      .toEqual([{ unit_id: null, teacher_id: teacher2 }]);
-    expect((await one<{ t: string }>(`select teacher_id as t from registration where id = $1`, [line!.id])).t).toBe(teacher2);
-  });
-
-  it("the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat", async () => {
-    const sub = await subject(adm, `RWN-VKS-${RUN}`, `Known sittings (08n ${RUN})`, { course: 1000, registration: 300 });
-    const s1 = await mkSeries('cambridge', 'june', Y + 1, `n08v-ks1-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    const s2 = await mkSeries('cambridge', 'june', Y + 1, `n08v-ks2-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
-    for (const s of [series, s1, s2]) await fee(s, 'subject', sub, 300);
-    const [a, b] = [await mkJune(`n08v-ks-a-${RUN}`), await mkJune(`n08v-ks-b-${RUN}`)];
-    const oa = await offer(a, sub, [whole(s1)]);
-    const ob = await offer(b, sub, [whole(s2)]);
-    const item = (await offer(june, sub, [whole(series)])).items[0]!;
+  // Restated on the family read's offerings → rows (P1c: the v1 part, per item `knownSittings`, left): the row names the
+  // one known sitting (F2) — the latest confirmed line of the subject before the row's sitting. The dropped line is in a
+  // later sitting than the one sat, so counting it would name it.
+  it("the family's read names as the known earlier sitting a confirmed line only: a dropped line was never sat", async () => {
+    const sub = await subject(adm, `RWN-VKS-${RUN}`, `Known sittings (08n ${RUN})`, { course: 1000, registration: 300 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const [a, b] = [await mkWinter(`n08v-ks-a-${RUN}`), await mkWinter(`n08v-ks-b-${RUN}`)];
+    const row = (sitting: 'november' | 'january') => ({ kind: 'all_papers' as const, sitting, examFee: 300, cells: OPEN });
+    const oa = await offerIn(adm, a, sub, { courseFee: 1000, teachers: [teacherId], rows: [row('november')] });
+    const ob = await offerIn(adm, b, sub, { courseFee: 1000, teachers: [teacherId], rows: [row('january')] });
+    const here = await offerSub(june, sub);
+    const [s1, s2] = [oa.rows[0]!.series!, ob.rows[0]!.series!];
+    expect([s1.month, s1.year, s2.month, s2.year]).toEqual(['november', Y, 'january', Y + 1]);
     const f = await onboard(officer, `n08v-ks-${RUN}`, 11);
-    const [sat] = await reserve(f.studentId, a, [{ offerItemId: oa.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
-    const [left] = await reserve(f.studentId, b, [{ offerItemId: ob.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [sat] = await reserve(f.studentId, a, [{ offerItemId: oa.first, attempt: 'first', mode: 'in_school', teacherId }]);
+    const [left] = await reserve(f.studentId, b, [{ offerItemId: ob.first, attempt: 'first', mode: 'in_school', teacherId }]);
     await pay(f, [sat!.id]);
     await pay(f, [left!.id]);
     const cr = (await apiResponse(f.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: left!.id }, json: { reason: 'not sitting it after all' } })))!;
     await apiResponse(f.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} }));
     expect(await statusOf(left!.id)).toBe('dropped');
+    expect(await statusOf(sat!.id)).toBe('confirmed');
     const listed = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: june, studentId: f.studentId } }));
-    const known = listed!.offers.find((o) => o.subject.id === sub)!.items.find((i) => i.id === item)!.knownSittings;
-    expect(known.map((k) => [k.registrationId, k.seriesId, k.status])).toEqual([[sat!.id, s1, 'confirmed']]);
+    const known = listed.offerings.find((o) => o.id === here.id)!.rows[0]!;
+    const { sittingLabel } = await import('../src/services/setup/labels');
+    expect(known.knownSitting).toEqual({ id: s1.id, label: sittingLabel(s1.month, s1.year) });
+    // Known to have sat it (F2): the retakes only.
+    expect(known.options.map((o) => o.attempt)).toEqual(['retake', 'retake']);
   });
 
   // 'Q-20: a late board entry (deadline.boardEntry) …' retired with late entries (§9.1: exceptions.boardEntryDeadline
@@ -1141,11 +1007,12 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
     teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher D (08n ${RUN})` } })))!.id;
   });
 
-  it('a draft with its sheet is deleted with a reason, audited in the same change; its subjects and the boards\' series stay', async () => {
+  // P1c: its subject set up through the coordinator's routes (the links sheet's offers route left).
+  it('a draft with its subjects is deleted with a reason, audited in the same change; its subjects and the boards\' series stay', async () => {
     const d = await mk(`n08-del-${RUN}`, true);
     expect(d.status).toBe('draft');
     const sub = await subject(adm, `RWN-DEL-${RUN}`, `Deleted with its draft (08n ${RUN})`, { course: 1000, registration: 0 });
-    const made = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const made = await offerIn(adm, d.id, sub, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', cells: OPEN }] });
     const linked = await sql<{ id: string }>(`select board_series_id as id from session_board_series where session_id = $1`, [d.id]);
     expect(linked.length).toBeGreaterThan(0);
     // A reason of a word is refused: the reason is what the audit keeps.
@@ -1181,17 +1048,17 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
     // and the refusal says it is kept rather than sending the admin to revoke it.
     const d = await mk(`n08-del-exc-${RUN}`, true);
     const sub = await subject(adm, `RWN-DELX-${RUN}`, `An exception in a draft (08n ${RUN})`, { course: 1000, registration: 0 });
-    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const o = await offerIn(adm, d.id, sub, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', cells: OPEN }] });
     const f = await onboard(officer, `n08-delx-${RUN}`, 11);
-    const ex = await apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.priorSeries', studentId: f.studentId, scope: { offerItemId: o.items[0]! }, reason: '08n: a first entry the item is not open to' } }));
+    const ex = await apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.priorSeries', studentId: f.studentId, scope: { offerItemId: o.first }, reason: '08n: a first entry the item is not open to' } }));
     const refusedWith = `An exception was granted for ${d.name}: it is kept as history and cannot be deleted`;
     expect(await refused(del(adm, d.id, 'a draft with an exception'))).toEqual({ status: 409, error: refusedWith });
     await apiResponse(coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: ex.id } }));
     expect(await one(`select status from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked' });
     expect(await refused(del(adm, d.id, 'the exception was revoked'))).toEqual({ status: 409, error: refusedWith });
     expect(await exists(d.id)).toBe(true);
-    expect(await one(`select count(*)::int as n from session_offer_item where offer_id = $1`, [o.id])).toEqual({ n: o.items.length });
-    expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked', offer_item_id: o.items[0] });
+    expect(await one(`select count(*)::int as n from session_offer_item where offer_id = $1`, [o.id])).toEqual({ n: o.rows.length });
+    expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'revoked', offer_item_id: o.first });
 
     // A reminder rule of the draft's own, and a reminder sent under it. No path sends one for a draft today (the
     // step reminds lines and open sessions); the history the rule's foreign keys keep is written as the step writes it.
@@ -1213,12 +1080,12 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
   it("finding 8: an exception granted on a draft's item while the deletion counts is seen and the deletion refused — never deleted unseen by the cascade", async () => {
     const d = await mk(`n08-del-race-${RUN}`, true);
     const sub = await subject(adm, `RWN-DELK-${RUN}`, `A grant during a deletion (08n ${RUN})`, { course: 1000, registration: 0 });
-    const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: d.id }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const o = await offerIn(adm, d.id, sub, { courseFee: 1000, teachers: [teacherId], rows: [{ kind: 'all_papers', cells: OPEN }] });
     const f = await onboard(officer, `n08-delk-${RUN}`, 11);
     // The grant paused at its audit row: its exception is written, its transaction still open.
     const p = await pauseAtAudits(['EXCEPTION_GRANTED']);
     try {
-      const granting = apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.priorSeries', studentId: f.studentId, scope: { offerItemId: o.items[0]! }, reason: '08n: granted while the draft is deleted' } }));
+      const granting = apiResponse(coordinator.api.v1.exceptions.$post({ json: { policyKey: 'gate.priorSeries', studentId: f.studentId, scope: { offerItemId: o.first }, reason: '08n: granted while the draft is deleted' } }));
       await p.paused('EXCEPTION_GRANTED');
       // The deletion waits on the item the grant names (its lock before the count), then counts the grant.
       const deleting = refused(del(adm, d.id, 'deleted while a grant is under way'));
@@ -1226,7 +1093,7 @@ describe('08n: a draft session nobody reserved in is deleted from its Session sc
       await p.release('EXCEPTION_GRANTED');
       const ex = await granting;
       expect(await deleting).toEqual({ status: 409, error: `An exception was granted for ${d.name}: it is kept as history and cannot be deleted` });
-      expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'active', offer_item_id: o.items[0] });
+      expect(await one(`select status, offer_item_id from exception where id = $1`, [ex.id])).toEqual({ status: 'active', offer_item_id: o.first });
       expect(await exists(d.id)).toBe(true);
     } finally {
       await p.releaseAll();

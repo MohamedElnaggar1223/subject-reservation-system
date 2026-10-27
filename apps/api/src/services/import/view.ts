@@ -13,7 +13,7 @@
  *   commit takes in one transaction.
  * - The mapping: each series and level to history or the session of that
  *   series (the reservations rework: a line on the offer and item the sheet's
- *   words name, priced from the series' fee grid), each subject to a catalogue
+ *   words name, priced from its row's fees), each subject to a catalogue
  *   row, each teacher to a record, the sections, and the coordinator's pending
  *   answers (self-study, carry forward).
  * - Per row, what a commit would do (the plan) and every problem; the
@@ -36,7 +36,7 @@ import {
 import { getSetting } from '../settings.services';
 import { judgeEligibility, mayRegisterFor, type Eligibility } from '../eligibility.services';
 import { schoolFeeGateReason } from '../school-fee.services';
-import { findOffer, findItem, findItemsByCode, namedCodes, findOrCreateSeries, availabilityConstraints, OfferError } from '../offer.services';
+import { findOffer, findItem, findItemsByCode, namedCodes, findOrCreateSeries, cellConstraints, cellsOfRow, OfferError } from '../offer.services';
 import { priceLine, PricingError } from '../pricing.services';
 import { assertLineRules, LineRuleError, type RuleLine } from '../line-rules.services';
 import { mayReserveRow, schoolDate } from '../window.services';
@@ -719,14 +719,14 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   // ── A line in a session (RESERVATIONS_REWORK.md §9's F7 list) ──
   type Target = {
     offerId: string; offerItemId: string; sessionId: string; subjectId: string; subjectName: string; itemLabel: string; itemKind: string;
-    needsPriorSeries: boolean; offerAvailability: string; itemAvailability: string; seriesId: string | null; boardCode: string | null;
+    needsPriorSeries: boolean; constraints: ReturnType<typeof cellConstraints>; seriesId: string | null; boardCode: string | null;
     month: string | null; year: number | null; seriesName: string | null; boardMonths: string[]; teachers: string[];
   };
   const factsCache = new Map<string, Target | null>();
   const itemFacts = async (itemId: string): Promise<Target | null> => {
     if (!factsCache.has(itemId)) {
       const [r] = await db.select({
-        item: sessionOfferItem, subjectId: sessionOffer.subjectId, offerAvailability: sessionOffer.availability, subjectName: subject.name,
+        item: sessionOfferItem, subjectId: sessionOffer.subjectId, accepting: sessionOffer.accepting, subjectName: subject.name,
         boardCode: boardSeries.boardCode, month: boardSeries.month, year: boardSeries.year, label: boardSeries.label, boardName: examBoard.name, boardMonths: examBoard.seriesMonths,
       }).from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId)).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
         .leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId)).leftJoin(examBoard, eq(examBoard.code, boardSeries.boardCode))
@@ -738,7 +738,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
         factsCache.set(itemId, {
           offerId: r.item.offerId, offerItemId: r.item.id, sessionId: r.item.sessionId, subjectId: r.subjectId, subjectName: r.subjectName,
           itemLabel: r.item.label, itemKind: r.item.kind, needsPriorSeries: r.item.needsPriorSeries,
-          offerAvailability: r.offerAvailability, itemAvailability: r.item.availability, seriesId: r.item.boardSeriesId, boardCode: r.boardCode,
+          constraints: cellConstraints(cellsOfRow(r.item), r.accepting), seriesId: r.item.boardSeriesId, boardCode: r.boardCode,
           month: r.month, year: r.year, seriesName: r.boardName && r.month ? `${r.boardName} ${seriesLabel(r.month, r.year!)}${r.label ? ` (${r.label})` : ''}` : null,
           boardMonths: (r.boardMonths as string[] | null) ?? [], teachers: teachers.map((t) => t.id),
         });
@@ -841,7 +841,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   /**
    * The line a row makes in its session: its offer and item, its attempt and mode from the note (the
    * coordinator's answers and staff's choices on the line over it), the sitting it follows and from
-   * where, its teacher and its price from the series' fee grid now. Pushes the line's problems.
+   * where, its teacher and its price from its row's fees now. Pushes the line's problems.
    */
   const pushOnce = (w: Working, p: ViewProblem) => { if (!w.problems.some((x) => x.code === p.code && x.detail === p.detail)) w.problems.push(p); };
   /** The lines a row makes in its session: one per item it names (several when it is split). */
@@ -872,7 +872,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   const lineFor = async (w: Working, d: SheetLine, sid: string | null, sess: SessionRow, t: Target, code: string | null, found: ImportLinePlan['found']) => {
     const e = (w.r.edits ?? {}) as ImportRowEditsType;
     const out = { live: true, mode: (d.selfStudy ? 'self_study' : 'in_school') as 'in_school' | 'self_study', refusals: [] as string[] };
-    const c = availabilityConstraints(t.offerAvailability, t.itemAvailability);
+    const c = t.constraints;
     if (c.selfStudyOnly) {
       if (d.selfStudy) pushOnce(w, { code: 'self_study_not_taught', severity: 'info', detail: null });
       out.mode = 'self_study';
@@ -959,7 +959,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       const win = await mayReserveRow(db, { studentId: sid ?? NEW_STUDENT, offerItemId: t.offerItemId, attempt, priorSittingSeriesId: priorId }, now);
       if (!win.allowed) out.refusals.push(win.message);
     }
-    // The price, from the series' fee grid now: a missing row is refused, naming the grid; a provisional one is marked.
+    // The price, from the row's fees now: a fee not set is refused; a provisional one (prices not final) is marked.
     let price: ImportLinePlan['price'] = null;
     try {
       const p = await priceLine(db, { item: { id: t.offerItemId }, attempt, mode: out.mode, studentId: sid ?? NEW_STUDENT, sessionId: sess.id });
@@ -1156,7 +1156,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const el = eligibilityCache.get(k);
     if (!el?.allowed || el.grade !== 10 || el.series.sessionType !== 'june') continue;
     const core = await db.select({ id: sessionOffer.id, name: subject.name }).from(sessionOffer).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
-      .where(and(eq(sessionOffer.sessionId, g.sessionId), eq(sessionOffer.grade10Core, true), ne(sessionOffer.availability, 'closed')));
+      .where(and(eq(sessionOffer.sessionId, g.sessionId), eq(sessionOffer.grade10Core, true), eq(sessionOffer.accepting, true)));
     const have = new Set([
       ...g.rows.flatMap((w) => (linePlans.get(w.r.id) ?? []).map((x) => x.line.offerId)),
       ...(g.sid ? liveRegs.filter((r) => r.studentId === g.sid && r.sessionId === g.sessionId).map((r) => r.offerId) : []),
@@ -1387,20 +1387,20 @@ function levelCodePanel(work: WorkLike[], subjects: Map<string, CatalogueRow>, c
   return { current, byReading };
 }
 
-/** Each session's items (subject — item, its series), open ones first, for the row editor's choice. */
+/** Each session's items (subject — item, its series, closed: nothing ticked or the subject switched off), for the row editor's choice. */
 async function sessionItemsOf(sessionIds: string[]) {
-  const out: Record<string, { id: string; subjectName: string; label: string; kind: string; availability: string; series: string | null }[]> = {};
+  const out: Record<string, { id: string; subjectName: string; label: string; kind: string; closed: boolean; series: string | null }[]> = {};
   if (!sessionIds.length) return out;
   const rows = await db.select({
     id: sessionOfferItem.id, sessionId: sessionOfferItem.sessionId, subjectName: subject.name, label: sessionOfferItem.label, kind: sessionOfferItem.kind,
-    availability: sessionOfferItem.availability, boardName: examBoard.name, month: boardSeries.month, year: boardSeries.year, seriesLabel: boardSeries.label,
+    item: sessionOfferItem, accepting: sessionOffer.accepting, boardName: examBoard.name, month: boardSeries.month, year: boardSeries.year, seriesLabel: boardSeries.label,
   }).from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId)).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
     .leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId)).leftJoin(examBoard, eq(examBoard.code, boardSeries.boardCode))
     .where(inArray(sessionOfferItem.sessionId, sessionIds))
     .orderBy(subject.name, sessionOfferItem.sortOrder, sessionOfferItem.label);
   for (const r of rows) {
     (out[r.sessionId] ??= []).push({
-      id: r.id, subjectName: r.subjectName, label: r.label, kind: r.kind, availability: r.availability,
+      id: r.id, subjectName: r.subjectName, label: r.label, kind: r.kind, closed: cellConstraints(cellsOfRow(r.item), r.accepting).closed,
       series: r.boardName && r.month ? `${r.boardName} ${seriesLabel(r.month, r.year!)}${r.seriesLabel ? ` (${r.seriesLabel})` : ''}` : null,
     });
   }

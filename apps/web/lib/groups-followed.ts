@@ -1,9 +1,10 @@
 /**
  * What happened to a student's group when their teacher changed, in the school's words
  * (docs/features/CYCLE_FOLLOWUPS.md §2): the desk's teacher change on a line (B's
- * `PUT /v1/registrations/:id/teacher`) and the Session screen's "Replace a teacher" (A's
- * `POST …/offers/:offerId/replace-teacher`) both return F1's follow-up outcome (`groupsFollowed`,
- * `followEnrolments` in apps/api/src/services/group.services.ts); this turns it into sentences.
+ * `PUT /v1/registrations/:id/teacher`) returns F1's follow-up outcome (`groupsFollowed`,
+ * `followEnrolments` in apps/api/src/services/group.services.ts); this turns it into sentences. (A
+ * teacher who leaves a whole subject is swapped in the coordinator's subject editor, then each of their
+ * lines moved at the desk, line by line — P1c removed A's replace-teacher route with the links sheet.)
  *
  * A group is F1's teaching group, named as the coordinator named it — "group" / مجموعة everywhere (the
  * lead's decision of 16 Oct 2026, 12; a section, 11A, is فصل). The sentences are English, one
@@ -19,7 +20,7 @@ import type { apiResponse } from '@repo/validations';
 
 type Client = ReturnType<typeof hc<AppType>>;
 type LineTeacherChange = Awaited<ReturnType<typeof apiResponse<ReturnType<Client['v1']['registrations'][':id']['teacher']['$put']>>>>;
-/** F1's follow-up outcome as the desk's teacher change answers it (A's replace-teacher answers the same). */
+/** F1's follow-up outcome as the desk's teacher change answers it. */
 export type GroupsFollowed = NonNullable<LineTeacherChange['groupsFollowed']>;
 
 export type FollowSentence = {

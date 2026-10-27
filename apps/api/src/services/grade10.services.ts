@@ -17,7 +17,7 @@ import { seriesAcademicYearStart, type LineInputType, type RefundPolicy, type Re
 import { academicYearForDate } from './school-fee.services';
 import { mayRegisterFor, assertMayRegisterForInTx } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { resolveItem, availabilityConstraints } from './offer.services';
+import { resolveItem, cellConstraints, cellsOfRow } from './offer.services';
 import { priceLine } from './pricing.services';
 import { insertLines } from './line.services';
 import { logAction, type AuditContext } from './audit.services';
@@ -66,7 +66,7 @@ async function plan(sessionId: string, studentIds?: string[]): Promise<{ session
   const ay = seriesAcademicYearStart(session.session_type, session.series_year);
   const core = await db.select({ offer: sessionOffer, subjectName: subject.name }).from(sessionOffer)
     .innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
-    .where(and(eq(sessionOffer.sessionId, sessionId), eq(sessionOffer.grade10Core, true), sql`${sessionOffer.availability} <> 'closed'`))
+    .where(and(eq(sessionOffer.sessionId, sessionId), eq(sessionOffer.grade10Core, true), eq(sessionOffer.accepting, true)))
     .orderBy(subject.name);
   if (!core.length) throw new Grade10Error('No subject of this session is marked grade-10 core: tick them on the Grade 10 tab first');
   // Grade 10 in the session's academic year: the cohort that starts grade 10 that year.
@@ -86,7 +86,7 @@ async function plan(sessionId: string, studentIds?: string[]): Promise<{ session
       if (live.some((l) => l.subjectId === c.offer.subjectId)) continue; // already reserved: nothing to do
       try {
         const r = await resolveItem(db, sessionId, c.offer.subjectId);
-        const k = availabilityConstraints(c.offer.availability, r.item.availability);
+        const k = cellConstraints(cellsOfRow(r.item), c.offer.accepting);
         const mode = k.selfStudyOnly ? 'self_study' as const : 'in_school' as const;
         const teachers = await db.select({ id: sessionOfferTeacher.teacherId }).from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, c.offer.id));
         let price: number | null = null;

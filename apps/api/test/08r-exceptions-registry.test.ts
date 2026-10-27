@@ -219,7 +219,7 @@ describe('08r: the exceptions registry', () => {
     // V3's request shape still grants, mapped the same way.
     const v3 = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { type: 'discount_percent', studentId: f.studentId, sessionId: june, value: 15, reason: 'V3 shape' } }));
     expect(v3).toMatchObject({ type: 'discount_percent', policyKey: 'price.discountPercent', valueNumber: 15, sessionId: june });
-    for (const id of [...Object.values(rows), ext, ref, v3.id]) await sql(`update exception set status = 'revoked', revoked_at = now(), revoked_by = $2 where id = $1`, [id, finadmin.id]);
+    for (const id of [...Object.values(rows), ext, ref, v3.id]) await sql(`update exception set status = 'revoked', revoked_at = now(), revoked_by = $1 where id = $2`, [finadmin.id, id]);
   });
 
   it('Check these: a migrated subject-scoped refund percent applies to nothing until a finance admin confirms it; then to that subject\'s lines, on the course fee', async () => {

@@ -39,7 +39,18 @@ Locally nothing changes: `API_URL` unset means no rewrite and the browser calls
   `NODE_ENV=production` at runtime only).
 - Start: `pnpm --filter @repo/db db:migrate && pnpm --filter @repo/db seed && pnpm --filter @repo/api start`.
   Migrations run on every boot; the seed (admin promotion only, no samples) is
-  idempotent and promotes the `ADMIN_EMAIL` account when it exists.
+  idempotent and promotes the `ADMIN_EMAIL` account when it exists. The API itself loads the
+  board's list (the reference data in `packages/db/reference`) at every start, before it serves
+  (P1c, 27 Oct 2026): idempotent, so no deploy step is needed for it, and a database copied from
+  an older one holds the list the coordinator picks subjects from. Its log line reads
+  `[reference] loaded at start: …`.
+- P1c's migration 0072 (the fee grid and availability dropped) refuses to run while a waiting
+  line is priced provisional from the fee grid, on a row with no exam fee of its own, in a
+  session whose prices are already final (it names each one: nothing could make such a line
+  payable once the grid is gone). Migrations run at start, so that refusal stops the boot: the
+  new build never serves and Render keeps the previous one running. Fix those lines first
+  **from the previous build** — set each row's exam fee in the subject editor (it re-prices
+  them) — then deploy again; nothing of 0072 is applied until it passes (one transaction).
 - Environment: `DATABASE_URL` (internal), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
   `APP_URL`, `CORS_ORIGINS`, `RESEND_API_KEY`, `EMAIL_FROM`, `NODE_VERSION`,
   `REQUIRE_EMAIL_VERIFICATION=false`, `ADMIN_EMAIL`, the rate-limit ceilings and the

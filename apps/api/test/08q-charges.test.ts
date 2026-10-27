@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, refusedWithCode, one, sql, money, takings, takingsDelta, openWindow, futureWindow, passCutOff,
+  admin, staff, onboard, subject, session, offer, refused, refusedWithCode, one, sql, money, takings, takingsDelta, openWindow, futureWindow, passCutOff,
   runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, CONSENT, confirmed, type Client, type Impact,
 } from './helpers';
 
@@ -357,9 +357,11 @@ describe('08q: charges', () => {
       await setStart(june, -15);
       expect(await drop(f, a!)).toMatchObject({ refundPercentage: 50, refundAmount: 1000 });
       expect(await credited(a!)).toEqual([1000]);
-      // The offer starts later (8 days ago: week 2) — its own date anchors its lines (100%).
+      // The offer starts later (8 days ago: week 2) — its own date anchors its lines (100%). P1c: no route sets an
+      // offering's own course start any more (the old offer route left; the subject editor has no such field): it is
+      // written as converted data holds it, and the refund still reads it.
       const offerD = (await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [june, subj.D!])).id;
-      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: june, offerId: offerD }, json: { courseStartsOn: day(-8), reason: 'D starts a week later' } }));
+      await sql(`update session_offer set course_starts_on = $1::date where id = $2`, [day(-8), offerD]);
       expect(await drop(f, b!)).toMatchObject({ refundPercentage: 100, refundAmount: 1500 });
       // One student who joined late: their own course start (today: week 1).
       await setStart(june, -50);
@@ -526,18 +528,17 @@ describe('08q: instalment plans', () => {
 
   it('refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the line\'s board deadline; granted by finance only', async () => {
     const f = await onboard(officer, 'cqp-refuse', 12);
-    // A subject whose board fee in the series is still provisional.
+    // A line whose price is still provisional. P1c: it was a subject whose board fee in the series' grid was still
+    // provisional; with the grid gone a price is provisional while its session's prices are not final (E6) — s1's,
+    // switched off while it has no line yet, then on again once the line is refused its plan.
     const prov = await subject(adm, 'CQP-PROV', 'Provisional (A Level, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'a_level', council: 'pearson_edexcel' });
-    const series = await seriesOfSession(s1, 'pearson_edexcel');
-    const t = await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher (plans)' } }));
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [{ keyKind: 'subject', keyId: prov, amount: 500, provisional: true }] } }));
-    await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: s1 },
-      json: { subjectId: prov, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: t!.id, mode: 'in_school' }],
-        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
-    }));
+    await offer(adm, s1, prov);
+    await apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: s1 }, json: { final: false } }));
     const [provLine] = await unpaid(f, [prov], s1);
+    expect(await one(`select price_provisional as p, price_at_registration::float as price from registration where id = $1`, [provLine!])).toEqual({ p: true, price: 1500 });
     expect((await refused(grant(f, provLine!, [1500]))).error).toContain('provisional');
+    expect(await sql(`select 1 from exception where student_id = $1 and policy_key = 'plan.instalments'`, [f.studentId])).toEqual([]);
+    await confirmed((expected?: Impact) => apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: s1 }, json: { final: true, ...(expected ? { expected } : {}) } })));
     const [line, other] = await unpaid(f, [subj.P1!, subj.P2!], s1);
     expect((await refused(grant(f, line!, [500, 500]))).error).toContain('add up to');
     // P1b: the last instalment by the line's board deadline (here its exams' start, about two years ahead).
@@ -927,18 +928,23 @@ describe('08q: instalment plans', () => {
     expect(await statusOf('registration', l!)).toBe('confirmed');
   });
 
-  it("a plan line moved to another series with its item keeps its price there — and its last instalment captures it", async () => {
-    // Offered the old way (priced from the grid): the item route moves a row with lines only on such a subject (§6).
-    const py = await subject(adm, 'CQP-MV', 'Move (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', pricedByGrid: true });
+  it("a plan line moved to another series keeps its price there — and its last instalment captures it", async () => {
+    // Priced by its row (P1c). A row's sitting does not change while lines use it (§6), and the old item route that
+    // moved a row with its lines left with P1c: the subject has a second row in January (its exam fee the 700 the
+    // January grid row carried), and the admin moves the line there (POST /sessions/:id/board-series/move).
+    const py = await subject(adm, 'CQP-MV', 'Move (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
     const f = await onboard(officer, 'cqp-move', 12);
     const [l] = await unpaid(f, [py], s1);
     const p = await plan(f, l!, [750, 750]);
     await payAtDesk(f, [p.i[0]!]);
-    const Y = academicYearStartOf();
-    const later = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'january', year: Y + 1, label: `cqp-mv-${Date.now() % 100000}`, examsStart: `${Y + 1}-01-10` } }))).id;
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: later }, json: { rows: [{ keyKind: 'subject', keyId: py, amount: 700, provisional: false }] } }));
     const item = await one<{ id: string; offer: string }>(`select i.id, i.offer_id as offer from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = $1 and o.subject_id = $2`, [s1, py]);
-    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: s1, offerId: item.offer, itemId: item.id }, json: { boardSeriesId: later, reason: 'sat in January instead' } }));
+    const cells = { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false };
+    await confirmed((expected?: Impact) => apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: s1, offeringId: item.offer },
+      json: { rows: [{ id: item.id, kind: 'all_papers', cells }, { kind: 'all_papers', referenceCodes: ['CQP-MV/JAN'], sitting: 'january', examFee: 700, cells }], ...(expected ? { expected } : {}) },
+    })));
+    const later = (await one<{ s: string }>(`select i.board_series_id as s from session_offer_item i join board_series bs on bs.id = i.board_series_id where i.offer_id = $1 and bs.month = 'january'`, [item.offer])).s;
+    await apiResponse(adm.api.v1.sessions[':id']['board-series'].move.$post({ param: { id: s1 }, json: { registrationIds: [l!], boardSeriesId: later, reason: 'sat in January instead' } }));
     expect(await one(`select board_series_id as s, price_at_registration::float as p from registration where id = $1`, [l!])).toEqual({ s: later, p: 1500 });
     await payAtDesk(f, [p.i[1]!]);
     expect(await statusOf('registration', l!)).toBe('confirmed');

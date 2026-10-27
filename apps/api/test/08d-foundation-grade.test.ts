@@ -337,7 +337,7 @@ describe('F0a: grade and eligibility', () => {
       // The same grade-10 student is offered June's subjects.
       const june = await apiResponse(g10.parent.api.v1.registrations.offers.$get({ query: { sessionId: S.jun2027!, studentId: g10.studentId } }));
       expect(june.eligibility.allowed).toBe(true);
-      expect(june.offers.length).toBeGreaterThan(0);
+      expect(june.offerings.length).toBeGreaterThan(0);
     });
 
     it("the grade-10 exception: a coordinator grants it (audited) and the student may sit that series; revoked, refused again", async () => {

@@ -78,6 +78,18 @@ export const ReservationConsent = z.object({
 });
 export type ReservationConsentType = z.infer<typeof ReservationConsent>;
 
+/**
+ * The price of a waiting line as the page showed it, sent with a checkout or a desk collection (P1c): a re-price
+ * that committed since the page was read is refused (PRICE_CHANGED_REFUSAL) rather than charged — as a
+ * reservation line's `expectedPrice` does.
+ */
+export const ExpectedLinePrices = z.array(z.object({
+  registrationId: z.string().min(1),
+  price: z.number().min(0).max(10_000_000),
+})).max(50)
+  .refine((xs) => new Set(xs.map((x) => x.registrationId)).size === xs.length, { message: 'A line\'s price is sent once' });
+export type ExpectedLinePricesType = z.infer<typeof ExpectedLinePrices>;
+
 /** The versions of the texts a consent row records (`registration_consent.text_version`). */
 export const CONSENT_TEXT_VERSIONS = {
   refund_policy: 'refund-policy-v1',

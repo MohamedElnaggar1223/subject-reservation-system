@@ -350,8 +350,8 @@ export type EnrolmentChange = {
  * none. A line whose item enters units while the student's enrolment of the
  * subject is subject-level — from before the rework (no unit), under 0042's
  * converted item entering all the subject's units — and none of those units
- * has an enrolment of its own goes through the subject's own row, as A's
- * replace-teacher does; it is never given unit enrolments beside it.
+ * has an enrolment of its own goes through the subject's own row (as A's
+ * replace-teacher did until P1c); it is never given unit enrolments beside it.
  */
 export async function lineEnrolmentUnits(executor: Executor, academicYearId: string, studentId: string, subjectId: string, units: string[]): Promise<(string | null)[]> {
   if (!units.length) return [null];

@@ -669,8 +669,8 @@ export const familyArabic: Record<string, string> = {
   // The API's sentences with no data (after familyWords)
   'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices':
     'أسعار هذه الجلسة ليست نهائية بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة أسعارها',
-  'The price of one or more of these subjects changed while this was open (the exam board confirmed its fee) — look at the new price and pay again':
-    'تغيّر سعر مادة أو أكثر من هذه المواد أثناء فتح هذه الصفحة (أكّد المجلس رسومه) — انظر إلى السعر الجديد وادفع مرة أخرى',
+  'The price of one or more of these subjects changed while this was open (the school updated it) — look at the new price and pay again':
+    'تغيّر سعر مادة أو أكثر من هذه المواد أثناء فتح هذه الصفحة (حدّثته المدرسة) — انظر إلى السعر الجديد وادفع مرة أخرى',
   'One or more registrations are not ready for payment': 'حجز واحد أو أكثر غير جاهز للدفع',
   'That choice is not on offer in this session': 'هذا الخيار غير معروض في هذه الجلسة',
 };

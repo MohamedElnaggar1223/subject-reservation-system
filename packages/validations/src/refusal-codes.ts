@@ -13,8 +13,6 @@ export const REFUSAL_CODES = [
   'NOT_ACCEPTING',
   /** Past the exam board's deadline: nothing is reserved, paid or confirmed (C6). */
   'BOARD_DEADLINE_PASSED',
-  /** The old preregistration of a session not open yet: reservations open when the session opens (C4). */
-  'PREREGISTRATION_GONE',
   // Paying (§6 "May pay").
   /** An unpaid line past its last day to pay (the cut-off, C10). */
   'CUT_OFF_PASSED',

@@ -410,8 +410,11 @@ try {
         const sid = catalogue.get(`${r.level}|${r.subject}`);
         if (!sid) continue;
         if (subjectIds.includes(sid)) { note('duplicate-row', 'The same subject twice for one student and series', 'Registered once.', r.row); continue; }
+        // The subject's all-papers row (kind 'whole' before 0066), one with a cell ticked first — as offer.services'
+        // findItem orders them (UNTICKED): the availability column it ordered by left with P1c (0072).
         const item = (await db.execute(sql`select i.id from session_offer_item i join session_offer o on o.id = i.offer_id
-          where o.session_id = ${sessionId} and o.subject_id = ${sid} and i.kind = 'whole' order by (i.availability = 'closed'), i.id limit 1`)).rows[0] as { id: string } | undefined;
+          where o.session_id = ${sessionId} and o.subject_id = ${sid} and i.kind = 'all_papers'
+          order by not (i.first_in_school or i.retake_in_school or i.retake_self_study or i.first_self_study), i.id limit 1`)).rows[0] as { id: string } | undefined;
         if (!item) { note('not-offered', 'The subject is not offered in the session', 'Not registered.', r.row); continue; }
         subjectIds.push(sid);
         const tid = r.teacher ? teacherIds.get(r.teacher.toLowerCase()) : undefined;

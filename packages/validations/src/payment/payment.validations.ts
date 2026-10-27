@@ -9,7 +9,7 @@
 
 import { z } from 'zod';
 import { isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
-import { ReservationConsent } from '../registration/reservation.validations';
+import { ReservationConsent, ExpectedLinePrices } from '../registration/reservation.validations';
 
 // ─── Payment Method Enum ──────────────────────────────────────────────────────
 
@@ -173,6 +173,8 @@ export const InitiatePayment = z.object({
   // A line the school reserved (grade 10) carries the school's consent only: the family gives its
   // own pair at checkout (RESERVATIONS_REWORK.md §3.5).
   consent: ReservationConsent.optional(),
+  // The price of each line as the checkout showed it (P1c): a re-price landing since is refused, PRICE_CHANGED.
+  expectedPrices: ExpectedLinePrices.optional(),
 })
   .refine((d) => d.registrationIds.length > 0 || d.chargeIds.length > 0, { message: 'Select at least one registration to pay for', path: ['registrationIds'] })
   .refine((d) => !(d.registrationIds.length > 0 && d.chargeIds.length > 0), {
