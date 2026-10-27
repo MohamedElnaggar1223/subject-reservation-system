@@ -13,11 +13,13 @@ import { TEST_DB_NAME, TEST_PG_ADMIN_URL } from './env';
  *
  * - 0072 refuses, naming it, a waiting line priced provisional from the grid on a row with no exam fee in a session
  *   whose prices are final (nothing could make it payable once the grid is gone), and changes nothing;
- * - a row priced from the grid takes the sum of its grid rows as its exam fee (provisional rows included), audited;
- *   a row whose keys miss a grid row stays "not set";
- * - a waiting version-1 line already payable keeps the grid's last word in its basis (`feeConfirmedAt`): its fee row's
- *   confirmation, or the prices-final switch's time for one the old Confirm did not clear (P1b fix 1);
- * - every line's price, provisional mark and status unchanged; a finished line's basis untouched;
+ * - a row priced from the grid takes the sum of its grid rows as its exam fee, audited — where every grid row it reads
+ *   is confirmed, or its session's prices are not final yet; one reading a provisional row in a session whose prices
+ *   are final stays "not set" (the fix round's S1), as does one whose keys miss a grid row;
+ * - every version-1 line no longer provisional, whatever its status, keeps the grid's last word in its basis
+ *   (`feeConfirmedAt`): its fee row's confirmation, or the prices-final switch's time for one the old Confirm did not
+ *   clear (P1b fix 1); a provisional line gets none;
+ * - every line's price, provisional mark and status unchanged;
  * - the grid, the fee keys and the availability columns dropped;
  * - 0071: the board-deadline reminder rule that never sent anything is deleted (audited); one that sent a reminder is
  *   kept switched off for its message; its template switched off; no new rule of the kind can be made.
@@ -71,7 +73,7 @@ describe('08zf: migrations 0071 and 0072 on data built the old way', () => {
     await db.query(`insert into "user" (id, name, email, role) values ('p-stu', 'Student', 'p-stu@example.test', 'student'), ('p-stu2', 'Student 2', 'p-stu2@example.test', 'student')`);
     await db.query(`insert into subject (id, name, code, council, price_in_school) values
       ('p-bio', 'Biology', 'P-BIO', 'cambridge', 12000), ('p-chem', 'Chemistry', 'P-CHEM', 'cambridge', 12000), ('p-phys', 'Physics', 'P-PHYS', 'cambridge', 12000),
-      ('p-geo', 'Geography', 'P-GEO', 'cambridge', 12000)`);
+      ('p-geo', 'Geography', 'P-GEO', 'cambridge', 12000), ('p-hist', 'History', 'P-HIST', 'cambridge', 12000)`);
     await db.query(`insert into board_series (id, board_code, month, year, label, entry_deadline) values ('p-june', 'cambridge', 'june', $1, 'm72', now() + interval '90 days')`, [Y]);
     // A: prices not final (as 0066 left a session reading a provisional row). B: prices final five days ago.
     await db.query(`insert into registration_session (id, name, session_type, series_year, label, start_date, end_date, course_starts_on, payment_due_at, status, prices_final, prices_final_at) values
@@ -80,22 +82,24 @@ describe('08zf: migrations 0071 and 0072 on data built the old way', () => {
     await db.query(`insert into session_board_series (id, session_id, board_series_id, board_code) values ('p-la', 'p-a', 'p-june', 'cambridge'), ('p-lb', 'p-b', 'p-june', 'cambridge')`);
     await db.query(`insert into session_offer (id, session_id, subject_id, availability, course_fee) values
       ('p-oa-bio', 'p-a', 'p-bio', 'open', 12000), ('p-oa-chem', 'p-a', 'p-chem', 'open', 12000), ('p-oa-phys', 'p-a', 'p-phys', 'open', 12000),
-      ('p-ob-bio', 'p-b', 'p-bio', 'open', 12000), ('p-ob-geo', 'p-b', 'p-geo', 'open', 12000)`);
-    // Biology priced by its row since 0066 (its grid row confirmed); Chemistry and Geography read a provisional grid row; Physics
-    // reads none (no grid row in the series).
+      ('p-ob-bio', 'p-b', 'p-bio', 'open', 12000), ('p-ob-geo', 'p-b', 'p-geo', 'open', 12000), ('p-ob-hist', 'p-b', 'p-hist', 'open', 12000)`);
+    // Biology priced by its row since 0066 (its grid row confirmed); Chemistry (A, prices not final) and Geography (B, prices
+    // final) read a provisional grid row; History (B) a confirmed one its row never took (made after 0066); Physics reads none.
     await db.query(`insert into session_offer_item (id, offer_id, session_id, label, kind, enters_kind, board_series_id, availability, first_in_school, retake_in_school, retake_self_study, exam_fee, exam_fee_source) values
       ('p-i-bio', 'p-oa-bio', 'p-a', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, 9850, 'typed'),
       ('p-i-chem', 'p-oa-chem', 'p-a', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, null, null),
       ('p-i-phys', 'p-oa-phys', 'p-a', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, null, null),
       ('p-i-b', 'p-ob-bio', 'p-b', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, 9850, 'typed'),
-      ('p-i-geo', 'p-ob-geo', 'p-b', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, null, null)`);
-    for (const [item, subj] of [['p-i-bio', 'p-bio'], ['p-i-chem', 'p-chem'], ['p-i-phys', 'p-phys'], ['p-i-b', 'p-bio'], ['p-i-geo', 'p-geo']]) {
+      ('p-i-geo', 'p-ob-geo', 'p-b', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, null, null),
+      ('p-i-hist', 'p-ob-hist', 'p-b', 'Whole subject', 'all_papers', 'subject', 'p-june', 'open', true, true, true, null, null)`);
+    for (const [item, subj] of [['p-i-bio', 'p-bio'], ['p-i-chem', 'p-chem'], ['p-i-phys', 'p-phys'], ['p-i-b', 'p-bio'], ['p-i-geo', 'p-geo'], ['p-i-hist', 'p-hist']]) {
       await db.query(`insert into session_offer_item_fee_key (id, item_id, key_kind, subject_id) values ($1, $2, 'subject', $3)`, [`fk-${item}`, item, subj]);
     }
     await db.query(`insert into board_fee (id, board_series_id, key_kind, subject_id, amount, provisional, confirmed_at) values
       ('p-fee-bio', 'p-june', 'subject', 'p-bio', 9850, false, now() - interval '10 days'),
       ('p-fee-chem', 'p-june', 'subject', 'p-chem', 10850, true, null),
-      ('p-fee-geo', 'p-june', 'subject', 'p-geo', 7700, true, null)`);
+      ('p-fee-geo', 'p-june', 'subject', 'p-geo', 7700, true, null),
+      ('p-fee-hist', 'p-june', 'subject', 'p-hist', 6600, false, now() - interval '3 days')`);
     // A: Biology waiting, priced from the confirmed row (its basis says confirmed); Chemistry waiting, provisional.
     await line('p-l-bio', 'p-a', 'p-bio', 'p-i-bio', { id: 'p-fee-bio', amount: 9850, provisional: false }, 'pending_payment', false);
     await line('p-l-chem', 'p-a', 'p-chem', 'p-i-chem', { id: 'p-fee-chem', amount: 10850, provisional: true }, 'pending_payment', true);
@@ -127,7 +131,7 @@ describe('08zf: migrations 0071 and 0072 on data built the old way', () => {
     const before = await lines();
     await expect(migrate(tags.slice(71, 73))).rejects.toThrow(/p-l-stuck \(June B, Geography — Whole subject\)/);
     expect(await lines()).toEqual(before);
-    expect(await db.query(`select count(*)::int as n from board_fee`)).toEqual([{ n: 3 }]);
+    expect(await db.query(`select count(*)::int as n from board_fee`)).toEqual([{ n: 4 }]);
     expect(await db.query(`select id from reminder_rule where kind = 'entry_deadline' order by id`)).toEqual([{ id: 'p-rule-ed' }, { id: 'rule-entry-deadline' }]);
   });
 
@@ -138,13 +142,15 @@ describe('08zf: migrations 0071 and 0072 on data built the old way', () => {
     const finalAt = (await db.query<{ at: Date }>(`select prices_final_at as at from registration_session where id = 'p-b'`))[0]!.at;
     await migrate(tags.slice(71, 73));
 
-    // The rows: Chemistry and Geography take their grid row's amount (provisional ones included), audited; Physics stays not set.
+    // The rows, audited: Chemistry takes its provisional grid row's amount (its session's prices are not final: a price not
+    // final, as the session says); History its confirmed one in a final session. Geography, a provisional amount in a session
+    // whose prices are final, stays not set (payable otherwise; her check list names it), as does Physics (no grid row).
     expect(await db.query(`select id, exam_fee::float as fee, exam_fee_source as source from session_offer_item order by id`)).toEqual([
       { id: 'p-i-b', fee: 9850, source: 'typed' }, { id: 'p-i-bio', fee: 9850, source: 'typed' }, { id: 'p-i-chem', fee: 10850, source: 'typed' },
-      { id: 'p-i-geo', fee: 7700, source: 'typed' }, { id: 'p-i-phys', fee: null, source: null },
+      { id: 'p-i-geo', fee: null, source: null }, { id: 'p-i-hist', fee: 6600, source: 'typed' }, { id: 'p-i-phys', fee: null, source: null },
     ]);
     expect(await db.query(`select entity_id as id, new_data->>'gridProvisional' as provisional from audit_log where action = 'OFFER_ITEM_UPDATED' and new_data->>'reason' like 'P1c:%' order by entity_id`))
-      .toEqual([{ id: 'p-i-chem', provisional: 'true' }, { id: 'p-i-geo', provisional: 'true' }]);
+      .toEqual([{ id: 'p-i-chem', provisional: 'true' }, { id: 'p-i-hist', provisional: 'false' }]);
 
     // Every line's money, mark and status as it was; the waiting payable v1 lines keep the grid's last word in their basis.
     const after = await lines();
@@ -157,12 +163,13 @@ describe('08zf: migrations 0071 and 0072 on data built the old way', () => {
       expect(rest).toEqual(beforeOf(id));
       return new Date(String(feeConfirmedAt)).getTime();
     };
-    // Biology's: its fee row's confirmation. The switch's line: the prices-final switch's time (P1b fix 1's rule).
+    // Biology's: its fee row's confirmation. The switch's line: the prices-final switch's time (P1b fix 1's rule). A finished
+    // (expired) line too — any status (L2: a paid line reversed and re-dated later reads it).
     expect(kept('p-l-bio')).toBe(confirmedAt.getTime());
     expect(kept('p-l-switch')).toBe(finalAt.getTime());
-    // A provisional waiting line and a finished (expired) line are untouched.
+    expect(kept('p-l-done')).toBe(confirmedAt.getTime());
+    // A provisional line gets none (it is made payable by the prices-final switch, whose time the rule reads then).
     expect(basisOf('p-l-chem')).toEqual(beforeOf('p-l-chem'));
-    expect(basisOf('p-l-done')).toEqual(beforeOf('p-l-done'));
 
     // The grid, the keys and the availability columns are gone.
     expect(await db.query(`select table_name from information_schema.tables where table_name in ('board_fee', 'session_offer_item_fee_key')`)).toEqual([]);

@@ -91,6 +91,37 @@ describe('08ze: P1c follow-ups', () => {
     expect(await put()).toMatchObject({ saved: true, impact: { dueDatesMoved: 0 } });
   });
 
+  it('6b. a row\'s Pay by moved into the past (the fix round\'s S2): the unpaid lines\' last day to pay brought forward is counted, and one already past (it would expire at the next sweep), as the session\'s due date counts them; a stale count is refused', async () => {
+    const row = await rowOf(winter, geo);
+    const offeringId = await offeringOf(winter, geo);
+    const f = await onboard(officer, `ze08-payby3-${RUN}`, 11);
+    const old = await reserve(f, winter, row, 1500);
+    // Reserved twenty days ago, the session's prices final for a month (the review's case: reserved 1 Nov, Pay by 20 Nov,
+    // moved on 15 Nov to 10 Nov) — so no prices-final grace moves its date.
+    await sql(`update registration set created_at = now() - interval '20 days' where id = $1`, [old]);
+    await sql(`update registration_session set prices_final_at = now() - interval '30 days' where id = $1`, [winter]);
+    const view = await apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$get({ param: { id: winter, offeringId } }));
+    const r = view.rows.find((x) => x.id === row)!;
+    // The row's unpaid lines: this one, and those test 6 reserved today (when it ran).
+    const waiting = (await sql<{ id: string }>(`select id from registration where offer_item_id = $1 and status = 'pending_payment'`, [row])).length;
+    // Ten days ago: the old line is due then and its last day to pay (+ the session's 3 days) has passed; lines reserved
+    // today are due a week after reserving (payment.graceDays), earlier than the row's old date + 3.
+    const payBy = new Date(Date.now() - 10 * DAY);
+    const send = (expected?: Impact) => apiResponse(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: winter, offeringId }, json: { rows: [{ id: row, kind: r.kind as 'all_papers', cells: r.cells, payBy }], ...(expected ? { expected } : {}) },
+    }));
+    const shown = await send();
+    expect(shown).toMatchObject({ saved: false, impact: { dueDatesMoved: waiting, cutOffsEarlier: waiting, cutOffsPassed: 1 } });
+    // A count that predates the cut-offs (the dialog of a client that showed only the due dates) is refused.
+    const stale = await refusedWithCode(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: winter, offeringId }, json: { rows: [{ id: row, kind: r.kind as 'all_papers', cells: r.cells, payBy }], expected: { ...shown.impact, cutOffsEarlier: 0, cutOffsPassed: 0 } },
+    }));
+    expect([stale.status, stale.code]).toEqual([409, 'IMPACT_CHANGED']);
+    expect(await send(shown.impact)).toMatchObject({ saved: true });
+    const cut = await one<{ cut: string }>(`select line_cut_off(due_at, session_id, attempt, prior_sitting_series_id, board_series_id, declaration_rejected) as cut from registration where id = $1`, [old]);
+    expect(new Date(cut.cut).getTime()).toBeLessThan(Date.now());
+  });
+
   it('7. the checkout pays the price the family saw: a re-price landing between the page\'s read and the click is refused (PRICE_CHANGED) and nothing is charged; the new price is then paid', async () => {
     const row = await rowOf(june, geo);
     const f = await onboard(officer, `ze08-co-${RUN}`, 11);

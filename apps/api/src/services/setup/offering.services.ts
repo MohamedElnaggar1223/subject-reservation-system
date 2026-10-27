@@ -29,6 +29,7 @@ import type {
 } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
 import { redateLines } from '../deadline.services';
+import { cutOffsOf } from '../window.services';
 import { findOrCreateSeries, attachSeries, detachUnusedSeries, OfferError } from '../offer.services';
 import { seriesRuleSentence } from '../series.services';
 import { teacherDuplicates, duplicateTeacherRefusal } from './teacher-names';
@@ -776,12 +777,27 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       const plan = await planReprice(tx, { rowIds: [...priceRows] });
       const { told: repriced, impact: priced } = await applyReprice(tx, plan, { actorId, reason: `${subjectRow.name}: its price changed in ${session.name}`, entity: { type: 'session_offer', id: offeringId }, ctx });
       let dueDatesMoved = 0;
+      let cutOffsEarlier = 0;
+      let cutOffsPassed = 0;
       if (payByRows.size) {
-        const waiting = await tx.select({ id: registration.id }).from(registration)
+        const waiting = await tx.select({ id: registration.id, status: registration.status }).from(registration)
           .where(and(inArray(registration.offerItemId, [...payByRows]), inArray(registration.status, WAITING_STATUSES))).orderBy(asc(registration.id));
+        // The unpaid lines' last day to pay follows their due date (C10: due + the session's days, capped by the board
+        // deadline): one brought forward, or already past (the sweep expires it at its next tick), is counted as the
+        // session's due date counts it (the fix round's S2; session-setup.services updateSetupSession).
+        const unpaid = waiting.filter((w) => w.status === 'pending_payment').map((w) => w.id);
+        const cutOffsBefore = await cutOffsOf(tx, unpaid);
         dueDatesMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, `the pay-by date of a row of ${subjectRow.name} changed`);
+        const cutOffsAfter = await cutOffsOf(tx, unpaid);
+        for (const lineId of unpaid) {
+          const was = cutOffsBefore.get(lineId)?.cutOff;
+          const is = cutOffsAfter.get(lineId)?.cutOff;
+          if (!was || !is || is >= was) continue;
+          cutOffsEarlier++;
+          if (is <= now && was > now) cutOffsPassed++;
+        }
       }
-      const impact = addImpact(priced, { linesAffected, dueDatesMoved });
+      const impact = addImpact(priced, { linesAffected, dueDatesMoved, cutOffsEarlier, cutOffsPassed });
       settleImpact(impact, data.expected);
       return { saved: true, impact: changed || plan.repriced.length ? impact : NO_IMPACT, repriced, subjectName: subjectRow.name, sessionName: session.name };
     });
