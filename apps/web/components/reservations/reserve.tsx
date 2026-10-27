@@ -201,6 +201,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     return new Map(lines.map((l) => [l.offerItemId, l]));
   }, [statement.data, studentId, sessionId]);
 
+  // The desk: subjects of this session already waiting for payment (collected with the new ones in one payment).
+  const waitingHere = [...held.values()].filter((l) => l.status === 'pending_payment').length;
   const rowOf = (id: string) => offerings.flatMap((o) => o.rows.map((r) => ({ o, r }))).find((x) => x.r.id === id) ?? null;
   const chosen = Object.entries(draft.picks).flatMap(([key, p]) => {
     const found = rowOf(p.rowId);
@@ -484,6 +486,13 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
         {Object.keys(problems).some((k) => k !== 'page') && <ErrorLine message="Some choices are not finished: they are marked in red above." />}
         <ErrorLine message={pageProblem} />
 
+        {/* "Then one collection" (§5 Desk): subjects already waiting are collected with the new ones in one payment. */}
+        {desk && waitingHere > 0 && (
+          <p className="text-sm text-foreground">
+            <span>{waitingHere}</span> <span>{waitingHere === 1 ? 'subject is already waiting for payment:' : 'subjects are already waiting for payment:'}</span>{' '}
+            <span>reserve only, then collect everything in one payment under "To collect now".</span>
+          </p>
+        )}
         {desk ? (
           <div className="flex flex-wrap items-end gap-3">
             <Button variant="outline" disabled={pending || closedSession} onClick={() => submit(() => deskMutation.mutate(false))}>Reserve only</Button>

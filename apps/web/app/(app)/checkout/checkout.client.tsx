@@ -166,7 +166,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
         .find((r) => sentence.includes(r.subject.name));
       setRefusal({ sentence, code, registrationId: named?.id ?? null });
       setSubmitError(named ? '' : sentence);
-      if (code === 'PRICE_CHANGED' || code === 'NOT_WAITING' || code === 'PRICES_NOT_FINAL') {
+      if (code === 'PRICE_CHANGED' || code === 'NOT_WAITING' || code === 'PRICES_NOT_FINAL' || code === 'CUT_OFF_PASSED' || code === 'BOARD_DEADLINE_PASSED') {
         queryClient.invalidateQueries({ queryKey: ['payments', 'checkout-summary', summaryKey] });
       }
     },

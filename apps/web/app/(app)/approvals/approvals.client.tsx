@@ -217,6 +217,7 @@ export default function ApprovalsClient(): React.JSX.Element {
   if (pending.length === 0) {
     return (
       <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up space-y-6">
+        <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Pending Approvals</h1>
         {approvedCheckoutIds && (
           <div className="rounded-xl border border-brand-200 bg-brand-50 dark:bg-brand-900/20 dark:border-brand-700 p-5 flex items-start gap-4">
             <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center shrink-0">

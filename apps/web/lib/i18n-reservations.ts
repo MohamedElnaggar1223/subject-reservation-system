@@ -638,6 +638,9 @@ export const familyArabic: Record<string, string> = {
   'In the session open now': 'في الجلسة المفتوحة الآن',
   'Reservations in sessions they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.':
     'تنتهي الحجوزات في الجلسات التي لم يعد يمكنه الامتحان فيها، وتُغلق عمليات الدفع المفتوحة ويُعاد أي مبلغ من الرصيد، وتُبلَّغ الأسرة. يُسجَّل التصحيح مع سببك.',
+  'subject is already waiting for payment:': 'مادة بانتظار الدفع بالفعل:',
+  'subjects are already waiting for payment:': 'مواد بانتظار الدفع بالفعل:',
+  'reserve only, then collect everything in one payment under "To collect now".': 'احجز فقط، ثم حصّل كل شيء في دفعة واحدة تحت «للتحصيل الآن».',
   // The API's sentences with no data (after familyWords)
   'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices':
     'أسعار هذه الجلسة ليست نهائية بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة أسعارها',
