@@ -34,6 +34,7 @@ import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-share
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 import { fetchReserveOffers, reserveOffersKey, optionOfLine, lineNamedBy } from '~/components/reservations/offers';
 import { fetchStatement, statementKey } from '~/components/reservations/statement';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 
 interface CheckoutClientProps {
   registrationIds: string[];
@@ -269,7 +270,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             onClick={() => router.push('/registrations' as never)}
             className="mt-4"
           >
-            Back to Registrations
+            Back to my reservations
           </Button>
         </div>
       </div>
@@ -309,12 +310,12 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                 </svg>
               </div>
               <h1 className="text-xl font-bold text-foreground font-display">
-                {completed ? 'Payment Complete' : 'Payment Initiated'}
+                {completed ? 'Payment Complete' : 'Payment started'}
               </h1>
               <p className="text-sm text-muted-foreground text-center">
                 {completed
                   ? 'Your registrations have been confirmed — no payment was required because your balance covered the full amount.'
-                  : 'Your payment is pending. Follow the instructions below to complete it.'}
+                  : 'Follow the steps below to finish it.'}
               </p>
             </div>
 
@@ -431,7 +432,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               onClick={() => router.push('/registrations' as never)}
               className="mt-6 w-full"
             >
-              Back to Registrations
+              Back to my reservations
             </Button>
           </div>
         </div>
@@ -518,7 +519,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           {open.status === 'pending' && !refSubmitted && cancelButton(open.id)}
 
           <Button variant="ghost" onClick={() => router.push('/registrations' as never)} className="mt-6 w-full">
-            Back to Registrations
+            Back to my reservations
           </Button>
         </div>
       </div>
@@ -552,7 +553,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   <li key={reg.id} className={`px-4 sm:px-6 py-3 ${here ? 'bg-destructive/5' : ''}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground"><bdi data-i18n-skip="true">{reg.subject.name}</bdi></p>
+                        <p className="text-sm font-medium text-foreground"><bdi data-i18n-skip="true">{titleFor(reg.subject.name, groupOfLevel(reg.subject.qualificationLevel))}</bdi></p>
                         {words && <p className="text-xs text-muted-foreground" data-i18n-skip="true">{words}</p>}
                         <p className="text-xs text-muted-foreground">
                           <bdi data-i18n-skip="true">{reg.session.name}</bdi>

@@ -484,6 +484,9 @@ export const familyArabic: Record<string, string> = {
   "Type a student's name, email, ID, or a payment reference…": 'اكتب اسم الطالب أو بريده أو رقمه أو مرجع دفعة…',
   'Pay at the school, started by the family': 'الدفع في المدرسة، بدأته الأسرة',
   'Quote this reference at the desk:': 'اذكر هذا المرجع في المكتب:',
+  'Back to my reservations': 'العودة إلى حجوزاتي',
+  'Payment started': 'بدأ الدفع',
+  'Follow the steps below to finish it.': 'اتبع الخطوات أدناه لإتمامه.',
   // P4a: Approvals in the families' words.
   'Waiting for your approval': 'بانتظار موافقتك',
   'Nothing is waiting for your approval': 'لا شيء بانتظار موافقتك',
