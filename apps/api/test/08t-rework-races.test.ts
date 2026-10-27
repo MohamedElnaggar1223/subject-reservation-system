@@ -391,6 +391,48 @@ describe('08t: the rework races', () => {
     });
   });
 
+  it("a swap approved while the exam fee of the row it swaps to changes (restated on the row's re-price; the review of B): the approval takes the new line's session, offering and row before the old line, waits for the change, and is refused at the new price — nothing moves", async () => {
+    // P1c: it was a swap racing the series' grid Confirm (three cases) — the fee row both lines read, confirmed while
+    // the approval made the new line. The grid left; the lock order it proved (holdNewLines before the old line) is kept
+    // by every swap, and the change that holds what the new line is priced from is now the row's exam fee.
+    const from = (await offerOf(s1, await subject(adm, `RWT-WF-${RUN}`, `Race swap from (08t ${RUN})`, { course: 1000, registration: 500 }))).items[0]!;
+    const to = (await offerOf(s1, await subject(adm, `RWT-WT-${RUN}`, `Race swap to (08t ${RUN})`, { course: 1000, registration: 500 }))).items[0]!;
+    const f = await onboard(officer, `t08-sw-${RUN}`, 11);
+    const [old] = await reserveAtDesk(f.studentId, s1, [{ offerItemId: from, attempt: 'first', mode: 'in_school', teacherId }]);
+    const paid = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [old!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: paid.id! }, json: { instrumentUsed: 'cash' } }));
+    const cr = await apiResponse(f.student.api.v1.registrations[':id']['request-swap'].$post({
+      param: { id: old!.id }, json: { line: { offerItemId: to, attempt: 'first', mode: 'in_school', teacherId }, reason: 'race: the other subject' },
+    }));
+    expect(Number(cr.priceAtRequest)).toBe(1500);
+    // The board's fee of the row swapped to changes (500 → 550), paused at its audit write: it holds the offering and
+    // its rows FOR UPDATE. Nobody has a line on that row, so it is sent with no counts.
+    const change = () => adm.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: s1, rowId: to }, json: { amount: 550 } });
+    const p = await pauseAtAudits(['OFFER_ITEM_UPDATED']);
+    let changing: ReturnType<typeof change> | undefined;
+    let approving: Promise<Res> | undefined;
+    try {
+      changing = change();
+      await p.paused('OFFER_ITEM_UPDATED');
+      approving = f.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} });
+      await lockWaiters(2);
+      // The approval waits on the new line's offering before it takes the old line (holdNewLines): the old line is free.
+      expect(await sql(`select id from registration where id = $1 for update skip locked`, [old!.id])).toEqual([{ id: old!.id }]);
+    } finally {
+      await p.releaseAll();
+    }
+    const [c, a] = await Promise.all([changing!, approving!]);
+    expect(await apiResponse(Promise.resolve(c))).toMatchObject({ saved: true, impact: { repriced: 0, listedForFinance: 0 } });
+    expect(await one(`select exam_fee::float as fee from session_offer_item where id = $1`, [to])).toEqual({ fee: 550 });
+    // Priced after the change, the new line would cost 1,550, not the 1,500 the request showed: refused, nothing moves.
+    const { SWAP_PRICE_CHANGED } = await import('../src/services/swap.services');
+    expect(await refusedWithCode(Promise.resolve(a))).toMatchObject({ status: 400, error: SWAP_PRICE_CHANGED });
+    expect(await one(`select status from change_request where id = $1`, [cr.id])).toEqual({ status: 'pending_approval' });
+    expect(await one(`select status, price_at_registration::float as price from registration where id = $1`, [old!.id])).toEqual({ status: 'confirmed', price: 1500 });
+    expect(await sql(`select 1 from registration where student_id = $1 and offer_item_id = $2`, [f.studentId, to])).toEqual([]);
+    expect(await sql(`select 1 from escrow_transaction where related_registration_id = $1`, [old!.id])).toEqual([]);
+  });
+
   // "an item's series changed while a checkout lands on its line: the checkout first, the change is refused" retired with
   // the old item route (P1c: a row's sitting does not change while lines use it, §6 — 08u "a row's sitting does not move
   // while reservations use it (§6): …"). Its checkout's side — it pays the price it read — is "the checkout lands

@@ -96,8 +96,10 @@ async function lockForLines(tx: Tx, sessionId: string, itemIds: string[]) {
  * then the line — and then makes the new one): what making the new lines will lock, taken first,
  * in §2.1's order — the subjects, the session's series links, the series, the session, the offers, the
  * items, then the student's price exceptions (FOR SHARE, as `priceLine` takes them): a change that holds
- * a row and then wants the lines priced from it, the old line among them, would otherwise close a cycle
- * against the new line's row taken after the old line (the review of B, on the swap approval).
+ * the session or the rows and then wants the lines priced from them, the old line among them (a price list
+ * over both subjects, the session's self-study share or prices-final switch), would otherwise close a cycle
+ * against the new line's row taken after the old line (the review of B, on the swap approval; P1c: it was
+ * the series' fee row, which left with the grid).
  * insertLines takes the same locks again, already held. Call after the student lock
  * (`assertMayRegisterForInTx`).
  */

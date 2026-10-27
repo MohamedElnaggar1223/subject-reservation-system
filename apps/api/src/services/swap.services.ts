@@ -521,8 +521,10 @@ export async function approveChangeRequest(
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
     if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
-    // The new line's series, offering and row before the old line (§2.1: a row's price change holds the row and then
-    // wants the lines priced from it, this old line among them).
+    // The new line's session, offering and row before the old line (§2.1): a change that holds them and then wants
+    // the lines priced from what it changed — a price list over both subjects' rows, the session's self-study share,
+    // its prices-final switch — reaches this old line after the new line's row; taken the other way round, the two
+    // would wait on each other (08t "a swap approved while the exam fee of the row it swaps to changes").
     if (cr.type === 'swap' && swap) await holdNewLines(tx, { studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, lines: [swap.line] });
     // Asked again under the line's lock, with its series held: a deadline moved at the same moment
     // waits. The line's receipt first (MA-16's order: a reversal takes the receipt, then the line).
