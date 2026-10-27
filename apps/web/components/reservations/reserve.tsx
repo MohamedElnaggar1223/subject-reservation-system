@@ -37,6 +37,7 @@ import { useI18n } from '~/lib/i18n';
 import { familyWords } from '~/lib/i18n-reservations';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, INPUT_CLASS, ErrorLine, errorText } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { ownName } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 import { fetchStatement, statementKey } from './statement';
 import { fetchReserveOffers, reserveOffersKey, optionKey, type OffersRead, type Offering, type OfferRow, type RowOption, type Question } from './offers';
 
@@ -71,7 +72,7 @@ export function RefundTermsSentence({ state }: { state: RefundTermsState }) {
 type Attempt = 'first' | 'retake';
 type Mode = 'in_school' | 'self_study';
 /** The option picked in a group, with its teacher and the earlier exam it follows ('id:<series>' or 'my:<month>|<year>'). */
-type Pick = { rowId: string; attempt: Attempt; mode: Mode; teacherId: string; earlier: string };
+type Pick = { rowId: string; attempt: Attempt; mode: Mode; teacherId: string; earlier: string; title: string };
 /** One child's page: the picks per group, the answers, the subjects whose retakes are shown, the ticks. */
 export type ReserveDraft = {
   picks: Record<string, Pick>;
@@ -134,6 +135,9 @@ function groupsOf(o: Offering): Group[] {
   }
   return out;
 }
+
+/** A subject as the school names it: "Biology O.L.", "Biology A.S./A.L." (two subjects share a name; the coordinator's screens say it so). */
+const titleOf = (o: Offering) => `${ownName(o.name, o.group)} ${o.group}`;
 
 /** A DOM id for a group or a question, unique per child. */
 const domId = (studentId: string, k: string) => `reserve-${studentId}-${k}`.replace(/[^\w-]/g, '-');
@@ -217,6 +221,24 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     patch({ picks });
   };
 
+  // A picked subject the read no longer offers (switched off or closed while the page was open, a refusal's
+  // read-again): off the choices, and said in the summary with the refusal's sentence when there was one.
+  const [gone, setGone] = useState<{ key: string; sentence: string }[]>([]);
+  useEffect(() => {
+    if (!data) return;
+    const rows = new Set(data.offerings.flatMap((o) => o.rows.map((r) => r.id)));
+    const missing = Object.entries(draft.picks).filter(([, p]) => !rows.has(p.rowId));
+    if (!missing.length) return;
+    setGone((g) => [...g, ...missing.map(([key, p]) => ({
+      key, sentence: refusal?.key === key ? refusal.sentence : `${p.title}: no longer taking reservations.`,
+    }))]);
+    if (missing.some(([key]) => refusal?.key === key)) setRefusal(null);
+    const picks = { ...draft.picks };
+    for (const [key] of missing) delete picks[key];
+    setDraft({ ...draft, picks });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   // A refusal at a subject: bring it into view.
   useEffect(() => {
     if (!refusal?.key) return;
@@ -283,6 +305,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     setDraft(EMPTY_DRAFT);
     setProblems({});
     setRefusal(null);
+    setGone([]);
     qc.invalidateQueries({ queryKey: ['registrations'] });
     qc.invalidateQueries({ queryKey: ['statement'] });
   };
@@ -410,7 +433,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
             {chosen.map((c) => (
               <li key={c.key} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1.5">
                 <span className="min-w-0">
-                  <bdi className="font-medium text-foreground" data-i18n-skip="true">{c.o.name}</bdi>{' '}
+                  <bdi className="font-medium text-foreground" data-i18n-skip="true">{titleOf(c.o)}</bdi>{' '}
                   <span className="text-muted-foreground" data-i18n-skip="true">{c.option.label[lang]}</span>
                 </span>
                 <Money amount={c.option.price?.total} />
@@ -453,6 +476,11 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
           )}
         </div>
 
+        {gone.length > 0 && (
+          <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {gone.map((g) => <p key={g.key}><span>{g.sentence}</span>{!g.sentence.endsWith('.') && <span>.</span>} <span>It was taken off the choices.</span></p>)}
+          </div>
+        )}
         {Object.keys(problems).some((k) => k !== 'page') && <ErrorLine message="Some choices are not finished: they are marked in red above." />}
         <ErrorLine message={pageProblem} />
 
@@ -516,7 +544,7 @@ function SubjectCard({ o, lang, words, viewer, studentId, draft, held, disabled,
     <article className={cn('rounded-xl border bg-card p-4 shadow-sm', picks.length ? 'border-primary ring-1 ring-primary' : 'border-border', anyProblem && 'border-destructive ring-1 ring-destructive')}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 className="font-display text-base font-semibold text-foreground">
-          <bdi data-i18n-skip="true">{o.name}</bdi> <span className="text-xs font-normal text-muted-foreground"><bdi data-i18n-skip="true">{o.board}</bdi></span>
+          <bdi data-i18n-skip="true">{titleOf(o)}</bdi> <span className="text-xs font-normal text-muted-foreground"><bdi data-i18n-skip="true">{o.board}</bdi></span>
         </h3>
         {allOnline && <Badge tone="info">Taught online</Badge>}
       </div>
@@ -571,7 +599,7 @@ function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend,
     <fieldset id={id} className="mt-3 min-w-0" aria-invalid={message ? true : undefined}>
       <legend className="mb-1 text-sm font-medium text-foreground"><span data-i18n-skip={legend === words.what ? undefined : 'true'}>{legend}</span></legend>
       <div className="space-y-1.5">
-        <OptionLine name={name} checked={!pick} disabled={disabled} onChange={() => onPick(null)}>
+        <OptionLine name={name} checked={!pick} disabled={disabled} quiet onChange={() => onPick(null)}>
           <span className="text-muted-foreground">Not taking it</span>
         </OptionLine>
         {opts.map(({ r, x }) => {
@@ -580,7 +608,7 @@ function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend,
           return (
             <div key={`${r.id}|${optionKey(x)}`}>
               <OptionLine name={name} checked={on} disabled={disabled || off}
-                onChange={() => onPick({ rowId: r.id, attempt: x.attempt, mode: x.mode, teacherId: '', earlier: '' })}
+                onChange={() => onPick({ rowId: r.id, attempt: x.attempt, mode: x.mode, teacherId: '', earlier: '', title: titleOf(o) })}
                 end={x.price ? <Money amount={x.price.total} className="font-semibold" /> : <span className="text-xs text-muted-foreground">price not set yet</span>}>
                 <span data-i18n-skip="true">{x.label[lang]}</span>
                 {r.closed && <> <span className="text-xs text-muted-foreground">(closed to new reservations)</span></>}
@@ -604,11 +632,12 @@ function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend,
   );
 }
 
-function OptionLine({ name, checked, disabled, onChange, end, children }: {
-  name: string; checked: boolean; disabled: boolean; onChange: () => void; end?: React.ReactNode; children: React.ReactNode;
+/** One choice of a group. `quiet`: "Not taking it", which never looks like a pick. */
+function OptionLine({ name, checked, disabled, quiet = false, onChange, end, children }: {
+  name: string; checked: boolean; disabled: boolean; quiet?: boolean; onChange: () => void; end?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <label className={cn('flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm', checked ? 'border-primary bg-accent' : 'border-border bg-card', disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-primary/50')}>
+    <label className={cn('flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm', checked && !quiet ? 'border-primary bg-accent' : 'border-border bg-card', disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-primary/50')}>
       <input type="radio" name={name} className="h-4 w-4 shrink-0" checked={checked} disabled={disabled} onChange={onChange} />
       <span className="min-w-0 flex-1">{children}</span>
       {end && <span className="shrink-0">{end}</span>}

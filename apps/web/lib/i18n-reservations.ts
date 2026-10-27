@@ -453,6 +453,7 @@ export const familyArabic: Record<string, string> = {
   'Choose…': 'اختر…',
   'Sat in': 'امتُحن فيها في',
   'Take it off the choices': 'احذفها من الاختيارات',
+  'It was taken off the choices.': 'حُذفت من الاختيارات.',
   'The price shown is now up to date: reserve again.': 'السعر المعروض محدَّث الآن: احجز مرة أخرى.',
   'Choose the teacher': 'اختر المعلم',
   'Choose the earlier exam': 'اختر الامتحان السابق',
@@ -622,6 +623,21 @@ export const familyArabic: Record<string, string> = {
   'Starts next year': 'يبدأ العام المقبل',
   'Grade not recorded': 'الصف غير مسجل',
   'Please write a short reason — it is stored in the audit trail.': 'اكتب سببًا قصيرًا — يُحفظ في سجل التدقيق.',
+  // The statement page; the desk's academic record (F0a's panel), in the app's word "session"
+  'Every reservation with its price and why, what is paid and what is still owed, its pay-by date and last day to pay, and the payments.':
+    'كل حجز بسعره وسببه، وما دُفع وما بقي، وموعد دفعه وآخر يوم لدفعه، والدفعات.',
+  'Session:': 'الجلسة:',
+  'They may now reserve in this session. The exception can be revoked here.': 'يمكنه الآن الحجز في هذه الجلسة. يمكن إلغاء الاستثناء من هنا.',
+  'They may no longer reserve in that session; the waiting reservations it allowed have expired, and their open checkouts closed.':
+    'لم يعد يمكنه الحجز في تلك الجلسة؛ انتهت الحجوزات المنتظرة التي سمح بها، وأُغلقت عمليات الدفع المفتوحة لها.',
+  'Sessions open now': 'الجلسات المفتوحة الآن',
+  'No session is open or being prepared.': 'لا توجد جلسة مفتوحة أو قيد الإعداد.',
+  'Grade in this session:': 'الصف في هذه الجلسة:',
+  'Grade 10 sits the June session only. This exception lets the student reserve in this session; it is recorded with your reason and can be revoked here.':
+    'يمتحن الصف 10 في جلسة يونيو فقط. يسمح هذا الاستثناء للطالب بالحجز في هذه الجلسة؛ ويُسجَّل مع سببك ويمكن إلغاؤه من هنا.',
+  'In the session open now': 'في الجلسة المفتوحة الآن',
+  'Reservations in sessions they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.':
+    'تنتهي الحجوزات في الجلسات التي لم يعد يمكنه الامتحان فيها، وتُغلق عمليات الدفع المفتوحة ويُعاد أي مبلغ من الرصيد، وتُبلَّغ الأسرة. يُسجَّل التصحيح مع سببك.',
   // The API's sentences with no data (after familyWords)
   'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices':
     'أسعار هذه الجلسة ليست نهائية بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة أسعارها',
@@ -653,6 +669,7 @@ const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   // Refusals at a subject (Appendix A's codes; the sentences of window.services and line-rules.services).
   [/^(.+) is not taking reservations \(it closed on (.+)\)$/, (m) => `${m[1]} لا تقبل حجوزات (أُغلقت في ${dateAr(m[2]!)})`],
   [/^(.+) is not taking reservations$/, (m) => `${m[1]} لا تقبل حجوزات`],
+  [/^(.+): no longer taking reservations\.$/, (m) => `${m[1]}: لم تعد تقبل حجوزات.`],
   [/^(.+) is not open for reservations yet$/, (m) => `${dateAr(m[1]!)} لم تُفتح للحجز بعد`],
   [/^Choose the teacher of (.+)$/, (m) => `اختر معلم ${m[1]}`],
   [/^Answer: (.+)$/, (m) => `أجب: ${m[1]}`],

@@ -20,7 +20,7 @@
  * prints the strings it checked; `--missing` lists the phrases no dictionary translates (a help, never a failure: a
  * sentence with data is translated by a rule). Its planted-word controls are `check-reservation-words.test.mjs`.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -47,6 +47,7 @@ export const FAMILY_SCREENS = [
   'app/(app)/desk/desk.client.tsx',
   'app/(app)/desk/desk-collect.client.tsx',
   'app/(app)/desk/desk-today.client.tsx',
+  'app/(app)/statement/statement.client.tsx',
 ];
 
 /** The shared components these screens render; `only` names the pieces they use. */
@@ -61,6 +62,8 @@ export const FAMILY_SHARED = [
   { file: 'components/ui/reason-modal.tsx' },
   { file: 'components/print-heading.tsx' },
   { file: 'lib/groups-followed.ts' },
+  // The desk's "Academic record" (F0a's panel, shared with /students).
+  { file: 'components/student-academic-panel.tsx' },
 ];
 
 export const FAMILY_FORBIDDEN_EN = /\b(awards?|suites?|series|sittings?|components?|mappings?|option[ -]codes?|provisional(?:ly)?|cut[- ]offs?|offer[ -]items?)\b/i;
@@ -133,7 +136,14 @@ export const FAMILY_SAMPLES = {
   paidByWords: [['in_school', 'cash'], ['in_school', 'card'], ['in_school', 'instapay'], ['in_school', 'other'], ['instapay', null], ['card', null], ['fawry', null]],
   gradeLabel: [[9], [10], [11], [12], [13], [null]],
 };
-export const FAMILY_NOT_SENTENCES = new Set(['apiResponse', 'refusalCodeOf', 'formatEgp', 'schoolDateString', 'gradeInAcademicYear', 'seriesAcademicYearStart', 'isRegistryPolicyKey']);
+export const FAMILY_NOT_SENTENCES = new Set(['hasRole', 'apiResponse', 'refusalCodeOf', 'formatEgp', 'schoolDateString', 'gradeInAcademicYear', 'seriesAcademicYearStart', 'isRegistryPolicyKey']);
+
+/** Every dictionary: the lib/i18n files and the files of the lib/i18n- folders (the foundation's, the exams'). */
+export const ALL_DICTIONARIES = (web = WEB) => [
+  ...DICTIONARIES(web),
+  ...readdirSync(path.join(web, 'lib')).filter((d) => /^i18n-/.test(d) && statSync(path.join(web, 'lib', d)).isDirectory())
+    .flatMap((d) => readdirSync(path.join(web, 'lib', d)).filter((f) => /\.tsx?$/.test(f)).map((f) => `lib/${d}/${f}`)),
+];
 
 /** Every hit: "file:line: text". */
 export async function checkFamily({ web = WEB, screens = FAMILY_SCREENS, shared = FAMILY_SHARED, wording = 'lib/i18n-reservations.ts', dictionaries, lib, list = false } = {}) {
@@ -160,7 +170,7 @@ export async function checkFamily({ web = WEB, screens = FAMILY_SCREENS, shared 
     for (const s of familyStringsOf(file)) if (s.line > offset && familyForbidden(s.v)) hits.push(`${wording}:${s.line}: ${s.v}`);
   }
   // The Arabic any dictionary gives a phrase these screens use.
-  for (const rel of dictionaries ?? (existsSync(path.join(web, 'lib')) ? DICTIONARIES(web) : [])) {
+  for (const rel of dictionaries ?? (existsSync(path.join(web, 'lib')) ? ALL_DICTIONARIES(web) : [])) {
     for (const p of dictionaryPairs(path.join(web, rel))) if (seen.has(p.key) && FAMILY_FORBIDDEN_AR.test(p.value)) hits.push(`${rel}:${p.line}: '${p.key}' renders '${p.value}' on these screens`);
   }
   // The sentences @repo/validations makes for these screens.
@@ -175,7 +185,7 @@ export async function checkFamily({ web = WEB, screens = FAMILY_SCREENS, shared 
 
 /** The phrases these screens render that no dictionary has (a help: a sentence with data is a rule's). */
 export function missingArabic(seen, web = WEB) {
-  const keys = new Set(DICTIONARIES(web).flatMap((rel) => dictionaryPairs(path.join(web, rel)).map((p) => p.key)));
+  const keys = new Set(ALL_DICTIONARIES(web).flatMap((rel) => dictionaryPairs(path.join(web, rel)).map((p) => p.key)));
   // As the translator reads a text node: its entities decoded, its spaces folded (lib/i18n.tsx, normalizeSourceText).
   const norm = (v) => v.replace(/&nbsp;/g, ' ').replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&mdash;/g, '—')
     .replace(/&ldquo;|&rdquo;/g, '"').replace(/\s+/g, ' ').trim();
