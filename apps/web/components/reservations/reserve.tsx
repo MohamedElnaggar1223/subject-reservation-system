@@ -38,7 +38,7 @@ import { useI18n } from '~/lib/i18n';
 import { familyWords } from '~/lib/i18n-reservations';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, INPUT_CLASS, ErrorLine, errorText } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
-import { ownName } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
+import { titleFor } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 import { fetchStatement, statementKey } from './statement';
 import { fetchReserveOffers, reserveOffersKey, optionKey, type OffersRead, type Offering, type OfferRow, type RowOption, type Question } from './offers';
 
@@ -137,8 +137,8 @@ function groupsOf(o: Offering): Group[] {
   return out;
 }
 
-/** A subject as the school names it: "Biology O.L.", "Biology A.S./A.L." (two subjects share a name; the coordinator's screens say it so). */
-const titleOf = (o: Offering) => `${ownName(o.name, o.group)} ${o.group}`;
+/** A subject as the school names it: "Biology O.L.", "Biology A.S./A.L.", "Arabic A.L." (two subjects share a name; the coordinator's screens say it so). */
+export const titleOf = (o: { name: string; group: string }) => titleFor(o.name, o.group);
 
 /** A DOM id for a group or a question, unique per child. */
 const domId = (studentId: string, k: string) => `reserve-${studentId}-${k}`.replace(/[^\w-]/g, '-');

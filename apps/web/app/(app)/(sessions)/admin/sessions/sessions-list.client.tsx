@@ -65,8 +65,8 @@ function SessionCard({ s, viewerRole, sessions }: { s: SessionRow; viewerRole: s
             {copiedFrom && <Badge tone="neutral"><span>copied from</span>&nbsp;<bdi>{copiedFrom.name}</bdi></Badge>}
           </div>
           <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span><span>Reservations close</span> {s.endDate ? <Day iso={s.endDate} /> : <span>— (optional)</span>}</span>
-            <span><span>Payment due</span> <Day iso={s.paymentDueAt} /></span>
+            <span><span>Reservations close</span> {s.endDate ? <Day iso={s.endDate} /> : <span>when you switch them off</span>}</span>
+            <span><span>Pay by</span> <Day iso={s.paymentDueAt} /></span>
             <span><span>First lesson</span> <Day iso={`${s.courseStartsOn}T12:00:00.000Z`} /></span>
           </p>
         </div>

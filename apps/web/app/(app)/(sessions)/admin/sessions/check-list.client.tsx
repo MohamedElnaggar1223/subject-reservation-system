@@ -74,6 +74,15 @@ const DAY = 24 * 60 * 60 * 1000;
 /** A deadline as the school reads it, in one piece for a sentence ("21 March 2027", Cairo). */
 const longDay = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' }).format(new Date(iso));
 
+/** The missing fees counted in brackets, each only when there is one ("(4 exam fees)"); nothing when neither is counted. */
+export const missingFees = (course: number, exam: number) => {
+  const parts = [
+    ...(course ? [`${course} ${course === 1 ? 'course fee' : 'course fees'}`] : []),
+    ...(exam ? [`${exam} ${exam === 1 ? 'exam fee' : 'exam fees'}`] : []),
+  ];
+  return parts.length ? ` (${parts.join(', ')})` : '';
+};
+
 const Name = ({ children }: { children: React.ReactNode }) => <bdi data-i18n-skip="true" className="font-medium">{children}</bdi>;
 
 /** The board and exam month of a sitting the session uses, from its rows. */
@@ -159,7 +168,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       body: (
         <>
           <span>{s.copiedFrom ? 'The copy moved the dates one year:' : 'The dates are the defaults:'}</span>{' '}
-          <span>payment due</span> <Day iso={s.paymentDueAt} /><span>,</span> <span>first lesson</span> <Day iso={`${s.courseStartsOn}T12:00:00.000Z`} /><span>.</span>{' '}
+          <span>pay by</span> <Day iso={s.paymentDueAt} /><span>,</span> <span>first lesson</span> <Day iso={`${s.courseStartsOn}T12:00:00.000Z`} /><span>.</span>{' '}
           <span>Set them in the header, or keep them.</span>
         </>
       ),
@@ -179,7 +188,8 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     const course = unpriced.filter((o) => o.rows.some((r) => ticked(r) && (r.courseFee ?? o.courseFee) === null)).length;
     entries.push({
       key: 'prices', severity: 'look', forHome: true,
-      body: <span>{`${unpriced.length} of ${s.offerings.length} subjects are not offered to families: a price is not set (${course} ${course === 1 ? 'course fee' : 'course fees'}, ${exam} ${exam === 1 ? 'exam fee' : 'exam fees'}).`}</span>,
+      // Only the fees that are missing are counted: "(4 exam fees)", never "(0 course fees, 4 exam fees)".
+      body: <span>{`${unpriced.length} of ${s.offerings.length} subjects ${unpriced.length === 1 ? 'is' : 'are'} not offered to families: a price is not set${missingFees(course, exam)}.`}</span>,
       actions: [{ kind: 'link', label: 'Go to Prices', href: `/admin/sessions/${s.id}#prices` }],
     });
   }
@@ -193,7 +203,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
   if (of('payment_date_passed').length) {
     entries.push({
       key: 'due-passed', severity: 'look', forHome: true,
-      body: <span>The payment due date has passed and prices are not final: families cannot pay yet.</span>,
+      body: <span>The pay-by date has passed and prices are not final: families cannot pay yet.</span>,
       actions: [{ kind: 'link', label: 'Set it', href: `/admin/sessions/${s.id}#dates` }],
     });
   }

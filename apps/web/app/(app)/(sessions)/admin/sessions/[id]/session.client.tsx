@@ -259,11 +259,16 @@ function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
         {s.status !== 'closed' && <p className="mt-1 text-xs text-muted-foreground">{CLOSE_KEEPS_WAITING}</p>}
       </div>
       <div>
-        <label htmlFor="sess-due" className="block text-sm font-medium text-foreground">Payment due</label>
+        <label htmlFor="sess-due" className="block text-sm font-medium text-foreground">Pay by</label>
         <input id="sess-due" type="date" className={cn(INPUT_CLASS, field)} value={due} disabled={!canSetUp || s.status === 'closed'}
           onChange={(e) => setDue(e.target.value)}
           onBlur={() => { if (due !== pickerValue(s.paymentDueAt) && valid(due)) save.save({ paymentDueAt: endOfSchoolDay(due) }); }} />
-        <p className="mt-1 text-xs text-muted-foreground"><span>Unpaid reservations are cancelled</span> <span>{s.unpaidCancelDays}</span> <span>{s.unpaidCancelDays === 1 ? 'day after it.' : 'days after it.'}</span></p>
+        {/* C10 in the families' words: the pay-by date, then the last day to pay (the session's days after it). */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          {s.unpaidCancelDays === 0
+            ? <span>The last day to pay is the same day; unpaid reservations are cancelled after it.</span>
+            : <><span>Last day to pay:</span> <span>{s.unpaidCancelDays}</span> <span>{s.unpaidCancelDays === 1 ? 'day after it.' : 'days after it.'}</span> <span>Unpaid reservations are cancelled after that.</span></>}
+        </p>
       </div>
       <div>
         <label htmlFor="sess-first" className="block text-sm font-medium text-foreground">First lesson</label>

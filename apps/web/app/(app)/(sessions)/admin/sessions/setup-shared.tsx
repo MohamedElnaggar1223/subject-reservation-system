@@ -67,10 +67,22 @@ const LEVEL_AT_END: Record<string, RegExp> = {
   'A.S./A.L.': /\s*\(?\bA\.?\s?S\.?\s*\/\s*A\.?\s?L\.?\)?\s*$/i,
 };
 /**
- * A subject as she names it on her links sheet: "Arabic O.L.", "Biology A.S./A.L." (two subjects share a name). The
- * level is said once: a name that already ends with it, in any spelling, ends with it as her screens write it.
+ * A level inside a group at the end of a subject's own name: "Arabic A.L." (the owner's name for the A Level-only
+ * Arabic, in the A.S./A.L. group) already says its level, and a narrower one than the group's.
  */
-export const subjectTitle = (o: { subject: { name: string }; group: string }) => `${ownName(o.subject.name, o.group)} ${o.group}`;
+const LEVEL_IN_GROUP: Record<string, RegExp> = {
+  'A.S./A.L.': /\s\(?A\.?\s?[LS2]\.?\)?$/,
+};
+/**
+ * A subject as she names it on her links sheet: "Arabic O.L.", "Biology A.S./A.L." (two subjects share a name). The
+ * level is said once: a name that already ends with the group, in any spelling, ends with it as her screens write it;
+ * a name that ends with a level inside the group ("Arabic A.L.") is shown as named, not "Arabic A.L. A.S./A.L.".
+ */
+export const titleFor = (name: string, group: string) => {
+  const own = ownName(name, group);
+  return LEVEL_IN_GROUP[group]?.test(own) ? own : `${own} ${group}`;
+};
+export const subjectTitle = (o: { subject: { name: string }; group: string }) => titleFor(o.subject.name, o.group);
 /** A subject's name without the level an older name ends with (shown beside it once). */
 export const ownName = (name: string, group: string) => {
   const own = LEVEL_AT_END[group];

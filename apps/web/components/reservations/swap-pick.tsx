@@ -15,7 +15,7 @@ import type { InferRequestType } from 'hono/client';
 import { api } from '~/lib/hono';
 import { DECLARATION_TEXT } from '@repo/validations';
 import { useI18n } from '~/lib/i18n';
-import { useRefundTerms, RefundTermsSentence, type RefundTermsState } from './reserve';
+import { useRefundTerms, RefundTermsSentence, titleOf, type RefundTermsState } from './reserve';
 import { fetchReserveOffers, reserveOffersKey, optionKey } from './offers';
 import { fetchStatement, statementKey } from './statement';
 
@@ -39,8 +39,9 @@ export function useSwapChoices(sessionId: string, studentId: string, currentItem
   const choices = (q.data?.offerings ?? []).filter((o) => o.accepting).flatMap((o) => o.rows
     .filter((r) => r.id !== currentItemId && !r.closed && !excluded(o, r))
     .flatMap((r) => r.options
-      // A retake, or a row that carries an earlier exam, only where the school knows it (it is filled in).
-      .filter((x) => x.price && (x.attempt === 'first' && !x.needsCarriedFrom ? true : !!r.knownSitting))
+      // A retake, or a row that carries an earlier exam, only where the school knows it (it is filled in); never an
+      // option past its board deadline (closed: it would be refused).
+      .filter((x) => x.price && !x.closed && (x.attempt === 'first' && !x.needsCarriedFrom ? true : !!r.knownSitting))
       .flatMap((x) => {
         const several = x.mode === 'in_school' && o.teacherChoice === 'families' && !o.teacherTbc && x.teachers.length > 1;
         // Where the family chooses the teacher (D5), one choice per teacher: the swap names it.
@@ -49,7 +50,7 @@ export function useSwapChoices(sessionId: string, studentId: string, currentItem
           const line: SwapLine = { offerItemId: r.id, attempt: x.attempt, mode: x.mode, expectedPrice: x.price!.total, ...(t ? { teacherId: t.id } : {}) };
           return {
             key: `${r.id}|${optionKey(x)}|${t?.id ?? ''}`,
-            label: `${o.name} — ${x.label[language]}${t ? ` · ${t.name}${t.online ? ' (online)' : ''}` : ''}`,
+            label: `${titleOf(o)} — ${x.label[language]}${t ? ` · ${t.name}${t.online ? ' (online)' : ''}` : ''}`,
             price: x.price!.total,
             notFinal: !pricesFinal,
             line,

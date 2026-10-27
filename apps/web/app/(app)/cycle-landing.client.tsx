@@ -87,8 +87,8 @@ function SessionCard({ row, viewerRole }: { row: SessionRow; viewerRole: string 
             <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{STATUS_WORDS[row.status] ?? row.status}</Badge>
           </div>
           <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span><span>Reservations close</span> {row.endDate ? <Day iso={row.endDate} /> : <span>— (optional)</span>}</span>
-            <span><span>Payment due</span> <Day iso={row.paymentDueAt} /></span>
+            <span><span>Reservations close</span> {row.endDate ? <Day iso={row.endDate} /> : <span>when you switch them off</span>}</span>
+            <span><span>Pay by</span> <Day iso={row.paymentDueAt} /></span>
             <span><span>First lesson</span> <Day iso={`${row.courseStartsOn}T12:00:00.000Z`} /></span>
           </p>
         </div>
@@ -117,7 +117,7 @@ function ClosedCard({ row }: { row: SessionRow }) {
             <h3 id={`home-${row.id}`} className="font-display text-lg font-semibold text-foreground"><bdi>{row.name}</bdi></h3>
             <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{STATUS_WORDS[row.status] ?? row.status}</Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground"><span>Payment due</span> <Day iso={row.paymentDueAt} /></p>
+          <p className="mt-1 text-sm text-muted-foreground"><span>Pay by</span> <Day iso={row.paymentDueAt} /></p>
         </div>
         <Button asChild variant="outline"><Link href={href as never}>{`Open ${row.name}`}</Link></Button>
       </div>

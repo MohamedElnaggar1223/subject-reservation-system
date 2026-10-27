@@ -77,12 +77,12 @@ export default function AgreeTab({ s }: { s: SetupSession }) {
             </div>
           </fieldset>
           <div>
-            <label htmlFor="ag-cancel" className="block text-sm font-medium text-foreground">Unpaid reservations are cancelled</label>
+            <label htmlFor="ag-cancel" className="block text-sm font-medium text-foreground">Last day to pay</label>
             <CommitSelect id="ag-cancel" className={cn(INPUT_CLASS, 'mt-1')} value={String(s.unpaidCancelDays)} disabled={closed || save.isPending} pending={holding}
               onCommit={(v) => save.save({ unpaidCancelDays: Number(v) })}>
-              {Array.from({ length: 15 }, (_, d) => d).map((d) => <option key={d} value={d}>{d === 0 ? 'on the payment due date' : `${d} ${d === 1 ? 'day' : 'days'} after the payment due date`}</option>)}
+              {Array.from({ length: 15 }, (_, d) => d).map((d) => <option key={d} value={d}>{d === 0 ? 'the pay-by date itself' : `${d} ${d === 1 ? 'day' : 'days'} after the pay-by date`}</option>)}
             </CommitSelect>
-            <p className="mt-1 text-xs text-muted-foreground">or at the board&apos;s deadline, if that is earlier. Reminders go before.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Unpaid reservations are cancelled after it, or at the board&apos;s deadline if that is earlier. Reminders go before.</p>
           </div>
         </div>
         <ErrorLine message={save.error} />
