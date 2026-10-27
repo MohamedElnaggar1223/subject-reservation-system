@@ -10,7 +10,9 @@
  * own row for a converted line over an enrolment from before the rework (`lineEnrolmentUnits`) —
  * takes the new teacher and mode, or is made, through F0b's `upsertEnrolments(source:
  * 'registrations', follow)`; the teaching group follows it there (F1's `followEnrolments`, in this
- * transaction). A whole offer's teacher who leaves is A's `POST …/offers/:offerId/replace-teacher`.
+ * transaction). A whole subject's teacher who leaves is swapped in the coordinator's subject editor, then each of
+ * their lines moved here (P1c removed A's replace-teacher route with the links sheet; 08s6 "a teacher replaced on a
+ * subject").
  * `changeLineTeacherTx` is the same change inside a caller's transaction (F1's "no preference"
  * assigned on Teaching groups).
  */
@@ -128,7 +130,7 @@ export async function changeLineTeacherTx(
 
     // The enrolment follows (§10): this academic year's open enrolment of the student in what the
     // line enters — one per unit for an item entering units, or the subject's own row for a converted
-    // line over an enrolment from before the rework (lineEnrolmentUnits, as A's replace-teacher) —
+    // line over an enrolment from before the rework (lineEnrolmentUnits) —
     // updated, or made from the line, through upsertEnrolments; the teaching group follows it there.
     const [year] = await tx.execute(sql`select id from academic_year where start_year = school_series_academic_year_start(${facts.sessionType}, ${facts.seriesYear})`)
       .then((r) => r.rows as { id: string }[]);
