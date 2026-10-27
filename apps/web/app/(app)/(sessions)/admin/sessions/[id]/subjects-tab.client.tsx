@@ -229,7 +229,7 @@ function NotOnTheList({ s, onClose }: { s: SetupSession; onClose: () => void }) 
   return (
     <Modal title="A subject not on the list" onClose={onClose}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) add.mutate(); }}>
-        <p className="text-sm text-muted-foreground">Families see its name as you type it, and the admin is told to add it to the board&apos;s list we hold.</p>
+        <p className="text-sm text-muted-foreground">Families see its name as you type it; we add it to the board&apos;s list we hold.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Board" htmlFor="nl-board">
             <select id="nl-board" className={INPUT_CLASS} value={board} onChange={(e) => setBoard(BoardCodeInputSchema.parse(e.target.value))}>

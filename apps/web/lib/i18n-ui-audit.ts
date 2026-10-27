@@ -101,7 +101,7 @@ export const uiAuditArabic: Record<string, string> = {
   // ── The family's balance with the school ("Wallet" until the lead's decision of 16 Oct 2026, 14) ──
   'Charges & Instalments': 'الرسوم والأقساط',
   'Money the school holds for each child — refunds and credits — to use on a later payment, move to another child, or take back.':
-    'مبالغ تحتفظ بها المدرسة لكل ابن — استردادات وأرصدة — تُستخدم في دفعة لاحقة، أو تُنقل إلى ابن آخر، أو تُسترد.',
+    'مبالغ تحتفظ بها المدرسة لكل ابن/ابنة — استردادات وأرصدة — تُستخدم في دفعة لاحقة، أو تُنقل إلى ابن/ابنة آخر، أو تُسترد.',
   'held for preregistered subjects (auto-applied when their session opens)': 'محتجزة لمواد مسجلة مسبقًا (تُطبَّق تلقائيًا عند فتح جلستها)',
   'Held:': 'المحتجز:',
   'transferred from': 'حُوّلت من',

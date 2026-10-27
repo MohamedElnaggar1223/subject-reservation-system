@@ -22,8 +22,8 @@
  * in self-study elsewhere is the student's exception, asked by assertLineRules.
  */
 
-import { db, sql, registrationSession, sessionQuestion, boardSeries, subject, and, eq, isNull, inArray, asc } from '@repo/db';
-import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, type SeriesMonth } from '@repo/validations';
+import { db, sql, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc } from '@repo/db';
+import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, IGCSE_NEVER_MONTHS, IAL_UNIT_MONTHS, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
 import { availabilityConstraints } from './offer.services';
 import { priceLine, PricingError } from './pricing.services';
@@ -288,6 +288,34 @@ export async function familyOfferings(
   const priorIds = [...new Set(all.flatMap((o) => o.rows.flatMap((r) => r.allowedPriorSittings.map((p) => p.id))))];
   const priors = new Map((priorIds.length ? await db.select().from(boardSeries).where(inArray(boardSeries.id, priorIds)) : []).map((p) => [p.id, p]));
   const order = (m: string, y: number) => y * 12 + (MONTH_ORDER[m] ?? 0);
+  // A retake on a row that carries nothing forward still names the exam it follows (the line rules keep "a retake
+  // names the sitting it follows", RETAKE_SITTING_REQUIRED): a student with none on record picks one of the board's
+  // exams of the two years before the row's (what a family may declare, resolveReservationLines), sent by its id
+  // when on record, else by its month and year. An O.L. subject never sat October or January (IGCSE_NEVER_MONTHS); a
+  // Pearson A.S./A.L. subject (IAL) sits October, January and June, never November (IAL_UNIT_MONTHS).
+  const boardCodes = [...new Set(all.map((o) => o.board.code))];
+  const boardMonths = new Map((boardCodes.length
+    ? await db.select({ code: examBoard.code, months: examBoard.seriesMonths }).from(examBoard).where(inArray(examBoard.code, boardCodes)) : [])
+    .map((b) => [b.code, b.months]));
+  const declarable = boardCodes.length
+    ? await db.select({ id: boardSeries.id, boardCode: boardSeries.boardCode, month: boardSeries.month, year: boardSeries.year })
+      .from(boardSeries).where(and(inArray(boardSeries.boardCode, boardCodes), eq(boardSeries.label, ''))) : [];
+  const sessionFirst = sessionSeriesMonths(s.sessionType, s.seriesYear)[0]!;
+  const retakeFromOf = (boardCode: string, group: string, here: { month: string; year: number } | null) => {
+    const at = here ?? sessionFirst;
+    const until = order(at.month, at.year);
+    const out: { id: string | null; month: SeriesMonth; year: number; label: { en: string; ar: string } }[] = [];
+    for (let y = at.year - 2; y <= at.year; y++) {
+      for (const m of boardMonths.get(boardCode) ?? []) {
+        if (boardCode === 'pearson_edexcel' && group !== 'O.L.' && !(IAL_UNIT_MONTHS as readonly string[]).includes(m)) continue;
+        const when = order(m, y);
+        if (when >= until || until - when > 24) continue;
+        if (group === 'O.L.' && (IGCSE_NEVER_MONTHS as readonly string[]).includes(m)) continue;
+        out.push({ id: declarable.find((d) => d.boardCode === boardCode && d.month === m && d.year === y)?.id ?? null, month: m as SeriesMonth, year: y, label: sittingLabel(m, y) });
+      }
+    }
+    return out.sort((a, b) => order(b.month, b.year) - order(a.month, a.year));
+  };
   const offerings = [];
   for (const o of all) {
     if (!preview && !o.offeredToFamilies) continue;
@@ -308,6 +336,9 @@ export async function familyOfferings(
         .map((p) => ({ id: p.id, label: sittingLabel(p.month, p.year) }));
       const rowTeachers = (r.teachers.length ? r.teachers : o.teachers).map((t) => ({ id: t.teacherId, name: t.name, online: t.online }));
       const options = [];
+      // Options past their board deadline (C6: nothing lifts it): a row whose every option is past reads closed, so a
+      // family cannot keep picking it and keep being refused (BOARD_DEADLINE_PASSED).
+      let pastBoard = 0;
       for (const cell of ticked) {
         const attempt = cell === 'firstInSchool' || cell === 'firstSelfStudy' ? 'first' as const : 'retake' as const;
         const mode = cell === 'firstInSchool' || cell === 'retakeInSchool' ? 'in_school' as const : 'self_study' as const;
@@ -325,6 +356,13 @@ export async function familyOfferings(
           if (!(err instanceof PricingError)) throw err;
           price = null;
         }
+        if (r.series?.id) {
+          const d = await effectiveDeadlineFor(db, { boardSeriesId: r.series.id, attempt, priorSittingSeriesId: null, declarationRejected: false });
+          if (d.at && d.at <= now) pastBoard++;
+        }
+        // D6 with an emptied list: the coordinator saved no earlier exam to carry from, and the line rules then take any
+        // earlier exam of the board (line-rules.services, "row with no list"): the family picks among the board's.
+        const carriesFromAny = r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2') && !allowedSittings.length;
         options.push({
           attempt, mode,
           label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), { attempt, mode }, { selfStudyShare: r.selfStudyFee !== null ? null : s.selfStudyPercent, lang })),
@@ -332,13 +370,16 @@ export async function familyOfferings(
           // D6: an A.2. and a one-paper retake (where the board asks) name the sitting they carry from.
           needsCarriedFrom: r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2'),
           allowedSittings: r.needsCarriedFrom ? allowedSittings : [],
+          // A retake of a row that carries nothing forward: the exams it may follow, latest first (none filled in).
+          // An emptied carried-from list: the board's earlier exams, the same window.
+          retakeFrom: (attempt === 'retake' && !r.needsCarriedFrom) || carriesFromAny ? retakeFromOf(o.board.code, o.group, r.series) : [],
           teachers: mode === 'in_school' && !o.teacherTbc ? rowTeachers : [],
         });
       }
       if (!options.length) continue;
       rows.push({
         id: r.id, label: both((lang) => rowLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), lang)), kind: r.kind, sitting: r.sitting,
-        closed: closedOffering || !!(r.closesAt && r.closesAt <= now), payBy: r.payBy, exclusiveGroup: r.exclusiveGroup,
+        closed: closedOffering || !!(r.closesAt && r.closesAt <= now) || pastBoard === options.length, payBy: r.payBy, exclusiveGroup: r.exclusiveGroup,
         knownSitting: known ? { id: known.id, label: sittingLabel(known.month, known.year) } : null,
         options,
       });

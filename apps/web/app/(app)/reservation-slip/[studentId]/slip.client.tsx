@@ -8,6 +8,7 @@ import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { fetchStatement, statementKey } from '~/components/reservations/statement';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { PrintHeading } from '~/components/print-heading';
+import { familyWords } from '~/lib/i18n-reservations';
 
 const LIVE = ['pending_approval', 'pending_payment', 'preregistered', 'confirmed'];
 
@@ -54,7 +55,7 @@ export default function SlipClient({ studentId, ids, schoolName }: { studentId: 
         </dl>
         <table className="w-full text-sm">
           <thead className="border-b border-border text-xs uppercase text-muted-foreground print:text-black">
-            <tr><th className="py-1 text-start">Subject</th><th className="py-1 text-start">Entry</th><th className="py-1 text-end">Price</th><th className="py-1 text-start ps-3">Due</th></tr>
+            <tr><th className="py-1 text-start">Subject</th><th className="py-1 text-start">Entry</th><th className="py-1 text-end">Price</th><th className="py-1 text-start ps-3">Pay by</th></tr>
           </thead>
           <tbody>
             {lines.map((l) => (
@@ -71,14 +72,17 @@ export default function SlipClient({ studentId, ids, schoolName }: { studentId: 
                   )}
                 </td>
                 <td className="py-1.5"><span>{l.attempt === 'retake' ? 'Retake' : 'First entry'}</span> · <span>{l.mode === 'self_study' ? 'self-study' : 'in school'}</span></td>
-                <td className="py-1.5 text-end"><Money amount={l.price} />{l.provisional && <> ⓟ</>}<div className="text-[10px] text-muted-foreground print:text-black" dir="ltr">{l.basisText}</div></td>
-                <td className="py-1.5 ps-3">{l.status === 'confirmed' ? <span>paid</span> : <Day iso={l.dueAt} />}</td>
+                <td className="py-1.5 text-end"><Money amount={l.price} />{l.provisional && <> *</>}<div className="text-[10px] text-muted-foreground print:text-black" dir="ltr">{familyWords(l.basisText)}</div></td>
+                <td className="py-1.5 ps-3">
+                  {l.status === 'confirmed' ? <span>paid</span> : <Day iso={l.dueAt ? String(l.dueAt) : null} />}
+                  {l.status !== 'confirmed' && l.deadline && !l.provisional && <div className="text-xs text-muted-foreground print:text-black"><span>last day to pay</span> <Day iso={String(l.deadline)} /></div>}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="mt-2 text-end text-sm font-semibold"><span>Total</span> <Money amount={total} /></p>
-        {lines.some((l) => l.provisional) && <p className="text-xs text-muted-foreground print:text-black">ⓟ board fee provisional: confirmed before payment.</p>}
+        {lines.some((l) => l.provisional) && <p className="text-xs text-muted-foreground print:text-black">* Prices are not final yet: payable once the school confirms them.</p>}
         <div className="mt-6 space-y-2 border-t border-border pt-4 text-xs">
           <p>{refundConsentText(snapshot)}</p>
           <p>{DECLARATION_TEXT}</p>

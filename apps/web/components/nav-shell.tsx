@@ -486,6 +486,10 @@ export default function NavShell({
     setLeaving(parked);
     if (parked) router.replace('/admin/sessions');
   }, [parked, router]);
+  // A link followed from the phone's menu closes it: it stayed open over the page it opened (P3's phone drive).
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   // L-5: Unread notification badge. Refetches every 30s so the number
   // reflects mark-as-read actions and new notifications without a

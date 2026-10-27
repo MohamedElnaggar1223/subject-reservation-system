@@ -14,7 +14,7 @@ import { examsArabic, translateExamsText } from './i18n-exams';
 import { importArabic, translateImportText } from './i18n-import';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
 import { moneyArabic, translateMoneyText } from './i18n-money';
-import { reservationsArabic, translateReservationsText } from './i18n-reservations';
+import { reservationsArabic, familyArabic, translateReservationsText } from './i18n-reservations';
 import { messagesArabic, translateMessagesText } from './i18n-messages';
 import { focusArabic } from './i18n-focus';
 import { uiAuditArabic } from './i18n-ui-audit';
@@ -1599,6 +1599,9 @@ Object.assign(autoArabicText, uiAuditArabic);
 Object.assign(autoArabicText, decisionsArabic);
 // The fix round of F8's findings (lib/i18n-findings.ts): after the decisions', so a sentence it rewrote wins.
 Object.assign(autoArabicText, findingsArabic);
+// P3, the family's and the desk's screens (lib/i18n-reservations.ts, familyArabic): after the findings', so the plain
+// words the coordinator rework gives families (no board jargon) win over an older screen's Arabic of the same phrase.
+Object.assign(autoArabicText, familyArabic);
 // The coordinator's screens (lib/i18n-setup.ts): only words not already translated, so a word her screens share
 // with the others keeps the app's Arabic.
 for (const [en, ar] of Object.entries(setupArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;

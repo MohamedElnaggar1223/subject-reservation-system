@@ -1,54 +1,24 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSuspenseQuery, useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, gradeLabel, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS, formatEgp } from '@repo/validations';
+import { apiResponse, gradeLabel, CHANGE_REQUEST_STATUS_LABELS, formatEgp } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Badge } from '~/components/ui/tone';
+import { useI18n } from '~/lib/i18n';
+import { familyWords } from '~/lib/i18n-reservations';
+import { fetchReserveOffers, reserveOffersKey, optionOfLine, lineNamedBy } from '~/components/reservations/offers';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types, from the fetcher (PATTERNS.md: never by hand) ────────────────────
 
-type Subject = {
-  id: string;
-  name: string;
-  code: string;
-  council: string;
-  priceInSchool: number;
-  isOfferedAtSchool: boolean;
-  customPrice: number | null;
-  isCore: boolean;
-};
-
-type Session = {
-  id: string;
-  name: string;
-  sessionType: string;
-  status: string;
-};
-
-type Student = {
-  id: string;
-  name: string;
-  email: string;
-  grade: number | null;
-  studentId: string | null;
-};
-
-type PendingRegistration = {
-  id: string;
-  studentId: string;
-  sessionId: string;
-  priceAtRegistration: number;
-  status: string;
-  requestedBy: string;
-  createdAt: string;
-  subject: Subject;
-  session: Session;
-  student: Student;
-};
+const fetchPending = () => apiResponse(api.v1.registrations.pending.$get());
+type PendingRegistration = Awaited<ReturnType<typeof fetchPending>>[number];
+type Session = PendingRegistration['session'];
+type Student = PendingRegistration['student'];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -77,8 +47,18 @@ export default function ApprovalsClient(): React.JSX.Element {
 
   const { data: pending = [] } = useSuspenseQuery({
     queryKey: ['registrations', 'pending'],
-    queryFn: () => apiResponse(api.v1.registrations.pending.$get()),
+    queryFn: fetchPending,
   });
+  // Each request in the reservation page's words ("Retake · self study 50% · all papers"), from the family read.
+  const { language } = useI18n();
+  const pairs = [...new Set(pending.map((r) => `${r.sessionId}|${r.studentId}`))].map((k) => { const [sessionId, studentId] = k.split('|'); return { sessionId: sessionId!, studentId: studentId! }; });
+  const reads = useQueries({
+    queries: pairs.map((p) => ({ queryKey: reserveOffersKey(p.sessionId, p.studentId), queryFn: () => fetchReserveOffers(p.sessionId, p.studentId), retry: false })),
+  });
+  const wordsOf = (r: PendingRegistration) =>
+    optionOfLine(reads[pairs.findIndex((p) => p.sessionId === r.sessionId && p.studentId === r.studentId)]?.data, r)?.option?.label[language] ?? null;
+  // A refusal on approving (a subject closed meanwhile, past its exam board's date): shown at the request it names.
+  const [refusedId, setRefusedId] = useState<{ id: string; sentence: string } | null>(null);
 
   // ─── Derived ───────────────────────────────────────────────────────────────
 
@@ -143,6 +123,7 @@ export default function ApprovalsClient(): React.JSX.Element {
     // every `id` below was definitively flipped to 'pending_payment' and is
     // safe to forward into the checkout URL.
     onSuccess: (ids) => {
+      setRefusedId(null);
       setApprovedCheckoutIds(ids);
       setSelectedIds(new Set());
       setApproveComment('');
@@ -150,7 +131,13 @@ export default function ApprovalsClient(): React.JSX.Element {
       invalidateFinancialState(queryClient);
       router.refresh();
     },
-    onError: (err: Error) => setActionError(err.message),
+    onError: (err: Error) => {
+      const sentence = familyWords(err.message);
+      const named = lineNamedBy(sentence, pending.filter((r) => selectedIds.has(r.id)), (r) => r.subject.name);
+      setRefusedId(named ? { id: named.id, sentence } : null);
+      setActionError(sentence);
+      setShowApproveModal(false);
+    },
   });
 
   const rejectMutation = useMutation({
@@ -230,6 +217,7 @@ export default function ApprovalsClient(): React.JSX.Element {
   if (pending.length === 0) {
     return (
       <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up space-y-6">
+        <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Pending Approvals</h1>
         {approvedCheckoutIds && (
           <div className="rounded-xl border border-brand-200 bg-brand-50 dark:bg-brand-900/20 dark:border-brand-700 p-5 flex items-start gap-4">
             <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center shrink-0">
@@ -432,9 +420,7 @@ export default function ApprovalsClient(): React.JSX.Element {
               {regs.map((reg) => {
                 const isSelected = selectedIds.has(reg.id);
                 const price = reg.priceAtRegistration;
-                const councilLabel =
-                  COUNCIL_LABELS[reg.subject.council as keyof typeof COUNCIL_LABELS] ??
-                  reg.subject.council;
+                const words = wordsOf(reg);
 
                 return (
                   <div
@@ -470,17 +456,11 @@ export default function ApprovalsClient(): React.JSX.Element {
                     {/* Subject info */}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-foreground text-sm">
-                        {reg.subject.name}
+                        <bdi data-i18n-skip="true">{reg.subject.name}</bdi>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {reg.subject.code} · {councilLabel}
-                        {reg.subject.isCore && (
-                          <span className="ms-2 text-amber-700 dark:text-amber-400">Core</span>
-                        )}
-                        {!reg.subject.isOfferedAtSchool && (
-                          <span className="ml-2 text-muted-foreground">(External)</span>
-                        )}
-                      </div>
+                      {words && <div className="text-xs text-muted-foreground mt-0.5" data-i18n-skip="true">{words}</div>}
+                      {reg.priceProvisional && <div className="mt-0.5"><Badge tone="warning">prices not final yet</Badge></div>}
+                      {refusedId?.id === reg.id && <div role="alert" className="mt-1 text-xs text-destructive">{refusedId.sentence}</div>}
                       <div className="text-xs text-muted-foreground mt-0.5">
                         Requested{' '}
                         {new Date(reg.createdAt).toLocaleDateString('en-GB', {
@@ -530,7 +510,7 @@ export default function ApprovalsClient(): React.JSX.Element {
 
             {approveMutation.isError && (
               <p className="text-sm text-destructive">
-                {(approveMutation.error as Error).message}
+                {familyWords((approveMutation.error as Error).message)}
               </p>
             )}
 

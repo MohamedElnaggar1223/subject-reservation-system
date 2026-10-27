@@ -34,7 +34,7 @@ export const EXCEPTION_TYPE_LABELS: Record<typeof EXCEPTION_TYPES[number], strin
   deadline_extension:    'Deadline Extension',
   late_registration:     'Late Registration Permission',
   custom_refund_percent: 'Custom Refund %',
-  grade10_other_series:  'Grade 10: sit a series other than June',
+  grade10_other_series:  'Grade 10: an exam month other than June',
 };
 
 /**

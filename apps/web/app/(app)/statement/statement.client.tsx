@@ -26,7 +26,7 @@ export default function StatementClient({ role, studentId, familyId }: { role: s
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Statement</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Every reservation with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Every reservation with its price and why, what is paid and what is still owed, its pay-by date and last day to pay, and the payments.</p>
         </div>
         {isParent && children.length > 1 && (
           <div>

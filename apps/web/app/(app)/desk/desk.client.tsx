@@ -32,6 +32,7 @@ import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.clien
 import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
 import { StatementView } from '~/components/reservations/statement';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { familyWords } from '~/lib/i18n-reservations';
 import { RESERVATION_CYCLE_ONLY } from '~/lib/reservation-focus';
 import DeskToday from './desk-today.client';
 
@@ -46,22 +47,6 @@ type Summary = Awaited<ReturnType<typeof fetchSummary>>;
 /** True when `a` falls in a calendar month before `b`'s (the takings' month rule, MO-11). */
 function isEarlierMonth(a: Date, b: Date): boolean {
   return a.getFullYear() * 12 + a.getMonth() < b.getFullYear() * 12 + b.getMonth();
-}
-
-/**
- * F0b: money is taken per exam series with its own entry deadline — one
- * payment each, so the officer sees each, and any the close took before it
- * could be confirmed (that money goes back to the family).
- */
-function paymentsLine(res: { payments: { series: string[]; collected: number }[]; notCollected: { series: string[]; amount: number; reason: string }[] }) {
-  const parts: string[] = [];
-  if (res.payments.length > 1) {
-    parts.push(` In ${res.payments.length} payments, one per exam series: ${res.payments.map((p) => `${p.series.join(' and ')} ${formatEgp(p.collected)}`).join('; ')}.`);
-  }
-  if (res.notCollected.length) {
-    parts.push(` Not collected — hand this money back: ${res.notCollected.map((n) => `${n.series.join(' and ')} ${formatEgp(n.amount)} (${n.reason})`).join('; ')}.`);
-  }
-  return parts.join('');
 }
 
 /** A payment's purpose and instrument in words (the API returns codes: "school_fee", "cash"). */
@@ -107,7 +92,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
     qc.invalidateQueries({ queryKey: ['finance'] });
   };
   const done = (msg: string | string[]) => { setMessage(msg); setErrorMsg(''); refresh(); };
-  const fail = (err: Error) => { setErrorMsg(err.message); setMessage(''); };
+  const fail = (err: Error) => { setErrorMsg(familyWords(err.message)); setMessage(''); };
 
   // ── Desk actions ──────────────────────────────────────────────────────────
   const issueReceiptMutation = useMutation({
@@ -361,7 +346,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           </div>
 
           {showRegister && (
-            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} onDone={(sentences) => done(sentences)} />
+            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} studentName={summary.student.name} onDone={(sentences) => done(sentences)} />
           )}
 
           {showStatement && (
@@ -380,12 +365,12 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground font-display">Registrations</h3>
+              <h3 id="desk-registrations" className="text-sm font-semibold text-foreground font-display">Registrations</h3>
             </div>
             {summary.registrations.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No registrations yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" role="region" aria-labelledby="desk-registrations" tabIndex={0}>
               <table className="w-full min-w-[720px] text-sm">
                 <tbody className="divide-y divide-border">
                   {summary.registrations.map((r) => (
@@ -412,6 +397,10 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                       </td>
                       <td className="px-3 py-2.5 text-xs">
                         {labelFor(REGISTRATION_STATUS_LABELS, r.status)}
+                        {/* A waiting subject: its last day to pay (C10), or that its prices are not final yet (E6). */}
+                        {r.status === 'pending_payment' && (r.priceProvisional
+                          ? <span className="block text-muted-foreground">prices not final yet</span>
+                          : r.cutOff && <span className="block text-muted-foreground"><span>last day to pay</span> <Day iso={String(r.cutOff)} /></span>)}
                       </td>
                       <td className="px-3 py-2.5 text-end font-medium text-foreground whitespace-nowrap" dir="ltr">
                         {formatEgp(r.priceAtRegistration)}
@@ -458,12 +447,12 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           {/* Recent payments */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground font-display">Recent payments</h3>
+              <h3 id="desk-payments" className="text-sm font-semibold text-foreground font-display">Recent payments</h3>
             </div>
             {summary.payments.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No payments yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" role="region" aria-labelledby="desk-payments" tabIndex={0}>
               <table className="w-full min-w-[720px] text-sm">
                 <tbody className="divide-y divide-border">
                   {summary.payments.slice(0, 10).map((p) => (
@@ -711,18 +700,27 @@ function OnboardCard({ onDone, onError }: { onDone: (msg: string, studentId: str
 const fetchActiveSessions = () => apiResponse(api.v1.sessions.active.$get());
 
 /**
- * The desk's Reserve page for the student in front of it (RESERVATIONS_REWORK.md §4.3): the
- * session, then every subject with what can be entered; "Reserve only" or "Reserve and collect"
- * (one payment per entry deadline; a provisional line reserved now, collected once confirmed);
- * the slip to print with the consent texts.
+ * The desk's reservation for the student in front of it (COORDINATOR_REWORK.md §5 "Desk"): the same page the family
+ * sees, on its behalf — the session open now preselected, every subject with its choices and prices; "Reserve only"
+ * or "Reserve and collect" (one payment for the subjects, whatever their dates; a subject whose prices are not final
+ * yet is reserved now and collected once they are); the slip to print with the agreement's texts.
+ *
+ * The sheet's version: find or add the family's row, type each subject into its column, look up and type the fee
+ * note, add the fees by hand, then write a receipt per subject. Here: pick each subject (one click), tick that the
+ * parent read and signed, take the money in one action; prices, teachers and dates are on the page, nothing is
+ * remembered or typed.
  */
-function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (sentences: string[]) => void }) {
+function DeskReserveCard({ studentId, studentName, onDone }: { studentId: string; studentName: string; onDone: (sentences: string[]) => void }) {
   const { data: sessions = [] } = useQuery({ queryKey: ['sessions', 'active'], queryFn: fetchActiveSessions });
   const [sessionId, setSessionId] = useState('');
   const [last, setLast] = useState<ReserveDone | null>(null);
   // "Also collect now" (step C, §4.3): the year's fee and the student's charges with the reservation.
   const [extras, setExtras] = useState<Extras>({ chargeIds: [], total: 0 });
   const chosen = sessionId || (sessions.length === 1 ? sessions[0]!.id : '');
+  // Subjects of this session already waiting for payment: "Reserve and collect" waits (reserve only, then one
+  // collection under "To collect now"), so its "Also collect now" ticks are not offered either.
+  const { data: summary } = useQuery({ queryKey: ['desk', 'summary', studentId], queryFn: () => fetchSummary(studentId) });
+  const waitingHere = (summary?.registrations ?? []).some((r) => r.status === 'pending_payment' && r.sessionId === chosen);
   return (
     <div className="bg-card rounded-xl border border-primary/40 shadow-sm p-5 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -745,9 +743,9 @@ function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (se
           <div className="mt-2"><SlipLink studentId={studentId} registrationIds={last.registrationIds} /></div>
         </div>
       )}
-      {chosen && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
+      {chosen && !waitingHere && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
       {chosen && (
-        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={extras}
+        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={waitingHere ? { chargeIds: [], total: 0 } : extras} childName={studentName}
           onDone={(d) => { setLast(d); setExtras({ chargeIds: [], total: 0 }); onDone(d.sentences); }} />
       )}
     </div>

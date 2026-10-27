@@ -1,27 +1,23 @@
 'use client';
 
 /**
- * Checkout Client Component — Parents Only
+ * Checkout — parents (COORDINATOR_REWORK.md §5 "Families", §10; P3).
  *
- * Interactive payment flow for pending_payment registrations.
- *
- * Features (V3 — §6.6/§6.11):
- * - Displays registration summary (subjects, session, prices)
- * - Escrow balance display with apply-to-checkout option
- * - Payment method selection: Pay at School or InstaPay
- * - Real-time total calculation (total − escrow applied)
- * - Submission → POST /v1/payments/initiate
- * - Pay at School: shows the desk reference to quote at the finance desk
- * - InstaPay: shows the school account details + a transfer-reference
- *   submission form; finance verifies against the bank statement
+ * One checkout over the subjects chosen, whatever their dates (no split per deadline): each subject with its words
+ * (the family read's option wording), its price and its last day to pay; the checkout is paid by the earliest of
+ * those. Pay at the school (a reference to quote at the desk, where cash, card or InstaPay is taken) or InstaPay
+ * (the school's account, then the transfer's reference, checked by the finance office); the balance (escrow)
+ * applied first if the family wants. A subject whose prices are not final yet is not paid here: it is said, and the
+ * others can be paid. A refusal comes back with a code: its sentence is shown at the subject it concerns, with the
+ * next step (take it off this payment, or read the new price).
  */
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import type { InferRequestType } from 'hono/client';
-import { apiResponse, formatEgp } from '@repo/validations';
+import { apiResponse, formatEgp, refusalCodeOf, type RefusalCode } from '@repo/validations';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   ACTIVE_PAYMENT_METHODS,
@@ -31,7 +27,13 @@ import {
   type ActivePaymentMethod,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Badge } from '~/components/ui/tone';
+import { useI18n } from '~/lib/i18n';
+import { familyWords } from '~/lib/i18n-reservations';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { InstantText } from '~/app/(app)/exams/exams-shared';
+import { fetchReserveOffers, reserveOffersKey, optionOfLine, lineNamedBy } from '~/components/reservations/offers';
+import { fetchStatement, statementKey } from '~/components/reservations/statement';
 
 interface CheckoutClientProps {
   registrationIds: string[];
@@ -64,6 +66,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   // family gives its own here (RESERVATIONS_REWORK.md §3.5).
   const [refundTick, setRefundTick] = useState(false);
   const [declTick, setDeclTick] = useState(false);
+  // A refusal with a code, at the subject it concerns (null: the whole payment).
+  const [refusal, setRefusal] = useState<{ sentence: string; code: RefusalCode | undefined; registrationId: string | null } | null>(null);
+  const { language } = useI18n();
 
   const summaryKey = registrationIds.join(',');
 
@@ -71,13 +76,48 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
     queryKey: ['payments', 'checkout-summary', summaryKey],
     queryFn: () => fetchCheckoutSummary(summaryKey),
   });
+  // Each subject's words, as the reservation page wrote them ("Retake · self study 50% · all papers").
+  const sessionIds = [...new Set((summary?.registrations ?? []).map((r) => r.sessionId))];
+  const reads = useQueries({
+    queries: sessionIds.map((sessionId) => ({
+      queryKey: reserveOffersKey(sessionId, summary?.student.id ?? ''),
+      queryFn: () => fetchReserveOffers(sessionId, summary!.student.id),
+      enabled: !!summary,
+      retry: false,
+    })),
+  });
+  const wordsOf = (r: { sessionId: string; offerItemId: string; attempt: string; mode: string }) =>
+    optionOfLine(reads[sessionIds.indexOf(r.sessionId)]?.data, r)?.option?.label[language] ?? null;
+  // The statement: until when a transfer being checked keeps its subjects (the earliest exam board date among them),
+  // and each line's name as a refusal gives it ("Mathematics — Paper 1").
+  const statementQuery = { studentId: summary?.student.id };
+  const statement = useQuery({
+    queryKey: statementKey(statementQuery),
+    queryFn: () => fetchStatement(statementQuery),
+    enabled: !!summary,
+  });
+  const keptUntil = (paymentId: string) =>
+    statement.data?.students.flatMap((s) => s.payments).find((p) => p.id === paymentId)?.deadline ?? null;
+  const refusalName = new Map(statement.data?.students.flatMap((s) => s.sessions.flatMap((x) => x.lines.map((l) => [l.id, l.label] as const))) ?? []);
 
+  // Paid now: a line whose price is final and whose last day to pay has not passed (the sweep expires it within the
+  // minute; until then it is shown apart, never sent to be refused).
+  const [openedAt] = useState(() => Date.now());
+  const pastLastDay = (id: string) => {
+    const c = summary?.lineCutOffs.find((x) => x.registrationId === id)?.cutOff;
+    return !!c && new Date(c).getTime() <= openedAt;
+  };
+  // Only a line still waiting for payment and not under an instalment plan (paid by its instalments): one the desk
+  // collected while this page was open, or one under a plan, is shown apart, never sent to be refused.
+  const waitingHere = (r: { id: string; status: string }) => r.status === 'pending_payment' && !(summary?.linesUnderPlan ?? []).includes(r.id);
+  const payableIds = (summary?.registrations ?? []).filter((r) => waitingHere(r) && !r.priceProvisional && !pastLastDay(r.id)).map((r) => r.id);
   const initiateMutation = useMutation({
     mutationFn: async () => {
-      const escrowToApply = applyEscrow ? Math.min(escrowAmount, summary?.escrowBalance ?? 0, summary?.totalCost ?? 0) : 0;
+      const payableCost = (summary?.registrations ?? []).filter((r) => payableIds.includes(r.id)).reduce((a, r) => a + r.priceAtRegistration, 0);
+      const escrowToApply = applyEscrow ? Math.min(escrowAmount, summary?.escrowBalance ?? 0, payableCost) : 0;
 
       return initiatePayment({
-        registrationIds,
+        registrationIds: payableIds,
         paymentMethod: selectedMethod,
         escrowAmountToApply: escrowToApply,
         ...(summary?.familyConsentNeeded.length ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
@@ -131,9 +171,29 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
       router.refresh();
     },
     onError: (err: Error) => {
-      setSubmitError(err.message);
+      const code = refusalCodeOf(err);
+      const sentence = familyWords(err.message);
+      // The subject the sentence names (lineNamedBy: the longest name, never a guess between two alike).
+      const named = lineNamedBy(sentence, summary?.registrations ?? [], (r) => refusalName.get(r.id) ?? r.subject.name);
+      setRefusal({ sentence, code, registrationId: named?.id ?? null });
+      // Paid or changed meanwhile (the desk, another tab), or under a plan: the re-read shows those apart, and the
+      // others can be paid; the API's sentence names no subject.
+      setSubmitError(named ? '' : code === 'NOT_WAITING' || code === 'UNDER_PLAN'
+        ? 'Some of these subjects were paid or changed meanwhile: they are now shown apart. Pay for the others.'
+        : sentence);
+      if (code === 'PRICE_CHANGED' || code === 'NOT_WAITING' || code === 'UNDER_PLAN' || code === 'PRICES_NOT_FINAL' || code === 'CUT_OFF_PASSED' || code === 'BOARD_DEADLINE_PASSED') {
+        queryClient.invalidateQueries({ queryKey: ['payments', 'checkout-summary', summaryKey] });
+      }
     },
   });
+
+  /** Take a subject off this payment: the checkout reopens on the others. */
+  const takeOff = (id: string) => {
+    const rest = registrationIds.filter((x) => x !== id);
+    setRefusal(null);
+    setSubmitError('');
+    router.replace((rest.length ? `/checkout?ids=${rest.join(',')}` : '/registrations') as never);
+  };
 
   const submitRefMutation = useMutation({
     mutationFn: ({ paymentId, reference }: { paymentId: string; reference: string }) =>
@@ -149,7 +209,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
       invalidateFinancialState(queryClient, { studentId: summary?.student.id });
       router.refresh();
     },
-    onError: (err: Error) => setRefError(err.message),
+    onError: (err: Error) => setRefError(familyWords(err.message)),
   });
 
   // Money audit MA-02: an unpaid checkout can be cancelled — escrow applied
@@ -215,10 +275,21 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   }
 
 
+  // A subject whose prices are not final yet is reserved, not paid (E6): said, and left out of this payment; so is one
+  // past its last day to pay.
+  const apart = summary.registrations.filter((r) => !waitingHere(r));
+  const notFinal = summary.registrations.filter((r) => waitingHere(r) && r.priceProvisional);
+  const past = summary.registrations.filter((r) => waitingHere(r) && !r.priceProvisional && pastLastDay(r.id));
+  const payable = summary.registrations.filter((r) => payableIds.includes(r.id));
+  const payableTotal = Math.round(payable.reduce((a, r) => a + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = applyEscrow
-    ? Math.min(escrowAmount, summary.escrowBalance, summary.totalCost)
+    ? Math.min(escrowAmount, summary.escrowBalance, payableTotal)
     : 0;
-  const amountDue = Math.max(0, summary.totalCost - escrowToApply);
+  const amountDue = Math.max(0, payableTotal - escrowToApply);
+  const cutOffOf = (id: string) => summary.lineCutOffs.find((c) => c.registrationId === id)?.cutOff ?? null;
+  const cutOffs = new Set(payable.map((r) => cutOffOf(r.id)).filter(Boolean).map(String));
+  // Paid by the earliest last day to pay of the subjects in this payment (the API's endsAt counts a line past its own).
+  const payBy = [...cutOffs].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] ?? (past.length ? null : summary.endsAt);
 
   // ─── Post-payment Result View ────────────────────────────────────────────
 
@@ -342,11 +413,12 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {/* Summary footer */}
             <div className="mt-6 pt-6 border-t border-border flex justify-between text-sm text-muted-foreground">
               <span>Amount due</span>
+              {/* The server's amounts: the summary's balance was already lowered by this payment (onSuccess). */}
               <span className="font-semibold text-foreground">
-                <Money amount={amountDue} />
-                {escrowToApply > 0 && (
+                <Money amount={completed ? 0 : result.amount ?? 0} />
+                {(result.escrowAmountApplied ?? 0) > 0 && (
                   <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 ml-1">
-                    (+ <Money amount={escrowToApply} /> <span>from your balance</span>)
+                    (+ <Money amount={result.escrowAmountApplied ?? 0} /> <span>from your balance</span>)
                   </span>
                 )}
               </span>
@@ -382,23 +454,29 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           <ul className="mt-2 text-sm text-foreground list-disc ps-5">
             {open.paymentRegistrations.map((pr) => (
               <li key={pr.registrationId}>
-                {pr.registration.subject.name} ({pr.registration.subject.code})
+                <bdi data-i18n-skip="true">{pr.registration.subject.name}</bdi>
               </li>
             ))}
           </ul>
 
-          {/* MO-10: the window closed while this checkout waited for its reference */}
+          {/* C10: the last day to pay has passed while this InstaPay checkout waited for its reference: it has until then. */}
           {open.status === 'pending' && open.referenceDueAt && (
             <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-sm text-amber-800 dark:text-amber-300">
-              The registration window has closed. Submit your transfer reference by{' '}
-              <strong>{new Date(open.referenceDueAt).toLocaleString()}</strong>; after that the payment is cancelled and the subjects are released.
+              <span>The last day to pay has passed. Submit your transfer reference by</span>{' '}
+              <strong><InstantText iso={String(open.referenceDueAt)} /></strong><span>: after that the payment is cancelled and the subjects are released.</span>
             </div>
           )}
 
           {open.status === 'pending_verification' ? (
             <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl text-sm text-violet-800 dark:text-violet-300">
-              Your transfer reference <span className="font-mono font-semibold">{open.verificationReference}</span> is with
-              the finance office. They confirm it against the bank statement, usually within one school day.
+              <p>
+                <span>Your transfer is being checked by the finance office: reference</span>{' '}
+                <span className="font-mono font-semibold" data-i18n-skip="true">{open.verificationReference}</span><span>.</span>{' '}
+                <span>They confirm it against the bank statement, usually within one school day.</span>
+              </p>
+              {keptUntil(open.id) && (
+                <p className="mt-1"><span>Your subjects are kept for it until</span> <Day iso={String(keptUntil(open.id))} /><span>.</span></p>
+              )}
             </div>
           ) : open.paymentMethod === 'in_school' ? (
             <div className="mt-5 p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-xl text-center">
@@ -448,52 +526,112 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   // ─── Checkout Form ────────────────────────────────────────────────────────
 
   return (
-    <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-5xl mx-auto animate-fade-up">
       <div className="max-w-2xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Checkout</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Complete payment for {summary.student.name}&apos;s subject registration
+            <span>The subjects reserved for</span> <bdi data-i18n-skip="true">{summary.student.name}</bdi>
           </p>
         </div>
 
         <div className="space-y-6">
-          {/* Registration Summary */}
+          {/* One checkout, whatever the subjects' dates: each with its words, its price and its last day to pay. */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground font-display">Registration Summary</h2>
+            <div className="px-4 sm:px-6 py-4 border-b border-border">
+              <h2 className="text-sm font-semibold text-foreground font-display">What you are paying for</h2>
             </div>
-            <div className="divide-y divide-border">
-              {summary.registrations.map((reg) => (
-                <div key={reg.id} className="px-6 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {reg.subject.name}
-                      <span className="ml-2 text-xs text-muted-foreground font-mono">{reg.subject.code}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{reg.session.name}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-foreground shrink-0 ml-4">
-                    <Money amount={reg.priceAtRegistration} />
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="px-6 py-3 bg-muted flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground">Total</span>
+            <ul className="divide-y divide-border">
+              {summary.registrations.map((reg) => {
+                const cut = cutOffOf(reg.id);
+                const here = refusal?.registrationId === reg.id ? refusal : null;
+                const words = wordsOf(reg);
+                return (
+                  <li key={reg.id} className={`px-4 sm:px-6 py-3 ${here ? 'bg-destructive/5' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground"><bdi data-i18n-skip="true">{reg.subject.name}</bdi></p>
+                        {words && <p className="text-xs text-muted-foreground" data-i18n-skip="true">{words}</p>}
+                        <p className="text-xs text-muted-foreground">
+                          <bdi data-i18n-skip="true">{reg.session.name}</bdi>
+                          {!waitingHere(reg)
+                            ? <> · <span>{reg.status === 'confirmed' ? 'already paid' : (summary.linesUnderPlan ?? []).includes(reg.id) ? 'paid by its instalments' : 'no longer waiting for payment'}</span></>
+                            : reg.priceProvisional
+                            ? <> · <span>prices not final yet: paid once the school confirms them</span></>
+                            : pastLastDay(reg.id) ? <> · <span>its last day to pay has passed</span> (<Day iso={String(cut)} />)</>
+                              : cut && <> · <span>last day to pay</span> <Day iso={String(cut)} /></>}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-foreground shrink-0">
+                        <Money amount={reg.priceAtRegistration} />
+                        {reg.priceProvisional && <span className="block text-end"><Badge tone="warning">not final yet</Badge></span>}
+                      </span>
+                    </div>
+                    {here && (
+                      <div role="alert" className="mt-2 text-sm text-destructive">
+                        <p>{here.sentence}</p>
+                        {here.code === 'PRICE_CHANGED'
+                          ? <p className="mt-1">The price shown is now up to date: pay again.</p>
+                          : summary.registrations.length > 1 && (
+                            <button type="button" className="mt-1 font-medium underline underline-offset-4" onClick={() => takeOff(reg.id)}>Take it off this payment</button>
+                          )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="px-4 sm:px-6 py-3 bg-muted flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-foreground">Total to pay now</span>
               <span className="text-base font-bold text-foreground">
-                <Money amount={summary.totalCost} />
+                <Money amount={payableTotal} />
               </span>
             </div>
+            {payBy && payable.length > 0 && (
+              <p className="px-4 sm:px-6 py-2 text-xs text-muted-foreground border-t border-border">
+                <span>Last day to pay</span> <Day iso={String(payBy)} />
+                {cutOffs.size > 1 && <> <span>(the earliest of these subjects)</span></>}
+              </p>
+            )}
           </div>
 
+          {apart.length > 0 && (
+            <div className="rounded-xl border border-border bg-muted p-4 text-sm text-foreground">
+              <p>
+                <bdi data-i18n-skip="true">{apart.map((r) => r.subject.name).join(', ')}</bdi><span>:</span>{' '}
+                <span>not in this payment (already paid, paid by instalments, or no longer waiting).</span>
+              </p>
+              {payable.length > 0 && <p className="mt-1 text-muted-foreground">This payment is for the others.</p>}
+            </div>
+          )}
+
+          {past.length > 0 && (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+              <p>
+                <bdi data-i18n-skip="true">{past.map((r) => r.subject.name).join(', ')}</bdi><span>:</span>{' '}
+                <span>the last day to pay has passed, so it can no longer be paid. Reserve it again while it is offered.</span>
+              </p>
+              {payable.length > 0 && <p className="mt-1">This payment is for the others.</p>}
+            </div>
+          )}
+
+          {notFinal.length > 0 && (
+            <div className="rounded-xl border border-border bg-muted p-4 text-sm text-foreground">
+              <p>
+                <span>Prices are not final yet for</span> <bdi data-i18n-skip="true">{notFinal.map((r) => r.subject.name).join(', ')}</bdi><span>:</span>{' '}
+                <span>they stay reserved, and you can pay them once the school confirms them.</span>
+              </p>
+              {payable.length > 0 && <p className="mt-1 text-muted-foreground">This payment is for the others.</p>}
+            </div>
+          )}
+
           {/* Escrow Balance */}
-          {summary.escrowBalance > 0 && (
-            <div className="bg-card rounded-xl border border-emerald-200 dark:border-emerald-700 shadow-sm overflow-hidden">
-              <div className="px-6 py-4">
-                <div className="flex items-center justify-between">
+          {summary.escrowBalance > 0 && payable.length > 0 && (
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="px-4 sm:px-6 py-4">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground font-display">Use your balance</h2>
+                    <h2 id="checkout-balance" className="text-sm font-semibold text-foreground font-display">Use your balance</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       <span>Available:</span> <Money amount={summary.escrowBalance} />
                     </p>
@@ -502,36 +640,39 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                     <input
                       type="checkbox"
                       className="sr-only peer"
+                      aria-labelledby="checkout-balance"
                       checked={applyEscrow}
                       onChange={(e) => {
                         setApplyEscrow(e.target.checked);
                         if (e.target.checked) {
-                          setEscrowAmount(Math.min(summary.escrowBalance, summary.totalCost));
+                          setEscrowAmount(Math.min(summary.escrowBalance, payableTotal));
                         }
                       }}
                     />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600" />
+                    <div className="w-11 h-6 bg-muted peer-focus-visible:ring-2 peer-focus-visible:ring-ring rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600" />
                   </label>
                 </div>
 
                 {applyEscrow && (
                   <div className="mt-4">
-                    <label className="block text-xs font-medium text-foreground mb-1">
+                    <label htmlFor="checkout-escrow" className="block text-xs font-medium text-foreground mb-1">
                       Amount to apply (EGP)
                     </label>
                     <input
+                      id="checkout-escrow"
                       type="number"
                       min="0"
-                      max={Math.min(summary.escrowBalance, summary.totalCost)}
+                      max={Math.min(summary.escrowBalance, payableTotal)}
                       step="0.01"
+                      inputMode="decimal"
                       value={escrowAmount}
                       onChange={(e) => setEscrowAmount(parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                     />
-                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span>Remaining to pay via payment method:</span>
                       <span className="font-semibold text-foreground">
-                        <Money amount={Math.max(0, summary.totalCost - escrowToApply)} />
+                        <Money amount={Math.max(0, payableTotal - escrowToApply)} />
                       </span>
                     </div>
                   </div>
@@ -541,17 +682,19 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           )}
 
           {/* Payment Method */}
+          {payable.length > 0 && (
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-border">
+            <div className="px-4 sm:px-6 py-4 border-b border-border">
               <h2 className="text-sm font-semibold text-foreground font-display">Payment Method</h2>
             </div>
-            <div className="p-4 grid grid-cols-2 gap-3">
+            <div className="p-4 grid grid-cols-1 gap-3 sm:grid-cols-2" role="group" aria-label="Payment Method">
               {ACTIVE_PAYMENT_METHODS.map((method) => (
                 <button
                   key={method}
                   type="button"
+                  aria-pressed={selectedMethod === method}
                   onClick={() => setSelectedMethod(method)}
-                  className={`p-4 rounded-xl border-2 text-sm font-medium text-left transition-all ${
+                  className={`min-h-11 p-4 rounded-xl border-2 text-sm font-medium text-start transition-all ${
                     selectedMethod === method
                       ? 'border-primary bg-primary/5 text-foreground'
                       : 'border-border text-muted-foreground hover:border-primary/40'
@@ -577,13 +720,15 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               </div>
             )}
           </div>
+          )}
 
           {/* Order Total */}
+          {payable.length > 0 && (
           <div className="bg-card rounded-xl border border-border shadow-sm p-5">
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span><Money amount={summary.totalCost} /></span>
+                <span><Money amount={payableTotal} /></span>
               </div>
               {escrowToApply > 0 && (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
@@ -597,8 +742,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               </div>
             </div>
           </div>
+          )}
 
-          {summary.familyConsentNeeded.length > 0 && (
+          {summary.familyConsentNeeded.length > 0 && payable.length > 0 && (
             <div className="bg-card rounded-xl border border-border shadow-sm p-5 space-y-2 text-sm">
               <p className="font-semibold text-foreground">The school reserved these subjects for you: confirm before paying</p>
               <label className="flex items-start gap-2">
@@ -613,24 +759,27 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           )}
 
           {submitError && (
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+            <div role="alert" className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
               {submitError}
+              {refusal?.code === 'PRICE_CHANGED' && !refusal.registrationId && <p className="mt-1">The price shown is now up to date: pay again.</p>}
             </div>
           )}
 
-          <Button
-            onClick={() => initiateMutation.mutate()}
-            disabled={initiateMutation.isPending || (summary.familyConsentNeeded.length > 0 && !(refundTick && declTick))}
-            className="w-full"
-            size="lg"
-          >
-            {initiateMutation.isPending
-              ? 'Processing...'
-              : amountDue === 0 && escrowToApply > 0
-                ? <><span>Confirm</span> <Money amount={escrowToApply} /> <span>from your balance</span></>
-                // "Pay EGP 14,350 at the school desk" (F6: was "Pay 14350.00 EGP via Pay at School").
-                : <><span>Pay</span> <Money amount={amountDue} /> <span>{selectedMethod === 'instapay' ? 'by InstaPay' : 'at the school desk'}</span></>}
-          </Button>
+          {payable.length > 0 && (
+            <Button
+              onClick={() => { setRefusal(null); setSubmitError(''); initiateMutation.mutate(); }}
+              disabled={initiateMutation.isPending || (summary.familyConsentNeeded.length > 0 && !(refundTick && declTick))}
+              className="w-full"
+              size="lg"
+            >
+              {initiateMutation.isPending
+                ? 'Processing...'
+                : amountDue === 0 && escrowToApply > 0
+                  ? <><span>Confirm</span> <Money amount={escrowToApply} /> <span>from your balance</span></>
+                  // "Pay EGP 14,350 at the school desk" (F6: was "Pay 14350.00 EGP via Pay at School").
+                  : <><span>Pay</span> <Money amount={amountDue} /> <span>{selectedMethod === 'instapay' ? 'by InstaPay' : 'at the school desk'}</span></>}
+            </Button>
+          )}
 
           <Button
             variant="ghost"

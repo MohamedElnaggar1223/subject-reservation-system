@@ -274,8 +274,8 @@ export function StudentAcademicPanel({
       const s = r?.series.find((x) => x.sessionId === v.sessionId);
       done({
         title: 'Exception granted',
-        lines: s ? [['Series:', s.name]] : [],
-        note: 'They may now register for this series. The exception can be revoked here.',
+        lines: s ? [['Session:', s.name]] : [],
+        note: 'They may now reserve in this session. The exception can be revoked here.',
       });
     },
     onError: failed,
@@ -289,7 +289,7 @@ export function StudentAcademicPanel({
       done({
         title: 'Exception revoked',
         lines: [['Registrations expired:', d.registrationsExpired]],
-        note: 'They may no longer register for that series; waiting registrations it allowed have expired, and their open checkouts closed.',
+        note: 'They may no longer reserve in that session; the waiting reservations it allowed have expired, and their open checkouts closed.',
       });
     },
     onError: (err: Error) => setRevokeError(err.message),
@@ -468,9 +468,9 @@ export function StudentAcademicPanel({
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* The exam series open now */}
-        <Block title="Exam series open now">
+        <Block title="Sessions open now">
           {r.series.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No exam series is open or being prepared.</p>
+            <p className="text-sm text-muted-foreground">No session is open or being prepared.</p>
           ) : (
             <ul className="divide-y divide-border">
               {r.series.map((s) => (
@@ -483,7 +483,7 @@ export function StudentAcademicPanel({
                     <Badge tone={s.allowed ? 'success' : 'danger'}>{s.allowed ? 'May register' : 'May not register'}</Badge>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span>Grade in this series:</span> <span>{gradeLabel(s.grade)}</span> ·{' '}
+                    <span>Grade in this session:</span> <span>{gradeLabel(s.grade)}</span> ·{' '}
                     <span dir="ltr">{shortYear(s.academicYear)}</span>
                   </p>
                   {!s.allowed && s.reason && (
@@ -609,7 +609,7 @@ export function StudentAcademicPanel({
       {dialog && typeof dialog === 'object' && (
         <ReasonModal
           title={dialog.grant.name}
-          description="Grade 10 sits the June series only. This exception lets the student register for this series; it is recorded with your reason and can be revoked here."
+          description="Grade 10 sits the June session only. This exception lets the student reserve in this session; it is recorded with your reason and can be revoked here."
           confirmLabel="Grant the exception"
           isPending={grant.isPending}
           error={dialogError}
@@ -847,7 +847,7 @@ function CohortDialog({
                 </ul>
                 {record.series.length > 0 && (
                   <>
-                    <p className="mt-2 font-medium text-foreground">In the exam series open now</p>
+                    <p className="mt-2 font-medium text-foreground">In the session open now</p>
                     <ul className="mt-1 space-y-0.5">
                       {record.series.map((s) => {
                         const year = academicYearStartFromLabel(s.academicYear);
@@ -864,7 +864,7 @@ function CohortDialog({
                   </>
                 )}
                 <p className="mt-2 text-muted-foreground">
-                  Registrations for series they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.
+                  Reservations in sessions they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.
                 </p>
               </>
             )}

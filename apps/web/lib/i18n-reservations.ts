@@ -93,11 +93,11 @@ export const reservationsArabic: Record<string, string> = {
   'Statement': 'كشف الحساب',
   'Hide statement': 'إخفاء كشف الحساب',
   // ── The family's page ──
-  'Choose your child and the session, tick what they will sit, and pay by exam series.': 'اختر ابنك والجلسة، وحدد ما سيمتحن فيه، وادفع لكل دورة امتحان.',
+  'Choose your child and the session, tick what they will sit, and pay by exam series.': 'اختر ابنك/ابنتك والجلسة، وحدد ما سيُمتحن فيه، وادفع.',
   'Tick what you will sit; your parent approves and pays.': 'حدد ما ستمتحن فيه؛ يوافق ولي أمرك ويدفع.',
-  'Child': 'الابن',
+  'Child': 'الابن/الابنة',
   'No linked children yet:': 'لا يوجد أبناء مرتبطون بعد:',
-  'link to your child': 'اربط حسابك بابنك',
+  'link to your child': 'اربط حسابك بحساب ابنك/ابنتك',
   'Reservations close': 'يُغلق الحجز',
   'not open yet: a preregistration holds the money until it opens': 'لم تُفتح بعد: التسجيل المسبق يحتجز المبلغ حتى تُفتح',
   'The school fee comes first': 'المصاريف الدراسية أولًا',
@@ -274,7 +274,7 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^Already reserved for this student in this session: (.+)$/, (m) => `محجوز بالفعل لهذا الطالب في هذه الجلسة: ${m[1]}`],
   [/^A first entry of (.+) follows no earlier sitting: choose "retake" to name one$/, (m) => `القيد الأول في ${m[1]} لا يتبع دورة سابقة: اختر «إعادة» لتسمية دورة`],
   [/^(.+) follows a sitting of (.+): the sitting named is another board's$/, (m) => `${m[1]} يتبع دورة لـ ${m[2]}: الدورة المذكورة لمجلس آخر`],
-  [/^The earlier sitting of (.+) must come before the series it is entered in$/, (m) => `يجب أن تسبق الدورة السابقة لـ ${m[1]} الدورة التي يُقيَّد فيها`],
+  [/^The earlier sitting of (.+) must come before the series it is entered in$/, (m) => `يجب أن يسبق الامتحانُ السابق لـ ${m[1]} الامتحانَ الذي يُقيَّد فيه`],
   [/^A retake of (.+) names the sitting it follows$/, (m) => `إعادة ${m[1]} تسمّي الدورة التي تتبعها`],
   [/^A payment for this line is in progress: confirm or reject it in the Finance Workbench first$/, () => 'هناك دفعة جارية لهذا السطر: أكّدها أو ارفضها في مكتب المالية أولًا'],
   [/^The finance desk verifies a sitting with the board's statement in hand: say what was seen$/, () => 'يتحقق مكتب المالية من الدورة وبيان المجلس بين يديه: اذكر ما تمت رؤيته'],
@@ -338,6 +338,10 @@ function waitAr(n: number): string {
 
 /** Sentences of these screens that carry a name, a number or a date. */
 export function translateReservationsText(text: string): string | null {
+  for (const [re, f] of FAMILY_RULES) {
+    const m = re.exec(text);
+    if (m) return f(m);
+  }
   for (const [re, f] of RULES) {
     const m = re.exec(text);
     if (m) return f(m);
@@ -356,4 +360,384 @@ export function translateReservationsText(text: string): string | null {
   const month = /^(January|June|October|November) (\d{4})$/.exec(text);
   if (month) return `${MONTHS_AR[month[1]!]} ${month[2]}`;
   return null;
+}
+
+// ─── P3: the family's and the desk's screens (COORDINATOR_REWORK.md F1–F5, §5, P3) ──────────────────────
+//
+// Words families and the desk read (the lead's "mock" row): no board jargon — no award, suite, series, sitting,
+// component, mapping, option code, provisional, cut-off or offer item, in English or Arabic; "last day to pay",
+// "prices not final yet", "the earlier exam". The parent is addressed ("your child"), the student's own view
+// addresses the student. A date not set is said plainly (موعد الدفع لم يُحدد بعد), never "pay before to be
+// announced". Subject names stay in English in Arabic (data). `apps/web/scripts/check-reservation-words.mjs`
+// checks these screens, this file and the Arabic the translator gives their phrases.
+
+/**
+ * An API sentence in the family's words: the board's words a refusal may carry (a sitting, a series, a provisional
+ * fee, an item) in theirs. Each rule is a whole word, so a subject's name or code is never touched.
+ */
+const FAMILY_WORDS: [RegExp, string][] = [
+  [/\bWhole subject\b/g, 'All papers'],
+  [/\bboard fee provisional\b/gi, 'prices not final yet'],
+  [/\bprovisional\b/gi, 'not final yet'],
+  [/\bcut-offs?\b/gi, 'last day to pay'],
+  [/\bsittings\b/gi, 'exams'],
+  [/\bsitting\b/gi, 'exam'],
+  [/\bseries\b/gi, 'exam'],
+  [/\bawards\b/gi, 'qualifications'],
+  [/\baward\b/gi, 'qualification'],
+  [/\bcomponents\b/gi, 'papers'],
+  [/\bcomponent\b/gi, 'paper'],
+  [/\bsuites\b/gi, 'sets'],
+  [/\bsuite\b/gi, 'set'],
+  [/\bmappings?\b/gi, 'links'],
+  [/\boption codes?\b/gi, 'codes'],
+  [/\boffer items?\b/gi, 'choice'],
+  [/\bThat item\b/g, 'That choice'],
+  [/\bitems\b/gi, 'choices'],
+  [/\bitem\b/gi, 'choice'],
+  // "A sitting of" → "A exam of": the article follows the new word.
+  [/\b([Aa]) (exams?|exam's)\b/g, '$1n $2'],
+];
+
+/**
+ * The school's own words are left as written: the question prompts after "Answer:" (the coordinator's text, which the
+ * page finds its question by) and anything quoted.
+ */
+export function familyWords(text: string): string {
+  if (/^Answer: /.test(text)) return text;
+  return text.split(/("[^"]*"|“[^”]*”)/).map((part, i) => {
+    if (i % 2) return part;
+    let out = part;
+    for (const [re, to] of FAMILY_WORDS) out = out.replace(re, to);
+    return out;
+  }).join('');
+}
+
+/** The family's and the desk's phrases (merged after the other dictionaries in lib/i18n.tsx: these win). */
+export const familyArabic: Record<string, string> = {
+  // P3's fix round (the lead): the checkout, the desk's balance, the reservation page.
+  'Last day to pay': 'آخر يوم للدفع',
+  '(the earliest of these subjects)': '(الأقرب بين هذه المواد)',
+  'paid by its instalments': 'تُدفع بأقساطها',
+  'no longer waiting for payment': 'لم تعد بانتظار الدفع',
+  'not in this payment (already paid, paid by instalments, or no longer waiting).': 'ليست في هذه الدفعة (مدفوعة بالفعل، أو تُدفع بالأقساط، أو لم تعد بانتظار الدفع).',
+  'Balance to use': 'المبلغ المستخدم من الرصيد',
+  'From the balance': 'من الرصيد',
+  'to take now': 'المطلوب تحصيله الآن',
+  'Ask the parent before using it. It pays the subjects and charges, not the school fee.': 'اسأل ولي الأمر قبل استخدامه. يدفع المواد والرسوم الأخرى، لا رسوم المدرسة.',
+  'Each new reservation has its own date to pay by, shown once it is reserved': 'لكل حجز جديد موعد سداد خاص به، يظهر بعد الحجز',
+  'Take off the choices:': 'احذف من الاختيارات:',
+  'What this student already reserved could not be loaded, so nothing can be picked yet.': 'تعذّر تحميل ما حجزه هذا الطالب بالفعل، فلا يمكن الاختيار بعد.',
+  'Waiting for approval': 'بانتظار الموافقة',
+  'its last day to pay has passed': 'مرّ آخر يوم للدفع',
+  'the last day to pay has passed, so it can no longer be paid. Reserve it again while it is offered.': 'مرّ آخر يوم للدفع، فلم يعد دفعها ممكنًا. احجزها مرة أخرى ما دامت معروضة.',
+  'Reserved at the school desk.': 'حُجزت في مكتب المدرسة.',
+  // The reservation page
+  'Reserve now': 'احجز الآن',
+  'Reserving for': 'الحجز لـ',
+  'Your choices': 'اختياراتك',
+  'subject': 'مادة',
+  'subjects': 'مواد',
+  'Nothing picked yet.': 'لم تختر شيئًا بعد.',
+  'when the school closes them': 'حين تغلقه المدرسة',
+  'The payment date is not set yet': 'موعد الدفع لم يُحدد بعد',
+  'Every subject open to your child this session, with its choices and their prices. Pick one choice per subject; the total is at the bottom.':
+    'كل مادة متاحة لابنك/ابنتك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ والإجمالي في الأسفل.',
+  'Every subject open to you this session, with its choices and their prices. Pick one choice per subject; your parent approves and pays.':
+    'كل مادة متاحة لك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ يوافق ولي أمرك ويدفع.',
+  'Every subject this student may take, with only the choices open to them and their prices. Pick what the parent asks for; the total is at the bottom.':
+    'كل مادة يمكن لهذا الطالب أخذها، بالخيارات المتاحة له فقط وأسعارها. اختر ما يطلبه ولي الأمر؛ والإجمالي في الأسفل.',
+  'Reservations for this session are closed. What is already reserved can still be paid.': 'الحجز في هذه الجلسة مغلق. ما حُجز بالفعل يمكن دفعه.',
+  'Prices are not final yet: you can reserve now and pay once the school confirms them.': 'الأسعار ليست نهائية بعد: يمكنك الحجز الآن والدفع حين تؤكدها المدرسة.',
+  'Prices are not final yet: reserve now, and collect once they are.': 'الأسعار ليست نهائية بعد: احجز الآن، وحصّل حين تصبح نهائية.',
+  'Reservations have not opened yet': 'لم يُفتح الحجز بعد',
+  'Taught online': 'تُدرَّس عبر الإنترنت',
+  'Not taking new reservations.': 'لا تقبل حجوزات جديدة.',
+  'Sat before: only the retake choices are shown.': 'امتُحن فيها من قبل: تظهر خيارات الإعادة فقط.',
+  'Sat it before? Show the retake choices': 'امتُحن فيها من قبل؟ اعرض خيارات الإعادة',
+  'What will your child take?': 'ماذا سيأخذ ابنك/ابنتك؟',
+  'What will you take?': 'ماذا ستأخذ؟',
+  'What will the student take?': 'ماذا سيأخذ الطالب؟',
+  'When did your child sit it?': 'متى امتُحن ابنك/ابنتك فيها؟',
+  'When did you sit it?': 'متى امتحنتَ فيها؟',
+  'When did the student sit it?': 'متى امتحن الطالب فيها؟',
+  'When did your child sit the A.S.?': 'متى امتُحن ابنك/ابنتك في A.S.؟',
+  'When did you sit the A.S.?': 'متى امتحنتَ في A.S.؟',
+  'When did the student sit the A.S.?': 'متى امتحن الطالب في A.S.؟',
+  'Not taking it': 'لن تُؤخذ',
+  'Already reserved': 'محجوزة بالفعل',
+  'waiting for payment': 'بانتظار الدفع',
+  'waiting for your approval': 'بانتظار موافقتك',
+  "waiting for your parent's approval": 'بانتظار موافقة ولي أمرك',
+  "waiting for the parent's approval": 'بانتظار موافقة ولي الأمر',
+  'price not set yet': 'السعر لم يُحدد بعد',
+  '(closed to new reservations)': '(مغلقة أمام الحجوزات الجديدة)',
+  'Teacher to be announced': 'سيُعلَن المعلم لاحقًا',
+  'The school assigns the teacher': 'تحدد المدرسة المعلم',
+  'Teacher:': 'المعلم:',
+  '(online)': '(عبر الإنترنت)',
+  'Choose the teacher…': 'اختر المعلم…',
+  'Choose…': 'اختر…',
+  'Sat in': 'امتُحن فيها في',
+  'Take it off the choices': 'احذفها من الاختيارات',
+  'It was taken off the choices.': 'حُذفت من الاختيارات.',
+  'The price shown is now up to date: reserve again.': 'السعر المعروض محدَّث الآن: احجز مرة أخرى.',
+  'Choose the teacher': 'اختر المعلم',
+  'Choose the earlier exam': 'اختر الامتحان السابق',
+  'Answer this question': 'أجب عن هذا السؤال',
+  'Pick at least one subject.': 'اختر مادة واحدة على الأقل.',
+  'Tick the refund policy and the declaration.': 'حدد سياسة الاسترداد والإقرار.',
+  'Tick that the parent read and signed the refund policy and the declaration.': 'حدد أن ولي الأمر قرأ سياسة الاسترداد والإقرار ووقّع عليهما.',
+  'Some choices are not finished: they are marked in red above.': 'بعض الاختيارات لم تكتمل: معلَّمة بالأحمر أعلاه.',
+  'A few questions from the school': 'أسئلة من المدرسة',
+  'Your answer': 'إجابتك',
+  'You can pay once the school confirms its prices.': 'يمكنك الدفع حين تؤكد المدرسة أسعارها.',
+  'Not open to this student': 'غير متاح لهذا الطالب',
+  'Grade 10: an exam month other than June': 'الصف 10: شهر امتحان غير يونيو',
+  // The statement and the slip
+  'declared by the family': 'صرّحت بها الأسرة',
+  'declared at the desk': 'صُرّح بها في المكتب',
+  'on record': 'مسجلة',
+  'before the system': 'قبل النظام',
+  'not final yet': 'ليست نهائية بعد',
+  'transfer being checked: kept until': 'التحويل قيد المراجعة: محجوزة حتى',
+  'last day to pay': 'آخر يوم للدفع',
+  'prices not final yet: payable once the school confirms them': 'الأسعار ليست نهائية بعد: تُدفع حين تؤكدها المدرسة',
+  'Your transfer is being checked by the school': 'تحويلك قيد المراجعة لدى المدرسة',
+  'its subjects are kept for it until': 'وموادّه محجوزة له حتى',
+  'Open until': 'مفتوحة حتى',
+  'Being checked': 'قيد المراجعة',
+  'Tick the refund policy and the declaration': 'حدد سياسة الاسترداد والإقرار',
+  '* Prices are not final yet: payable once the school confirms them.': '* الأسعار ليست نهائية بعد: تُدفع حين تؤكدها المدرسة.',
+  // The register page
+  'One page per child: pick the subjects, agree once, and reserve. You pay at the checkout.': 'صفحة لكل ابن/ابنة: اختر المواد، ووافق مرة واحدة، واحجز. الدفع في صفحة الدفع.',
+  'Pick what you will sit; your parent approves and pays.': 'اختر ما ستمتحن فيه؛ يوافق ولي أمرك ويدفع.',
+  'Reserve for': 'الحجز لـ',
+  'Your subjects': 'موادك',
+  'Reserved for': 'تم الحجز لـ',
+  // The checkout
+  'Cancel this checkout': 'ألغِ عملية الدفع هذه',
+  "Quote this reference (or the student's name) at the desk. Your registrations are confirmed as soon as the finance officer records your payment.":
+    'اذكر هذا المرجع (أو اسم الطالب) في المكتب. تُؤكَّد حجوزاتك بمجرد أن يسجل موظف المالية دفعتك.',
+  '1 — Transfer via InstaPay to the school account': '1 — حوّل عبر إنستاباي إلى حساب المدرسة',
+  '2 — Submit your transaction reference': '2 — أرسل مرجع التحويل',
+  'Reference submitted. The finance team will verify your transfer against the bank statement and confirm your registrations — usually within one school day.':
+    'تم إرسال المرجع. سيراجع فريق المالية تحويلك مقابل كشف البنك ويؤكد حجوزاتك — عادةً خلال يوم دراسي واحد.',
+  "You can find the reference in your InstaPay app under the transfer's details.": 'تجد المرجع في تطبيق إنستاباي ضمن تفاصيل التحويل.',
+  'Payment already started': 'الدفع بدأ بالفعل',
+  'The last day to pay has passed. Submit your transfer reference by': 'انقضى آخر يوم للدفع. أرسل مرجع التحويل قبل',
+  ': after that the payment is cancelled and the subjects are released.': ': بعده تُلغى الدفعة وتُحرَّر المواد.',
+  'Your transfer is being checked by the finance office: reference': 'تحويلك قيد المراجعة لدى مكتب المالية: المرجع',
+  'They confirm it against the bank statement, usually within one school day.': 'يؤكدونه مقابل كشف البنك، عادةً خلال يوم دراسي واحد.',
+  'Your subjects are kept for it until': 'موادك محجوزة له حتى',
+  'Quote this reference at the finance desk': 'اذكر هذا المرجع في مكتب المالية',
+  'Reference submitted. The finance team will verify it.': 'تم إرسال المرجع. سيراجعه فريق المالية.',
+  'The subjects reserved for': 'المواد المحجوزة لـ',
+  'What you are paying for': 'ما تدفع مقابله',
+  'prices not final yet: paid once the school confirms them': 'الأسعار ليست نهائية بعد: تُدفع حين تؤكدها المدرسة',
+  'The price shown is now up to date: pay again.': 'السعر المعروض محدَّث الآن: ادفع مرة أخرى.',
+  'Take it off this payment': 'احذفها من هذه الدفعة',
+  'Total to pay now': 'الإجمالي المطلوب دفعه الآن',
+  '(the earliest last day to pay of these subjects)': '(أقرب آخر يوم للدفع بين هذه المواد)',
+  'Prices are not final yet for': 'الأسعار ليست نهائية بعد لـ',
+  'they stay reserved, and you can pay them once the school confirms them.': 'تبقى محجوزة، ويمكنك دفعها حين تؤكدها المدرسة.',
+  'This payment is for the others.': 'هذه الدفعة للمواد الأخرى.',
+  "You'll get a payment reference to quote at the school finance desk. Pay by cash, card, or InstaPay at the desk — registrations confirm on the spot.":
+    'ستحصل على مرجع دفع تذكره في مكتب المالية بالمدرسة. ادفع نقدًا أو بالبطاقة أو بإنستاباي في المكتب — تُؤكَّد الحجوزات في الحال.',
+  "You'll get the school's account details to transfer the exact amount via InstaPay, then submit your transaction reference. The finance team verifies the transfer before your registrations are confirmed.":
+    'ستحصل على بيانات حساب المدرسة لتحويل المبلغ بالضبط عبر إنستاباي، ثم ترسل مرجع التحويل. يراجع فريق المالية التحويل قبل تأكيد حجوزاتك.',
+  // Registrations
+  'Refund policy: you will receive': 'سياسة الاسترداد: ستسترد',
+  'back (of': '(من',
+  "), released to the balance once the subject's receipt is returned to the school.": ')، تُضاف إلى الرصيد بمجرد إعادة إيصال المادة إلى المدرسة.',
+  'Prices are not final yet: it can be paid once the school confirms them.': 'الأسعار ليست نهائية بعد: يمكن دفعها حين تؤكدها المدرسة.',
+  'Reverting...': 'جارٍ التراجع...',
+  'Bring paper receipt': 'أحضر الإيصال الورقي',
+  'back to the school finance desk': 'إلى مكتب المالية بالمدرسة',
+  'to release your': 'لتحرير',
+  '. The drop only completes once the school has it.': '. لا يكتمل السحب إلا حين تستلمه المدرسة.',
+  'is ready to collect from the finance desk.': 'جاهز للاستلام من مكتب المالية.',
+  '— keep it safe, it must be returned if you drop or swap this subject.': '— احتفظ به، فيجب إعادته إن سحبت هذه المادة أو استبدلتها.',
+  'Reservations for this session are closed: swapping is no longer possible. A drop still is, with its refund shown first.':
+    'الحجز في هذه الجلسة مغلق: لم يعد الاستبدال ممكنًا. السحب ما زال ممكنًا، ويُعرض مبلغ الاسترداد أولًا.',
+  'Swap': 'استبدال',
+  'The refund below is credited after approval and receipt return.': 'يُضاف الاسترداد أدناه بعد الموافقة وإعادة الإيصال.',
+  'Prices are not final yet: the new subject can be paid once the school confirms them.': 'الأسعار ليست نهائية بعد: يمكن دفع المادة الجديدة حين تؤكدها المدرسة.',
+  'Old subject refunded per the refund policy below.': 'تُسترد المادة القديمة وفق سياسة الاسترداد أدناه.',
+  'awaiting payment': 'بانتظار الدفع',
+  'Select All': 'تحديد الكل',
+  'Pay Selected': 'ادفع المحدد',
+  'Pay All': 'ادفع الكل',
+  'Waiting on your parent to approve these. They will find them under "Pending Approvals" when they sign in — we have already notified them.':
+    'بانتظار موافقة ولي أمرك عليها. سيجدها تحت «طلبات بانتظار الموافقة» عند تسجيل الدخول — وقد أبلغناه بالفعل.',
+  // Approvals
+  'No subject requests': 'لا توجد طلبات مواد',
+  'None of your children are waiting on a subject-registration approval.': 'لا ينتظر أي من أبنائك موافقتك على حجز مادة.',
+  'prices not final yet': 'الأسعار ليست نهائية بعد',
+  'Student not found': 'الطالب غير موجود',
+  // The family's next step and its home
+  'is open for reservations.': 'مفتوحة للحجز.',
+  '— kept until': '— محجوزة حتى',
+  'pay by': 'الدفع قبل',
+  'Last day to pay:': 'آخر يوم للدفع:',
+  '; after it the subject can no longer be paid.': '؛ بعده لا يمكن دفع المادة.',
+  'once the school confirms its prices.': 'حين تؤكد المدرسة أسعارها.',
+  'Payable once the school confirms its prices.': 'تُدفع حين تؤكد المدرسة أسعارها.',
+  'You need a linked child before you can register subjects or pay fees. If your child already has an account, request the link; otherwise the school office can set both up for you in one visit.':
+    'تحتاج إلى ربط حساب ابنك/ابنتك قبل أن تحجز المواد أو تدفع الرسوم. إن كان لابنك/ابنتك حساب فاطلب الربط؛ وإلا فيمكن لمكتب المدرسة إعداد الحسابين لك في زيارة واحدة.',
+  'You’re all caught up': 'لا شيء ينتظرك',
+  'Nothing is owed and nothing is waiting for your approval.': 'لا شيء مستحق ولا شيء بانتظار موافقتك.',
+  'Nothing is waiting on you right now.': 'لا شيء ينتظرك الآن.',
+  'Everything outstanding for your family, in one place.': 'كل ما على أسرتك، في مكان واحد.',
+  'Here is where things stand.': 'هذا وضعك الآن.',
+  'Open now:': 'مفتوحة الآن:',
+  // The balance
+  'Held for a Subject': 'محتجز لمادة',
+  'Hold Released': 'أُفرج عن المبلغ المحتجز',
+  'Instalment Held for a Subject': 'قسط محتجز لمادة',
+  'Instalments Applied to Subject': 'الأقساط طُبّقت على المادة',
+  'Instalments Released': 'أُفرج عن الأقساط',
+  'Instalments Kept by the Plan': 'الأقساط احتفظت بها الخطة',
+  'Instalment Reversed': 'أُلغي القسط',
+  'Charge Refund': 'استرداد رسوم',
+  'held for subjects paid in instalments (applied to them when the plan is paid)': 'محتجز لمواد تُدفع بالأقساط (يُطبَّق عليها حين تُسدَّد الخطة)',
+  // The desk
+  'Cash': 'نقدًا',
+  'Receipt marked as handed to the parent.': 'سُجّل أن الإيصال سُلّم لولي الأمر.',
+  'Receipt returned — any pending drop refund is released.': 'أُعيد الإيصال — يُحرَّر أي استرداد سحب معلق.',
+  'Payment reversed — registrations back to pending payment, receipts voided. The money returned counts as money out today.':
+    'أُلغيت الدفعة — عادت الحجوزات إلى انتظار الدفع وأُبطلت الإيصالات. المبلغ المُعاد يُحسب مالًا خارجًا اليوم.',
+  'Payment reversed — registrations back to pending payment, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.':
+    'أُلغيت الدفعة — عادت الحجوزات إلى انتظار الدفع وأُبطلت الإيصالات. سُجّلت تصحيحًا ليوم تأكيدها؛ ودرج اليوم لم يتغير.',
+  'Could not search right now. Check your connection and try again.': 'تعذّر البحث الآن. تحقق من اتصالك وحاول مرة أخرى.',
+  'No student matches "': 'لا يوجد طالب يطابق «',
+  '". If they are new, use': '». إن كان جديدًا فاستخدم',
+  'to create their accounts.': 'لإنشاء حساباتهم.',
+  'Started grade 10 in': 'بدأ الصف 10 في',
+  'Hide academic record': 'إخفاء السجل الدراسي',
+  'Academic record': 'السجل الدراسي',
+  'Parents:': 'أولياء الأمور:',
+  'none linked — onboard the family above': 'لا أحد مرتبط — سجّل الأسرة أعلاه',
+  'school fee paid': 'المصاريف الدراسية مدفوعة',
+  'school fee waived — nothing to collect': 'المصاريف الدراسية معفاة — لا شيء للتحصيل',
+  'Active exceptions:': 'الاستثناءات السارية:',
+  '(outside)': '(خارجية)',
+  'e.g. Wrong student — money returned to the parent': 'مثلًا: طالب خطأ — أُعيد المبلغ لولي الأمر',
+  'Was the money returned to the family?': 'هل أُعيد المبلغ إلى الأسرة؟',
+  'Yes — the money was given back': 'نعم — أُعيد المبلغ',
+  'Cash handed back, card refunded or transfer returned. Counts as money out today.': 'نقد أُعيد، أو بطاقة استُردت، أو تحويل أُعيد. يُحسب مالًا خارجًا اليوم.',
+  'No — it was never received': 'لا — لم يُستلم أصلًا',
+  'Family onboarded — accounts ready and linked. Share the temporary passwords with them.': 'سُجّلت الأسرة — الحسابات جاهزة ومرتبطة. شارك كلمات المرور المؤقتة معهم.',
+  "Enter emails. Existing accounts are reused; new ones need a name and temporary password. The link is approved on the spot — you're vouching for them in person.":
+    'أدخل البريد الإلكتروني. تُستخدم الحسابات الموجودة؛ والجديدة تحتاج اسمًا وكلمة مرور مؤقتة. يُعتمد الربط في الحال — فأنت تضمنهم شخصيًا.',
+  'Parent email *': 'بريد ولي الأمر *',
+  'Parent name (new account)': 'اسم ولي الأمر (حساب جديد)',
+  'Temp password (new account)': 'كلمة مرور مؤقتة (حساب جديد)',
+  'Student email *': 'بريد الطالب *',
+  'Student name (new account)': 'اسم الطالب (حساب جديد)',
+  'Grade 9 (starts grade 10 next year)': 'الصف 9 (يبدأ الصف 10 العام المقبل)',
+  'Prices not final yet, collected once the school confirms them:': 'الأسعار ليست نهائية بعد، تُحصَّل حين تؤكدها المدرسة:',
+  'Past its last day to pay': 'انقضى آخر يوم لدفعها',
+  ': it can no longer be paid. Reserve it again while it is offered.': ': لم يعد ممكنًا دفعها. احجزها من جديد ما دامت معروضة.',
+  'reaches its last day to pay today': 'يحل آخر يوم لدفعه اليوم',
+  'reach their last day to pay today': 'يحل آخر يوم لدفعها اليوم',
+  ': the subjects in one, the charges in their own.': ': المواد في دفعة واحدة، والرسوم الأخرى في دفعاتها.',
+  'Something went wrong': 'حدث خطأ ما',
+  'Something went wrong fetching this data — it is not empty, it just did not load.': 'حدث خطأ أثناء جلب هذه البيانات — ليست فارغة، لكنها لم تُحمَّل.',
+  'At school': 'في المدرسة',
+  'Starts next year': 'يبدأ العام المقبل',
+  'Grade not recorded': 'الصف غير مسجل',
+  'Please write a short reason — it is stored in the audit trail.': 'اكتب سببًا قصيرًا — يُحفظ في سجل التدقيق.',
+  // The statement page; the desk's academic record (F0a's panel), in the app's word "session"
+  'Every reservation with its price and why, what is paid and what is still owed, its pay-by date and last day to pay, and the payments.':
+    'كل حجز بسعره وسببه، وما دُفع وما بقي، وموعد دفعه وآخر يوم لدفعه، والدفعات.',
+  'Session:': 'الجلسة:',
+  'They may now reserve in this session. The exception can be revoked here.': 'يمكنه الآن الحجز في هذه الجلسة. يمكن إلغاء الاستثناء من هنا.',
+  'They may no longer reserve in that session; the waiting reservations it allowed have expired, and their open checkouts closed.':
+    'لم يعد يمكنه الحجز في تلك الجلسة؛ انتهت الحجوزات المنتظرة التي سمح بها، وأُغلقت عمليات الدفع المفتوحة لها.',
+  'Sessions open now': 'الجلسات المفتوحة الآن',
+  'No session is open or being prepared.': 'لا توجد جلسة مفتوحة أو قيد الإعداد.',
+  'Grade in this session:': 'الصف في هذه الجلسة:',
+  'Grade 10 sits the June session only. This exception lets the student reserve in this session; it is recorded with your reason and can be revoked here.':
+    'يمتحن الصف 10 في جلسة يونيو فقط. يسمح هذا الاستثناء للطالب بالحجز في هذه الجلسة؛ ويُسجَّل مع سببك ويمكن إلغاؤه من هنا.',
+  'In the session open now': 'في الجلسة المفتوحة الآن',
+  'Reservations in sessions they may no longer sit expire, their open checkouts close with any money from the balance put back, and the family is told. The correction is recorded with your reason.':
+    'تنتهي الحجوزات في الجلسات التي لم يعد يمكنه الامتحان فيها، وتُغلق عمليات الدفع المفتوحة ويُعاد أي مبلغ من الرصيد، وتُبلَّغ الأسرة. يُسجَّل التصحيح مع سببك.',
+  'subject is already waiting for payment:': 'مادة بانتظار الدفع بالفعل:',
+  'subjects are already waiting for payment:': 'مواد بانتظار الدفع بالفعل:',
+  'reserve only, then collect everything in one payment under "To collect now".': 'احجز فقط، ثم حصّل كل شيء في دفعة واحدة تحت «للتحصيل الآن».',
+  // The API's sentences with no data (after familyWords)
+  'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices':
+    'أسعار هذه الجلسة ليست نهائية بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة أسعارها',
+  'The price of one or more of these subjects changed while this was open (the exam board confirmed its fee) — look at the new price and pay again':
+    'تغيّر سعر مادة أو أكثر من هذه المواد أثناء فتح هذه الصفحة (أكّد المجلس رسومه) — انظر إلى السعر الجديد وادفع مرة أخرى',
+  'One or more registrations are not ready for payment': 'حجز واحد أو أكثر غير جاهز للدفع',
+  'That choice is not on offer in this session': 'هذا الخيار غير معروض في هذه الجلسة',
+};
+
+const MONTHS_LONG_AR: Record<string, string> = {
+  January: 'يناير', February: 'فبراير', March: 'مارس', April: 'أبريل', May: 'مايو', June: 'يونيو',
+  July: 'يوليو', August: 'أغسطس', September: 'سبتمبر', October: 'أكتوبر', November: 'نوفمبر', December: 'ديسمبر',
+};
+/** A date or an exam month the API wrote ("1 November 2026", "June 2026"), its month in Arabic. */
+const dateAr = (d: string) => d.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g, (m) => MONTHS_LONG_AR[m] ?? m);
+/** "First entry in school" and the other cells, as the API names an option. */
+const OPTION_AR: Record<string, string> = {
+  'a first entry in school': 'قيد أول في المدرسة', 'a first entry in self study': 'قيد أول دراسة ذاتية',
+  'a retake in school': 'إعادة في المدرسة', 'a retake in self study': 'إعادة دراسة ذاتية',
+};
+const countAr = (n: number, one: string, many: string) => (n === 1 ? `${one} واحد` : `${n} ${many}`);
+
+/** The family's and the desk's sentences with data: the reservation's results and the refusals they show (after familyWords). */
+const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
+  [/^(\d+) registrations? in all$/, (m) => `${countAr(Number(m[1]), 'تسجيل', 'تسجيلات')} في المجموع`],
+  [/^Reserved: (\d+) reservations? waiting for payment\.$/, (m) => `تم الحجز: ${countAr(Number(m[1]), 'حجز', 'حجوزات')} بانتظار الدفع.`],
+  [/^Reserved: (\d+) reservations?\.$/, (m) => `تم الحجز: ${countAr(Number(m[1]), 'حجز', 'حجوزات')}.`],
+  [/^(\d+) reserved, not collected: prices are not final yet\.$/, (m) => `${countAr(Number(m[1]), 'حجز', 'حجوزات')} دون تحصيل: الأسعار ليست نهائية بعد.`],
+  [/^Collected EGP ([\d,.]+)\.$/, (m) => `تم تحصيل ${m[1]} جنيه.`],
+  // Refusals at a subject (Appendix A's codes; the sentences of window.services and line-rules.services).
+  [/^(.+) is not taking reservations \(it closed on (.+)\)$/, (m) => `${m[1]} لا تقبل حجوزات (أُغلقت في ${dateAr(m[2]!)})`],
+  [/^(.+) is not taking reservations$/, (m) => `${m[1]} لا تقبل حجوزات`],
+  [/^(.+): no longer taking reservations\.$/, (m) => `${m[1]}: لم تعد تقبل حجوزات.`],
+  [/^(.+): this choice is no longer offered\.$/, (m) => `${m[1]}: لم يعد هذا الخيار متاحًا.`],
+  [/^(.+) is not open for reservations yet$/, (m) => `${dateAr(m[1]!)} لم تُفتح للحجز بعد`],
+  [/^Choose the teacher of (.+)$/, (m) => `اختر معلم ${m[1]}`],
+  [/^Answer: (.+)$/, (m) => `أجب: ${m[1]}`],
+  [/^(.+) was sat before \((.+)\): reserve it as a retake$/, (m) => `امتُحن في ${m[1]} من قبل (${dateAr(m[2]!)}): احجزها إعادةً`],
+  [/^A retake of (.+) names the exam it follows$/, (m) => `إعادة ${m[1]} تسمّي الامتحان الذي تتبعه`],
+  [/^(.+) carries an earlier exam forward: name the one it is carried from$/, (m) => `${m[1]} تنقل نتيجة امتحان سابق: سمِّ الامتحان المنقول منه`],
+  [/^(.+) is not one of the earlier exams (.+) is carried from$/, (m) => `${dateAr(m[1]!)} ليس من الامتحانات السابقة التي تُنقل منها ${m[2]}`],
+  [/^(.+) and (.+) cannot be reserved together$/, (m) => `لا يمكن حجز ${m[1]} و${m[2]} معًا`],
+  [/^(.+) is already reserved in (.+) \((.+)\): the board takes one entry$/, (m) => `${m[1]} محجوزة بالفعل في ${dateAr(m[2]!)} (${dateAr(m[3]!)}): يقبل المجلس قيدًا واحدًا`],
+  [/^(.+): already reserved\.$/, (m) => `${m[1]}: محجوزة بالفعل.`],
+  [/^(.+) is self study on a second entry only: name the earlier exam, or ask for the exception$/,
+    (m) => `${m[1]} دراسة ذاتية في القيد الثاني فقط: اذكر الامتحان السابق، أو اطلب استثناءً`],
+  [/^Subjects can only be taken outside school when retaking or when the school does not offer them$/,
+    () => 'لا تُدرس المواد خارج المدرسة إلا عند الإعادة أو حين لا تقدمها المدرسة'],
+  [/^The earlier exam of (.+) must come before the exam it is entered in$/, (m) => `يجب أن يسبق الامتحانُ السابق لـ ${m[1]} الامتحانَ الذي يُقيَّد فيه`],
+  [/^An exam of (.+) more than two years before this exam is declared at the finance desk, with the board's statement$/,
+    (m) => `امتحان ${m[1]} السابق بأكثر من عامين يُصرَّح به في مكتب المالية، مع كشف المجلس`],
+  [/^A subject under an instalment plan is paid by its instalments: pay the next instalment instead$/, () => 'المادة المقسّطة تُدفع بأقساطها: ادفع القسط التالي بدلًا من ذلك'],
+  [/^Not enough in the balance: EGP ([\d,.]+) available$/, (m) => `الرصيد لا يكفي: المتاح ${m[1]} جنيه`],
+  [/^The amount from the balance cannot be more than the total cost$/, () => 'لا يمكن أن يزيد المبلغ المأخوذ من الرصيد على التكلفة الإجمالية'],
+  [/^Some of these subjects were paid or changed meanwhile: they are now shown apart\. Pay for the others\.$/,
+    () => 'دُفعت بعض هذه المواد أو تغيّرت في الأثناء: تظهر الآن منفصلة. ادفع البقية.'],
+  [/^(.+) is not offered as (a first entry in school|a first entry in self study|a retake in school|a retake in self study)$/, (m) => `${m[1]} غير معروضة ${OPTION_AR[m[2]!]}`],
+  [/^(.+) is not offered in this session$/, (m) => `${m[1]} غير معروضة في هذه الجلسة`],
+  [/^(.+) is a retake of one paper: it takes no first entry$/, (m) => `${m[1]} إعادة لورقة واحدة: لا تقبل قيدًا أول`],
+  [/^(.+): the exam board's (entry|retake) deadline \((.+)\) has passed$/, (m) => `${m[1]}: انقضى آخر موعد ${m[2] === 'retake' ? 'للإعادة' : 'للقيد'} لدى المجلس (${dateAr(m[3]!)})`],
+  [/^(.+): its exams start on (.+) and its board takes no more entries$/, (m) => `${m[1]}: تبدأ امتحاناتها في ${dateAr(m[2]!)} ولا يقبل مجلسها قيودًا أخرى`],
+  [/^(.+) was not paid by (.+), its last day to pay: it can no longer be paid — reserve it again while it is offered$/,
+    (m) => `${m[1]} لم تُدفع حتى ${dateAr(m[2]!)}، آخر يوم للدفع: لم يعد ممكنًا دفعها — احجزها من جديد ما دامت معروضة`],
+  [/^(.+)'s price is not confirmed yet: the subject is reserved, and it can be paid once the school confirms its price$/,
+    (m) => `سعر ${m[1]} لم يُؤكَّد بعد: المادة محجوزة، ويمكن دفعها حين تؤكد المدرسة سعرها`],
+  [/^(.+) is not waiting for payment$/, (m) => `${m[1]} ليست بانتظار الدفع`],
+  [/^(.+) is in grade (\d+) in (\S+), and this session takes (.+?)(\. A coordinator can grant an exception\.)?$/,
+    (m) => `${m[1]} في الصف ${m[2]} في ${m[3]}، وهذه الجلسة تقبل ${gradesAr(m[4]!)}${m[5] ? '. يمكن للمنسق منح استثناء.' : ''}`],
+  [/^(.+) finished grade 12 in (\S+), and this session takes (.+)$/, (m) => `أنهى ${m[1]} الصف 12 في ${m[2]}، وهذه الجلسة تقبل ${gradesAr(m[3]!)}`],
+];
+
+/** "grades 11 and 12 and graduates" → Arabic, word by word. */
+function gradesAr(text: string): string {
+  return text.replace(/\bgrades?\b/g, 'الصفوف').replace(/\bgraduates\b/g, 'الخريجين').replace(/ and /g, ' و').replace(/, /g, '، ');
 }

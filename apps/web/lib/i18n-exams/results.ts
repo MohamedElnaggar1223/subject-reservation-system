@@ -265,7 +265,7 @@ export const resultsArabic: Record<string, string> = {
   'Exams': 'الامتحانات',
   'Your next exams, your statement of entry to check, and your results.': 'امتحاناتك القادمة، وبيان القيد لتراجعه، ونتائجك.',
   "Your child's next exams, their statement of entry to check, and their results.": 'امتحانات ابنك القادمة، وبيان القيد لمراجعته، ونتائجه.',
-  'Child': 'الابن',
+  'Child': 'الابن/الابنة',
   'Loading your children…': 'جارٍ تحميل أبنائك…',
   'Your children did not load': 'لم يُحمَّل أبناؤك',
   'This is a connection problem. Try again.': 'هذه مشكلة اتصال. حاول مرة أخرى.',

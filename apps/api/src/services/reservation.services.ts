@@ -410,7 +410,7 @@ export async function reserveLines(
     .where(and(eq(registration.studentId, a.studentId), eq(registration.sessionId, a.sessionId), inArray(registration.status, [...LIVE]),
       inArray(registration.offerItemId, a.lines.map((l) => l.offerItemId))));
   if (held.length) {
-    throw new ReservationError(`Already reserved for this student in this session: ${held.map((h) => itemName({ kind: h.kind, subjectName: h.subjectName, label: h.label })).join(', ')}`, 409);
+    throw coded(new ReservationError(`Already reserved for this student in this session: ${held.map((h) => itemName({ kind: h.kind, subjectName: h.subjectName, label: h.label })).join(', ')}`, 409), 'ALREADY_RESERVED');
   }
   const lines = await resolveReservationLines(tx, { studentId: a.studentId, sessionId: a.sessionId, lines: a.lines, declaredBy: a.declaredBy, actorId: a.requestedBy });
   const { declaredBy: _d, channel, lines: asked, answers, ...rest } = a;
