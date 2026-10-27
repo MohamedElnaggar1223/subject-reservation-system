@@ -5,7 +5,7 @@ import { referenceFixture } from './reference-fixture';
 
 /**
  * 08u — the school's forms in the subject editor (COORDINATOR_REWORK.md D2–D10, §6; rewritten for P1a from
- * F6a's one-form-per-subject route, `PUT /sessions/:id/offers/:offerId/form`, which is deprecated).
+ * F6a's one-form-per-subject route, `PUT /sessions/:id/offers/:offerId/form`, which left with P1c).
  *
  * The shapes the school's forms have (SCHOOL_FORMS.md §2), each saved whole through
  * `PUT /sessions/:id/offerings/:offeringId` and read back as the family page reads it (the preview):
@@ -272,27 +272,11 @@ describe("08u: the school's forms in the subject editor", () => {
     expect(await sql(`select 1 as one from session_board_series where session_id = $1 and board_series_id = $2`, [winter, lonely])).toEqual([]);
   });
 
-  it("the deprecated one-form-per-subject route on a subject priced by its rows: it neither rewrites a row's options (here unticking the first entry its reservations use) nor moves a row with reservations to another sitting — refused, nothing changed", async () => {
-    const { PRICED_BY_ROWS_REFUSAL } = await import('../src/services/offer.services');
-    const ar = await view(winter, offering.arWinter!);
-    const u1 = rowOf(ar, 'waa01');
-    const name = ar.subject.name;
-    const form = (item: { availability: 'open' | 'retake_only'; seriesMonth?: 'october' | 'january' }) => coordinator.api.v1.sessions[':id'].offers[':offerId'].form.$put({
-      param: { id: winter, offerId: ar.id },
-      json: {
-        teachers: ar.teachers.map((t) => ({ teacherId: t.teacherId, mode: t.online ? 'online' as const : 'in_school' as const })),
-        availability: 'open', courseFee: ar.courseFee!, grade10Core: false, courseStartsOn: null, notes: ar.note, reason: 'the old screen',
-        items: [{ itemId: u1.id, courseFee: null, ...item }],
-      },
-    });
-    const before = await sql(`select id, first_in_school, retake_in_school, availability, board_series_id from session_offer_item where offer_id = $1 order by id`, [ar.id]);
-    const lines = await sql(`select id, board_series_id from registration where offer_item_id = $1 order by id`, [u1.id]);
-    expect(lines.length).toBeGreaterThan(0);
-    expect(await refused(form({ availability: 'retake_only' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL(name, 'what it offers') });
-    expect(await refused(form({ availability: 'open', seriesMonth: 'october' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL(name, 'the sitting of a row with reservations') });
-    expect(await sql(`select id, first_in_school, retake_in_school, availability, board_series_id from session_offer_item where offer_id = $1 order by id`, [ar.id])).toEqual(before);
-    expect(await sql(`select id, board_series_id from registration where offer_item_id = $1 order by id`, [u1.id])).toEqual(lines);
-  });
+  // 'the deprecated one-form-per-subject route on a subject priced by its rows: … refused, nothing changed' retired with
+  // the route (P1c: `PUT /sessions/:id/offers/:offerId/form` and the links sheet's other routes are gone, and with them
+  // PRICED_BY_ROWS_REFUSAL). No money moved in it; what it protected — a cell reservations use stays ticked, a row's
+  // sitting does not move under its reservations — is this file's "a row's sitting does not move" and 08y's
+  // "reservations are protected".
 
   it("a Cambridge A level's three routes: A.S. offered at its fee, A.2. carried forward in self study (its own first entry after the A.S., and a retake) asking its earlier sitting, A.L. not this cycle — one choice", async () => {
     const cs = await add(june, { referenceCode: '9618', board: 'cambridge' });

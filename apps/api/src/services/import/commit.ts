@@ -8,7 +8,7 @@
  * its accounts, links, section places, course enrolments, registration
  * history, lines awaiting payment (when a series is mapped to its session: the
  * admin's — each on the offer and item the sheet's words name, its attempt and
- * mode from the note, priced from the series' fee grid by insertLines, the
+ * mode from the note, priced from its row's fees by insertLines, the
  * sheet's confirmation recorded as its consent on the imported channel) and
  * money history — every row it makes pointing back to
  * its line, every account and link audited, one IMPORT_FAMILY_COMMITTED row
@@ -498,8 +498,8 @@ async function commitFamily(
  * them (RESERVATIONS_REWORK.md §6, §9's F7 list): the student held first (assertMayRegisterForInTx,
  * FOR NO KEY UPDATE), the session open for each line (its series' effective deadline), the school-fee
  * gate, then insertLines — the rework's locks in their order, assertLineRules, priceLine from the
- * series' fee grid (a missing row refused, naming the grid; a provisional one priced provisional,
- * never 0), the due date and the teacher — on the offer item the review found, with the attempt,
+ * row's own fees (a fee not set refused, never 0; provisional while the session's prices are not
+ * final), the due date and the teacher — on the offer item the review found, with the attempt,
  * mode and sitting the sheet gives: a sitting from the student's legacy history ('legacy') or named
  * on the sheet or the line ('declared_by_desk', listed on To verify), made as a board series with no
  * dates when not on record. The sheet's confirmation is the family's consent on the imported

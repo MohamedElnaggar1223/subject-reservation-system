@@ -331,9 +331,10 @@ export async function setPricesFinal(id: string, data: PricesFinalType, actorId:
         await logAction(actorId, 'SESSION_PRICES_FINAL', 'session', id, { pricesFinal: true }, { pricesFinal: false }, ctx, tx);
         return { saved: true, impact: NO_IMPACT, dueDatesMoved: 0 };
       }
-      // A waiting line priced from a fee not confirmed, on a row with no exam fee of its own (an older line priced
-      // from the deprecated fee grid): switching final would leave it unpayable under a session that reads "prices
-      // final". Refused, its rows named, until their exam fees are set (L-lead of the P1b review).
+      // A waiting line priced from a fee not confirmed, on a row with no exam fee of its own (a line priced from the
+      // fee grid before P1c dropped it, on a row whose grid rows were missing): switching final would leave it unpayable
+      // under a session that reads "prices final". Refused, its rows named, until their exam fees are set (L-lead of
+      // the P1b review).
       const unpriced = await tx.select({ subject: subject.name, kind: sessionOfferItem.kind, label: sessionOfferItem.label, lines: sql<number>`count(*)::int` })
         .from(registration)
         .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))

@@ -14,7 +14,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, itemDisplayLabel, policySentence, type PolicyScope, type RegistryPolicyKey, formatEgp } from '@repo/validations';
+import { apiResponse, policySentence, type PolicyScope, type RegistryPolicyKey, formatEgp } from '@repo/validations';
+import { useI18n } from '~/lib/i18n';
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money, fetchSessions, SESSIONS_KEY } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
@@ -82,7 +83,9 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
   const parents = (summary.data?.parents ?? []).filter((p) => p.linkStatus === 'approved');
   const lines = (summary.data?.registrations ?? []).filter((r) => !['expired', 'rejected', 'dropped'].includes(r.status));
   const student = students.data?.students.find((s) => s.id === studentId);
-  const offer = offers.data?.offers.find((o) => o.id === scope.offerId);
+  // The session's subjects and their rows as the family read gives them (offerings → rows; P1c: the read's v1 part left).
+  const offer = offers.data?.offerings.find((o) => o.id === scope.offerId);
+  const { language: lang } = useI18n();
   const line = lines.find((l) => l.id === scope.registrationId);
 
   const grouped = useMemo(() => data.groups.map((g) => ({ ...g, policies: data.policies.filter((p) => p.group === g.id) })), [data]);
@@ -109,8 +112,8 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
   const scopeWords = [
     scope.sessionId && sessions.data?.find((x) => x.id === scope.sessionId)?.name,
     scope.subjectId && subjects.data?.find((x) => x.id === scope.subjectId)?.name,
-    scope.offerId && offer?.subject.name,
-    scope.offerItemId && offer?.items.find((i) => i.id === scope.offerItemId)?.label,
+    scope.offerId && offer?.name,
+    scope.offerItemId && offer?.rows.find((r) => r.id === scope.offerItemId)?.label[lang],
     line && `${line.subject?.name ?? ''} · ${line.session?.name ?? ''}`,
     scope.chargeId && charges.data?.find((c) => c.id === scope.chargeId)?.description,
     scope.boardSeriesId && seriesLabel(series.data?.find((x) => x.id === scope.boardSeriesId)),
@@ -267,7 +270,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.offer} htmlFor="exc-scope-offer" hint={!studentId ? 'Pick the student first.' : !offerSession ? 'Pick the session first.' : undefined}>
                 <select id="exc-scope-offer" value={scope.offerId ?? ''} disabled={!offers.data} onChange={(e) => setScopeField('offerId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">{accepts.has('offer') ? 'Any' : 'Pick the subject…'}</option>
-                  {(offers.data?.offers ?? []).map((o) => <option key={o.id} value={o.id}>{o.subject.name}</option>)}
+                  {(offers.data?.offerings ?? []).map((o) => <option key={o.id} value={o.id} data-i18n-skip="true">{o.name}</option>)}
                 </select>
               </Field>
             )}
@@ -275,7 +278,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.item} htmlFor="exc-scope-item">
                 <select id="exc-scope-item" value={scope.offerItemId ?? ''} disabled={!offer} onChange={(e) => setScopeField('offerItemId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">Any</option>
-                  {(offer?.items ?? []).map((i) => <option key={i.id} value={i.id}>{itemDisplayLabel(i)}</option>)}
+                  {(offer?.rows ?? []).map((r) => <option key={r.id} value={r.id} data-i18n-skip="true">{r.label[lang]}</option>)}
                 </select>
               </Field>
             )}

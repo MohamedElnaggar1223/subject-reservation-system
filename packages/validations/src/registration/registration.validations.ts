@@ -78,15 +78,6 @@ export const DirectRegistration = z.object({
 });
 export type DirectRegistrationType = z.infer<typeof DirectRegistration>;
 
-// ─── Parent: Preregistration for a Future Session (V3 §6.8) ─────────────────
-
-/**
- * Parent preregisters subjects for a DRAFT (not-yet-open) session.
- * Price locks at preregistration time (D-E). Payment lands in the
- * held wallet and is auto-captured when the session activates.
- */
-export const PreregisterRegistration = DirectRegistration;
-export type PreregisterRegistrationType = z.infer<typeof PreregisterRegistration>;
 
 // ─── Parent: Approve Pending Registrations ───────────────────────────────────
 

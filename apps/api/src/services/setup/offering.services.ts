@@ -10,10 +10,8 @@
  * (D6) and the row's own teachers (D4).
  *
  * The system derives the rest (A3): the label (D9), the exclusive group (D8), whether the sitting
- * carried from is asked (D6, the board rule), the row's board series (created when not on record and
- * linked to the session), and — until P1b drops them — today's columns kept in step: the offer's and
- * the row's availability from the switch and the cells, so the reservation path P1b has not replaced
- * yet offers what the cells allow.
+ * carried from is asked (D6, the board rule) and the row's board series (created when not on record and
+ * linked to the session). The availability columns once kept in step with the switch and the cells left with P1c.
  *
  * Locks (§9.2): the session FOR SHARE, the offering FOR UPDATE, its rows FOR UPDATE in id order, then
  * (planReprice) the lines FOR UPDATE and their payment history. A price change answers its impact
@@ -39,7 +37,7 @@ import { deriveFollowingFees } from './price-list.services';
 import { rowLabel, labelRowOf } from './labels';
 import { WHOLE_ITEM_LABEL } from '@repo/validations';
 import {
-  availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
+  exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
   NO_CELLS, isLiveStatus, LIVE_LINE_STATUSES, beyondCarryForward, type Cells,
 } from './model';
 import {
@@ -120,13 +118,8 @@ const CELL_OPTION: Record<keyof Cells, { attempt: 'first' | 'retake'; mode: 'in_
   firstSelfStudy: { attempt: 'first', mode: 'self_study', words: 'first entry in self study' },
 };
 
-/** The offer's availability kept in step with its switch and close date (today's line rules read it until P1b). */
-const offerAvailability = (accepting: boolean, closesAt: Date | null, now = new Date()) =>
-  accepting && !(closesAt && closesAt <= now) ? 'open' : 'closed';
-
-/** A row's availability kept in step with its cells and close date. */
-const rowAvailability = (cells: Cells, closesAt: Date | null, now = new Date()) =>
-  closesAt && closesAt <= now ? 'closed' : availabilityOf(cells);
+/** Whether a subject takes reservations: its switch on and its close date, if any, not reached (C4). */
+const subjectOpen = (accepting: boolean, closesAt: Date | null, now = new Date()) => accepting && !(closesAt && closesAt <= now);
 
 // ─── Teachers (D4) ───────────────────────────────────────────────────────────
 
@@ -399,7 +392,6 @@ async function writeRow(
     label, kind, referenceKey: ref?.key ?? (input.referenceKey === null ? null : existing?.referenceKey ?? null), referenceCodes: codes,
     boardSeriesId: seriesId, closesAt, payBy, examFee, examFeeSource, priceListRowId, courseFee, selfStudyFee,
     ...cells,
-    availability: rowAvailability(cells, closesAt, now),
     needsPriorSeries: needsPrior,
     exclusiveGroup: exclusiveGroupFor(kind),
     allowedPriorSeriesIds: priors ?? existing?.allowedPriorSeriesIds ?? [],
@@ -422,7 +414,7 @@ async function writeRow(
   const before = {
     label: existing.label, kind: existing.kind, referenceKey: existing.referenceKey, referenceCodes: existing.referenceCodes, boardSeriesId: existing.boardSeriesId,
     closesAt: existing.closesAt, payBy: existing.payBy, examFee: existing.examFee, examFeeSource: existing.examFeeSource, priceListRowId: existing.priceListRowId,
-    courseFee: existing.courseFee, selfStudyFee: existing.selfStudyFee, ...cellsOf(existing), availability: existing.availability,
+    courseFee: existing.courseFee, selfStudyFee: existing.selfStudyFee, ...cellsOf(existing),
     needsPriorSeries: existing.needsPriorSeries, exclusiveGroup: existing.exclusiveGroup, allowedPriorSeriesIds: existing.allowedPriorSeriesIds,
     keptPriorSeriesIds: existing.keptPriorSeriesIds, sortOrder: existing.sortOrder,
     cellsByDefault: existing.cellsByDefault,
@@ -449,8 +441,8 @@ async function removeRow(tx: Tx, c: RowContext, row: ItemRow, lines: Awaited<Ret
   const live = mine.filter((l) => isLiveStatus(l.status)).reduce((a, l) => a + l.n, 0);
   if (live) throw new SetupError(`${row.label} has ${live} reservation${live === 1 ? '' : 's'}: a row with reservations is not removed — close it instead (they stand)`, 409);
   if (mine.length) {
-    await tx.update(sessionOfferItem).set({ ...NO_CELLS, availability: 'closed', closesAt: row.closesAt ?? new Date(), updatedAt: new Date() }).where(eq(sessionOfferItem.id, row.id));
-    await logAction(c.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', row.id, { ...cellsOf(row), availability: row.availability }, { ...NO_CELLS, availability: 'closed', reason: 'Removed from the subject: kept closed for its history' }, undefined, tx);
+    await tx.update(sessionOfferItem).set({ ...NO_CELLS, closesAt: row.closesAt ?? new Date(), updatedAt: new Date() }).where(eq(sessionOfferItem.id, row.id));
+    await logAction(c.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', row.id, { ...cellsOf(row) }, { ...NO_CELLS, reason: 'Removed from the subject: kept closed for its history' }, undefined, tx);
     return;
   }
   await tx.delete(sessionOfferItem).where(eq(sessionOfferItem.id, row.id));
@@ -515,7 +507,7 @@ export async function addOffering(sessionId: string, input: AddOfferingType, act
       // fees the board rule fills reach no family before then; the check list says so).
       const accepting = !takesReservations(session);
       const [offer] = await tx.insert(sessionOffer).values({
-        id, sessionId, subjectId: subjectRow.id, availability: accepting ? 'open' : 'closed', courseFee: null, referenceCode, teacherChoice: 'families', teacherTbc: false,
+        id, sessionId, subjectId: subjectRow.id, courseFee: null, referenceCode, teacherChoice: 'families', teacherTbc: false,
         accepting, closesAt: null, sortOrder: n, createdBy: actorId,
       }).returning();
       // The reference's suggested rows (D2), no cell ticked: she ticks what the school offers.
@@ -565,7 +557,7 @@ export async function copyOfferingInto(tx: Tx, session: SessionRow, src: OfferRo
   };
   const id = randomUUID();
   const [offer] = await tx.insert(sessionOffer).values({
-    id, sessionId: session.id, subjectId: s.id, availability: takesReservations(session) ? 'closed' : 'open', courseFee: src.courseFee, courseStartsOn: null, grade10Core: false, notes: src.notes,
+    id, sessionId: session.id, subjectId: s.id, courseFee: src.courseFee, courseStartsOn: null, grade10Core: false, notes: src.notes,
     referenceCode: src.referenceCode, teacherChoice: src.teacherChoice, teacherTbc: src.teacherTbc, accepting: !takesReservations(session), closesAt: roll(src.closesAt),
     sortOrder: src.sortOrder ?? n, createdBy: actorId,
   }).returning();
@@ -653,13 +645,13 @@ export async function updateOffering(sessionId: string, offeringId: string, data
       if (data.courseFee !== undefined && data.courseFee !== offer.courseFee) next.courseFee = data.courseFee;
       const accepting = next.accepting ?? offer.accepting;
       const closesAt = next.closesAt !== undefined ? next.closesAt : offer.closesAt;
-      const availability = offerAvailability(accepting, closesAt ?? null, now);
-      if (availability !== offer.availability) next.availability = availability;
+      const wasOpen = subjectOpen(offer.accepting, offer.closesAt, now);
+      const isOpen = subjectOpen(accepting, closesAt ?? null, now);
       // Her "Looks right": the pre-load's notes leave the check list (an unrelated save keeps them).
       if (data.notesReviewed && offer.checkNotes.length) next.checkNotes = [];
       const live = (ids: string[]) => lines.filter((l) => ids.includes(l.itemId) && isLiveStatus(l.status)).reduce((a, l) => a + l.n, 0);
       // Closing the subject (its switch off, or a close date reached): the reservations that stand are counted.
-      if (offer.availability !== 'closed' && availability === 'closed') linesAffected += live(rows.map((r) => r.id));
+      if (wasOpen && !isOpen) linesAffected += live(rows.map((r) => r.id));
       if (Object.keys(next).length) {
         await tx.update(sessionOffer).set({ ...next, updatedAt: now }).where(eq(sessionOffer.id, offeringId));
         await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offeringId,
@@ -893,8 +885,6 @@ export async function offeringsView(executor: Executor, sessionId: string, offer
         teachers: rowTeachers.filter((t) => t.itemId === r.id).map(({ teacherId, name, kind, mode }) => ({ teacherId, name, external: kind === 'provider', online: mode === 'online' })),
         sortOrder: r.sortOrder,
         cellsByDefault: r.cellsByDefault,
-        // A row made by the deprecated routes keeps its fee keys until P1b (priced from the fee grid).
-        legacyFeeKeys: r.examFee === null && r.entersKind !== 'subject',
         lines: {
           live: counts.filter((x) => isLiveStatus(x.status)).reduce((a, x) => a + x.n, 0),
           all: counts.reduce((a, x) => a + x.n, 0),

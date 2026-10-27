@@ -16,7 +16,7 @@
  * days it makes the line's cut-off (window.services.ts, the cut-off sweep in overdue.services.ts).
  */
 
-import { db, registration, registrationSession, sessionOfferItem, boardFee, sql, eq, and, inArray } from '@repo/db';
+import { db, registration, registrationSession, sessionOfferItem, sql, eq, and, inArray } from '@repo/db';
 import { getSetting } from './settings.services';
 import { lineExceptions, type ExceptionScope } from './line-exceptions';
 import { logActions } from './audit.services';
@@ -141,34 +141,21 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
     .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
     .where(eq(registration.id, input.lineId));
   if (!line) throw new Error('Registration not found');
-  // When the price stopped being provisional: a v2 line (the coordinator rework) when its session's
-  // prices were switched final (§6: switching them final re-dates every waiting line from prices_final_at);
-  // a v1 line when the last fee row its basis read was confirmed. A v1 line priced from a fee its basis
-  // recorded as provisional, on a row now priced by its own exam fee, was made payable by one of two acts,
-  // told apart by the old Confirm's own condition (board-fee.services settleLinesOfConfirmed): every row its
-  // basis recorded confirmed at the amount it recorded — the Confirm cleared it, at its confirmation time;
-  // otherwise the prices-final switch did (a converted line, M3b), at prices_final_at, so every later re-date
-  // keeps the grace the switch gave it. A line that was never provisional keeps its own rule, and so does one
-  // the Confirm cleared (0066 stamped legacy sessions prices-final at the migration: that moment says nothing
-  // about their price — P1b fix 1).
+  // When the price stopped being provisional: a v2 line (the coordinator rework) when its session's prices were
+  // switched final (§6: switching them final re-dates every waiting line from prices_final_at). A v1 line (priced from
+  // the fee grid before P1c dropped it): the time its basis keeps (`feeConfirmedAt`, written by migration 0072 from the
+  // grid's last word — the last confirmation of the rows it read, or prices_final_at for a line the old Confirm did not
+  // clear, P1b fix 1); a v1 line made payable since by the prices-final switch (priced provisional, its row given the
+  // grid's amount by 0072): prices_final_at; one never provisional: none (its fee was confirmed before it was reserved).
   let feeConfirmedAt: Date | null = null;
-  if ((line.pricingBasis as { v?: number } | null)?.v === 2) {
+  const basis = line.pricingBasis as { v?: number; feeConfirmedAt?: string | null; feeRows?: { provisional?: boolean }[] } | null;
+  if (basis?.v === 2) {
     feeConfirmedAt = !line.priceProvisional ? line.pricesFinalAt : null;
+  } else if (basis && 'feeConfirmedAt' in basis) {
+    feeConfirmedAt = basis.feeConfirmedAt ? new Date(basis.feeConfirmedAt) : null;
   } else {
-    const basisRows = (line.pricingBasis as { feeRows?: { id: string; amount?: number; provisional?: boolean }[] } | null)?.feeRows ?? [];
-    const feeIds = basisRows.map((f) => f.id);
-    const rows = feeIds.length
-      ? await executor.select({ id: boardFee.id, amount: boardFee.amount, provisional: boardFee.provisional, confirmedAt: boardFee.confirmedAt })
-        .from(boardFee).where(inArray(boardFee.id, feeIds))
-      : [];
-    const confirmed = rows.map((r) => r.confirmedAt).filter((d): d is Date => !!d);
-    feeConfirmedAt = !line.priceProvisional && confirmed.length ? new Date(Math.max(...confirmed.map((d) => d.getTime()))) : null;
-    const pricedProvisional = basisRows.some((f) => f.provisional);
-    const confirmedAsRecorded = basisRows.length > 0
-      && basisRows.every((f) => rows.some((r) => r.id === f.id && !r.provisional && r.amount === f.amount));
-    if (!line.priceProvisional && pricedProvisional && line.rowExamFee !== null && line.pricesFinalAt && !confirmedAsRecorded) {
-      feeConfirmedAt = line.pricesFinalAt;
-    }
+    const pricedProvisional = (basis?.feeRows ?? []).some((f) => f.provisional);
+    feeConfirmedAt = !line.priceProvisional && pricedProvisional && line.rowExamFee !== null ? line.pricesFinalAt : null;
   }
   const [deadline, exc] = await Promise.all([
     effectiveDeadlineFor(executor, line),

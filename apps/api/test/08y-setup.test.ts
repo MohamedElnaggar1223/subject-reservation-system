@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, deriveSessionName } from '@repo/validations';
 import {
-  admin, staff, onboard, refused, refusedWithCode, one, sql, money, notified, confirmed, pauseAtAudit, lockWaiters, CONSENT, type Client, type Impact, cairoDateIn,
+  admin, staff, onboard, refused, refusedWithCode, one, sql, money, notified, confirmed, pauseAtAudit, lockWaiters, holdRowLock, CONSENT, type Client, type Impact, cairoDateIn,
 } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
@@ -196,9 +196,10 @@ describe('08y: the coordinator sets up a session', () => {
     expect(saved.offering.rows.map((r) => r.cellsByDefault.length)).toEqual([3, 0]);
     await apiResponse(put(coordinator, offering.bio!, { defaultsReviewed: true }));
     expect((await offeringOf(coordinator, offering.bio!)).rows.map((r) => r.cellsByDefault)).toEqual([[], []]);
-    // The old columns kept in step for the reservation path P1b has not replaced yet.
-    expect(await sql(`select kind, availability, exclusive_group as g from session_offer_item where offer_id = $1 order by sort_order`, [offering.bio!]))
-      .toEqual([{ kind: 'all_papers', availability: 'open', g: 'entry' }, { kind: 'paper', availability: 'self_study_only', g: 'entry' }]);
+    // D8's group as stored (P1c: the old availability columns once kept in step with the cells are dropped, 0072; the
+    // cells above are what a row offers).
+    expect(await sql(`select kind, exclusive_group as g from session_offer_item where offer_id = $1 order by sort_order`, [offering.bio!]))
+      .toEqual([{ kind: 'all_papers', g: 'entry' }, { kind: 'paper', g: 'entry' }]);
     // Asked again, the board rule gives the same fee: nothing changes.
     expect(await apiResponse(coordinator.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: june, rowId: row.bioPaper! }, json: { source: 'board_rule' } })))
       .toEqual({ saved: true, impact: { repriced: 0, listedForFinance: 0, linesAffected: 0, dueDatesMoved: 0, cutOffsEarlier: 0, cutOffsPassed: 0 }, examFee: 10850, examFeeSource: 'board_rule' });
@@ -322,7 +323,8 @@ describe('08y: the coordinator sets up a session', () => {
     offering.arabic = ar.id;
     expect(ar).toMatchObject({ accepting: false, offeredToFamilies: false });
     expect(ar.rows.find((r) => r.kind === 'qualification')!.cellsByDefault.length).toBe(3);
-    expect(await one(`select availability, accepting from session_offer where id = $1`, [ar.id])).toEqual({ availability: 'closed', accepting: false });
+    // (P1c: the switch alone; the old availability column it was kept in step with is dropped, 0072.)
+    expect(await one(`select accepting from session_offer where id = $1`, [ar.id])).toEqual({ accepting: false });
     expect((await sessionOf(coordinator, june)).checkList.filter((c) => c.offeringId === ar.id).map((c) => c.code)).toContain('switched_off');
     const f = await onboard(officer, `y08-off-${RUN}`, 11);
     expect((await familyRead(f)).offerings.map((o) => o.id)).not.toContain(ar.id);
@@ -352,8 +354,9 @@ describe('08y: the coordinator sets up a session', () => {
       ['Retake · self study 50% · Paper 41/42 only', 12350, true, [`November ${Y - 1}`, `June ${Y - 1}`]],
     ]);
     expect(paper!.knownSitting).toBeNull();
-    // Today's read is still there for the Reserve page P3 replaces.
-    expect(read.offers.length).toBeGreaterThan(0);
+    // P1c: the read's v1 part (offers, availability, grade10Core, declarableSittings) left; what stays is the session, the
+    // eligibility and the offerings.
+    expect(Object.keys(read).sort()).toEqual(['eligibility', 'offerings', 'session']);
   });
 
   it('prices final (E6): a line reserved before is not payable; switched on, the counts first (lines made payable, due dates moved), then it is; one-way once a line exists', async () => {
@@ -417,8 +420,10 @@ describe('08y: the coordinator sets up a session', () => {
       expect((await lineOf(unpaidLine)).price).toBe(14350);
     });
 
-    it('reservations are protected: a cell they use stays ticked, a row they use is not removed, a subject they hold is not deleted (close it instead); the deprecated routes change neither its course fee nor whether it is open; its board does not change under it', async () => {
+    it('reservations are protected: a cell they use stays ticked, a row they use is not removed, a subject they hold is not deleted (close it instead), nothing changed; its board does not change under it', async () => {
       const cells = (first: boolean) => ({ firstInSchool: first, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false });
+      const linePrices = () => sql(`select id, price_at_registration::float as p from registration where session_id = $1 order by id`, [june]);
+      const pricesBefore = await linePrices();
       expect(await refused(put(coordinator, offering.bio!, { rows: [
         { id: row.bioAll, kind: 'all_papers', cells: cells(false) },
         { id: row.bioPaper, kind: 'paper', cells: { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: true, firstSelfStudy: false } },
@@ -427,50 +432,9 @@ describe('08y: the coordinator sets up a session', () => {
         .toMatchObject({ status: 409, error: expect.stringContaining('is not removed — close it instead') });
       expect(await refused(coordinator.api.v1.sessions[':id'].offerings[':offeringId'].$delete({ param: { id: june, offeringId: offering.bio! } })))
         .toEqual({ status: 409, error: 'Biology has reservations in this session: close it instead (they stand)' });
-      // The old Session screen's routes would re-price and count nothing: a subject priced by its rows refuses them.
-      const { PRICED_BY_ROWS_REFUSAL } = await import('../src/services/offer.services');
-      const linePrices = () => sql(`select id, price_at_registration::float as p from registration where session_id = $1 order by id`, [june]);
-      const pricesBefore = await linePrices();
-      const oldOffer = (json: { courseFee?: number; availability?: 'closed' | 'retake_only'; notes?: string; reason?: string }) =>
-        coordinator.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: june, offerId: offering.bio! }, json });
-      expect(await refused(oldOffer({ courseFee: 4000, reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'its course fee') });
-      expect(await refused(oldOffer({ availability: 'closed', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'closing it') });
-      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { courseFee: 500, reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'its course fee') });
-      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { availability: 'closed', reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'closing it') });
-      // Any availability write rewrites the rows' cells: refused whether it would untick an option reservations use
-      // (first entry in school), re-tick one she unticked (the paper's first entry: open), or switch a switched-off
-      // subject back on — on the offer and the item.
-      expect(await refused(oldOffer({ availability: 'retake_only', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
-      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioAll! }, json: { availability: 'self_study_only', reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
-      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioPaper! }, json: { availability: 'open', reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
-      // Switched off by her (its reservations counted first), the old route does not switch it back on.
-      const switchBio = (accepting: boolean) => confirmed((expected?: Impact) => apiResponse(put(coordinator, offering.bio!, { accepting, ...(expected ? { expected } : {}) })));
-      await switchBio(false);
-      expect(await refused(oldOffer({ availability: 'retake_only', reason: 'the old screen' }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
-      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: june, offerId: offering.bio! }, json: { availability: 'open', reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'what it offers') });
-      expect(await one(`select accepting, availability from session_offer where id = $1`, [offering.bio!])).toEqual({ accepting: false, availability: 'closed' });
-      await switchBio(true);
-      // The item route's series change on a row with reservations (§6: the editor refuses it too).
-      const otherJune = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y, label: `${label}-other` } }))).id;
-      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: june, offerId: offering.bio!, itemId: row.bioAll! }, json: { boardSeriesId: otherJune, reason: 'the old screen' } })))
-        .toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'the sitting of a row with reservations') });
-      // The old one-form-per-subject route: its course fee and its "not offered this cycle" alike.
-      const asForm = async () => {
-        const o = await offeringOf(coordinator, offering.bio!);
-        return {
-          teachers: o.teachers.map((t) => ({ teacherId: t.teacherId, mode: t.online ? 'online' as const : 'in_school' as const })),
-          availability: 'open' as 'open' | 'closed', courseFee: o.courseFee!, items: [], grade10Core: false, courseStartsOn: null, notes: o.note, reason: 'the old screen',
-        };
-      };
-      const form = (json: Awaited<ReturnType<typeof asForm>> & { linesStand?: boolean }) =>
-        coordinator.api.v1.sessions[':id'].offers[':offerId'].form.$put({ param: { id: june, offerId: offering.bio! }, json });
-      expect(await refused(form({ ...(await asForm()), courseFee: 4000 }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'its course fee') });
-      expect(await refused(form({ ...(await asForm()), availability: 'closed', linesStand: true }))).toEqual({ status: 409, error: PRICED_BY_ROWS_REFUSAL('Biology', 'closing it') });
+      // P1c: the old Session screen's routes (offers, items, the one-form-per-subject form) left, and with them their
+      // refusal on a subject priced by its rows (PRICED_BY_ROWS_REFUSAL); no money moved in those cases. The editor's
+      // refusals above changed nothing: its course fee, its switch, its rows and every line's price are as they were.
       expect(await offeringOf(coordinator, offering.bio!)).toMatchObject({ courseFee: 3500, accepting: true });
       expect((await offeringOf(coordinator, offering.bio!)).rows.map((r) => [r.id, r.cells.firstInSchool, r.series?.label])).toEqual([[row.bioAll, true, label], [row.bioPaper, false, label]]);
       expect(await linePrices()).toEqual(pricesBefore);
@@ -624,13 +588,13 @@ describe('08y: the coordinator sets up a session', () => {
       `select price_at_registration::float as price, course_fee_at_registration::float as course, price_provisional as provisional from registration where id = $1`, [id]);
     const share = (percent: number, expected?: Impact) => coordinator.api.v1.sessions[':id'].$put({ param: { id: race }, json: { selfStudyPercent: percent, ...(expected ? { expected } : {}) } });
     const pricesFinal = (expected?: Impact) => coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: race }, json: { final: true, ...(expected ? { expected } : {}) } });
-    /** A reservation held after it has taken the session, the offering and the row FOR SHARE (at the fee-grid lock it takes next). */
+    /**
+     * A reservation held after it has taken the session and the offering FOR SHARE, at its row (insertLines' next lock,
+     * held FOR UPDATE here): a change sent meanwhile waits for the session it holds. (P1c: the fee-grid lock it was held
+     * at, just after the row, left with the fee grid.)
+     */
     async function holdingAReservation<T>(f: { parent: Client; studentId: string }, mode: 'in_school' | 'self_study', meanwhile: () => Promise<T>) {
-      const { default: pg } = await import('pg');
-      const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
-      await holder.connect();
-      const series = (await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [raceRow])).s;
-      await holder.query(`select pg_advisory_lock(4041, hashtext($1))`, [series]);
+      const release = await holdRowLock('session_offer_item', raceRow);
       let reserving: ReturnType<typeof raceReserve> | undefined;
       let other: Promise<T> | undefined;
       try {
@@ -639,8 +603,7 @@ describe('08y: the coordinator sets up a session', () => {
         other = meanwhile();
         await lockWaiters(2);
       } finally {
-        await holder.query(`select pg_advisory_unlock(4041, hashtext($1))`, [series]);
-        await holder.end();
+        await release();
       }
       return Promise.all([reserving!, other!]);
     }

@@ -1,21 +1,33 @@
 /**
  * F4's demo data for a running dev system (docs/features/EXAM_ENTRIES.md, "Running it"), on the
- * reservations rework's model: staff, the catalogue's components and option codes, a winter
- * session whose offers' items enter Cambridge IGCSE syllabi (November) and Pearson IAL units
- * (January), fee grids, families reserved and paid at the desk (lines and consent — a declared
- * self-study retake and a declared unit retake among them), a paid cash-in, course enrolment from
- * the lines, candidates, entries, forecasts, the timetable, a seated sitting, and an earlier
- * series' results (which verify a declared sitting) and certificates. Everything goes through the
- * API over HTTP, as the screens do (made-up names; never the school's sheet).
+ * coordinator's model (COORDINATOR_REWORK.md, P1c): staff, the catalogue's components and option
+ * codes, a winter session whose rows enter Cambridge IGCSE syllabi (November) and Pearson IAL units
+ * (January) at the boards' fees, families reserved and paid at the desk (lines and consent — a
+ * declared self-study retake and a declared unit retake among them), a paid cash-in, course enrolment
+ * from the lines, candidates, entries, forecasts, the timetable, a seated sitting, and an earlier
+ * series' results (which verify a declared sitting) and certificates (made-up names; never the
+ * school's sheet).
+ *
+ * Everything goes through the API over HTTP, as the screens do, but one thing: what a row enters with
+ * the board (an award, an option code, units). No route sets it since P1c (the links sheet's item
+ * routes left; 0066 kept it on converted rows for the parked exam entries), so the script writes it to
+ * the database the API runs on — read from the API's own environment (apps/api/.env: DATABASE_URL), as
+ * the June 2027 seed does. The session's rows sit in its own sittings (a session's label names them):
+ * Cambridge November 2026 and Pearson January 2027 "exams demo", dated here.
  *
  *   API_URL=http://localhost:3043 WEB_ORIGIN=http://localhost:3040 \
  *     pnpm --filter @repo/api exec tsx scripts/exams-demo/seed-exams.ts
  *
  * Run it once on a fresh copy of the template dev database migrated to the branch.
  */
+import { config } from 'dotenv';
 import { hc } from 'hono/client';
 import { apiResponse } from '@repo/validations';
 import type { AppType } from '../../src/app';
+
+config();
+// After the environment: @repo/db opens its pool with DATABASE_URL when it is imported.
+const { db, sql } = await import('@repo/db');
 
 const API = process.env.API_URL ?? 'http://localhost:3043';
 const ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3040';
@@ -69,19 +81,19 @@ async function main() {
   const r101 = await room('Room 101', 24, 'classroom');
   await room('Library', 30, 'library');
 
-  // ─── The catalogue: components and option codes ────────────────────────────
-  let cat = await apiResponse(coord.v1.catalogue.$get());
+  // ─── The catalogue: components and option codes (the admin's: G1, the catalogue left the coordinator's screens) ─
+  let cat = await apiResponse(admin.v1.catalogue.$get());
   const qual = (code: string) => cat.qualifications.find((q) => q.code === code && q.boardCode === 'cambridge')!;
   const addComponents = async (syllabus: string, papers: [string, string, 'core' | 'extended' | null][], options: [string, string, string[]][]) => {
     const q = qual(syllabus);
     if (q.units.length) return;
     const ids: Record<string, string> = {};
     for (const [n, title, tier] of papers) {
-      ids[n] = (await apiResponse(coord.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `${syllabus}/${n}`, shortCode: `Paper ${n}`, title, unitLevel: 'igcse', kind: 'component', tier } }))).id;
+      ids[n] = (await apiResponse(admin.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `${syllabus}/${n}`, shortCode: `Paper ${n}`, title, unitLevel: 'igcse', kind: 'component', tier } }))).id;
     }
-    await apiResponse(coord.v1.catalogue.qualifications[':id'].units.$put({ param: { id: q.id }, json: { units: Object.values(ids).map((unitId) => ({ unitId, requirement: 'optional' as const })) } }));
+    await apiResponse(admin.v1.catalogue.qualifications[':id'].units.$put({ param: { id: q.id }, json: { units: Object.values(ids).map((unitId) => ({ unitId, requirement: 'optional' as const })) } }));
     for (const [code, label, ns] of options) {
-      await apiResponse(coord.v1.catalogue.qualifications[':id'].options.$post({ param: { id: q.id }, json: { code, label, unitIds: ns.map((n) => ids[n]!) } }));
+      await apiResponse(admin.v1.catalogue.qualifications[':id'].options.$post({ param: { id: q.id }, json: { code, label, unitIds: ns.map((n) => ids[n]!) } }));
     }
   };
   await addComponents('0610', [['12', 'Multiple Choice (Core)', 'core'], ['22', 'Multiple Choice (Extended)', 'extended'], ['32', 'Theory (Core)', 'core'], ['42', 'Theory (Extended)', 'extended'], ['62', 'Alternative to Practical', null]],
@@ -90,8 +102,8 @@ async function main() {
     [['CX', 'Extended: Papers 2, 4 and 6', ['22', '42', '62']]]);
   await addComponents('0580', [['12', 'Paper 1 (Core)', 'core'], ['22', 'Paper 2 (Extended)', 'extended'], ['32', 'Paper 3 (Core)', 'core'], ['42', 'Paper 4 (Extended)', 'extended']],
     [['MX', 'Extended: Papers 2 and 4', ['22', '42']], ['MC', 'Core: Papers 1 and 3', ['12', '32']]]);
-  await apiResponse(coord.v1.catalogue.starter.$post({ json: { set: 'pearson_ial_mathematics' } }));
-  cat = await apiResponse(coord.v1.catalogue.$get());
+  await apiResponse(admin.v1.catalogue.starter.$post({ json: { set: 'pearson_ial_mathematics' } }));
+  cat = await apiResponse(admin.v1.catalogue.$get());
   const unit = (code: string) => cat.units.find((u) => u.code === code)!.id;
   const xma = cat.qualifications.find((q) => q.code === 'XMA01')!.id;
   const subjects = await apiResponse(admin.v1.subjects.$get({ query: {} }));
@@ -100,29 +112,38 @@ async function main() {
   const ialMaths = sid('IAL-MATHS') ?? (await apiResponse(admin.v1.subjects.$post({ json: {
     name: 'Mathematics (IAL)', code: 'IAL-MATHS', council: 'pearson_edexcel', courseFee: 2400, registrationFee: 1600, qualificationLevel: 'as_level', isOfferedAtSchool: true, isCore: false,
   } }))).id;
-  await apiResponse(coord.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ialMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: xma, unitIds: [] } }));
+  await apiResponse(admin.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ialMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: xma, unitIds: [] } }));
   // Cambridge A Level Biology (9700): the A Level in one series (AX) and A2 with the AS carried forward (BY).
   let al = cat.qualifications.find((q) => q.code === '9700' && q.boardCode === 'cambridge' && q.level === 'a_level');
   if (!al) {
-    const made = await apiResponse(coord.v1.catalogue.qualifications.$post({ json: { boardCode: 'cambridge', code: '9700', title: 'Biology', level: 'a_level', suite: 'Cambridge International AS & A Level', subjectArea: 'Biology', entryMethod: 'syllabus_option' } }));
-    const comp = async (n: string, title: string, unitLevel: 'as' | 'a2') => (await apiResponse(coord.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `9700/${n}`, shortCode: `Paper ${n}`, title, unitLevel, kind: 'component' } }))).id;
+    const made = await apiResponse(admin.v1.catalogue.qualifications.$post({ json: { boardCode: 'cambridge', code: '9700', title: 'Biology', level: 'a_level', suite: 'Cambridge International AS & A Level', subjectArea: 'Biology', entryMethod: 'syllabus_option' } }));
+    const comp = async (n: string, title: string, unitLevel: 'as' | 'a2') => (await apiResponse(admin.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `9700/${n}`, shortCode: `Paper ${n}`, title, unitLevel, kind: 'component' } }))).id;
     const c = [await comp('12', 'Multiple Choice', 'as'), await comp('22', 'AS Structured Questions', 'as'), await comp('42', 'A Level Structured Questions', 'a2'), await comp('52', 'Planning, Analysis and Evaluation', 'a2')];
-    await apiResponse(coord.v1.catalogue.qualifications[':id'].units.$put({ param: { id: made.id }, json: { units: c.map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
-    await apiResponse(coord.v1.catalogue.qualifications[':id'].options.$post({ param: { id: made.id }, json: { code: 'AX', label: 'A Level in one series', unitIds: c } }));
-    await apiResponse(coord.v1.catalogue.qualifications[':id'].options.$post({ param: { id: made.id }, json: { code: 'BY', label: 'A2, AS carried forward', unitIds: [c[2]!, c[3]!], carryForward: true } }));
-    cat = await apiResponse(coord.v1.catalogue.$get());
+    await apiResponse(admin.v1.catalogue.qualifications[':id'].units.$put({ param: { id: made.id }, json: { units: c.map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
+    await apiResponse(admin.v1.catalogue.qualifications[':id'].options.$post({ param: { id: made.id }, json: { code: 'AX', label: 'A Level in one series', unitIds: c } }));
+    await apiResponse(admin.v1.catalogue.qualifications[':id'].options.$post({ param: { id: made.id }, json: { code: 'BY', label: 'A2, AS carried forward', unitIds: [c[2]!, c[3]!], carryForward: true } }));
+    cat = await apiResponse(admin.v1.catalogue.$get());
     al = cat.qualifications.find((q) => q.code === '9700' && q.boardCode === 'cambridge' && q.level === 'a_level')!;
   }
   const alOption = (code: string) => al!.options.find((o) => o.code === code)!.id;
   const alBio = sid('AL-BIO') ?? (await apiResponse(admin.v1.subjects.$post({ json: {
     name: 'Biology (A Level)', code: 'AL-BIO', council: 'cambridge', courseFee: 12000, registrationFee: 3200, qualificationLevel: 'a_level', isOfferedAtSchool: true, isCore: false,
   } }))).id;
-  await apiResponse(coord.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: alBio }, json: { boardCode: 'cambridge', qualificationId: al.id, unitIds: [] } }));
+  await apiResponse(admin.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: alBio }, json: { boardCode: 'cambridge', qualificationId: al.id, unitIds: [] } }));
+
+  const igcse = ['0610', '0620', '0580', '0625', '0500'];
 
   // ─── Series and their dates ────────────────────────────────────────────────
+  // The session's own sittings ("exams demo": its rows sit in the sittings its label names), dated for the demo; June
+  // 2026 is the reference sitting the declared retakes name.
+  const LABEL = 'exams demo';
   const series = await apiResponse(admin.v1['board-series'].$get({ query: {} }));
-  const camNov = series.find((s) => s.boardCode === 'cambridge' && s.month === 'november' && s.year === 2026 && !s.label)!.id;
+  const own = async (boardCode: 'cambridge' | 'pearson_edexcel', month: 'november' | 'january', year: number) =>
+    series.find((s) => s.boardCode === boardCode && s.month === month && s.year === year && s.label === LABEL)?.id
+      ?? (await apiResponse(admin.v1['board-series'].$post({ json: { boardCode, month, year, label: LABEL } }))).id;
+  const camNov = await own('cambridge', 'november', 2026);
   const camJun = series.find((s) => s.boardCode === 'cambridge' && s.month === 'june' && s.year === 2026 && !s.label)!.id;
+  const pearsonJan = await own('pearson_edexcel', 'january', 2027);
   const now = Date.now();
   await apiResponse(admin.v1['board-series'][':id'].$put({ param: { id: camNov }, json: {
     entryDeadline: new Date(now + 14 * DAY), retakeDeadline: new Date(now + 18 * DAY), reason: 'the school\'s date for the exam-entries demo', forecastGradesDue: cairoDate(new Date(now + 20 * DAY)),
@@ -130,71 +151,83 @@ async function main() {
     lateFeeFrom: cairoDate(new Date(now + 15 * DAY)), lateEntriesClose: cairoDate(new Date(now + 21 * DAY)),
   } }));
   await apiResponse(admin.v1['board-series'][':id'].$put({ param: { id: camJun }, json: { resultsOn: '2026-08-11', certificatesOn: '2026-10-31', examsStart: '2026-04-27', examsEnd: '2026-06-10' } }));
-  const pearsonJan = series.find((s) => s.boardCode === 'pearson_edexcel' && s.month === 'january' && s.year === 2027 && !s.label)?.id
-    ?? (await apiResponse(admin.v1['board-series'].$post({ json: {
-      boardCode: 'pearson_edexcel', month: 'january', year: 2027, label: '', entryDeadline: new Date(now + 9 * DAY),
-      lateFeeFrom: cairoDate(new Date(now + 10 * DAY)), highLateFeeFrom: cairoDate(new Date(now + 37 * DAY)), examsStart: '2027-01-05', examsEnd: '2027-01-28', resultsOn: '2027-03-05', certificatesOn: '2027-05-20',
-    } }))).id;
-
-  // ─── The fee grids ─────────────────────────────────────────────────────────
-  const igcse = ['0610', '0620', '0580', '0625', '0500'];
-  await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: camNov }, json: {
-    rows: igcse.map((c) => ({ keyKind: 'qualification' as const, keyId: qual(c).id, amount: 2600, provisional: false })), reason: 'Cambridge November 2026 fee list (demo)',
-  } }));
-  await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: camNov }, json: {
-    rows: [{ keyKind: 'option' as const, keyId: alOption('AX'), amount: 4200, provisional: false }, { keyKind: 'option' as const, keyId: alOption('BY'), amount: 2600, provisional: false }],
-    reason: 'Cambridge November 2026 fee list, A Level (demo)',
-  } }));
-  await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: pearsonJan }, json: {
-    rows: ['WMA11', 'WMA12', 'WME01'].map((c) => ({ keyKind: 'unit' as const, keyId: unit(c), amount: 1600, provisional: false })), reason: 'Pearson January 2027 fee list (demo)',
+  await apiResponse(admin.v1['board-series'][':id'].$put({ param: { id: pearsonJan }, json: {
+    entryDeadline: new Date(now + 9 * DAY), reason: 'the school\'s date for the exam-entries demo',
+    lateFeeFrom: cairoDate(new Date(now + 10 * DAY)), highLateFeeFrom: cairoDate(new Date(now + 37 * DAY)), examsStart: '2027-01-05', examsEnd: '2027-01-28', resultsOn: '2027-03-05', certificatesOn: '2027-05-20',
   } }));
   await apiResponse(finadmin.v1['board-services'].fees.$put({ json: {
     boardSeriesId: pearsonJan, rows: [{ boardServiceId: 'svc-pearson-ci', level: 'as_a_level', amount: 700, provisional: false }], reason: 'Pearson January 2027 cash-in fee (demo)',
   } }));
 
-  // ─── The session and its offers (the links sheet) ──────────────────────────
+  // ─── The session and its subjects (the coordinator's subject editor) ───────
   const sessions = await apiResponse(admin.v1.sessions.$get({ query: {} }));
-  const sessionId = sessions.find((s) => s.label === 'exams demo')?.id
-    ?? (await apiResponse(admin.v1.sessions.$post({ json: {
-      type: 'winter', year: 2026, label: 'exams demo', startDate: new Date(now - 3600_000).toISOString(), endDate: new Date(now + 8 * DAY).toISOString(),
+  let sessionId = sessions.find((s) => s.label === LABEL)?.id;
+  if (!sessionId) {
+    sessionId = (await apiResponse(admin.v1.sessions.$post({ json: {
+      type: 'winter', year: 2026, label: LABEL, startDate: new Date(now - 3600_000).toISOString(), endDate: new Date(now + 8 * DAY).toISOString(),
       courseStartsOn: cairoDate(new Date(now)), paymentDueAt: new Date(now + 7 * DAY).toISOString(),
     } }))).id;
-  const offers = await apiResponse(admin.v1.sessions[':id'].offers.$get({ param: { id: sessionId } }));
-  const teach: Record<string, string> = { '0610': 'Karim Adel', '0620': 'Karim Adel', '0580': 'Dina Fathy', '0625': 'Youssef Hamed', '0500': 'Youssef Hamed', 'IAL-MATHS': 'Dina Fathy' };
-  const itemOf: Record<string, string> = {};
-  for (const code of igcse) {
-    const subjectId = sid(code)!;
-    const existing = offers.offers.find((o) => o.subjectId === subjectId);
-    itemOf[code] = existing?.items[0]?.id ?? (await apiResponse(admin.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: {
-      subjectId, courseFee: 9000, teachers: [{ teacherId: tId(teach[code]!), mode: 'in_school' }],
-      items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: qual(code).id }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false }],
-    } }))).items[0]!;
+    // The boards' fees below are the published ones: the session's prices are final (lines are payable).
+    await apiResponse(coord.v1.sessions[':id']['prices-final'].$put({ param: { id: sessionId }, json: { final: true } }));
   }
-  const alOffer = offers.offers.find((o) => o.subjectId === alBio);
-  if (alOffer) for (const it of alOffer.items) itemOf[it.label] = it.id;
-  else {
-    const made = await apiResponse(admin.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: {
-      subjectId: alBio, courseFee: 12000, teachers: [{ teacherId: tId('Karim Adel'), mode: 'in_school' }],
-      items: [
-        { label: 'A Level', kind: 'route', enters: { kind: 'option', optionId: alOption('AX') }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false, exclusiveGroup: 'route' },
-        { label: 'A2, carry forward', kind: 'route', enters: { kind: 'option', optionId: alOption('BY') }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false, exclusiveGroup: 'route', sortOrder: 1 },
-      ],
+  type Enters = { kind: 'award'; qualificationId: string } | { kind: 'option'; optionId: string } | { kind: 'units'; unitIds: string[] };
+  type DemoRow = { kind: 'all_papers' | 'unit' | 'al' | 'a2'; name?: string; sitting: 'november' | 'january'; examFee: number; enters: Enters };
+  const KIND_ORDER: Record<DemoRow['kind'], number> = { all_papers: 0, unit: 2, a2: 4, al: 5 };
+  /**
+   * A subject offered in the session through the coordinator's routes: its course fee and teacher, one row per entry at
+   * the board's fee, every option but a first entry in self study ticked; then what each row enters, written as converted
+   * data holds it (above). A subject the session offers already is left as it is. Returns its rows' ids by name.
+   */
+  const offering = async (subjectId: string, courseFee: number, teacherId: string, rows: DemoRow[]) => {
+    const rowsOf = async (where: ReturnType<typeof sql>) =>
+      (await db.execute(sql`select i.id, i.label from session_offer_item i join session_offer o on o.id = i.offer_id where ${where} order by i.sort_order`)).rows as { id: string; label: string }[];
+    const there = await rowsOf(sql`o.session_id = ${sessionId} and o.subject_id = ${subjectId}`);
+    if (there.length) return Object.fromEntries(there.map((r) => [r.label, r.id]));
+    const [sub] = (await db.execute(sql`select name, code, council, qualification_level as level, qualification_id as q from subject where id = ${subjectId}`)).rows as
+      { name: string; code: string; council: 'cambridge' | 'pearson_edexcel'; level: string; q: string | null }[];
+    const igcse = sub!.level === 'igcse';
+    const made = await apiResponse(coord.v1.sessions[':id'].offerings.$post({ param: { id: sessionId }, json: {
+      custom: { board: sub!.council, name: sub!.name, level: igcse ? 'igcse' : 'as_al', group: igcse ? 'O.L.' : 'A.S./A.L.', code: sub!.code },
     } }));
-    itemOf['A Level'] = made.items[0]!;
-    itemOf['A2, carry forward'] = made.items[1]!;
-  }
-  const mathsOffer = offers.offers.find((o) => o.subjectId === ialMaths);
-  if (mathsOffer) for (const it of mathsOffer.items) itemOf[it.label] = it.id;
-  else {
-    const made = await apiResponse(admin.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: {
-      subjectId: ialMaths, courseFee: 2400, teachers: [{ teacherId: tId('Dina Fathy'), mode: 'in_school' }],
-      items: (['P1', 'P2', 'M1'] as const).map((label, i) => ({
-        label, kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unit({ P1: 'WMA11', P2: 'WMA12', M1: 'WME01' }[label])] },
-        boardSeriesId: pearsonJan, availability: 'open' as const, requiredInSeries: false, sortOrder: i,
+    await apiResponse(coord.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: sessionId, offeringId: made.id }, json: {
+      accepting: true, courseFee, teachers: [{ teacherId, online: false, external: false }],
+      rows: rows.map((r) => ({
+        kind: r.kind, ...(r.name ? { name: r.name } : {}), sitting: r.sitting, examFee: r.examFee,
+        cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false },
       })),
     } }));
-    (['P1', 'P2', 'M1'] as const).forEach((label, i) => { itemOf[label] = made.items[i]!; });
+    // The rows in the editor's order (by kind, then as sent), matched back to the entries they make.
+    const saved = await rowsOf(sql`o.id = ${made.id}`);
+    const order = rows.map((r, i) => ({ r, i })).sort((a, b) => KIND_ORDER[a.r.kind] - KIND_ORDER[b.r.kind] || a.i - b.i);
+    for (const [pos, { r }] of order.entries()) {
+      const id = saved[pos]!.id;
+      if (r.enters.kind === 'award') {
+        await db.execute(sql`update session_offer_item set enters_kind = 'award', qualification_id = ${r.enters.qualificationId} where id = ${id}`);
+      } else if (r.enters.kind === 'option') {
+        await db.execute(sql`update session_offer_item set enters_kind = 'option', qualification_option_id = ${r.enters.optionId},
+          qualification_id = (select qualification_id from qualification_option where id = ${r.enters.optionId}) where id = ${id}`);
+      } else {
+        await db.execute(sql`update session_offer_item set enters_kind = 'units', qualification_id = ${sub!.q} where id = ${id}`);
+        for (const unitId of r.enters.unitIds) await db.execute(sql`insert into session_offer_item_unit (item_id, unit_id) values (${id}, ${unitId}) on conflict do nothing`);
+      }
+    }
+    return Object.fromEntries(saved.map((r) => [r.label, r.id]));
+  };
+  const teach: Record<string, string> = { '0610': 'Karim Adel', '0620': 'Karim Adel', '0580': 'Dina Fathy', '0625': 'Youssef Hamed', '0500': 'Youssef Hamed', 'IAL-MATHS': 'Dina Fathy' };
+  const itemOf: Record<string, string> = {};
+  // Cambridge November 2026's fees (the demo's): each IGCSE syllabus 2,600; A Level in one series 4,200, A2 carried forward 2,600.
+  for (const code of igcse) {
+    const rows = await offering(sid(code)!, 9000, tId(teach[code]!), [{ kind: 'all_papers', sitting: 'november', examFee: 2600, enters: { kind: 'award', qualificationId: qual(code).id } }]);
+    itemOf[code] = Object.values(rows)[0]!;
   }
+  Object.assign(itemOf, await offering(alBio, 12000, tId('Karim Adel'), [
+    { kind: 'al', name: 'A Level', sitting: 'november', examFee: 4200, enters: { kind: 'option', optionId: alOption('AX') } },
+    { kind: 'a2', name: 'A2, carry forward', sitting: 'november', examFee: 2600, enters: { kind: 'option', optionId: alOption('BY') } },
+  ]));
+  // Pearson January 2027's: each unit 1,600.
+  Object.assign(itemOf, await offering(ialMaths, 2400, tId('Dina Fathy'), (['P1', 'P2', 'M1'] as const).map((name): DemoRow => ({
+    kind: 'unit', name, sitting: 'january', examFee: 1600, enters: { kind: 'units', unitIds: [unit({ P1: 'WMA11', P2: 'WMA12', M1: 'WME01' }[name])] },
+  }))));
 
   // ─── Families, reserved and paid at the desk ───────────────────────────────
   const first = (code: string): Line => ({ offerItemId: itemOf[code]!, attempt: 'first', mode: 'in_school' });
@@ -342,6 +375,7 @@ async function main() {
   await apiResponse(coord.v1.exams.invigilation.$put({ json: { ...sitting, roomId: hall, teacherIds: [tId('Youssef Hamed')], leadTeacherId: tId('Youssef Hamed') } }));
 
   console.log('F4 demo data ready:', Object.keys(students).length, 'families');
+  await (db as unknown as { $client: { end(): Promise<void> } }).$client.end();
 }
 
 main().catch((err) => {

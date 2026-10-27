@@ -97,16 +97,11 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     '* /v1/board-series/*',
     'POST /v1/board-series',
     'GET /v1/sessions/:id/board-series',
-    // The reservations rework: the session's header and its links sheet (offers, teachers,
-    // items), the grade-10 bulk, the fee grids (read), and a student's offers.
+    // The reservations rework: the session's header, the grade-10 bulk and a student's offers (the links sheet's
+    // routes, the fee grids and the v1 staff preview left with P1c).
     'GET /v1/sessions/:id',
-    '* /v1/sessions/:id/offers',
-    '* /v1/sessions/:id/offers/*',
     'POST /v1/sessions/:id/grade10/*',
-    'GET /v1/board-fees',
     'GET /v1/registrations/offers',
-    // F6a: the Session screen's "Preview the family's form" (no student).
-    'GET /v1/registrations/offers/preview',
     // The coordinator rework (COORDINATOR_REWORK.md B1): all of set-up — sessions (create, the header and
     // what families agree to, the Accepting switch, prices final), offerings, price lists and prices, the
     // live preview, the reservations (read), the reference data, teachers with the duplicate check. Never

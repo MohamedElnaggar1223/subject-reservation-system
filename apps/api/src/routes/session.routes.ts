@@ -15,16 +15,14 @@
  * - PUT  /sessions/:id/prices-final    — one-way once a line exists (impact first)
  *   (offerings, price lists, prices, the preview, the reservations: setup.routes.ts)
  * Admin:
- * - POST /sessions/:id/copy-from       — deprecated: offers of an earlier session of the same kind
  * - PUT  /sessions/:id/series          — correct the exam series (F0a)
  * - POST /sessions/:id/activate        — deprecated: the old screen's open (the new switch is /open)
  * - POST /sessions/:id/board-series/move — lines to another series (behind the item's series)
- * Admin and coordinator — the links sheet:
+ * Admin and coordinator:
  * - GET  /sessions/:id/board-series    — the series its items are entered in (derived, read only)
- * - GET  /sessions/:id/offers, /offers/addable; POST /offers; PUT/DELETE /offers/:offerId;
- *   POST /offers/:offerId/replace-teacher; POST /offers/:offerId/items; PUT/DELETE …/items/:itemId
- * - PUT  /sessions/:id/offers/:offerId/form — one subject's whole form, one transaction (F6a)
- * - POST /sessions/:id/grade10/preview, /commit
+ * - POST /sessions/:id/grade10/preview, /commit (parked: the grade-10 core)
+ * The links sheet's routes (offers, items, the subject's form, replace teacher) and the offers-only copy
+ * (copy-from) left with P1c: the subject editor is /sessions/:id/offerings (setup.routes.ts).
  * Admin and finance:
  * - GET  /sessions/:id/money           — lines only (§4.6)
  */
@@ -39,16 +37,7 @@ import {
   SessionId,
   ListSessionsQuery,
   CorrectSessionSeries,
-  CopySessionFrom,
   MoveRegistrationsToSeries,
-  CreateOffer,
-  UpdateOffer,
-  OfferForm,
-  UpdateOfferItem,
-  OfferItemInput,
-  ReplaceOfferTeacher,
-  OfferParam,
-  OfferItemParam,
   Grade10Bulk,
   SessionMoneyQuery,
   SessionReason,
@@ -178,21 +167,6 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...now!, ...saved });
       } catch (err) {
         const f = failure(err, 'Failed to update session');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  /** COPY AN EARLIER SESSION'S OFFERS (board fees provisional). */
-  .post('/:id/copy-from',
-    requireAdmin(),
-    zValidator('param', SessionId),
-    zValidator('json', CopySessionFrom),
-    async (c) => {
-      try {
-        return success(c, await sessionService.copySessionFrom(c.req.valid('param').id, c.req.valid('json').fromSessionId, c.get('user')!.id));
-      } catch (err) {
-        const f = failure(err, 'Failed to copy the session');
         return error(c, f.message, f.status, codeOf(err));
       }
     }
@@ -397,152 +371,6 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...now!, ...saved });
       } catch (err) {
         const f = failure(err, 'Failed to change prices final');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  // ─── The links sheet: offers, teachers, items (§4.2) — deprecated by the coordinator rework ─────
-  // The old screen's routes keep working until P2 replaces it (the new subject editor is
-  // /sessions/:id/offerings, setup.routes.ts); items made here are priced from their fee keys.
-
-  .get('/:id/offers',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', SessionId),
-    async (c) => {
-      try {
-        return success(c, await offerService.listOffers(c.req.valid('param').id));
-      } catch (err) {
-        const f = failure(err, 'Failed to load the session\'s subjects');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .get('/:id/offers/addable',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', SessionId),
-    async (c) => success(c, await offerService.addableSubjects(c.req.valid('param').id))
-  )
-
-  .post('/:id/offers',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', SessionId),
-    zValidator('json', CreateOffer),
-    async (c) => {
-      try {
-        return success(c, await offerService.createOffer(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
-      } catch (err) {
-        const f = failure(err, 'Failed to add the subject');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .put('/:id/offers/:offerId',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferParam),
-    zValidator('json', UpdateOffer),
-    async (c) => {
-      const { id, offerId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.updateOffer(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
-      } catch (err) {
-        const f = failure(err, 'Failed to update the subject');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  /**
-   * PUT /sessions/:id/offers/:offerId/form (F6a, docs/features/SESSION_WORDS.md) — one subject's
-   * form on the links sheet, saved whole in one transaction: who teaches it, how it is offered, the
-   * course fee, its papers, routes, units and qualifications, the grade-10 core, the course start
-   * and the notes. Only what differs is written; the same form twice changes nothing.
-   */
-  .put('/:id/offers/:offerId/form',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferParam),
-    zValidator('json', OfferForm),
-    async (c) => {
-      const { id, offerId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.saveOfferForm(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
-      } catch (err) {
-        const f = failure(err, 'Failed to save the subject');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .delete('/:id/offers/:offerId',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferParam),
-    async (c) => {
-      const { id, offerId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.deleteOffer(id, offerId, c.get('user')!.id, extractAuditContext(c)));
-      } catch (err) {
-        const f = failure(err, 'Failed to remove the subject');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .post('/:id/offers/:offerId/replace-teacher',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferParam),
-    zValidator('json', ReplaceOfferTeacher),
-    async (c) => {
-      const { id, offerId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.replaceTeacher(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
-      } catch (err) {
-        const f = failure(err, 'Failed to replace the teacher');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .post('/:id/offers/:offerId/items',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferParam),
-    zValidator('json', OfferItemInput),
-    async (c) => {
-      const { id, offerId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.createItem(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
-      } catch (err) {
-        const f = failure(err, 'Failed to add the item');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .put('/:id/offers/:offerId/items/:itemId',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferItemParam),
-    zValidator('json', UpdateOfferItem),
-    async (c) => {
-      const { id, offerId, itemId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.updateItem(id, offerId, itemId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
-      } catch (err) {
-        const f = failure(err, 'Failed to update the item');
-        return error(c, f.message, f.status, codeOf(err));
-      }
-    }
-  )
-
-  .delete('/:id/offers/:offerId/items/:itemId',
-    requireRole(...LINKS_SHEET),
-    zValidator('param', OfferItemParam),
-    async (c) => {
-      const { id, offerId, itemId } = c.req.valid('param');
-      try {
-        return success(c, await offerService.deleteItem(id, offerId, itemId, c.get('user')!.id, extractAuditContext(c)));
-      } catch (err) {
-        const f = failure(err, 'Failed to remove the item');
         return error(c, f.message, f.status, codeOf(err));
       }
     }

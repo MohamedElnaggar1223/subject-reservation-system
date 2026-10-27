@@ -505,6 +505,13 @@
       "when": 1793116757620,
       "tag": "0071_p1c_entry_deadline_reminder",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793117542393,
+      "tag": "0072_p1c_drop_grid_and_availability",
+      "breakpoints": true
     }
   ]
 }

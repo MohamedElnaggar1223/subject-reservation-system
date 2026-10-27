@@ -5,12 +5,11 @@
  * - D8 combinations, fixed: all papers and the one-paper rows exclude each other; A.S., A.2. and A.L.
  *   exclude each other; qualification rows exclude each other; units combine freely.
  * - D6 "carried from" asked by the board rule: an A.2. always; a one-paper retake where the board asks it.
- * - The cells (D3) and today's availability kept in step both ways until P1b drops the old column.
  * - C1, D12 the sitting of a row → its board series' month and year.
  * - C3 the year roll of a copy.
  */
 
-import type { Availability, RowKind, Sitting, SeriesMonth } from '@repo/validations';
+import type { RowKind, Sitting, SeriesMonth } from '@repo/validations';
 
 /**
  * A line that is live: it holds its row, its option, its price and the session's counts (the four setup
@@ -49,54 +48,6 @@ export function needsPriorFor(kind: string, onePaperAsksSitting: boolean): boole
   if (kind === 'a2') return true;
   if (kind === 'paper') return onePaperAsksSitting;
   return false;
-}
-
-/**
- * Today's availability, derived from the four cells so the reservation path P1b has not replaced yet
- * (line rules reading `availability`) offers what the cells allow, as nearly as the old enum says it:
- * a first entry in school → open (first entries and retakes); a retake in school without a first
- * entry → retakes only; self study only → self-study only; no cell → closed. The old enum cannot
- * say every combination (a first entry in school with no retake in school reads as open); P1b's line
- * rules read the cells themselves.
- */
-export function availabilityOf(cells: Cells): Availability {
-  if (cells.firstInSchool) return 'open';
-  if (cells.retakeInSchool) return 'retake_only';
-  if (cells.retakeSelfStudy || cells.firstSelfStudy) return 'self_study_only';
-  return 'closed';
-}
-
-/**
- * The cells an item made by the deprecated routes stands for (its offer's and its own availability
- * together, as migration 0066 converted them): closed → none; retakes only → retake in school and in
- * self study; self-study only → retake in self study, and a first entry in self study where the row
- * carries a sitting forward; open → first entry in school, retake in school and in self study. A
- * one-paper row takes no first entry.
- */
-export function cellsOfAvailability(offer: string, item: string, kind: string, needsPriorSeries: boolean): Cells {
-  const closed = offer === 'closed' || item === 'closed';
-  const retakeOnly = offer === 'retake_only' || item === 'retake_only';
-  const selfStudyOnly = offer === 'self_study_only' || item === 'self_study_only';
-  if (closed) return { ...NO_CELLS };
-  const paper = kind === 'paper';
-  return {
-    firstInSchool: !retakeOnly && !selfStudyOnly && !paper,
-    retakeInSchool: !selfStudyOnly,
-    retakeSelfStudy: true,
-    firstSelfStudy: !retakeOnly && selfStudyOnly && needsPriorSeries && !paper,
-  };
-}
-
-/** The deprecated routes' item kinds in her words (migration 0066's conversion, for what they still write). */
-export function kindOfLegacy(kind: string, a: { needsPriorSeries?: boolean; label: string; qualificationLevel?: string | null }): RowKind {
-  if (kind === 'whole') return 'all_papers';
-  if (kind === 'one_paper') return 'paper';
-  if (kind === 'route') {
-    if (a.needsPriorSeries || /\ba\.?\s?2\b/i.test(a.label)) return 'a2';
-    if (a.qualificationLevel === 'as_level' || /\ba\.?\s?s\b/i.test(a.label)) return 'as';
-    return 'al';
-  }
-  return kind as RowKind;
 }
 
 /** C1, D12: a row's sitting as its board series' month and year in a session of a type and year. */

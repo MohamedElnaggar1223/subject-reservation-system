@@ -29,13 +29,12 @@ import { deriveSessionName, seriesLabel, sessionSeriesMonths, type CorrectSessio
 import { env } from '../env';
 import { randomUUID } from 'crypto';
 import { seriesRuleSentence, windowChangeMisfit, boardSeriesName, openCheckoutsSpanningDeadlines } from './series.services';
-import { findOrCreateSeries, defaultSeriesFor, attachSeries, copyOffersFrom } from './offer.services';
+import { findOrCreateSeries, defaultSeriesFor, attachSeries } from './offer.services';
 import { effectiveDeadlinesOf } from './deadline.services';
 import { schoolDate } from './window.services';
 import { getSetting } from './settings.services';
 import { dueDateFor, redateLines } from './deadline.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
-import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 
@@ -153,7 +152,7 @@ export async function getSessions(filters?: {
         db.execute(sql`
           select o.session_id as id, count(*)::int as offers, count(distinct s.council)::int as boards
           from session_offer o join subject s on s.id = o.subject_id
-          where o.session_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)}) and o.availability <> 'closed'
+          where o.session_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)}) and o.accepting
           group by o.session_id`).then((r) => r.rows as { id: string; offers: number; boards: number }[]),
         db.execute(sql`
           select r.session_id as id,
@@ -263,16 +262,20 @@ const sameCycle = (s: { sessionType: string; seriesYear: number; label: string }
  */
 /**
  * Create a session (§4.1): six inputs — type, year, reserve from, reserve to, course starts,
- * payment due. The name is derived; the refund policy is the type's setting; with
- * `copyFromSessionId` the offers, teachers, items, availability and course fees come across and
- * the board fees come across provisional. A session whose start has come opens at once (one
- * active session per type, year and label). Created and audited in one transaction.
+ * payment due. The name is derived; the refund policy is the type's setting. A session whose start
+ * has come opens at once (one active session per type, year and label). Created and audited in one
+ * transaction. A copy is made by the coordinator's contract (type and year, no dates): the legacy
+ * contract's offers-only copy left with P1c and is refused here (LEGACY_COPY_REFUSAL).
  */
 /** The legacy contract's input (CreateSession with its dates; the route sends it here only when `startDate` is given). */
 export type LegacyCreateSession = CreateSessionType & { startDate: Date; endDate: Date; courseStartsOn: string; paymentDueAt: Date };
 
+/** P1c: the legacy dated contract's offers-only copy left; a copy is made from a type and a year (C3), with no dates. */
+export const LEGACY_COPY_REFUSAL = 'A session is copied from its type and year (no dates given): its dates are set once it is made';
+
 /** @deprecated the legacy contract (COORDINATOR_REWORK.md P1a): the new one is setup/session-setup.services.ts createSetupSession. */
 export async function createSession(data: LegacyCreateSession, actorId: string, ctx?: AuditContext) {
+  if (data.copyFromSessionId) throw new SessionError(LEGACY_COPY_REFUSAL);
   const initialStatus = resolveInitialStatus(data.startDate);
   const label = data.label ?? '';
   if (initialStatus === 'active' && (await hasActiveSessionOfType(data.type, data.year, label))) {
@@ -304,9 +307,8 @@ export async function createSession(data: LegacyCreateSession, actorId: string, 
           editHistory: [],
         })
         .returning();
-      const copied = data.copyFromSessionId ? await copyOffersFrom(tx, row!, data.copyFromSessionId, actorId) : null;
-      await logAction(actorId, 'SESSION_CREATED', 'session', id, null, { ...(row as Record<string, unknown>), copied }, ctx, tx);
-      return { ...row!, copied };
+      await logAction(actorId, 'SESSION_CREATED', 'session', id, null, { ...(row as Record<string, unknown>) }, ctx, tx);
+      return { ...row!, copied: null };
     });
     if (initialStatus === 'active') {
       const students = await db.query.user.findMany({ where: (u, { eq: eqOp }) => eqOp(u.role, 'student'), columns: { id: true } });
@@ -331,21 +333,6 @@ export async function createSession(data: LegacyCreateSession, actorId: string, 
   }
 }
 
-/** Copy an earlier session's offers into this one (an open or draft session). */
-export async function copySessionFrom(id: string, fromSessionId: string, actorId: string) {
-  try {
-    return await db.transaction(async (tx) => {
-      const [s] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('share');
-      if (!s) throw new SessionError('Session not found', 404);
-      if (s.status === 'closed') throw new SessionError('This session is closed');
-      return copyOffersFrom(tx, s, fromSessionId, actorId);
-    });
-  } catch (err) {
-    const sentence = seriesRuleSentence(err);
-    if (sentence) throw new SessionError(sentence, 409);
-    throw err;
-  }
-}
 
 // Changing a session's header is setup/session-setup.services.ts updateSetupSession since the coordinator
 // rework (both contracts: the new fields and the legacy start/end with their old rules).
@@ -424,10 +411,6 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
         const misfit = await windowChangeMisfit(tx, id, { sessionType: data.sessionType, seriesYear: data.seriesYear });
         if (misfit) throw new Error(`${misfit} (its lines that are history stay in the series they were in)`);
       }
-      // The fee rows each item will read in its corrected series (carried provisional from the
-      // series it is in where finance has none), FOR SHARE before the lines — Confirm's order, so a
-      // Confirm of one lands first or waits and reaches the moved lines (the review of 40c1447).
-      await lockMoveFeeRows(tx, plan.map((p, n) => ({ itemId: p.itemId, fromSeriesId: items[n]!.seriesId, toSeriesId: p.to })), adminId, 'The session\'s series was corrected');
       const live = await tx.select().from(registration)
         .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])))
         .orderBy(registration.id).for('update');
@@ -472,21 +455,18 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
         userId: adminId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
         previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: plan.find((p) => p.itemId === l.offerItemId)?.to ?? null, reason: data.reason },
       })), tx);
-      // What the lines cost in the corrected series: its fee rows (held since before the lines),
-      // each student's lines checked again there.
-      let repriced: RepricedLine[] = [];
+      // Each student's lines checked again in the corrected series. Their prices stay (P1c: a line is priced by its
+      // row, not by its series' fee grid).
       try {
         await recheckLines(tx, live.map((l) => l.id));
-        repriced = await repriceMovedLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
       } catch (err) {
         if (err instanceof LineRuleError || err instanceof PricingError) throw new SessionError(err.message, 409);
         throw err;
       }
       await redateLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
       const expired = await expireIneligibleRegistrations(tx, { sessionIds: [id] }, 'series_corrected');
-      return { session: updated!, expired, repriced };
+      return { session: updated!, expired };
     }));
-    await tellPriceChanged(out.repriced, "The session's exam series was corrected, and with it the board fee");
     return { session: out.session, expired: out.expired };
   } catch (err) {
     if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {

@@ -455,9 +455,10 @@ describe('money invariants over the whole database', () => {
   });
 
   // P1b (§12: reworded): a line priced by its row (version 2) is provisional exactly while its session's prices are not
-  // final; a line priced from the old grid (version 1) keeps the old rule — no longer provisional once every fee row
-  // it read is confirmed at the amount it recorded.
-  it('no provisional line once prices are final (v2); no v1 line provisional on confirmed rows', async () => {
+  // final. P1c (§12's wording, "no provisional line once prices are final"): the version-1 clause, which read the fee
+  // grid's rows, left with the grid (migration 0072); no line is priced from it any more, and a waiting v1 line still
+  // provisional sits in a session whose prices are not final (0072 refuses to run otherwise).
+  it('no provisional line once prices are final', async () => {
     const v2 = await sql(`
       select r.id, r.status, r.price_provisional, s.prices_final from registration r join registration_session s on s.id = r.session_id
       where r.status in ('pending_approval', 'pending_payment') and (r.pricing_basis->>'v')::int = 2
@@ -465,19 +466,12 @@ describe('money invariants over the whole database', () => {
     `);
     expect(v2).toEqual([]);
     const stuck = await sql(`
-      select r.id, r.status, r.pricing_basis->'feeRows' as rows from registration r
-      where r.price_provisional and r.status in ('pending_approval', 'pending_payment', 'preregistered')
-        and coalesce((r.pricing_basis->>'v')::int, 1) = 1
-        and jsonb_array_length(coalesce(r.pricing_basis->'feeRows', '[]'::jsonb)) > 0
-        and not exists (
-          select 1 from jsonb_array_elements(r.pricing_basis->'feeRows') fr
-          left join board_fee f on f.id = fr->>'id'
-          where f.id is null or f.provisional or ${cents('f.amount')} <> ${cents("(fr->>'amount')::numeric")})
+      select r.id, r.status from registration r join registration_session s on s.id = r.session_id
+      where r.price_provisional and s.prices_final and r.status in ('pending_approval', 'pending_payment', 'preregistered')
     `);
     expect(stuck).toEqual([]);
     // There is something to check: prices switched final with lines waiting, and a line reserved before it.
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'SESSION_PRICES_FINAL' and (new_data->>'linesMadePayable')::int > 0`))[0]?.n)).toBeGreaterThan(0);
-    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'BOARD_FEES_CONFIRMED' and (new_data->>'linesNoLongerProvisional')::int > 0`))[0]?.n)).toBeGreaterThan(0);
   });
 
   // P1b (§12: reworded): the same row code once per sitting (line rules v2's gate.sameEntryOnce): a row entering the
@@ -1302,9 +1296,11 @@ describe('money invariants over the whole database', () => {
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'REGISTRATION_CONFIRMED' and new_data->>'boardDeadline' is not null`))[0]?.n)).toBeGreaterThan(0);
   });
 
-  it("every line's basis matches its row's fees: the exam fee and the course fee it was priced from, unless a later change left it to finance (§6, E7)", async () => {
+  it("every line's basis matches its row's fees: the exam fee and the course fee it was priced from, unless a later change left it to finance (§6, E7) or a move took it to another row", async () => {
     // A row's fee changed after a line was reserved re-prices the line (its basis follows) or, with a payment
-    // history, lists it for finance and leaves it as it was; a line no longer live keeps what it had.
+    // history, lists it for finance and leaves it as it was; a line no longer live keeps what it had. P1c: a line the
+    // admin's move or a series correction took to a row of another sitting keeps its price (§12: "matches its row's
+    // fees at reservation"; a move re-prices nothing since the series' fee grid left) — its move's audit row says so.
     const broken = await sql(`
       select r.id, r.status, (r.pricing_basis->>'examFee')::numeric as basis_exam, i.exam_fee,
         (r.pricing_basis->>'courseFeeBase')::numeric as basis_course,
@@ -1317,6 +1313,7 @@ describe('money invariants over the whole database', () => {
              ${cents("case when r.mode = 'self_study' and i.self_study_fee is not null then i.self_study_fee else coalesce(i.course_fee, o.course_fee) end")})
         and not exists (select 1 from audit_log a where a.action = 'ROWS_REPRICED'
           and exists (select 1 from jsonb_array_elements(a.new_data->'listedForFinance') l where l->>'id' = r.id))
+        and not exists (select 1 from audit_log a where a.entity_id = r.id and a.action in ('REGISTRATION_SERIES_MOVED', 'LINE_SERIES_MOVED'))
     `);
     expect(broken).toEqual([]);
   });

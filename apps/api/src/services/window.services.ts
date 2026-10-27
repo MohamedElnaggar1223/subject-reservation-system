@@ -65,8 +65,9 @@ export const CUT_OFF_PASSED_REFUSAL = (what: string, at: Date) =>
 /** PRICES_NOT_FINAL (payment): reserved before the prices are final, paid once they are (E6). */
 export const PRICES_NOT_FINAL_REFUSAL = 'The prices of this session are not final yet: the subject is reserved, and it can be paid once the school confirms its prices';
 /**
- * PRICES_NOT_FINAL for one line when its session's prices are final: an older line priced from a fee not confirmed
- * (the deprecated fee grid) whose row has no exam fee of its own yet. Its subject's price, not the session's.
+ * PRICES_NOT_FINAL for one line when its session's prices are final: a line still provisional there (one priced from
+ * the fee grid before P1c; migration 0072 refuses to run while such a line waits) names its subject's price, not the
+ * session's.
  */
 export const LINE_PRICE_NOT_FINAL_REFUSAL = (what: string) =>
   `${what}'s price is not confirmed yet: the subject is reserved, and it can be paid once the school confirms its price`;

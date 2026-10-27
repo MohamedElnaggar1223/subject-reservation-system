@@ -46,7 +46,6 @@ import { enrolmentRoutes } from './routes/enrolment.routes';
 import { examEntryRoutes } from './routes/exam-entry.routes';
 import { examTimetableRoutes } from './routes/exam-timetable.routes';
 import { examResultRoutes } from './routes/exam-result.routes';
-import { boardFeeRoutes } from './routes/board-fee.routes';
 import { lineRoutes, sessionVerifyRoutes, statementRoutes } from './routes/reservation.routes';
 import { importRoutes } from './routes/import.routes';
 import { schedulingRoutes } from './routes/scheduling.routes';
@@ -451,7 +450,6 @@ const v1 = new Hono<HonoEnv>()
   // F0b: the exam catalogue, board series, course enrolment
   .route('/catalogue', catalogueRoutes)
   .route('/board-series', boardSeriesRoutes)
-  .route('/board-fees', boardFeeRoutes)
   .route('/enrolments', enrolmentRoutes)
   // The reservations rework, step C
   .route('/charges', charges)

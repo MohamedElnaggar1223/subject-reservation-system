@@ -418,7 +418,7 @@ describe('08z: reserving and paying', () => {
       const [l] = await reserved(f, X, [subj.s1!]);
       const [row] = await rowsOf(X, subj.s1!);
       expect(await lineOf(l!)).toMatchObject({ status: 'pending_payment', provisional: true });
-      // An older row: priced from the deprecated fee grid, with no exam fee of its own.
+      // An older row with no exam fee of its own (as converted data held one the fee grid, gone since P1c, priced).
       await sql(`update session_offer_item set exam_fee = null, exam_fee_source = null where id = $1`, [row!.id]);
       const final = (expected?: Impact) => coordinator.api.v1.sessions[':id']['prices-final'].$put({ param: { id: X }, json: { final: true, ...(expected ? { expected } : {}) } });
       expect(await refusedWithCode(final())).toEqual({ status: 409, error: PRICES_FINAL_UNPRICED_REFUSAL([name.s1!], 1), code: 'PRICE_NOT_SET' });
@@ -564,12 +564,13 @@ describe('08z: reserving and paying', () => {
       expect(await sql(`select 1 from audit_log where action = 'LINE_DUE_MOVED' and entity_id = $1`, [made!.id])).toEqual([]);
     });
 
-    it("the refusal codes of a draft and of the cells: NOT_OPEN, PREREGISTRATION_GONE, OPTION_NOT_OFFERED", async () => {
+    // P1c: the preregistration route (POST /registrations/preregister) and its PREREGISTRATION_GONE refusal left; a draft
+    // refuses a direct reservation (NOT_OPEN) and nothing is made. No money moved in the retired part.
+    it("the refusal codes of a draft and of the cells: NOT_OPEN, OPTION_NOT_OFFERED", async () => {
       const draft = await session(adm, 'June (08z, draft)', 'june', 'igcse', futureWindow());
       const f = await family('codes');
       expect(await refusedWithCode(reserve(f, draft, [subj.s1!]))).toMatchObject({ code: 'NOT_OPEN', error: expect.stringMatching(/ is not open for reservations yet$/) });
-      expect(await refusedWithCode(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, studentId: f.studentId, ...(await reservationOf(draft, [subj.s1!])) } })))
-        .toEqual({ status: 400, error: 'Reservations open when the session opens: a session that is not open yet takes none', code: 'PREREGISTRATION_GONE' });
+      expect(await sql(`select 1 from registration where student_id = $1 and session_id = $2`, [f.studentId, draft])).toEqual([]);
       const X = await fresh('codes');
       const [row] = await rowsOf(X, subj.s2!);
       const consent = (await reservationOf(X, [])).consent;

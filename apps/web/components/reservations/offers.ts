@@ -1,9 +1,8 @@
 /**
  * The family read the reservation page, the swap, the teacher change and the approvals are built on
- * (`GET /v1/registrations/offers`, COORDINATOR_REWORK.md Appendix A): its v2 part only — `session` (name, dates,
- * prices final, the refund sentence, the declaration, the questions), `eligibility` and `offerings → rows → options`.
- * Its v1 part (`offers`, `availability`, `grade10Core`, `declarableSittings`) is P1c's to remove: no family or desk screen
- * reads it; the exceptions grant form still does (`admin/exceptions/grant-form.client.tsx`).
+ * (`GET /v1/registrations/offers`, COORDINATOR_REWORK.md Appendix A): `session` (name, dates, prices final, the refund
+ * sentence, the declaration, the questions), `eligibility` and `offerings → rows → options` — all it holds since P1c
+ * removed its v1 part. The exceptions grant form reads the same offerings (`admin/exceptions/grant-form.client.tsx`).
  * Types come from the fetcher (PATTERNS.md), never by hand.
  */
 

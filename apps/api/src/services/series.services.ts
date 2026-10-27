@@ -34,7 +34,6 @@ import { logAction, logActions, type AuditContext } from './audit.services';
 import { entriesFollowMoveInTx } from './exam-entry.services';
 import { schoolDate, entryDeadlineMessage } from './window.services';
 import { lineDeadlineSql, effectiveDeadlinesOf, deadlinePassedSentence, redateLines, redateSeriesLines } from './deadline.services';
-import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 
@@ -442,18 +441,13 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       if (!link) throw new SeriesError('This session has no item in that series', 404);
       const target = link.series;
       const now = new Date();
-      // Before the lines (§6; Confirm's order): the items they would go to in the target, FOR SHARE
-      // (a change of such an item's series waits for this move), then the fee rows those read
-      // there, FOR SHARE, carried provisional where finance has none (the review of 40c1447). A
-      // line's item is read before its lock: its student is held, and only a move changes it.
+      // Before the lines (§6): the items they would go to in the target, FOR SHARE (a change of such an item's
+      // series waits for this move). A line's item is read before its lock: its student is held, and only a move
+      // changes it. A moved line keeps its price (P1c: a line is priced by its row, not by its series' fee grid).
       const pre = await tx.select({ offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId })
         .from(registration).where(inArray(registration.id, data.registrationIds));
       const toward = pre.filter((r) => r.boardSeriesId !== target.id);
       const siblings = await siblingItems(tx, [...new Set(toward.map((r) => r.offerItemId))], target.id);
-      await lockMoveFeeRows(tx, toward.flatMap((r) => {
-        const to = siblings.get(r.offerItemId);
-        return to ? [{ itemId: to, fromSeriesId: r.boardSeriesId, toSeriesId: target.id }] : [];
-      }), actorId, 'A line moved to another series');
       const regs = await tx
         .select({ id: registration.id, sessionId: registration.sessionId, status: registration.status, boardSeriesId: registration.boardSeriesId,
           offerItemId: registration.offerItemId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
@@ -498,11 +492,9 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
         }
         await tx.update(registration).set({ offerItemId: toItem, boardSeriesId: target.id, updatedAt: now }).where(eq(registration.id, r.id));
       }
-      // Each student's lines checked again where they now are (§6), then priced from the new grid.
-      let repriced: Awaited<ReturnType<typeof repriceMovedLines>> = [];
+      // Each student's lines checked again where they now are (§6).
       try {
         await recheckLines(tx, moving.map((r) => r.id));
-        repriced = await repriceMovedLines(tx, moving.map((r) => r.id), actorId, 'moved to another series');
       } catch (err) {
         if (err instanceof LineRuleError || err instanceof PricingError) throw new SeriesError(err.message, 409);
         throw err;
@@ -522,10 +514,9 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       })), tx);
       await redateLines(tx, moving.map((r) => r.id), actorId, 'moved to another series');
 
-      return { result: { moved: moving.length, repriced: repriced.length, alreadyThere: regs.length - moving.length, boardSeriesId: target.id, series: boardSeriesName(names, target) }, repriced };
+      return { moved: moving.length, alreadyThere: regs.length - moving.length, boardSeriesId: target.id, series: boardSeriesName(names, target) };
     });
-    await tellPriceChanged(out.repriced, 'The subject is now entered in another exam series, with its own board fee');
-    return out.result;
+    return out;
   } catch (err) {
     const sentence = seriesRuleSentence(err);
     if (sentence) throw new SeriesError(sentence, 409);
@@ -555,7 +546,7 @@ async function siblingItems(tx: Tx, itemIds: string[], targetId: string) {
       and coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i2.id), '{}')
         = coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i1.id), '{}')
     where i1.id in (${ids}) and i2.id in (${sql.join(heldIds.map((id) => sql`${id}`), sql`, `)})
-    order by i1.id, (i2.availability = 'closed'), i2.id`);
+    order by i1.id, not (i2.first_in_school or i2.retake_in_school or i2.retake_self_study or i2.first_self_study), i2.id`);
   for (const x of r.rows as { from: string; to: string }[]) out.set(x.from, x.to);
   return out;
 }

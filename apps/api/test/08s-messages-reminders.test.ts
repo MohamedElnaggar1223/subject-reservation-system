@@ -3,7 +3,7 @@ import { apiResponse, academicYearStartOf, academicYearLabel, SETTINGS } from '@
 // The Arabic of step D's screens: the settings page reads its sentences from here (the review of 9e7a4d6, item 2).
 import { messagesArabic } from '../../web/lib/i18n-messages';
 import {
-  admin, staff, onboard, refused, one, sql, money, app, waitFor, pauseAtAudits, lockWaiters, holdRowLock, notificationsFor, CONSENT, type Client,
+  admin, staff, onboard, refused, one, sql, money, app, waitFor, pauseAtAudits, lockWaiters, holdRowLock, notificationsFor, CONSENT, confirmed, type Client, type Impact,
 } from './helpers';
 import { setClockForTests } from '../src/lib/clock';
 
@@ -64,8 +64,8 @@ const reminderCount = async (email: string) => (await notificationsFor(email, 'P
 describe('08s: messages and reminders', () => {
   let adm: Client, officer: Client, finadmin: Client, coordinator: Client;
   let teacherId: string, seriesA: string, seriesProv: string, priorSeries: string;
-  let sessionA: string, sessionAName: string, sessionAEnd: Date;
-  let subjA: string, subjAName: string, itemA: string, itemProv: string, feeProv: string;
+  let sessionA: string, sessionAName: string, sessionAEnd: Date, sessionProv: string;
+  let subjA: string, subjAName: string, itemA: string, itemProv: string;
   let dueDay: string;
   const TPL = { paymentDue: 'tpl-payment-due', paymentOverdue: 'tpl-payment-overdue' };
   type Family = Awaited<ReturnType<typeof onboard>>;
@@ -77,6 +77,35 @@ describe('08s: messages and reminders', () => {
     }))).registrations[0]!.id;
   const payAtDesk = (f: Family, ids: string[]) =>
     apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: ids, instrumentUsed: 'cash', escrowAmountToApply: 0 } }));
+  /** A June session of the file (the deprecated dated create: open at once), due on the payment day; its prices final unless `final` is false. */
+  const juneSession = async (label: string, final = true) => {
+    const id = (await apiResponse(adm.api.v1.sessions.$post({
+      json: { type: 'june', year: Y + 1, label, startDate: new Date(Date.now() - DAY).toISOString(), endDate: sessionAEnd.toISOString(), courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString() },
+    })))!.id;
+    if (final) await apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id }, json: { final: true } }));
+    return id;
+  };
+  /**
+   * A subject offered in a session through the coordinator's routes (P1c: the old offer route and the fee grid left):
+   * the subject not on the reference list, by its code; course fee 1,000, the file's teacher, and one all-papers row
+   * in the session's June sitting — the series of the session's label — at the exam fee 500 the grid row carried.
+   * Returns the row.
+   */
+  const offerIn = async (sessionId: string, subjectId: string) => {
+    const sub = await one<{ name: string; code: string }>(`select name, code from subject where id = $1`, [subjectId]);
+    const made = await apiResponse(adm.api.v1.sessions[':id'].offerings.$post({ param: { id: sessionId }, json: { custom: { board: 'cambridge', name: sub.name, level: 'igcse', group: 'O.L.', code: sub.code } } }));
+    const saved = await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: sessionId, offeringId: made.id },
+      json: {
+        accepting: true, courseFee: 1000, teachers: [{ teacherId, online: false, external: false }],
+        rows: [{ kind: 'all_papers', referenceCodes: [sub.code], sitting: 'june', examFee: 500, cells: { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false } }],
+      },
+    }));
+    expect(saved.saved).toBe(true);
+    return saved.offering.rows[0]!.id;
+  };
+  const mk = async (label: string, entryDeadline?: Date) =>
+    (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, ...(entryDeadline ? { entryDeadline } : {}) } })))!.id;
 
   afterAll(async () => {
     await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: false, reason: 'back to as installed' } }));
@@ -94,32 +123,22 @@ describe('08s: messages and reminders', () => {
     // The payment due date: a Cairo day 30 days ahead, at noon; the session runs well past it.
     dueDay = cairoDay(new Date(Date.now() + 30 * DAY));
     sessionAEnd = cairoAt(shift(dueDay, 40), 23, 59);
-    sessionA = (await apiResponse(adm.api.v1.sessions.$post({
-      json: {
-        type: 'june', year: Y + 1, label: `s08-${RUN}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: sessionAEnd.toISOString(),
-        courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString(),
-      },
-    })))!.id;
+    sessionA = await juneSession(`s08-${RUN}`);
     sessionAName = (await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionA])).name;
-    const mk = async (label: string, entryDeadline?: Date) =>
-      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, ...(entryDeadline ? { entryDeadline } : {}) } })))!.id;
+    // Each session's rows sit in the sitting of its own label (the series made here, with the entry deadline).
     seriesA = await mk(`s08-${RUN}`, cairoAt(shift(dueDay, 60), 23, 59));
     seriesProv = await mk(`s08-prov-${RUN}`, cairoAt(shift(dueDay, 60), 23, 59));
     priorSeries = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y, label: `s08-prior-${RUN}` } })))!.id;
     subjAName = `Biology (08s ${RUN})`;
     subjA = (await apiResponse(adm.api.v1.subjects.$post({ json: { name: subjAName, code: `S08A-${RUN}`, council: 'cambridge', courseFee: 1000, registrationFee: 500, isOfferedAtSchool: true, isCore: false } })))!.id;
     const subjP = (await apiResponse(adm.api.v1.subjects.$post({ json: { name: `Chemistry (08s ${RUN})`, code: `S08P-${RUN}`, council: 'cambridge', courseFee: 1000, registrationFee: 500, isOfferedAtSchool: true, isCore: false } })))!.id;
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: seriesA }, json: { rows: [{ keyKind: 'subject', keyId: subjA, amount: 500, provisional: false }] } }));
-    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: seriesProv }, json: { rows: [{ keyKind: 'subject', keyId: subjP, amount: 500, provisional: true }] } }));
-    feeProv = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_id = $2`, [seriesProv, subjP])).id;
-    const offer = async (subjectId: string, seriesId: string) => (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: sessionA }, json: {
-        subjectId, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }],
-        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
-      },
-    })))!.items[0]!;
-    itemA = await offer(subjA, seriesA);
-    itemProv = await offer(subjP, seriesProv);
+    itemA = await offerIn(sessionA, subjA);
+    expect((await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [itemA])).s).toBe(seriesA);
+    // The provisional line's session (P1c): a price is provisional while its session's prices are not final (E6) — it
+    // was a grid row of its own series still provisional, beside A's confirmed one.
+    sessionProv = await juneSession(`s08-prov-${RUN}`, false);
+    itemProv = await offerIn(sessionProv, subjP);
+    expect((await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [itemProv])).s).toBe(seriesProv);
   });
 
   // ─── The seeded rules, the templates, the settings ────────────────────────────
@@ -272,13 +291,15 @@ describe('08s: messages and reminders', () => {
 
   // ─── A provisional line ──────────────────────────────────────────────────────
 
-  it('a line on a provisional board fee is not reminded (it cannot be paid yet); confirmed, it is reminded once', async () => {
+  it('a line whose price is not final is not reminded (it cannot be paid yet); its session\'s prices made final, it is reminded once', async () => {
     const f = await onboard(officer, `s08-prov-${RUN}`, 11);
-    const line = await reserveUnpaid(f, itemProv);
+    const line = await reserveUnpaid(f, itemProv, sessionProv);
     expect((await one<{ p: boolean }>(`select price_provisional as p from registration where id = $1`, [line])).p).toBe(true);
     await step(cairoAt(shift(dueDay, -7), 9, 10));
     expect(await offsetsOf(line)).toEqual([]);
-    await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: seriesProv }, json: { rows: [{ feeId: feeProv }], reason: 'the board published its fee' } }));
+    // P1c: the board's fee confirmed on the grid is the coordinator's switch, prices final (E6), counted first.
+    const { shown } = await confirmed((expected?: Impact) => apiResponse(adm.api.v1.sessions[':id']['prices-final'].$put({ param: { id: sessionProv }, json: { final: true, ...(expected ? { expected } : {}) } })));
+    expect(shown.impact).toMatchObject({ linesAffected: 1 });
     expect((await one<{ p: boolean; d: string }>(`select price_provisional as p, due_at as d from registration where id = $1`, [line])).p).toBe(false);
     // Its due date is still the session's (the confirmation plus the grace is earlier): reminded on day −3, once.
     await step(cairoAt(shift(dueDay, -3), 9, 10));
@@ -316,12 +337,11 @@ describe('08s: messages and reminders', () => {
   // ─── A session's own rule ────────────────────────────────────────────────────
 
   it("a session's own rule overrides the rule for every session there; switched off, nothing goes; dropped, the session follows every session's rule again", async () => {
-    const sessionB = (await apiResponse(adm.api.v1.sessions.$post({
-      json: { type: 'june', year: Y + 1, label: `s08b-${RUN}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: sessionAEnd.toISOString(), courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString() },
-    })))!.id;
-    const itemB = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: sessionB }, json: { subjectId: subjA, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesA, availability: 'open', requiredInSeries: false }] },
-    })))!.items[0]!;
+    // P1c: B's row sits in B's own sitting (a row sits in its session's; the old item route placed it in A's series),
+    // with A's entry deadline.
+    const sessionB = await juneSession(`s08b-${RUN}`);
+    await mk(`s08b-${RUN}`, cairoAt(shift(dueDay, 60), 23, 59));
+    const itemB = await offerIn(sessionB, subjA);
     const fB = await onboard(officer, `s08-ovr-${RUN}`, 11);
     const fA = await onboard(officer, `s08-glob-${RUN}`, 11);
     const lineB = await reserveUnpaid(fB, itemB, sessionB);
@@ -754,12 +774,10 @@ describe('08s: messages and reminders', () => {
   });
 
   it('a rule changed during the day never sends a family a second reminder that day about the same date (item 5)', async () => {
-    const sessionC = (await apiResponse(adm.api.v1.sessions.$post({
-      json: { type: 'june', year: Y + 1, label: `s08c-${RUN}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: sessionAEnd.toISOString(), courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString() },
-    })))!.id;
-    const itemC = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: sessionC }, json: { subjectId: subjA, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesA, availability: 'open', requiredInSeries: false }] },
-    })))!.items[0]!;
+    // P1c: C's row sits in C's own sitting, with A's entry deadline (as B's above).
+    const sessionC = await juneSession(`s08c-${RUN}`);
+    await mk(`s08c-${RUN}`, cairoAt(shift(dueDay, 60), 23, 59));
+    const itemC = await offerIn(sessionC, subjA);
     const f = await onboard(officer, `s08-sameday-${RUN}`, 11);
     const line = await reserveUnpaid(f, itemC, sessionC);
     const rule = (offsetsDays: number[], reason: string) => apiResponse(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: sessionC, offsetsDays, repeatEveryDays: null, channels: ['in_app'], templateId: TPL.paymentDue, active: true, reason } }));

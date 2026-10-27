@@ -62,9 +62,16 @@ export async function refusedWithCode(p: Promise<{ status: number; json(): Promi
   return { status: res.status, error: typeof body.error === 'string' ? body.error : JSON.stringify(body.error ?? ''), code: typeof body.code === 'string' ? body.code : undefined };
 }
 
-/** Raw SQL against the test database. Values are bound, never interpolated. */
+/**
+ * Raw SQL against the test database. Values are bound, never interpolated — by position: the n-th placeholder takes
+ * params[n - 1], whatever its number, so the placeholders must read $1, $2, … in the order they appear (refused
+ * otherwise: `… = $2 where id = $1` bound the values the other way round and silently updated nothing, three times
+ * before this check, P1c).
+ */
 export async function sql<T = Json>(text: string, params: unknown[] = []): Promise<T[]> {
   const { db, sql: s } = await dbmod();
+  const numbers = [...text.matchAll(/\$(\d+)/g)].map((m) => Number(m[1]));
+  if (numbers.some((n, i) => n !== i + 1)) throw new Error(`sql(): write the placeholders $1, $2, … in the order they appear (got ${numbers.map((n) => `$${n}`).join(', ')})`);
   const parts = text.split(/\$\d+/);
   let q = s.raw(parts[0] ?? '');
   for (let i = 1; i < parts.length; i++) {
@@ -183,12 +190,11 @@ type Sitting = 'june' | 'november' | 'january';
  * A suite session keeps a label of its own (so no two collide, one open per type, year and label)
  * and its rows sit in that label's sittings, made with an exam start far ahead (reservable, with no
  * entry deadline until a test sets one) — the board dates a real session reads from the reference
- * data. The deprecated routes (feedSeries, placeItemsIn, subjectFeeIn) stay for the scenarios P1b adapts.
+ * data. The deprecated routes and the fee grid they priced from (feedSeries, placeItemsIn, subjectFeeIn,
+ * pricedByGrid) left with P1c: every suite subject is priced by its row's exam fee.
  */
 type SubjectMeta = {
   id: string; code: string; name: string; level: Level; council: Board; courseFee: number; registrationFee: number; isOfferedAtSchool: boolean; isCore: boolean;
-  // Offered the old way (the deprecated offers route, its fee read from the series' fee grid; no exam fee on its row).
-  pricedByGrid: boolean;
 };
 type SessionMeta = { id: string; oldType: OldType; level: Level; type: 'june' | 'winter'; year: number; oldYear: number; label: string; adm: Client };
 const SUBJECTS: SubjectMeta[] = [];
@@ -211,15 +217,9 @@ export async function subject(
   extra: {
     qualificationLevel?: 'igcse' | 'as_level' | 'a_level'; isOfferedAtSchool?: boolean; isCore?: boolean;
     council?: 'cambridge' | 'pearson_edexcel' | 'oxford';
-    /**
-     * Offered the old way in the file's windows: the deprecated offers route with a whole-subject item in the
-     * suite's series and its fee on the series' grid — a subject priced from the grid, as converted data and a
-     * subject only in closed sessions still are (the board-change scenarios P1b retires with that machinery).
-     */
-    pricedByGrid?: boolean;
   } = {}
 ): Promise<string> {
-  const { pricedByGrid, ...fields } = extra;
+  const fields = extra;
   const r = await apiResponse(
     adm.api.v1.subjects.$post({
       json: {
@@ -230,7 +230,7 @@ export async function subject(
   );
   const meta: SubjectMeta = {
     id: r.id, code, name, level: extra.qualificationLevel ?? 'igcse', council: extra.council ?? 'cambridge', courseFee: fees.course,
-    registrationFee: fees.registration, isOfferedAtSchool: extra.isOfferedAtSchool ?? true, isCore: extra.isCore ?? false, pricedByGrid: !!pricedByGrid,
+    registrationFee: fees.registration, isOfferedAtSchool: extra.isOfferedAtSchool ?? true, isCore: extra.isCore ?? false,
   };
   SUBJECTS.push(meta);
   // Offered in the file's open and draft windows of its level, as the conversion offers it.
@@ -286,27 +286,12 @@ async function suiteSeries(adm: Client, s: SessionMeta, board: Board, level: Lev
  * its code, its course fee and teacher, and one all-papers row in the window's sitting — first entry,
  * retake in school and in self study where the school teaches it, retake in self study where it does
  * not — at its registration fee as the exam fee. A core subject keeps the grade-10 flag (a parked
- * feature: set through the deprecated offer route the new model does not carry).
+ * feature the new model does not carry and no route sets since P1c: written as converted data holds it).
  */
 async function offerInSession(adm: Client, s: SessionMeta, sub: SubjectMeta) {
   // A subject's board may have changed since it was made (a board-change test): read it again.
   const [now] = await sql<{ council: Board; name: string; code: string }>(`select council, name, code from subject where id = $1`, [sub.id]);
   if (now) { sub.council = now.council; sub.name = now.name; sub.code = now.code; }
-  if (sub.pricedByGrid) {
-    // The old way (the deprecated offers route; its fee on the series' grid).
-    const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
-    const teacherId = await teacherOfTheSuite(adm);
-    await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-      param: { id: s.id },
-      json: {
-        subjectId: sub.id, availability: sub.isOfferedAtSchool ? 'open' : 'self_study_only', courseFee: sub.courseFee, grade10Core: sub.isCore,
-        teachers: sub.isOfferedAtSchool ? [{ teacherId, mode: 'in_school' }] : [],
-        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
-      },
-    }));
-    await setSuiteFee(adm, seriesId, sub);
-    return;
-  }
   await suiteSeries(adm, s, sub.council, sub.level);
   const { sitting } = sittingFor(s, sub.council, sub.level);
   const teacherId = await teacherOfTheSuite(adm);
@@ -329,26 +314,7 @@ async function offerInSession(adm: Client, s: SessionMeta, sub: SubjectMeta) {
       }],
     },
   }));
-  if (sub.isCore) {
-    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: s.id, offerId: made.id }, json: { grade10Core: true, reason: 'suite: a grade-10 core subject' } }));
-  }
-}
-
-/** The subject's registration fee as its board fee in a series (confirmed): the deprecated fee grid, read by an item made by the deprecated routes. */
-async function setSuiteFee(adm: Client, seriesId: string, sub: SubjectMeta) {
-  const [row] = await sql<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id = $2`, [seriesId, sub.id]);
-  if (row) return;
-  await apiResponse(adm.api.v1['board-fees'].$put({
-    query: { seriesId },
-    json: { rows: [{ keyKind: 'subject', keyId: sub.id, amount: sub.registrationFee, provisional: false, ...(sub.registrationFee === 0 ? { zeroReason: 'suite: no board fee' } : {}) }] },
-  }));
-}
-
-/** A file subject's board fee in a series (its registration fee), as finance sets it on the deprecated Fees tab. */
-export async function subjectFeeIn(adm: Client, seriesId: string, subjectId: string) {
-  const sub = SUBJECTS.find((x) => x.id === subjectId);
-  if (!sub) throw new Error('subjectFeeIn(): a subject this file made');
-  await setSuiteFee(adm, seriesId, sub);
+  if (sub.isCore) await sql(`update session_offer set grade10_core = true where id = $1`, [made.id]);
 }
 
 /**
@@ -419,85 +385,27 @@ export async function offer(adm: Client, sessionId: string, subjectId: string) {
 }
 
 /**
- * F0b's "feed a series" (deprecated with the item routes; P1b retires the scenarios that use it): a
- * board series of the window's own month and year (labelled with `label`), into which the window's
- * rows of that board go — with their live lines when they sat in the window's own suite sitting, or
- * beside them when they sat in an earlier fed series (the old one closed: new lines go to the new
- * one). Its fee rows are the subjects' registration fees. Returns the series id.
- */
-export async function feedSeries(
-  adm: Client,
-  sessionId: string,
-  opts: { boardCode?: 'cambridge' | 'pearson_edexcel' | 'oxford'; label: string; entryDeadline?: Date; month?: 'january' | 'june' | 'october' | 'november'; year?: number },
-): Promise<string> {
-  const s = SESSIONS.find((x) => x.id === sessionId);
-  if (!s) throw new Error('feedSeries(): a session this file made');
-  const board = opts.boardCode ?? 'pearson_edexcel';
-  const created = await apiResponse(adm.api.v1['board-series'].$post({
-    json: {
-      boardCode: board, month: opts.month ?? s.oldType, year: opts.year ?? s.oldYear, label: opts.label,
-      entryDeadline: opts.entryDeadline ?? null, ...(opts.entryDeadline ? {} : { examsStart: `${(opts.year ?? s.oldYear) + 1}-12-31` }),
-    },
-  }));
-  await placeItemsIn(adm, sessionId, created.id);
-  return created.id;
-}
-
-/**
- * A suite window's rows of a series' board go into that series (F0b's "this window feeds it", through
- * the deprecated item routes): a row still in the window's own suite sitting moves with its live
- * lines; one in an earlier fed series stays for its lines, closed, and a new item in the series takes
- * new lines (priced from the fee grid, each subject's registration fee its board fee there).
- */
-export async function placeItemsIn(adm: Client, sessionId: string, seriesId: string) {
-  const s = SESSIONS.find((x) => x.id === sessionId);
-  if (!s) throw new Error('placeItemsIn(): a session this file made');
-  const [target] = await sql<{ board_code: string }>(`select board_code from board_series where id = $1`, [seriesId]);
-  const items = await sql<{ id: string; offer_id: string; subject_id: string; label: string; series_label: string; series_id: string }>(`
-    select i.id, i.offer_id, o.subject_id, i.label, bs.label as series_label, i.board_series_id as series_id
-    from session_offer_item i join session_offer o on o.id = i.offer_id join board_series bs on bs.id = i.board_series_id
-    where i.session_id = $1 and bs.board_code = $2 and i.availability <> 'closed' order by i.id`, [sessionId, target!.board_code]);
-  for (const it of items) {
-    if (it.series_id === seriesId) continue;
-    const sub = SUBJECTS.find((x) => x.id === it.subject_id);
-    if (sub) await setSuiteFee(adm, seriesId, sub);
-    if (it.series_label === s.label) {
-      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
-        param: { id: sessionId, offerId: it.offer_id, itemId: it.id }, json: { boardSeriesId: seriesId, reason: 'suite: the window feeds this series' },
-      }));
-    } else {
-      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items.$post({
-        param: { id: sessionId, offerId: it.offer_id },
-        json: { label: it.label, kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false },
-      }));
-      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
-        param: { id: sessionId, offerId: it.offer_id, itemId: it.id }, json: { availability: 'closed', reason: 'suite: new lines go to the new series' },
-      }));
-    }
-  }
-}
-
-/**
  * The SQL for a subject's all-papers row in a session (`$s`, `$t`: the session's and subject's
  * placeholders) — what resolveItem picks — for a test that inserts a line by hand.
  */
 export const wholeItemSql = (s: string, t: string) =>
-  `(select i.id from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = ${s} and o.subject_id = ${t} and i.kind = 'all_papers' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1)`;
+  `(select i.id from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = ${s} and o.subject_id = ${t} and i.kind = 'all_papers' order by not (i.first_in_school or i.retake_in_school or i.retake_self_study or i.first_self_study), (i.board_series_id is null), i.id limit 1)`;
 
-/** The series a session's (open) rows of a board sit in. */
+/** The series a session's (ticked) rows of a board sit in. */
 export async function seriesOfSession(sessionId: string, board: 'cambridge' | 'pearson_edexcel' | 'oxford' = 'pearson_edexcel') {
   return (await one<{ id: string }>(`select distinct i.board_series_id as id from session_offer_item i join board_series bs on bs.id = i.board_series_id
-    where i.session_id = $1 and bs.board_code = $2 and i.availability <> 'closed'`, [sessionId, board])).id;
+    where i.session_id = $1 and bs.board_code = $2 and (i.first_in_school or i.retake_in_school or i.retake_self_study or i.first_self_study)`, [sessionId, board])).id;
 }
 
 /** Both consents ticked: every reservation path takes them since step B (RESERVATIONS_REWORK.md §3.5). */
 export const CONSENT = { refundPolicy: true, declaration: true } as const;
 
-/** A subject's all-papers row in a session — what resolveItem picks: an open one first, then one with a series. */
+/** A subject's all-papers row in a session — what resolveItem picks: one with a cell ticked first, then one with a series. */
 async function wholeItemOf(sessionId: string, subjectId: string) {
-  const [it] = await sql<{ id: string; offer_availability: string; availability: string }>(
-    `select i.id, o.availability as offer_availability, i.availability from session_offer_item i join session_offer o on o.id = i.offer_id
-     where o.session_id = $1 and o.subject_id = $2 and i.kind = 'all_papers' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1`,
+  const [it] = await sql<{ id: string; in_school: boolean }>(
+    `select i.id, (i.first_in_school or i.retake_in_school) as in_school from session_offer_item i join session_offer o on o.id = i.offer_id
+     where o.session_id = $1 and o.subject_id = $2 and i.kind = 'all_papers'
+     order by not (i.first_in_school or i.retake_in_school or i.retake_self_study or i.first_self_study), (i.board_series_id is null), i.id limit 1`,
     [sessionId, subjectId]);
   return it ?? null;
 }
@@ -517,7 +425,8 @@ export async function reservationOf(
   const lines: { offerItemId: string; attempt: 'first'; mode: 'in_school' | 'self_study'; teacherId?: string }[] = [];
   for (const subjectId of subjectIds) {
     const it = await wholeItemOf(sessionId, subjectId);
-    const selfStudyOnly = it ? it.offer_availability === 'self_study_only' || it.availability === 'self_study_only' : false;
+    // A row taught nowhere in school (no in-school cell) is reserved in self study (D3).
+    const selfStudyOnly = it ? !it.in_school : false;
     lines.push({
       offerItemId: it?.id ?? `not-offered:${subjectId}`,
       attempt: 'first',

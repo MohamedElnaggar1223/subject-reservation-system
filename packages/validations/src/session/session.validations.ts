@@ -240,11 +240,6 @@ export const UpdateSession = z
   .refine((d) => !(d.startDate && d.endDate) || d.endDate > d.startDate, { message: 'End date must be after start date', path: ['endDate'] });
 export type UpdateSessionType = z.infer<typeof UpdateSession>;
 
-/** Copy the offers of an earlier session into this one (offers already here are kept). */
-export const CopySessionFrom = z.object({
-  fromSessionId: z.string().min(1),
-});
-export type CopySessionFromType = z.infer<typeof CopySessionFrom>;
 
 /**
  * Correct a session's exam series (type and year) — F0a. Admin-only, in any status, with a

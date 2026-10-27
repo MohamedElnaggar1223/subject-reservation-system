@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, refused, one, sql, confirmed, boardDate, lockWaiters, pauseAtAudit, CONSENT, type Client, type Impact, cairoDateIn,
+  admin, staff, onboard, refused, one, sql, confirmed, boardDate, lockWaiters, pauseAtAudit, holdRowLock, CONSENT, type Client, type Impact, cairoDateIn,
 } from './helpers';
 import { referenceFixture } from './reference-fixture';
 
@@ -243,14 +243,12 @@ describe('08za: price lists', () => {
       expect(await priceOf(raced)).toBe(15000);
       expect([await priceOf(unpaid), await priceOf(paid)]).toEqual([15000, 13850]);
 
-      // The reservation first: held after it has taken its rows FOR SHARE (at the fee-grid lock it takes next);
-      // the list, sent with the counts it had before, waits for the rows, then finds a line it did not count.
-      const { default: pg } = await import('pg');
-      const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
-      await holder.connect();
-      const series = (await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [row.bioAll!])).s;
-      await holder.query(`select pg_advisory_lock(4041, hashtext($1))`, [series]);
+      // The reservation first: held after it has taken the session and the offering FOR SHARE, at its row (insertLines'
+      // next lock, held FOR UPDATE here; P1c: the fee-grid lock it was held at, just after the row, left with the fee
+      // grid); the list, sent with the counts it had before, waits for what the reservation holds, then finds a line it
+      // did not count.
       const g = await onboard(officer, `za08-race-b-${RUN}`, 11);
+      const hold = await holdRowLock('session_offer_item', row.bioAll!);
       let second: ReturnType<typeof reserve> | undefined;
       let late: ReturnType<typeof apply> | undefined;
       const before = { unpaid: await priceOf(unpaid), fee: (await fees())[row.bioAll!] };
@@ -261,8 +259,7 @@ describe('08za: price lists', () => {
           { repriced: 3, listedForFinance: 1, linesAffected: 0, dueDatesMoved: 0 });
         await lockWaiters(2);
       } finally {
-        await holder.query(`select pg_advisory_unlock(4041, hashtext($1))`, [series]);
-        await holder.end();
+        await hold();
       }
       const [r2, l2] = await Promise.all([second!, late!]);
       expect(r2.status).toBe(201);
@@ -335,26 +332,9 @@ describe('08za: price lists', () => {
       expect(r).toMatchObject({ status: 409, error: expect.stringContaining('and it has reservations: set a price, or close it instead') });
       expect(await fees()).toEqual(before);
 
-      // P1b fixes 2 and 4: the old Session screen's routes neither remove a row of a subject priced by its rows (Mathematics'
-      // all papers would keep the sum of a paper that is gone) nor add one (priced from the old grid, a row with no price
-      // there would hide the whole subject from families): the item's delete, the item route and the form's paper alike.
-      const { PRICED_BY_ROWS_REFUSAL } = await import('../src/services/offer.services');
-      const mathsName = (await one<{ name: string }>(`select s.name from session_offer o join subject s on s.id = o.subject_id where o.id = $1`, [offering.maths!])).name;
-      const mathsOffer = await one<{ availability: 'open'; series: string }>(
-        `select o.availability, (select board_series_id from session_offer_item where id = $1) as series from session_offer o where o.id = $2`, [row.maths2h!, offering.maths!]);
-      const mathsTeachers = await sql<{ teacherId: string; mode: 'in_school' | 'online' }>(
-        `select teacher_id as "teacherId", mode from session_offer_teacher where offer_id = $1 order by sort_order`, [offering.maths!]);
-      const old = coordinator.api.v1.sessions[':id'].offers[':offerId'];
-      const itsRows = { status: 409, error: PRICED_BY_ROWS_REFUSAL(mathsName, 'its rows') };
-      expect(await refused(old.items[':itemId'].$delete({ param: { id: june, offerId: offering.maths!, itemId: row.maths2h! } }))).toEqual(itsRows);
-      expect(await refused(old.items.$post({ param: { id: june, offerId: offering.maths! }, json: {
-        label: 'Paper 3H only', kind: 'one_paper', enters: { kind: 'subject' }, boardSeriesId: mathsOffer.series, availability: 'retake_only', requiredInSeries: false,
-      } }))).toEqual(itsRows);
-      expect(await refused(old.form.$put({ param: { id: june, offerId: offering.maths! }, json: {
-        teachers: mathsTeachers, availability: mathsOffer.availability, courseFee: 2500, grade10Core: false, courseStartsOn: null, notes: null,
-        items: [{ paperUnitId: 'a-paper-the-catalogue-gives', availability: 'retake_only', courseFee: null }], reason: 'the old screen',
-      } }))).toEqual(itsRows);
-      expect(await fees()).toEqual(before);
+      // P1b fixes 2 and 4 (the old Session screen's routes neither removing nor adding a row of a subject priced by its
+      // rows, refused PRICED_BY_ROWS_REFUSAL) retired with those routes in P1c: the offers, items and form routes are gone.
+      // No money moved in them; a row removed or added is the editor's save above, priced by its rows.
     });
   });
 });

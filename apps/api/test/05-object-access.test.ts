@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, one, sql, notified, money, clientFor,
-  openWindow, futureWindow, type Client, reservationOf, swapTo,
+  openWindow, type Client, reservationOf, swapTo,
 } from './helpers';
 import { examWorld } from './exam-helpers';
 
@@ -14,7 +14,7 @@ import { examWorld } from './exam-helpers';
  * Two families. Family A owns real records of every kind: confirmed and
  * pending registrations, a desk payment and a pending InstaPay payment,
  * receipts, free escrow, a withdrawal, a drop request, remark requests, a
- * preregistration, a link, notifications and a file. Family B's parent and
+ * link, notifications and a file. Family B's parent and
  * student then try every endpoint that takes one of A's ids or A's student
  * id. Each attempt must be refused (a 4xx) and leave A's records exactly as
  * they were; list endpoints must not return A's rows.
@@ -40,7 +40,7 @@ describe('object-level access between families', () => {
   let parentA: Client, studentA: Client, studentAId: string;
   let parentB: Client, studentB: Client, studentBId: string;
   let phys: string, chem: string, geo: string, hist: string, bio: string, econ: string, maths: string, lit: string;
-  let sessionId: string, draftId: string;
+  let sessionId: string;
   // Family A's records
   let physA: string, chemA: string, geoA: string, deskPaymentA: string, physReceiptA: string;
   let bioA: string, instaPaymentA: string, econA: string;
@@ -73,7 +73,6 @@ describe('object-level access between families', () => {
     maths = await subject(adm, 'OA-MAT', 'Mathematics (AS)', { course: 1200, registration: 300 }, as);
     lit = await subject(adm, 'OA-LIT', 'Literature (AS)', { course: 1200, registration: 300 }, as);
     sessionId = await session(adm, 'November (AS, object access)', 'november', 'as_level', { ...openWindow(), activate: true });
-    draftId = await session(adm, 'January (AS, object access)', 'january', 'as_level', futureWindow());
     await apiResponse(finadmin.api.v1.remarks.fees.$put({ json: { council: 'cambridge', serviceType: 'review_of_marking', amountPerPaper: 800 } }));
 
     ({ parent: parentA, student: studentA, studentId: studentAId } = await onboard(officer, 'oa-a', 12));
@@ -108,7 +107,7 @@ describe('object-level access between families', () => {
     }))).id!;
 
     // A: a student request waiting for the parent. (No preregistration: a draft takes none since the coordinator
-    // rework, C4; the route refuses everyone, so B's attempts below are refused whatever the ownership check says.)
+    // rework, C4, and P1c removed its routes.)
     econA = (await apiResponse(studentA.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [econ])) } })))[0]!.id;
 
     // A: a drop request from the student on a confirmed subject.
@@ -172,8 +171,8 @@ describe('object-level access between families', () => {
     await refusedAs('parentB revert A approval', parentB.api.v1.registrations['revert-approval'].$put({ json: { registrationIds: [econA] } }));
     expect(await statusOf('registration', econA)).toBe('pending_payment');
     await refusedAs('parentB direct-register A', parentB.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [maths])), studentId: studentAId } }));
-    await refusedAs('parentB preregister A', parentB.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [maths])), studentId: studentAId } }));
-    await refusedAs('parentB cancel A prereg', parentB.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: bioA } }));
+    // P1c: the preregistration routes (POST /registrations/preregister, POST /registrations/:id/cancel-prereg) are gone —
+    // 404 for everyone, so they probe no ownership check; their two attempts and the draft session they targeted left.
 
     expect(await statusOf('registration', physA)).toBe('confirmed');
     expect(await statusOf('registration', bioA)).toBe('pending_payment');

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, feedSeries, placeItemsIn, type Client, reservationOf } from './helpers';
+import { admin, staff, onboard, subject, session, offer, refused, one, sql, audited, futureWindow, seriesOfSession, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — the exam catalogue (FEATURES_PLAN.md F0b; DISCOVERY_RESEARCH.md §5
@@ -62,7 +62,7 @@ describe('F0b: the exam catalogue', () => {
   });
 
   describe('a unit counting toward AS and A Level (IS-01)', () => {
-    let m1Subject: string, p1Subject: string, p3Subject: string, asWindow: string, alWindow: string;
+    let m1Subject: string, p1Subject: string, p3Subject: string, asWindow: string;
     let g11: { parent: Client; studentId: string }, g12: { parent: Client; studentId: string };
     const unit = (cat: Catalogue, code: string) => cat.units.find((u) => u.code === code)!;
     const award = (cat: Catalogue, code: string) => cat.qualifications.find((q) => q.code === code)!;
@@ -141,12 +141,15 @@ describe('F0b: the exam catalogue', () => {
     });
 
     it('"A.S./A.2." is derived per registration from the unit\'s level, the awards and the student\'s year — and nothing stored moves when the reading changes', async () => {
-      // An AS window and an A Level window feed one Pearson January series.
+      // The AS units and the A Level's P3 sit one Pearson January series. They were an AS window and an A Level
+      // window feeding one series; P1c retired feeding a series (the item routes and the fee grid left): a session
+      // holds every level, each row in the session's own sitting, so one January window offers the three and its
+      // rows sit its one January series.
       // P1b (C4): reserved in open sessions (they were preregistrations in drafts; a draft takes none now).
       asWindow = await session(adm, 'January (AS, catalogue)', 'january', 'as_level', { ...futureWindow(), activate: true });
-      alWindow = await session(adm, 'January (A-Level, catalogue)', 'january', 'a_level', { ...futureWindow(), activate: true });
-      const seriesId = await feedSeries(adm, asWindow, { label: 'catalogue' });
-      await placeItemsIn(adm, alWindow, seriesId);
+      await offer(adm, asWindow, p3Subject);
+      const seriesId = await seriesOfSession(asWindow, 'pearson_edexcel');
+      expect(await sql(`select distinct board_series_id as id from session_offer_item where session_id = $1`, [asWindow])).toEqual([{ id: seriesId }]);
 
       g11 = await onboard(officer, 'cat-g11', 11);
       g12 = await onboard(officer, 'cat-g12', 12);
@@ -155,14 +158,11 @@ describe('F0b: the exam catalogue', () => {
       // Grade 11 sits P1 and M1 (AS units only); grade 12 sits M1 with P3 (an A2 unit) in the same series.
       const [g11p1, g11m1] = await prereg(g11, asWindow, [p1Subject, m1Subject]).then((r) => [r.find((x) => x.subjectId === p1Subject)!.id, r.find((x) => x.subjectId === m1Subject)!.id]);
       const g12m1 = (await prereg(g12, asWindow, [m1Subject]))[0]!.id;
-      const g12p3 = (await prereg(g12, alWindow, [p3Subject]))[0]!.id;
+      const g12p3 = (await prereg(g12, asWindow, [p3Subject]))[0]!.id;
       const ids = [g11p1!, g11m1!, g12m1, g12p3];
 
       const codes = async () => {
-        const items = [
-          ...await apiResponse(coordinator.api.v1.catalogue.entries.$get({ query: { sessionId: asWindow } })),
-          ...await apiResponse(coordinator.api.v1.catalogue.entries.$get({ query: { sessionId: alWindow } })),
-        ];
+        const items = await apiResponse(coordinator.api.v1.catalogue.entries.$get({ query: { sessionId: asWindow } }));
         return Object.fromEntries(ids.map((id) => [id, items.find((i) => i.registrationId === id)!.levelCode]));
       };
       const stored = () => sql(`select * from registration where id in ($1, $2, $3, $4) order by id`, ids);
@@ -309,17 +309,23 @@ describe('F0b: the exam catalogue', () => {
   describe("adding and retiring a subject (F8-02, F8-03)", () => {
     const tag = Math.random().toString(36).slice(2, 6).toUpperCase();
 
-    it('a subject is added with its name, code, board, level and default course fee alone — no registration fee, no core — and the session sheet can add it', async () => {
+    it('a subject is added with its name, code, board, level and default course fee alone — no registration fee, no core — and the coordinator can add it to a session', async () => {
       const made = await apiResponse(adm.api.v1.subjects.$post({
         json: { name: `Psychology A.S./A.L. (08h ${tag})`, code: `F802-PSY-${tag}`, council: 'oxford', qualificationLevel: 'a_level', courseFee: 15000 },
       }));
       expect(made).toMatchObject({ code: `F802-PSY-${tag}`, council: 'oxford', qualificationLevel: 'a_level', courseFee: 15000, registrationFee: 0, isCore: false, isActive: true });
       await audited([made!.id], ['SUBJECT_CREATED']);
-      // The Catalogue lists it to map; the session's sheet offers it on its Add subject, with its course fee to prefill.
+      // The Catalogue lists it to map. P1c: the session sheet's Add subject list (GET /sessions/:id/offers/addable) left
+      // with the old offer routes; the coordinator adds it as a subject not on the reference list, by its code — the
+      // same subject, not a second one. Its course fee in the session is hers to set (Appendix A: not set until she
+      // does); the sheet's prefill from the subject's default left with that list.
       expect((await fetchCatalogue()).registrable.find((r) => r.id === made!.id)).toMatchObject({ mapped: false, isActive: true });
       const sessionId = await session(adm, '08h F8-02', 'june', 'a_level', futureWindow());
-      const addable = await apiResponse(adm.api.v1.sessions[':id'].offers.addable.$get({ param: { id: sessionId } }));
-      expect(addable.find((s) => s.id === made!.id)).toMatchObject({ courseFee: 15000, mapped: false });
+      const added = await apiResponse(coordinator.api.v1.sessions[':id'].offerings.$post({
+        param: { id: sessionId }, json: { custom: { board: 'oxford', name: `Psychology A.S./A.L. (08h ${tag})`, level: 'as_al', group: 'A.S./A.L.', code: `F802-PSY-${tag}` } },
+      }));
+      expect(added.subject).toEqual({ id: made!.id, name: `Psychology A.S./A.L. (08h ${tag})`, code: `F802-PSY-${tag}` });
+      expect(await sql(`select id from subject where code = $1`, [`F802-PSY-${tag}`])).toEqual([{ id: made!.id }]);
       // Adding a subject stays the admin's: the coordinator maps it on the Catalogue, but cannot make one.
       expect((await refused(coordinator.api.v1.subjects.$post({ json: { name: 'x', code: `F802-X-${tag}`, council: 'oxford', courseFee: 1 } }))).status).toBe(403);
     });

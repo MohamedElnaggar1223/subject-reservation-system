@@ -80,6 +80,55 @@ describe('F7: the day-one import', () => {
   const subj: Record<string, string> = {};
   let firstBatch: string;
 
+  /** A row of a subject as the links sheet's item was: its kind, its name, its grid's fee (or none), how it was open, what units it enters. */
+  type RowIn = { kind: 'all_papers' | 'paper' | 'unit' | 'a2'; name?: string; examFee: number | null; open?: 'open' | 'retake_only'; units?: string[] };
+  const KIND_ORDER: Record<RowIn['kind'], number> = { all_papers: 0, paper: 1, unit: 2, a2: 4 };
+  /**
+   * P1c: a subject offered in a session through the coordinator's routes (the links sheet's offer and item routes and the
+   * series' fee grids left): its course fee and teacher on the offering; one row per item in the session's November
+   * sitting — the series the old item named, the suite's sessions labelling their own sittings — with the cells its old
+   * availability was converted to (open: first entry in school, retake in school and in self study; retakes only: the two
+   * retakes), at the exam fee its grid held (null where it held none). A unit row enters its units: no route sets what a
+   * row enters since P1c, so it is written as converted data holds it (as exam-helpers' offerOf does). Returns the
+   * offering's id and its rows' ids in the order given.
+   */
+  const offerThrough = async (sessionId: string, subjectId: string, o: { courseFee: number | null; teacherId: string; seriesId: string; rows: RowIn[] }) => {
+    const sub = await one<{ name: string; code: string; council: 'cambridge' | 'pearson_edexcel' | 'oxford'; level: string }>(
+      `select name, code, council, qualification_level as level from subject where id = $1`, [subjectId]);
+    const igcse = sub.level === 'igcse';
+    const made = await apiResponse(adm.api.v1.sessions[':id'].offerings.$post({
+      param: { id: sessionId }, json: { custom: { board: sub.council, name: sub.name, level: igcse ? 'igcse' : 'as_al', group: igcse ? 'O.L.' : 'A.S./A.L.', code: sub.code } },
+    }));
+    await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({
+      param: { id: sessionId, offeringId: made.id },
+      json: {
+        // Added to an open session it starts switched off until reviewed: offered at once, as the old route's offer was.
+        accepting: true, courseFee: o.courseFee, teachers: [{ teacherId: o.teacherId, online: false, external: false }],
+        rows: o.rows.map((r) => ({
+          kind: r.kind, ...(r.name ? { name: r.name } : {}), sitting: 'november' as const, examFee: r.examFee,
+          cells: (r.open ?? 'open') === 'open'
+            ? { firstInSchool: true, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false }
+            : { firstInSchool: false, retakeInSchool: true, retakeSelfStudy: true, firstSelfStudy: false },
+        })),
+      },
+    }));
+    // The rows in D10's order (by kind, then as sent), matched back to the items.
+    const rows = await sql<{ id: string; series: string }>(`select id, board_series_id as series from session_offer_item where offer_id = $1 order by sort_order`, [made.id]);
+    expect(rows.map((r) => r.series)).toEqual(o.rows.map(() => o.seriesId));
+    const ids: string[] = [];
+    const order = o.rows.map((r, i) => ({ r, i })).sort((a, b) => KIND_ORDER[a.r.kind] - KIND_ORDER[b.r.kind] || a.i - b.i);
+    for (const [pos, { r, i }] of order.entries()) {
+      const id = rows[pos]!.id;
+      if (r.units?.length) {
+        // A units item's qualification is its subject's (the old route's), bound in the order the placeholders appear.
+        await sql(`update session_offer_item set enters_kind = 'units', qualification_id = (select qualification_id from subject where id = $1) where id = $2`, [subjectId, id]);
+        for (const unitId of r.units) await sql(`insert into session_offer_item_unit (item_id, unit_id) values ($1, $2)`, [id, unitId]);
+      }
+      ids[i] = id;
+    }
+    return { id: made.id, items: ids };
+  };
+
   beforeAll(async () => {
     adm = await admin('imp');
     adm2 = await admin('imp2');
@@ -546,8 +595,9 @@ describe('F7: the day-one import', () => {
     });
   });
 
-  describe('lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin\'s)', () => {
-    let windowId: string, seriesId: string, seriesName: string, liveBatch: string, finadmin: Client, mrLive: string;
+  // P1c: priced from their rows' fees (the series' fee grids left): the grid's amount is the row's exam fee.
+  describe('lines in a session, on the offers and items the sheet names, priced from their rows (the admin\'s)', () => {
+    let windowId: string, seriesId: string, seriesName: string, liveBatch: string, finadmin: Client, mrLive: string, gridlessRow: string;
     const level = 'as_level' as const;
     const seriesYear = seriesYearInAcademicYear('november', Y);
     const L: Record<string, string> = {};
@@ -562,29 +612,22 @@ describe('F7: the day-one import', () => {
         liveOne('Live Subject A', 'Mr Live', 'No'),                                   // 3: a first entry in school
         liveOne('Live Subject B', '', 'Yes'),                                         // 4: self-study on a first entry of a taught subject
         liveOne('Live Subject Self', '', 'Yes'),                                      // 5: self-study, not taught this cycle
-        liveOne('Live Subject Gridless', 'Mr Live', 'No'),                            // 6: no fee row in the series' grid
+        liveOne('Live Subject Gridless', 'Mr Live', 'No'),                            // 6: no exam fee on its row yet (no grid row before P1c)
         liveTwo('11K', 'Live Subject B', 'Yes'),                                      // 7: a retake of the student's history (legacy)
         liveTwo('11K', 'Live Subject A', 'Yes', `Retake Self Study 50% fees (All Papers) From November ${Y - 1}`), // 8: the sitting named on the sheet
         liveOne('Live Subject C', 'Mr Live', 'No', 'Retake in School 100% fees (All Papers)'), // 9: a retake naming no sitting
-        liveOne('Live Subject Provisional', 'Mr Live', 'No'),                         // 10: a provisional fee row
+        liveOne('Live Subject Provisional', 'Mr Live', 'No'),                         // 10: once a provisional grid row; its row's own fee since P1c
       ] },
       // What Live Two sat before the system: last June, in grade 10.
       { name: 'Past', rows: [[`June ${Y} Session`], header, liveTwo('10A', 'Live Subject B', 'No'), liveTwo('10A', 'Live Subject C', 'No')] },
     ]);
-    /** A subject the school offers in the session with a course fee, whose board fee row finance has (or has not) set. */
-    const offerOwn = async (k: string, name: string, fee: { amount: number; provisional: boolean } | null) => {
+    /** A subject the school offers in the session with a course fee and its teacher, at the exam fee its grid row held — or none, the grid having none (P1c). */
+    const offerOwn = async (k: string, name: string, examFee: number | null) => {
       const s = await apiResponse(adm.api.v1.subjects.$post({ json: {
         name, code: `IMP-LIVE-${k}`, council: 'pearson_edexcel', qualificationLevel: level, courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
       } }));
-      await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-        param: { id: windowId },
-        json: {
-          subjectId: s.id, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: mrLive, mode: 'in_school' }],
-          items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
-        },
-      }));
-      if (fee) await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: s.id, amount: fee.amount, provisional: fee.provisional }] } }));
-      return s.id;
+      const made = await offerThrough(windowId, s.id, { courseFee: 1000, teacherId: mrLive, seriesId, rows: [{ kind: 'all_papers', examFee }] });
+      return { subjectId: s.id, rowId: made.items[0]! };
     };
     const lineOf = (r: RowView) => r.plan.lines[0]!;
 
@@ -601,8 +644,9 @@ describe('F7: the day-one import', () => {
       seriesName = `Pearson Edexcel November ${s.year} (${s.label})`;
       // Mr Live teaches A, B and C this cycle (the session's links sheet).
       for (const k of ['A', 'B', 'C'] as const) await teachOffer(adm, windowId, L[k]!, [mrLive]);
-      L.G = await offerOwn('G', 'Live Subject Gridless', null);
-      L.P = await offerOwn('P', 'Live Subject Provisional', { amount: 600, provisional: true });
+      const gridless = await offerOwn('G', 'Live Subject Gridless', null);
+      [L.G, gridlessRow] = [gridless.subjectId, gridless.rowId];
+      L.P = (await offerOwn('P', 'Live Subject Provisional', 600)).subjectId;
       liveBatch = await stage(adm, liveSheet(), 'live.xlsx', 'school_sheet');
     });
     afterAll(async () => {
@@ -636,8 +680,8 @@ describe('F7: the day-one import', () => {
         code: 'registration_refused', severity: 'error', detail: 'Live Subject Self is self study on a second entry only: name the earlier sitting, or ask for the exception',
       });
       expect(lineOf(rowAt(v, 'Live', 5))).toMatchObject({ attempt: 'first', mode: 'self_study', teacherId: null, price: { total: 1000, courseFee: 500, boardFee: 500, coursePercent: 50, boardPercent: 100 } });
-      // 6: no fee row in the series' grid: refused, naming the grid (never priced at 0).
-      expect(rowAt(v, 'Live', 6).problems).toEqual([{ code: 'fee_missing', severity: 'error', detail: `Whole subject has no board fee in ${seriesName} yet — set one on the session's Fees tab` }]);
+      // 6: no exam fee on its row: refused, naming the fee not set (never priced at 0).
+      expect(rowAt(v, 'Live', 6).problems).toEqual([{ code: 'fee_missing', severity: 'error', detail: 'Live Subject Gridless has no exam fee set yet: it is not offered to families until the school sets it' }]);
       expect(lineOf(rowAt(v, 'Live', 6)).price).toBeNull();
       // 7: Live Two sat B last June (the Past tab, over by now): a retake of the student's legacy history.
       expect(rowAt(v, 'Live', 7).problems).toEqual([{ code: 'self_study_retake', severity: 'info', detail: `a retake of June ${Y} (the student’s history)` }]);
@@ -652,9 +696,11 @@ describe('F7: the day-one import', () => {
       expect(rowAt(v, 'Live', 9).problems.find((p) => p.code === 'retake_sitting_missing')).toEqual({
         code: 'retake_sitting_missing', severity: 'error', detail: '"Retake in School 100% fees (All Papers)": name the sitting it follows on the line, or make it a first entry',
       });
-      // 10: a provisional fee row prices the line provisional, at its amount — never 0.
-      expect(rowAt(v, 'Live', 10).problems).toEqual([{ code: 'price_provisional', severity: 'info', detail: `board fee 600 in ${seriesName}` }]);
-      expect(lineOf(rowAt(v, 'Live', 10)).price).toEqual({ total: 1600, courseFee: 1000, boardFee: 600, provisional: true, courseFeeBase: 1000, coursePercent: 100, boardFeeBase: 600, boardPercent: 100 });
+      // 10: priced at its row's exam fee — never 0. P1c: a fee is no longer provisional by its grid row; a line is provisional
+      // while its session's prices are not final (E6: 08z-reserve-pay "prices not final: a line is reserved, not payable …"),
+      // and this session's are final.
+      expect(rowAt(v, 'Live', 10).problems).toEqual([]);
+      expect(lineOf(rowAt(v, 'Live', 10)).price).toEqual({ total: 1600, courseFee: 1000, boardFee: 600, provisional: false, courseFeeBase: 1000, coursePercent: 100, boardFeeBase: 600, boardPercent: 100 });
       expect(rowAt(v, 'Past', 3).plan).toMatchObject({ registration: 'history', lines: [] });
     });
 
@@ -672,14 +718,15 @@ describe('F7: the day-one import', () => {
       expect(codes(rowAt(await fetchView(adm, liveBatch), 'Live', 3))).toEqual([]);
     });
 
-    it('staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines', async () => {
+    it('staff settle each line: the self-study answer, the row\'s exam fee set on the subject, the sitting named; the coordinator may not commit lines', async () => {
       let v = await fetchView(adm, liveBatch);
       await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 4).id], edits: { selfStudyChoice: 'in_school' } });
       await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 9).id], edits: { priorSitting: { month: 'june', year: Y } } });
       // The untaught subject's self-study row: a retake once staff name the sitting it follows (decision 1, 16 Oct 2026).
       await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 5).id], edits: { priorSitting: { month: 'june', year: Y } } });
-      // The gridless subject is refused until finance sets its row in the series' grid.
-      await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: L.G!, amount: 450, provisional: false }] } }));
+      // The gridless subject is refused until the school sets its row's exam fee (P1c: the coordinator, on the subject; the grid left).
+      expect(await apiResponse(coordinator.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: windowId, rowId: gridlessRow }, json: { amount: 450 } })))
+        .toMatchObject({ saved: true });
       v = await fetchView(adm, liveBatch);
       expect(rowAt(v, 'Live', 4)).toMatchObject({ mode: 'in_school', plan: { registration: 'live', lines: [{ attempt: 'first', mode: 'in_school', teacherId: mrLive, price: { total: 1500 } }] } });
       expect(rowAt(v, 'Live', 4).problems.find((p) => p.code === 'self_study_on_taught')).toMatchObject({ severity: 'info', detail: 'taken as taught in school' });
@@ -694,7 +741,7 @@ describe('F7: the day-one import', () => {
       expect((await one<{ status: string }>(`select status from import_batch where id = $1`, [liveBatch])).status).toBe('staged');
     });
 
-    it('the admin commits: lines through insertLines, priced from the grids, with the sheet\'s consent on the imported channel and the sitting\'s source; never paid', async () => {
+    it('the admin commits: lines through insertLines, priced from their rows, with the sheet\'s consent on the imported channel and the sitting\'s source; never paid', async () => {
       const payments = Number((await one<{ n: string }>(`select count(*) as n from payment`)).n);
       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$post({ param: { id: liveBatch } }));
       expect(out.result.created).toMatchObject({ students: 2, parents: 2, registrations: 8, history: 2 });
@@ -716,7 +763,7 @@ describe('F7: the day-one import', () => {
         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 1000, 500, false, null, null, 'Mr Live', 100, 100],
         ['live.one', 'Live Subject C', 'retake', 'in_school', 1500, 1000, 500, false, 'declared_by_desk', `pearson_edexcel june ${Y}`, 'Mr Live', 100, 100],
         ['live.one', 'Live Subject Gridless', 'first', 'in_school', 1450, 1000, 450, false, null, null, 'Mr Live', 100, 100],
-        ['live.one', 'Live Subject Provisional', 'first', 'in_school', 1600, 1000, 600, true, null, null, 'Mr Live', 100, 100],
+        ['live.one', 'Live Subject Provisional', 'first', 'in_school', 1600, 1000, 600, false, null, null, 'Mr Live', 100, 100],
         ['live.one', 'Live Subject Self', 'retake', 'self_study', 1000, 500, 500, false, 'declared_by_desk', `pearson_edexcel june ${Y}`, null, 50, 100],
         ['live.two', 'Live Subject A', 'retake', 'self_study', 1000, 500, 500, false, 'declared_by_desk', `pearson_edexcel november ${Y - 1}`, null, 50, 100],
         // A retake of what the student sat before the system (the legacy history), at the self-study share.
@@ -743,8 +790,10 @@ describe('F7: the day-one import', () => {
       // B's known sittings are the system's own lines (the lead's answer, 8 Oct): Live Two's sheet history of C is not one.
       const two = await one<{ id: string }>(`select id from "user" where email = $1`, [`live.two${D}`]);
       const offers = await apiResponse(officer.api.v1.registrations.offers.$get({ query: { studentId: two.id, sessionId: windowId } }));
-      const c = offers.offers.find((o) => o.subject.id === L.C)!.items[0]!;
-      expect(c.knownSittings).toEqual([]);
+      const offeringC = (await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [windowId, L.C])).id;
+      // P1c: the family read's offerings (its v1 part left): no sitting on record, so none filled in.
+      const c = offers.offerings.find((o) => o.id === offeringC)!.rows[0]!;
+      expect(c.knownSitting).toBeNull();
     });
 
     it('the statement and the session\'s Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent', async () => {
@@ -761,7 +810,8 @@ describe('F7: the day-one import', () => {
       expect(imported).toHaveLength(8);
       expect(imported.every((l) => l.unpaid && !l.paid && l.status === 'pending_payment')).toBe(true);
       expect(imported.reduce((a, l) => a + l.outstanding, 0)).toBe(1500 + 1500 + 1500 + 1450 + 1600 + 1000 + 1000 + 1000);
-      expect(imported.filter((l) => l.provisional).map((l) => [l.subject.name, l.price])).toEqual([['Live Subject Provisional', 1600]]);
+      // Prices final in this session: no imported line is provisional (P1c: provisional is the session's, not a grid row's).
+      expect(imported.filter((l) => l.provisional).map((l) => [l.subject.name, l.price])).toEqual([]);
     });
 
     it('a first entry in self-study is a line once the student has the exception: the line uses it once', async () => {
@@ -949,7 +999,7 @@ describe('F7: the day-one import', () => {
       // The unit rows the catalogue holds as subjects of their own (P1, M1) are not offered here: the session offers the IAL subjects.
       for (const sid of [subj.P1!, subj.M1!]) {
         const o = await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [sess, sid]);
-        await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].$delete({ param: { id: sess, offerId: o.id } }));
+        await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$delete({ param: { id: sess, offeringId: o.id } }));
       }
       const cat = await apiResponse(importer.api.v1.catalogue.$get());
       const unit = (code: string) => cat.units.find((u) => u.code === code)!.id;
@@ -961,15 +1011,12 @@ describe('F7: the day-one import', () => {
       };
       maths = await parent('Mathematics A.S./A.L. (imp)', 'IMP-IALMA', ['WMA11', 'WMA12', 'WME01']);
       bio = await parent('Biology A.S./A.L. (imp)', 'IMP-IALBI', ['WBI11', 'WBI12']);
-      const item = (label: string, code: string, availability: 'open' | 'retake_only' = 'open') =>
-        ({ label, kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unit(code)] }, boardSeriesId: series, availability, requiredInSeries: false });
+      // Each unit at the 4,800 the series' grid held for it (its row's exam fee since P1c).
+      const item = (name: string, code: string, open: 'open' | 'retake_only' = 'open'): RowIn => ({ kind: 'unit', name, examFee: 4800, open, units: [unit(code)] });
       for (const [subjectId, its] of [[maths, [item('P1', 'WMA11'), item('P2', 'WMA12', 'retake_only'), item('M1', 'WME01')]], [bio, [item('Paper 1', 'WBI11'), item('Paper 2', 'WBI12')]]] as const) {
-        const made = await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-          param: { id: sess }, json: { subjectId, availability: 'open', courseFee: 900, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }], items: [...its] },
-        }));
-        its.forEach((it, i) => { items[it.label] = made.items[i]!; });
+        const made = await offerThrough(sess, subjectId, { courseFee: 900, teacherId: teacher, seriesId: series, rows: [...its] });
+        its.forEach((it, i) => { items[it.name!] = made.items[i]!; });
       }
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: ['WMA11', 'WMA12', 'WME01', 'WBI11', 'WBI12'].map((c) => ({ keyKind: 'unit' as const, keyId: unit(c), amount: 4800, provisional: false })) } }));
     });
     afterAll(async () => {
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: sess }, json: { reason: 'import scenario done' } }));
@@ -1031,7 +1078,9 @@ describe('F7: the day-one import', () => {
       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P1, itemLabel: 'P1' }, { code: 'p5', offerItemId: null, itemLabel: null }]);
       expect(r.plan.lines).toEqual([]);
-      expect(r.problems.find((p) => p.code === 'item_unclear')).toEqual({ code: 'item_unclear', severity: 'error', detail: 'Mathematics A.S./A.L. (imp): choose the item for p5 (M1 · P1 · P2)' });
+      // The subject's rows in their own order (D10: as the subject editor saves them — the old route's items all sat at
+      // sort order 0 and were listed by label, M1 · P1 · P2).
+      expect(r.problems.find((p) => p.code === 'item_unclear')).toEqual({ code: 'item_unclear', severity: 'error', detail: 'Mathematics A.S./A.L. (imp): choose the item for p5 (P1 · P2 · M1)' });
       // Staff choose M1 for "P5" (the sheet's slip), and only for that code.
       await putRows(adm, id, { rowIds: [r.id], edits: { codeItems: { p5: items.M1! } } });
       r = rowAt(await fetchView(adm, id), 'Two units', 3);
@@ -1066,14 +1115,11 @@ describe('F7: the day-one import', () => {
         const subjectId = (await apiResponse(adm.api.v1.subjects.$post({ json: {
           name, code, council: 'cambridge', qualificationLevel: 'as_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
         } }))).id;
-        await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sess }, json: {
-          subjectId, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
-          items: [
-            { label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false },
-            ...papers.map((label) => ({ label, kind: 'one_paper' as const, enters: { kind: 'subject' as const }, boardSeriesId: cambridge, availability: 'retake_only' as const, requiredInSeries: false })),
-          ],
-        } }));
-        await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 500, provisional: false }] } }));
+        // The whole subject and its one-paper retakes, each at the 500 the grid held for the subject (its rows' exam fees since P1c).
+        await offerThrough(sess, subjectId, { courseFee: 1000, teacherId: teacher, seriesId: cambridge, rows: [
+          { kind: 'all_papers', examFee: 500 },
+          ...papers.map((name): RowIn => ({ kind: 'paper', name, examFee: 500, open: 'retake_only' })),
+        ] });
       };
       await offerOf('Imp Chemistry One', 'IMP-ONE-CHE', ['Paper 4 only (retake)']);
       await offerOf('Imp Physics Two', 'IMP-ONE-PHY', ['Paper 4 only (retake)', 'Paper 5 only (retake)']);
@@ -1173,14 +1219,12 @@ describe('F7: the day-one import', () => {
       const subjectId = (await apiResponse(adm.api.v1.subjects.$post({ json: {
         name: 'Imp Chemistry Retake', code: 'IMP-ONE-RTK', council: 'cambridge', qualificationLevel: 'as_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
       } }))).id;
-      await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sess }, json: {
-        subjectId, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
-        items: [
-          { label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false, exclusiveGroup: 'entry' },
-          { label: 'Paper 4 only (retake)', kind: 'one_paper', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'retake_only', requiredInSeries: false, exclusiveGroup: 'entry' },
-        ],
-      } }));
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 500, provisional: false }] } }));
+      // The whole subject and its one-paper retake (D8 puts both in the 'entry' group, as the old items were), each at the
+      // 500 the grid held for the subject.
+      await offerThrough(sess, subjectId, { courseFee: 1000, teacherId: teacher, seriesId: cambridge, rows: [
+        { kind: 'all_papers', examFee: 500 },
+        { kind: 'paper', name: 'Paper 4 only (retake)', examFee: 500, open: 'retake_only' },
+      ] });
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
       const id = await stage(adm, workbook([{ name: 'One paper retake', rows: [[`Nov. ${Y} Session`], header,
         // The forms' one-paper retake in self-study with no series named (the subject is taught: the coordinator's rule applies).
@@ -1211,10 +1255,8 @@ describe('F7: the day-one import', () => {
       } }))).id;
       const igcse = await mk('IMP-LVL-OL', 'igcse');
       const as = await mk('IMP-LVL-AS', 'as_level');
-      const offerIt = (subjectId: string) => apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sess }, json: {
-        subjectId, availability: 'open', courseFee: 800, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
-        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false }],
-      } }));
+      // The grid held no fee for either: their rows have none.
+      const offerIt = (subjectId: string) => offerThrough(sess, subjectId, { courseFee: 800, teacherId: teacher, seriesId: cambridge, rows: [{ kind: 'all_papers', examFee: null }] });
       await offerIt(igcse);
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
       const id = await stage(adm, workbook([{ name: 'Levels', rows: [[`Nov. ${Y} Session`], header,
@@ -1240,11 +1282,8 @@ describe('F7: the day-one import', () => {
       const phys = (await apiResponse(adm.api.v1.subjects.$post({ json: {
         name: 'Physics A.S./A.L. (imp)', code: 'IMP-PHY-AL', council: 'cambridge', qualificationLevel: 'a_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
       } }))).id;
-      const route = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sess }, json: {
-        subjectId: phys, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
-        items: [{ label: 'A2, carry forward', kind: 'route', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false, needsPriorSeries: true }],
-      } }))).items[0]!;
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: phys, amount: 400, provisional: false }] } }));
+      // The carry-forward route is an A.2. row (it carries the AS forward, D6), at the 400 the grid held for the subject.
+      const route = (await offerThrough(sess, phys, { courseFee: 1000, teacherId: teacher, seriesId: cambridge, rows: [{ kind: 'a2', name: 'A2, carry forward', examFee: 400 }] })).items[0]!;
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Signature', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
       const r = (n: number, spec: string, self: 'Yes' | 'No', signature = ''): Cell[] =>
         [`Carry Child ${n}`, '12K', spec, 'Physics A.S./A.L. (imp)', self === 'Yes' ? '' : 'Teacher of the IAL units (imp)', signature, `0106868686${n}`, `carry.child${n}${D}`, `Carry Parent ${n}`, `carry.parent${n}${D}`, `0106969696${n}`, 'I confirm my registration', self];
@@ -1278,18 +1317,17 @@ describe('F7: the day-one import', () => {
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
-    it('the commit holds every student with lines before the first line, in id order: while it waits for either of a family\'s two students, none of their fee rows is held (both orders)', async () => {
+    // P1c: a line is priced from its row (the series' fee grid left): the rows a line is priced from are what pricing holds
+    // FOR SHARE in the commit's transaction, as the grid's fee rows were.
+    it('the commit holds every student with lines before the first line, in id order: while it waits for either of a family\'s two students, none of the rows their lines are priced from is held (both orders)', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-      const cat = await apiResponse(importer.api.v1.catalogue.$get());
-      const feeRow = async (code: string) => (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'unit' and key_id = $2`,
-        [series, cat.units.find((u) => u.code === code)!.id])).id;
-      const fees = { P1: await feeRow('WMA11'), M1: await feeRow('WME01') };
+      const fees = { P1: items.P1!, M1: items.M1! };
       const { default: pg } = await import('pg');
-      /** Whether a fee row can be locked for update right now (NOWAIT): false while a transaction holds it. */
-      const free = async (feeId: string) => {
+      /** Whether a row can be locked for update right now (NOWAIT): false while a transaction holds it. */
+      const free = async (rowId: string) => {
         const c = new pg.Client({ connectionString: process.env.DATABASE_URL });
         await c.connect();
-        try { await c.query('begin'); await c.query('select id from board_fee where id = $1 for update nowait', [feeId]); return true; }
+        try { await c.query('begin'); await c.query('select id from session_offer_item where id = $1 for update nowait', [rowId]); return true; }
         catch (err) { if ((err as { code?: string }).code === '55P03') return false; throw err; }
         finally { await c.query('rollback').catch(() => {}); await c.end(); }
       };
@@ -1308,7 +1346,7 @@ describe('F7: the day-one import', () => {
         expect(v.summary).toMatchObject({ readyFamilies: 1, heldFamilies: 0 });
         // Hold one of the two students the way a reservation does (FOR NO KEY UPDATE): the commit must wait
         // there before any line. Held second in id order, a commit that locked each student as it reached
-        // them would hold the first one's line and fee row while it waits.
+        // them would hold the first one's line and its row while it waits.
         const [lo, hi] = [a.studentId, b.studentId].sort();
         const heldId = held === 'second' ? hi! : lo!;
         const hold = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -1319,7 +1357,7 @@ describe('F7: the day-one import', () => {
           const commit = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
           await waitFor(async () => Number((await one<{ n: string }>(
             `select count(*) as n from pg_locks l join pg_stat_activity a on a.pid = l.pid where not l.granted and l.locktype <> 'advisory' and a.datname = current_database()`)).n) >= 1 || null);
-          // Waiting for the held student, the commit holds neither child's fee row (no line of either is made yet).
+          // Waiting for the held student, the commit holds neither child's row (no line of either is made yet).
           expect([await free(fees.P1), await free(fees.M1)]).toEqual([true, true]);
           await hold.query('commit');
           const out = await apiResponse(commit);
@@ -1382,12 +1420,15 @@ describe('F7: the day-one import', () => {
       // Another winter session offering IAL Mathematics with its P1 in the same board series.
       const other = await session(adm, 'Winter session (import, race)', 'november', 'as_level', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
       const cat = await apiResponse(importer.api.v1.catalogue.$get());
-      const made = await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
-        param: { id: other }, json: {
-          subjectId: maths, availability: 'open', courseFee: 900, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
-          items: [{ label: 'P1', kind: 'unit', enters: { kind: 'units', unitIds: [cat.units.find((u) => u.code === 'WMA11')!.id] }, boardSeriesId: series, availability: 'open', requiredInSeries: false }],
-        },
-      }));
+      // P1c: the coordinator's routes place a session's rows in the sittings its own label names; a second session's row in
+      // the first's series is what converted data holds (the links sheet placed items in any series): its row is made in its
+      // own session's sitting, then placed there by SQL with the series linked, at the 4,800 the shared grid held.
+      const otherSeries = (await one<{ s: string }>(`select distinct board_series_id as s from session_offer_item i join board_series bs on bs.id = i.board_series_id
+        where i.session_id = $1 and bs.board_code = 'pearson_edexcel'`, [other])).s;
+      const made = await offerThrough(other, maths, { courseFee: 900, teacherId: teacher, seriesId: otherSeries, rows: [{ kind: 'unit', name: 'P1', examFee: 4800, units: [cat.units.find((u) => u.code === 'WMA11')!.id] }] });
+      await sql(`insert into session_board_series (id, session_id, board_series_id, board_code, is_default)
+        select gen_random_uuid()::text, $1, bs.id, bs.board_code, false from board_series bs where bs.id = $2 on conflict do nothing`, [other, series]);
+      await sql(`update session_offer_item set board_series_id = $1 where id = $2`, [series, made.items[0]!]);
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
       // Its own tab name: a file with another's tabs and titles is that sheet exported again, and carries its mapping (flag 3).
       const id = await stage(adm, workbook([{ name: 'Lock race', rows: [[`Nov. ${Y} Session`], header,
@@ -1593,7 +1634,7 @@ describe('F7: the day-one import', () => {
   });
 
   describe('the catalogue from the review, and a file put aside', () => {
-    it('the admin adds the sheet\'s missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not', async () => {
+    it('the admin adds the sheet\'s missing subjects in one step, active and with no price (a line is priced from its row\'s fees); the coordinator may not', async () => {
       const sheet = workbook([{ name: 'Extra', rows: [
         [`Nov. ${Y} Session`],
         ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Student Email', '', 'Parent Email', '', ''],
@@ -1626,35 +1667,31 @@ describe('F7: the day-one import', () => {
         status: 409, error: 'A subject with the code IMP-AST exists already — map "Astronomy" to it, or choose another code',
       });
 
-      // Nothing is reserved for such a subject for free (MO-9): the session offers it with a course fee, and a line
-      // of it is refused, naming the series' grid, until finance sets its board fee there.
+      // Nothing is reserved for such a subject for free (MO-9): the session offers it, and a line of it is refused, naming
+      // the fee not set, until the school sets both its fees. P1c: on the coordinator's subject editor — a fee not set is
+      // null and refused at pricing; the old offer route's refusal to open a subject at a course fee of 0, and the fee
+      // grid, left with the links sheet.
       const winter = await session(adm, 'Winter session (import, added subjects)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
       const cambridge = await seriesOfSession(winter, 'cambridge');
       const teacher = await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher of the added subject (imp)' } }));
-      // The course fee is the school's to set on the offer: open with none, it is refused, naming the subject;
-      // closed, it waits, and opens once the fee is set (MO-9; the review of 8 Oct, item 6).
-      const offerJson = (availability: 'open' | 'closed', courseFee: number) => ({
-        subjectId: made.id, availability, courseFee, grade10Core: false, teachers: [{ teacherId: teacher!.id, mode: 'in_school' as const }],
-        items: [{ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId: cambridge, availability: 'open' as const, requiredInSeries: false }],
-      });
-      const noFee = 'Astronomy has no course fee: set the school\'s course fee before it is open in this session (a line is never priced without one)';
-      expect(await refused(adm.api.v1.sessions[':id'].offers.$post({ param: { id: winter }, json: offerJson('open', 0) }))).toEqual({ status: 400, error: noFee });
-      const offer = await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: winter }, json: offerJson('closed', 0) }));
-      const putOffer = (json: { availability?: 'open' | 'closed'; courseFee?: number }) => adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: winter, offerId: offer.id }, json });
-      expect(await refused(putOffer({ availability: 'open' }))).toEqual({ status: 400, error: noFee });
-      expect(await refused(putOffer({ courseFee: 0, availability: 'open' }))).toEqual({ status: 400, error: noFee });
-      expect(await one(`select availability, course_fee::float as fee from session_offer where id = $1`, [offer.id])).toEqual({ availability: 'closed', fee: 0 });
-      await apiResponse(putOffer({ availability: 'open', courseFee: 900 }));
-      expect(await refused(putOffer({ courseFee: 0 }))).toEqual({ status: 400, error: noFee });
-      const grid = await one<{ board: string; year: number; label: string }>(`select b.name as board, bs.year, bs.label from board_series bs join exam_board b on b.code = bs.board_code where bs.id = $1`, [cambridge]);
+      const offered = await offerThrough(winter, made.id, { courseFee: null, teacherId: teacher!.id, seriesId: cambridge, rows: [{ kind: 'all_papers', examFee: null }] });
       expect((await putSettings(adm, id, { series: { [`november-${Y}-igcse`]: { mode: 'window', sessionId: winter } } })).status).toBe(200);
       v = await fetchView(adm, id);
       expect(rowAt(v, 'Extra', 3).problems.find((p) => p.code === 'fee_missing')).toEqual({
-        code: 'fee_missing', severity: 'error', detail: `Whole subject has no board fee in ${grid.board} November ${grid.year} (${grid.label}) yet — set one on the session's Fees tab`,
+        code: 'fee_missing', severity: 'error', detail: 'Astronomy has no exam fee set yet: it is not offered to families until the school sets it',
       });
       // Cosmology is not offered in the session at all.
       expect(rowAt(v, 'Extra', 4).problems.find((p) => p.code === 'not_offered')).toMatchObject({ severity: 'error' });
-      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: made.id, amount: 300, provisional: false }] } }));
+      // Its exam fee set (the board's 300), it is still refused for the course fee nobody set …
+      expect(await apiResponse(adm.api.v1.sessions[':id'].rows[':rowId']['exam-fee'].$put({ param: { id: winter, rowId: offered.items[0]! }, json: { amount: 300 } })))
+        .toMatchObject({ saved: true });
+      v = await fetchView(adm, id);
+      expect(rowAt(v, 'Extra', 3).problems.find((p) => p.code === 'fee_missing')).toEqual({
+        code: 'fee_missing', severity: 'error', detail: 'Astronomy has no course fee set yet: it is not offered to families until the school sets it',
+      });
+      // … and priced once the school's course fee is set on the subject.
+      expect(await apiResponse(adm.api.v1.sessions[':id'].offerings[':offeringId'].$put({ param: { id: winter, offeringId: offered.id }, json: { courseFee: 900 } })))
+        .toMatchObject({ saved: true });
       v = await fetchView(adm, id);
       expect(rowAt(v, 'Extra', 3).problems.filter((p) => p.code === 'fee_missing')).toEqual([]);
       expect(rowAt(v, 'Extra', 3).plan.lines[0]).toMatchObject({ subjectName: 'Astronomy', attempt: 'first', mode: 'in_school', price: { total: 1200, courseFee: 900, boardFee: 300 } });
@@ -1668,81 +1705,14 @@ describe('F7: the day-one import', () => {
       await audited([id], ['IMPORT_STAGED', 'IMPORT_DISCARDED']);
     });
 
-    it('MO-9\'s course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)', async () => {
-      const winter = await session(adm, 'Winter session (import, course fee)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
-      const cambridge = await seriesOfSession(winter, 'cambridge');
-      const teacher = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher of the fee rule (imp)' } })))!.id;
-      const subjectOf = async (name: string, code: string) => (await apiResponse(adm.api.v1.subjects.$post({ json: {
-        name, code, council: 'cambridge', qualificationLevel: 'igcse', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
-      } }))).id;
-      const taught = await subjectOf('Fee Rule Taught (imp)', 'IMP-FEE-T');
-      const untaught = await subjectOf('Fee Rule Untaught (imp)', 'IMP-FEE-U');
-      const offerJson = (subjectId: string, availability: 'open' | 'retake_only' | 'self_study_only', courseFee: number, zeroFeeReason?: string) => ({
-        subjectId, availability, courseFee, grade10Core: false, teachers: availability === 'self_study_only' ? [] : [{ teacherId: teacher, mode: 'in_school' as const }],
-        items: [{ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId: cambridge, availability: 'open' as const, requiredInSeries: false }],
-        ...(zeroFeeReason ? { zeroFeeReason } : {}),
-      });
-      const post = (sessionId: string, json: ReturnType<typeof offerJson>) => adm.api.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json });
-      // Open and retakes-only: refused at 0, naming the subject.
-      const noFee = 'Fee Rule Taught (imp) has no course fee: set the school\'s course fee before it is open in this session (a line is never priced without one)';
-      expect(await refused(post(winter, offerJson(taught, 'open', 0)))).toEqual({ status: 400, error: noFee });
-      expect(await refused(post(winter, offerJson(taught, 'retake_only', 0)))).toEqual({ status: 400, error: noFee });
-      // Self-study only: 0 needs a reason, as a board fee of 0 does; with one it is made, the reason on its audit row.
-      expect(await refused(post(winter, offerJson(untaught, 'self_study_only', 0)))).toEqual({
-        status: 400, error: 'Fee Rule Untaught (imp) is self-study only at a course fee of 0: say why (its lines are priced at the board fee alone)',
-      });
-      const selfOffer = await apiResponse(post(winter, offerJson(untaught, 'self_study_only', 0, 'priced at the board fee alone this cycle')));
-      expect(await one(`select new_data->>'zeroFeeReason' as reason from audit_log where action = 'SESSION_OFFER_CREATED' and entity_id = $1`, [selfOffer.id]))
-        .toEqual({ reason: 'priced at the board fee alone this cycle' });
-      // Edited without a new reason while it stays self-study only at 0; made retakes-only at 0, refused.
-      const put = (json: { availability?: 'retake_only' | 'self_study_only'; courseFee?: number; notes?: string }) =>
-        adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: winter, offerId: selfOffer.id }, json });
-      await apiResponse(put({ availability: 'self_study_only', courseFee: 0, notes: 'the board fee only' }));
-      expect((await refused(put({ availability: 'retake_only', courseFee: 0 }))).error).toBe('Fee Rule Untaught (imp) has no course fee: set the school\'s course fee before it is open in this session (a line is never priced without one)');
-      // The taught one open with its fee; then (as an offer saved before the rule) at 0.
-      const openOffer = await apiResponse(post(winter, offerJson(taught, 'open', 900)));
-      await sql(`update session_offer set course_fee = 0 where id = $1`, [openOffer.id]);
-      // Copied into the next winter session: the open one at 0 comes across closed and named; the self-study one at 0 as it is.
-      const next = await session(adm, 'Winter session (import, course fee, copy)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
-      const copied = await apiResponse(adm.api.v1.sessions[':id']['copy-from'].$post({ param: { id: next }, json: { fromSessionId: winter } }));
-      expect(copied.closedNoFee).toEqual(['Fee Rule Taught (imp)']);
-      expect(await sql(`select s.name, o.availability, o.course_fee::float as fee from session_offer o join subject s on s.id = o.subject_id
-        where o.session_id = $1 and s.code in ('IMP-FEE-T', 'IMP-FEE-U') order by s.code`, [next])).toEqual([
-        { name: 'Fee Rule Taught (imp)', availability: 'closed', fee: 0 },
-        { name: 'Fee Rule Untaught (imp)', availability: 'self_study_only', fee: 0 },
-      ]);
-      await audited([next], ['SESSION_CREATED', 'SESSION_COPIED']);
-      // The self-study one at 0 comes across with the reason the rule asks for, on the copy's audit row (2ca07a4's round, item 3).
-      const winterName = (await one<{ name: string }>(`select name from registration_session where id = $1`, [winter])).name;
-      const copiedFrom = { subject: 'Fee Rule Untaught (imp)', reason: `copied from ${winterName}; priced at the board fee alone` };
-      expect(copied.zeroFeeSelfStudy).toEqual([copiedFrom]);
-      expect(await one(`select new_data->'zeroFeeSelfStudy' as z from audit_log where action = 'SESSION_COPIED' and entity_id = $1`, [next])).toEqual({ z: [copiedFrom] });
-      for (const id of [winter, next]) await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id }, json: { reason: 'import scenario done' } }));
-
-      // A session converted while closed (migration 0042: its offers closed with it, not by choice): its
-      // untaught subject comes across self-study only at 0 — the reason never asked there, recorded now as
-      // converted — and a new session made from it says so (the New session screen shows the summary).
-      const old = await session(adm, 'Winter session (import, course fee, converted)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
-      const oldCambridge = await seriesOfSession(old, 'cambridge');
-      const converted = await subjectOf('Fee Rule Converted (imp)', 'IMP-FEE-C');
-      await sql(`update subject set is_offered_at_school = false where id = $1`, [converted]);
-      const conv = await apiResponse(post(old, { ...offerJson(converted, 'self_study_only', 0, 'made to be converted'),
-        items: [{ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId: oldCambridge, availability: 'open' as const, requiredInSeries: false }] }));
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: old }, json: { reason: 'converted while closed (scenario)' } }));
-      await sql(`update session_offer set availability = 'closed', legacy = '{"converted": true}' where id = $1`, [conv.id]);
-      await sql(`update session_offer_item set availability = 'closed', legacy = '{"converted": true}' where offer_id = $1`, [conv.id]);
-      const oldName = (await one<{ name: string }>(`select name from registration_session where id = $1`, [old])).name;
-      const day = 86_400_000;
-      const made = await apiResponse(adm.api.v1.sessions.$post({ json: {
-        type: 'winter', year: seriesYearInAcademicYear('november', Y), label: `fee-conv-${Date.now() % 1_000_000}`,
-        startDate: new Date(Date.now() - day).toISOString(), endDate: new Date(Date.now() + 30 * day).toISOString(),
-        courseStartsOn: new Date().toISOString().slice(0, 10), paymentDueAt: new Date(Date.now() + 30 * day).toISOString(), copyFromSessionId: old,
-      } }));
-      expect(made.copied?.zeroFeeSelfStudy).toEqual([{ subject: 'Fee Rule Converted (imp)', reason: `converted from ${oldName}; priced at the board fee alone` }]);
-      expect(await one(`select o.availability, o.course_fee::float as fee from session_offer o where o.session_id = $1 and o.subject_id = $2`, [made.id, converted]))
-        .toEqual({ availability: 'self_study_only', fee: 0 });
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: made.id }, json: { reason: 'import scenario done' } }));
-    });
+    // Retired by name (P1c): "MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a
+    // reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)". Every part of it
+    // was the links sheet's: the offer route's availability-dependent refusal of a course fee of 0 and its zeroFeeReason, and
+    // the session copy's closedNoFee / zeroFeeSelfStudy lists (POST /sessions/:id/copy-from, and the dated create's
+    // copyFromSessionId, which now refuses a copy). The coordinator's model says a fee not set (null) is refused at pricing
+    // (PRICE_NOT_SET: the test above, and 08z-reserve-pay "L-lead: prices final is refused, its rows named (PRICE_NOT_SET) …"),
+    // and a copy carries last year's prices with prices final off (08n-session-offers "the next June copied from it (C3) …").
+    // No money: no line was made in it.
 
     it('the list of imports: every file, its state and its counts', async () => {
       const list = await apiResponse(importer.api.v1.imports.$get());
