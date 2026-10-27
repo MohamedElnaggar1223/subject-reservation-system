@@ -437,8 +437,9 @@ function RequestSwapModal({
         <RefundPreviewNote registrationId={reg.id} />
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Swap to</label>
+          <label htmlFor="swap-request-to" className="block text-sm font-medium text-foreground mb-1">Swap to</label>
           <select
+            id="swap-request-to"
             value={choiceKey}
             onChange={(e) => setChoiceKey(e.target.value)}
             disabled={isLoading}
@@ -592,8 +593,9 @@ function DirectSwapModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Swap to</label>
+          <label htmlFor="swap-direct-to" className="block text-sm font-medium text-foreground mb-1">Swap to</label>
           <select
+            id="swap-direct-to"
             value={choiceKey}
             onChange={(e) => setChoiceKey(e.target.value)}
             disabled={isLoading}
@@ -843,6 +845,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
           </div>
           {isParent && uniqueStudents.length > 1 && (
             <select
+              aria-label="Child"
               value={selectedStudentId ?? ''}
               onChange={(e) => setSelectedStudentId(e.target.value || null)}
               className="rounded-lg border border-border bg-card text-foreground text-sm px-3 py-1.5"

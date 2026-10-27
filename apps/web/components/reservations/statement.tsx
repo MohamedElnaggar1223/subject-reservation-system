@@ -148,7 +148,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                     {money && <th className="px-3 py-2 text-start font-medium">Pay by</th>}
                     {money && <th className="px-3 py-2 text-start font-medium">Receipt</th>}
                     <th className="px-3 py-2 text-start font-medium">Status</th>
-                    {teacherChange && <th className="px-3 py-2" />}
+                    {teacherChange && <th className="px-3 py-2"><span className="sr-only">Teacher</span></th>}
                   </tr>
                 </thead>
                 <tbody className="max-sm:block">
