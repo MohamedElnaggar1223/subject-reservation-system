@@ -118,7 +118,7 @@ const WORDS: Record<Viewer, { what: string; when: string; whenAS: string; approv
 const HELD_STATUS: Record<string, string> = { pending_payment: 'waiting for payment', confirmed: 'paid' };
 const LIVE = ['pending_approval', 'pending_payment', 'confirmed'];
 /** Codes whose next step is to take the subject off the choices (it can no longer be reserved as picked). */
-const TAKE_OFF: RefusalCode[] = ['NOT_ACCEPTING', 'NOT_OPEN', 'BOARD_DEADLINE_PASSED', 'OPTION_NOT_OFFERED', 'ONE_PAPER_IS_RETAKE', 'EXCLUSIVE_OPTIONS', 'SAME_ENTRY_ONCE', 'RETAKE_ONLY', 'SELF_STUDY_SECOND_ENTRY_ONLY'];
+const TAKE_OFF: RefusalCode[] = ['NOT_ACCEPTING', 'NOT_OPEN', 'BOARD_DEADLINE_PASSED', 'OPTION_NOT_OFFERED', 'ONE_PAPER_IS_RETAKE', 'EXCLUSIVE_OPTIONS', 'SAME_ENTRY_ONCE', 'ALREADY_RESERVED', 'RETAKE_ONLY', 'SELF_STUDY_SECOND_ENTRY_ONLY'];
 /** Codes after which the page reads the offers again (a price, a close or what the student holds changed). */
 const READ_AGAIN: RefusalCode[] = [...TAKE_OFF, 'PRICE_CHANGED'];
 
@@ -144,19 +144,22 @@ const titleOf = (o: Offering) => `${ownName(o.name, o.group)} ${o.group}`;
 const domId = (studentId: string, k: string) => `reserve-${studentId}-${k}`.replace(/[^\w-]/g, '-');
 
 /**
- * The earlier exam a picked option names: the one the school knows (F2: filled in, and sent, so the line records
- * the exam the family saw), else the family's pick among its choices; none for a first entry that carries nothing.
- * A carried row whose known exam is not one it carries from asks among those it does.
+ * The earlier exam a picked option names: the one the school knows (F2: shown, and filled in by the server, which
+ * records it as known), else the family's pick among its choices; none for a first entry that carries nothing. A
+ * carried row whose known exam is not one it carries from asks among those it does; a carried row whose list the
+ * coordinator emptied asks among the board's earlier exams (`retakeFrom`, what the line rules then take).
  */
 function earlierOf(row: OfferRow, option: RowOption) {
   const none = { asks: false, known: null as OfferRow['knownSitting'], choices: [] as { value: string; label: { en: string; ar: string } }[] };
+  const fromBoard = () => option.retakeFrom.map((s) => ({ value: s.id ? `id:${s.id}` : `my:${s.month}|${s.year}`, label: s.label }));
   if (option.needsCarriedFrom) {
-    if (row.knownSitting && option.allowedSittings.some((s) => s.id === row.knownSitting!.id)) return { ...none, known: row.knownSitting };
-    return { ...none, asks: true, choices: option.allowedSittings.map((s) => ({ value: `id:${s.id}`, label: s.label })) };
+    const anyOfBoard = !option.allowedSittings.length;
+    if (row.knownSitting && (anyOfBoard || option.allowedSittings.some((s) => s.id === row.knownSitting!.id))) return { ...none, known: row.knownSitting };
+    return { ...none, asks: true, choices: anyOfBoard ? fromBoard() : option.allowedSittings.map((s) => ({ value: `id:${s.id}`, label: s.label })) };
   }
   if (option.attempt !== 'retake') return none;
   if (row.knownSitting) return { ...none, known: row.knownSitting };
-  return { ...none, asks: true, choices: option.retakeFrom.map((s) => ({ value: s.id ? `id:${s.id}` : `my:${s.month}|${s.year}`, label: s.label })) };
+  return { ...none, asks: true, choices: fromBoard() };
 }
 
 /** Whether the family chooses this option's teacher (D5: in school, several teachers, the families' choice). */
@@ -197,7 +200,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
   const [escrow, setEscrow] = useState('');
   // What stops the reservation, where it is: a group or question key → its sentence; `page` for the rest.
   const [problems, setProblems] = useState<Record<string, string>>({});
-  const [refusal, setRefusal] = useState<{ sentence: string; code: RefusalCode | undefined; key: string | null } | null>(null);
+  const [refusal, setRefusal] = useState<{ sentence: string; code: RefusalCode | undefined; key: string | null; candidates?: string[] } | null>(null);
 
   const data = offers.data;
   const offerings = useMemo(() => data?.offerings ?? [], [data]);
@@ -226,7 +229,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     if (p) picks[key] = p;
     else delete picks[key];
     setProblems(({ [key]: _gone, ...rest }) => rest);
-    if (refusal?.key === key) setRefusal(null);
+    if (refusal?.key === key || refusal?.candidates?.includes(key)) setRefusal(null);
     patch({ picks });
   };
 
@@ -240,6 +243,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     const missing = Object.entries(draft.picks).flatMap(([key, p]) => {
       const row = rows.get(p.rowId);
       if (!row) return [{ key, p, why: `${p.title}: no longer taking reservations.` }];
+      // Reserved meanwhile (the student's request, the desk, another tab): the group shows it as held.
+      if (groups.find((g) => g.key === key)?.rows.some((r) => held.has(r.id))) return [{ key, p, why: `${p.title}: already reserved.` }];
       return row.options.some((x) => optionKey(x) === optionKey(p)) ? [] : [{ key, p, why: `${p.title}: this choice is no longer offered.` }];
     }).map(({ key, p, why }) => [key, p, why] as const);
     if (!missing.length) return;
@@ -251,7 +256,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     for (const [key] of missing) delete picks[key];
     setDraft({ ...draft, picks });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, held]);
 
   // A refusal at a subject: bring it into view.
   useEffect(() => {
@@ -281,8 +286,9 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
   const linesOut = (): Line[] => chosen.map((c) => {
     const line: Line = { offerItemId: c.r.id, attempt: c.p.attempt, mode: c.p.mode, ...(c.option.price ? { expectedPrice: c.option.price.total } : {}) };
     if (choosesTeacher(c.o, c.option)) line.teacherId = c.p.teacherId;
-    const known = earlierOf(c.r, c.option).known;
-    if (known) line.priorSittingSeriesId = known.id;
+    // A known exam is not sent: the server fills it in from the student's record and records it as known (sent, it
+    // would read as the family's declaration, under the declaration's two-year rule).
+    if (earlierOf(c.r, c.option).known) { /* filled in by the server */ }
     else if (c.p.earlier.startsWith('id:')) line.priorSittingSeriesId = c.p.earlier.slice(3);
     else if (c.p.earlier.startsWith('my:')) {
       const [month, year] = c.p.earlier.slice(3).split('|') as [SeriesMonth, string];
@@ -297,32 +303,34 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
   const consent = { refundPolicy: true as const, declaration: true as const };
 
   /**
-   * Where a refusal belongs: the picked subject its sentence names (the longest name, then the row's words). Two
-   * picks the sentence names alike (Biology O.L. and Biology A.S./A.L., both all papers) leave it at the page: a
-   * refusal is never pinned to a guess.
+   * Where a refusal belongs: the picked subject its sentence names (the longest name, then the row's words), read
+   * from the API's own sentence. Two picks the sentence names alike with no row named (Physics O.L. and Physics
+   * A.S./A.L.: a subject's close, or an all-papers row, is named by the subject alone) leave it at the page, each of
+   * them offered off: a refusal is never pinned to a guess. `candidates`: the picks it may concern.
    */
-  function locate(sentence: string): string | null {
+  function locate(sentence: string): { key: string | null; candidates: string[] } {
     const named = chosen.filter((c) => sentence.includes(c.o.name)).sort((a, b) => b.o.name.length - a.o.name.length);
     if (!named.length) {
       const q = asked.find((x) => sentence.includes(x.prompt));
-      return q ? `q:${q.id}` : null;
+      return { key: q ? `q:${q.id}` : null, candidates: [] };
     }
     const top = named.filter((c) => c.o.name === named[0]!.o.name);
     const byRow = top.filter((c) => c.r.kind !== 'all_papers' && sentence.includes(`${c.o.name} — `) && sentence.includes(c.r.label.en));
-    if (byRow.length === 1) return byRow[0]!.key;
-    const whole = top.filter((c) => c.r.kind === 'all_papers' && !sentence.includes(`${c.o.name} — `));
-    if (whole.length === 1) return whole[0]!.key;
-    return top.length === 1 ? top[0]!.key : null;
+    if (byRow.length === 1) return { key: byRow[0]!.key, candidates: [] };
+    return top.length === 1 ? { key: top[0]!.key, candidates: [] } : { key: null, candidates: top.map((c) => c.key) };
   }
   const refused = (e: unknown) => {
     const code = refusalCodeOf(e);
-    const sentence = familyWords(errorText(e));
-    const key = code === 'ANSWER_REQUIRED' ? (asked.find((q) => sentence.includes(q.prompt)) ? `q:${asked.find((q) => sentence.includes(q.prompt))!.id}` : null) : locate(sentence);
-    setRefusal({ sentence, code, key });
-    if (code && READ_AGAIN.includes(code)) {
-      qc.invalidateQueries({ queryKey: reserveOffersKey(sessionId, studentId) });
-      qc.invalidateQueries({ queryKey: statementKey(statementQuery) });
-    }
+    // Located by the API's sentence (the school's question prompts and names as written), shown in the family's words.
+    const raw = errorText(e);
+    const sentence = familyWords(raw);
+    const q = code === 'ANSWER_REQUIRED' ? asked.find((x) => raw.includes(x.prompt)) : undefined;
+    const at = code === 'ANSWER_REQUIRED' ? { key: q ? `q:${q.id}` : null, candidates: [] } : locate(raw);
+    setRefusal({ sentence, code, key: at.key, candidates: at.candidates });
+    // What the student holds is read again after any refusal (something may have been reserved meanwhile: the held
+    // picks then leave the choices, named); the offers when the code says they changed, or when there is no code.
+    qc.invalidateQueries({ queryKey: statementKey(statementQuery) });
+    if (!code || READ_AGAIN.includes(code)) qc.invalidateQueries({ queryKey: reserveOffersKey(sessionId, studentId) });
   };
   const afterReserve = () => {
     // A consent belongs to the lines it was given for; the next reservation asks again.
@@ -394,8 +402,10 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     send();
   };
 
-  if (offers.isLoading) return <LoadingState />;
+  if (offers.isLoading || statement.isLoading) return <LoadingState />;
   if (offers.isError || !data) return <ErrorState message={offers.error instanceof Error ? familyWords(offers.error.message) : undefined} onRetry={() => offers.refetch()} />;
+  // What the student already holds decides what can be picked: without it, nothing is offered as pickable.
+  if (statement.isError) return <ErrorState message="What this student already reserved could not be loaded, so nothing can be picked yet." onRetry={() => statement.refetch()} />;
   if (!data.eligibility.allowed) {
     return <Notice tone="danger" title="Not open to this student">{familyWords(data.eligibility.reason ?? '')}</Notice>;
   }
@@ -414,7 +424,10 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
           <span>Reservations close</span>{' '}
           {data.session.closesAt ? <Day iso={String(data.session.closesAt)} /> : <span>when the school closes them</span>}
           {' · '}
-          {data.session.paymentDueAt ? <><span>Pay by</span> <Day iso={String(data.session.paymentDueAt)} /></> : <span>The payment date is not set yet</span>}
+          {!data.session.paymentDueAt ? <span>The payment date is not set yet</span>
+            : new Date(data.session.paymentDueAt).getTime() > Date.now() ? <><span>Pay by</span> <Day iso={String(data.session.paymentDueAt)} /></>
+              // Past the session's payment date, a new reservation is due a few days after it is made: its own date is on the statement.
+              : <span>Each new reservation has its own date to pay by, shown once it is reserved</span>}
         </p>
         <p className="text-sm text-muted-foreground">
           {desk
@@ -461,6 +474,10 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
                 <span className="min-w-0">
                   <bdi className="font-medium text-foreground" data-i18n-skip="true">{titleOf(c.o)}</bdi>{' '}
                   <span className="text-muted-foreground" data-i18n-skip="true">{c.option.label[lang]}</span>
+                  {/* D5: the teacher picked (one is preselected), read back to the parent. */}
+                  {c.p.teacherId && c.option.teachers.find((t) => t.id === c.p.teacherId) && (
+                    <span className="text-muted-foreground"> · <bdi data-i18n-skip="true">{c.option.teachers.find((t) => t.id === c.p.teacherId)!.name}</bdi></span>
+                  )}
                 </span>
                 <Money amount={c.option.price?.total} />
               </li>
@@ -509,6 +526,16 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
         )}
         {Object.keys(problems).some((k) => k !== 'page') && <ErrorLine message="Some choices are not finished: they are marked in red above." />}
         <ErrorLine message={pageProblem} />
+        {/* A refusal that may concern several picks (two subjects of one name): each offered off, never a guess. */}
+        {refusal && !refusal.key && refusal.code && TAKE_OFF.includes(refusal.code) && (refusal.candidates ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {chosen.filter((c) => refusal.candidates!.includes(c.key)).map((c) => (
+              <button key={c.key} type="button" className="font-medium text-destructive underline underline-offset-4" onClick={() => setPick(c.key, null)}>
+                <span>Take off the choices:</span> <bdi data-i18n-skip="true">{titleOf(c.o)}</bdi>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* "Then one collection" (§5 Desk): subjects already waiting are collected with the new ones in one payment, under
             "To collect now" — "Reserve and collect" would pay the new ones alone, so it waits until nothing else does. */}

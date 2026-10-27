@@ -82,6 +82,9 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   // read and signed, goes with its collection (step B, RESERVATIONS_REWORK.md §3.5).
   const [consent, setConsent] = useState(false);
   const [refusedLine, setRefusedLine] = useState<{ id: string; sentence: string } | null>(null);
+  // The family's balance, used only as far as the parent asks (0 at first): it pays the subjects and the charges
+  // other than instalments, never the school fee (desk.services: at most their total).
+  const [balanceText, setBalanceText] = useState('');
   const isOn = (key: string) => picked.get(key) ?? !owed.laterInstalments.has(key);
   const flip = (key: string) => setPicked((m) => new Map(m).set(key, !isOn(key)));
   const lineIds = owed.lines.filter((l) => isOn(`l:${l.id}`)).map((l) => l.id);
@@ -90,14 +93,20 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   const total = owed.lines.filter((l) => lineIds.includes(l.id)).reduce((s, l) => s + l.priceAtRegistration, 0)
     + owed.payable.filter((c) => chargeIds.includes(c.id)).reduce((s, c) => s + c.amount, 0)
     + (fee?.amount ?? 0);
+  const balance = summary.escrow.freeBalance;
+  const balanceCap = Math.round(Math.min(balance,
+    owed.lines.filter((l) => lineIds.includes(l.id)).reduce((s, l) => s + l.priceAtRegistration, 0)
+    + owed.payable.filter((c) => chargeIds.includes(c.id) && c.kind !== 'instalment').reduce((s, c) => s + c.amount, 0)) * 100) / 100;
+  const fromBalance = Math.round(Math.min(Math.max(Number(balanceText) || 0, 0), balanceCap) * 100) / 100;
+  const cash = Math.round((total - fromBalance) * 100) / 100;
 
   const collect = useMutation({
     mutationFn: (instrumentUsed: Parameters<typeof collectAtDesk>[0]['instrumentUsed']) => collectAtDesk({
-      studentId, registrationIds: lineIds, chargeIds, instrumentUsed, escrowAmountToApply: 0,
+      studentId, registrationIds: lineIds, chargeIds, instrumentUsed, escrowAmountToApply: fromBalance,
       ...(fee ? { schoolFeeYear: fee.academicYear } : {}),
       ...(consent && owed.lines.some((l) => l.familyConsentNeeded && lineIds.includes(l.id)) ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
     }),
-    onSuccess: (r) => { setResult(r); setError(''); setRefusedLine(null); setPicked(new Map()); setConsent(false); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
+    onSuccess: (r) => { setResult(r); setError(''); setRefusedLine(null); setPicked(new Map()); setConsent(false); setBalanceText(''); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
     onError: (err: Error) => {
       // A refusal at the subject it names (CUT_OFF_PASSED, PRICES_NOT_FINAL, NOT_WAITING…): untick it, say why there.
       const sentence = familyWords(err.message);
@@ -119,8 +128,29 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
     <section aria-labelledby="desk-owed" className="rounded-xl border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
         <h3 id="desk-owed" className="font-display text-sm font-semibold text-foreground">To collect now</h3>
-        <CollectBar total={total} disabled={!lineIds.length && !chargeIds.length && !fee} pending={collect.isPending} onCollect={(i) => collect.mutate(i)} />
+        <CollectBar total={cash} disabled={!lineIds.length && !chargeIds.length && !fee} pending={collect.isPending} onCollect={(i) => collect.mutate(i)} />
       </div>
+      {balance > 0 && (
+        <div className="flex flex-wrap items-end gap-3 border-b border-border px-5 py-2.5 text-sm">
+          <div>
+            <label htmlFor="collect-balance" className="mb-1 block text-xs font-medium text-foreground">
+              <span>Balance to use</span> <span className="font-normal text-muted-foreground">(<span>available</span> <Money amount={balance} />)</span>
+            </label>
+            <input id="collect-balance" type="number" min="0" max={balanceCap} step="0.01" inputMode="decimal" placeholder="0"
+              className="h-9 w-36 rounded-lg border border-input bg-background px-3 text-sm text-foreground" value={balanceText} onChange={(e) => setBalanceText(e.target.value)} />
+          </div>
+          {balanceCap > 0 && fromBalance < balanceCap && (
+            <button type="button" className="mb-2 text-xs text-primary underline underline-offset-4" onClick={() => setBalanceText(String(balanceCap))}>
+              <span>Use</span> <Money amount={balanceCap} />
+            </button>
+          )}
+          <p className="mb-2 text-xs text-muted-foreground">
+            {fromBalance > 0
+              ? <><span>From the balance</span> <Money amount={fromBalance} /> · <span>to take now</span> <Money amount={cash} /></>
+              : <span>Ask the parent before using it. It pays the subjects and charges, not the school fee.</span>}
+          </p>
+        </div>
+      )}
       <ul className="divide-y divide-border text-sm">
         {owed.fees.map((f) => (
           <Row key={`f:${f.academicYear}`} checked={isOn(`f:${f.academicYear}`)} onChange={() => flip(`f:${f.academicYear}`)}

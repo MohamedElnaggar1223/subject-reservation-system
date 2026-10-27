@@ -15,7 +15,7 @@
  * - the dates (C5): "Keep them" (`datesConfirmed`) or set them in the header;
  * - a board date the reference lacks (C6): the coordinator reads "Waiting for the admin", with no
  *   button (the lead's decision on the mock); the admin enters it here, once;
- * - the subjects not on the board's list we hold: one line naming them (the admin is told);
+ * - the subjects not on the board's list we hold: one line naming them (D1: flagged for us, who add them to the list);
  * - every other item: its sentence and the subject or tab that fixes it; an item this screen does not
  *   know yet shows the API's own sentence, so nothing the API says is dropped.
  *
@@ -262,7 +262,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     }
   }
 
-  // D1: the subjects not on the board's list we hold — one line naming them; nothing for her to do (the admin is told).
+  // D1: the subjects not on the board's list we hold — one line naming them; nothing for her to do (D1: flagged for us; we add them to the reference list).
   const notListed = of('not_on_the_list').map((c) => byId.get(c.offeringId ?? '')).filter((o): o is Offering => !!o);
   if (notListed.length) {
     entries.push({
@@ -270,7 +270,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       body: (
         <>
           <span>Not on the board&apos;s list we hold:</span> {notListed.map((o, i) => <span key={o.id}>{i > 0 && ', '}<Name>{subjectTitle(o)}</Name></span>)}{!subjectTitle(notListed[notListed.length - 1]!).endsWith('.') && '.'}{' '}
-          <span>{notListed.length === 1 ? 'Families see its name as you typed it, and the admin is told to add it.' : 'Families see the names as you typed them, and the admin is told to add them.'}</span>
+          <span>{notListed.length === 1 ? 'Families see its name as you typed it; we add it to the board\'s list we hold.' : 'Families see the names as you typed them; we add them to the board\'s list we hold.'}</span>
         </>
       ),
       actions: [],

@@ -717,6 +717,10 @@ function DeskReserveCard({ studentId, studentName, onDone }: { studentId: string
   // "Also collect now" (step C, §4.3): the year's fee and the student's charges with the reservation.
   const [extras, setExtras] = useState<Extras>({ chargeIds: [], total: 0 });
   const chosen = sessionId || (sessions.length === 1 ? sessions[0]!.id : '');
+  // Subjects of this session already waiting for payment: "Reserve and collect" waits (reserve only, then one
+  // collection under "To collect now"), so its "Also collect now" ticks are not offered either.
+  const { data: summary } = useQuery({ queryKey: ['desk', 'summary', studentId], queryFn: () => fetchSummary(studentId) });
+  const waitingHere = (summary?.registrations ?? []).some((r) => r.status === 'pending_payment' && r.sessionId === chosen);
   return (
     <div className="bg-card rounded-xl border border-primary/40 shadow-sm p-5 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -739,9 +743,9 @@ function DeskReserveCard({ studentId, studentName, onDone }: { studentId: string
           <div className="mt-2"><SlipLink studentId={studentId} registrationIds={last.registrationIds} /></div>
         </div>
       )}
-      {chosen && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
+      {chosen && !waitingHere && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
       {chosen && (
-        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={extras} childName={studentName}
+        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={waitingHere ? { chargeIds: [], total: 0 } : extras} childName={studentName}
           onDone={(d) => { setLast(d); setExtras({ chargeIds: [], total: 0 }); onDone(d.sentences); }} />
       )}
     </div>

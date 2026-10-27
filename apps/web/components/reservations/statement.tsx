@@ -39,6 +39,8 @@ type StudentStatement = StatementData['students'][number];
 type StatementLine = StudentStatement['sessions'][number]['lines'][number];
 export const statementKey = (q: { studentId?: string; familyId?: string }) => ['statement', q.studentId ?? '', q.familyId ?? ''] as const;
 
+/** A line's status in the words every family screen uses (the reservation page, checkout, home): not the staff's labels. */
+const LINE_STATUS_WORDS: Record<string, string> = { pending_payment: 'Waiting for payment', pending_approval: 'Waiting for approval' };
 const STATUS_TONE: Record<string, Tone> = {
   pending_approval: 'warning', pending_payment: 'warning', preregistered: 'info', confirmed: 'success',
   dropped_pending_receipt: 'warning', dropped: 'neutral', rejected: 'neutral', expired: 'neutral',
@@ -216,7 +218,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                           ) : <span className="text-muted-foreground">—</span>}
                         </td>
                       )}
-                      <td className="px-3 py-2 max-sm:w-full max-sm:pt-0"><Badge tone={STATUS_TONE[l.status] ?? 'neutral'}>{labelFor(REGISTRATION_STATUS_LABELS, l.status)}</Badge></td>
+                      <td className="px-3 py-2 max-sm:w-full max-sm:pt-0"><Badge tone={STATUS_TONE[l.status] ?? 'neutral'}>{LINE_STATUS_WORDS[l.status] ?? labelFor(REGISTRATION_STATUS_LABELS, l.status)}</Badge></td>
                       {teacherChange && (
                         <td className="px-3 py-2 text-end">
                           {['pending_approval', 'pending_payment', 'preregistered', 'confirmed'].includes(l.status) && (

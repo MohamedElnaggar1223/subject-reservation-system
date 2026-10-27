@@ -93,11 +93,11 @@ export const reservationsArabic: Record<string, string> = {
   'Statement': 'كشف الحساب',
   'Hide statement': 'إخفاء كشف الحساب',
   // ── The family's page ──
-  'Choose your child and the session, tick what they will sit, and pay by exam series.': 'اختر ابنك والجلسة، وحدد ما سيمتحن فيه، وادفع لكل دورة امتحان.',
+  'Choose your child and the session, tick what they will sit, and pay by exam series.': 'اختر ابنك/ابنتك والجلسة، وحدد ما سيُمتحن فيه، وادفع.',
   'Tick what you will sit; your parent approves and pays.': 'حدد ما ستمتحن فيه؛ يوافق ولي أمرك ويدفع.',
-  'Child': 'الابن',
+  'Child': 'الابن/الابنة',
   'No linked children yet:': 'لا يوجد أبناء مرتبطون بعد:',
-  'link to your child': 'اربط حسابك بابنك',
+  'link to your child': 'اربط حسابك بحساب ابنك/ابنتك',
   'Reservations close': 'يُغلق الحجز',
   'not open yet: a preregistration holds the money until it opens': 'لم تُفتح بعد: التسجيل المسبق يحتجز المبلغ حتى تُفتح',
   'The school fee comes first': 'المصاريف الدراسية أولًا',
@@ -274,7 +274,7 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^Already reserved for this student in this session: (.+)$/, (m) => `محجوز بالفعل لهذا الطالب في هذه الجلسة: ${m[1]}`],
   [/^A first entry of (.+) follows no earlier sitting: choose "retake" to name one$/, (m) => `القيد الأول في ${m[1]} لا يتبع دورة سابقة: اختر «إعادة» لتسمية دورة`],
   [/^(.+) follows a sitting of (.+): the sitting named is another board's$/, (m) => `${m[1]} يتبع دورة لـ ${m[2]}: الدورة المذكورة لمجلس آخر`],
-  [/^The earlier sitting of (.+) must come before the series it is entered in$/, (m) => `يجب أن تسبق الدورة السابقة لـ ${m[1]} الدورة التي يُقيَّد فيها`],
+  [/^The earlier sitting of (.+) must come before the series it is entered in$/, (m) => `يجب أن يسبق الامتحانُ السابق لـ ${m[1]} الامتحانَ الذي يُقيَّد فيه`],
   [/^A retake of (.+) names the sitting it follows$/, (m) => `إعادة ${m[1]} تسمّي الدورة التي تتبعها`],
   [/^A payment for this line is in progress: confirm or reject it in the Finance Workbench first$/, () => 'هناك دفعة جارية لهذا السطر: أكّدها أو ارفضها في مكتب المالية أولًا'],
   [/^The finance desk verifies a sitting with the board's statement in hand: say what was seen$/, () => 'يتحقق مكتب المالية من الدورة وبيان المجلس بين يديه: اذكر ما تمت رؤيته'],
@@ -395,16 +395,40 @@ const FAMILY_WORDS: [RegExp, string][] = [
   [/\bThat item\b/g, 'That choice'],
   [/\bitems\b/gi, 'choices'],
   [/\bitem\b/gi, 'choice'],
+  // "A sitting of" → "A exam of": the article follows the new word.
+  [/\b([Aa]) (exams?|exam's)\b/g, '$1n $2'],
 ];
 
+/**
+ * The school's own words are left as written: the question prompts after "Answer:" (the coordinator's text, which the
+ * page finds its question by) and anything quoted.
+ */
 export function familyWords(text: string): string {
-  let out = text;
-  for (const [re, to] of FAMILY_WORDS) out = out.replace(re, to);
-  return out;
+  if (/^Answer: /.test(text)) return text;
+  return text.split(/("[^"]*"|“[^”]*”)/).map((part, i) => {
+    if (i % 2) return part;
+    let out = part;
+    for (const [re, to] of FAMILY_WORDS) out = out.replace(re, to);
+    return out;
+  }).join('');
 }
 
 /** The family's and the desk's phrases (merged after the other dictionaries in lib/i18n.tsx: these win). */
 export const familyArabic: Record<string, string> = {
+  // P3's fix round (the lead): the checkout, the desk's balance, the reservation page.
+  'Last day to pay': 'آخر يوم للدفع',
+  '(the earliest of these subjects)': '(الأقرب بين هذه المواد)',
+  'paid by its instalments': 'تُدفع بأقساطها',
+  'no longer waiting for payment': 'لم تعد بانتظار الدفع',
+  'not in this payment (already paid, paid by instalments, or no longer waiting).': 'ليست في هذه الدفعة (مدفوعة بالفعل، أو تُدفع بالأقساط، أو لم تعد بانتظار الدفع).',
+  'Balance to use': 'المبلغ المستخدم من الرصيد',
+  'From the balance': 'من الرصيد',
+  'to take now': 'المطلوب تحصيله الآن',
+  'Ask the parent before using it. It pays the subjects and charges, not the school fee.': 'اسأل ولي الأمر قبل استخدامه. يدفع المواد والرسوم الأخرى، لا رسوم المدرسة.',
+  'Each new reservation has its own date to pay by, shown once it is reserved': 'لكل حجز جديد موعد سداد خاص به، يظهر بعد الحجز',
+  'Take off the choices:': 'احذف من الاختيارات:',
+  'What this student already reserved could not be loaded, so nothing can be picked yet.': 'تعذّر تحميل ما حجزه هذا الطالب بالفعل، فلا يمكن الاختيار بعد.',
+  'Waiting for approval': 'بانتظار الموافقة',
   'its last day to pay has passed': 'مرّ آخر يوم للدفع',
   'the last day to pay has passed, so it can no longer be paid. Reserve it again while it is offered.': 'مرّ آخر يوم للدفع، فلم يعد دفعها ممكنًا. احجزها مرة أخرى ما دامت معروضة.',
   'Reserved at the school desk.': 'حُجزت في مكتب المدرسة.',
@@ -418,7 +442,7 @@ export const familyArabic: Record<string, string> = {
   'when the school closes them': 'حين تغلقه المدرسة',
   'The payment date is not set yet': 'موعد الدفع لم يُحدد بعد',
   'Every subject open to your child this session, with its choices and their prices. Pick one choice per subject; the total is at the bottom.':
-    'كل مادة متاحة لابنك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ والإجمالي في الأسفل.',
+    'كل مادة متاحة لابنك/ابنتك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ والإجمالي في الأسفل.',
   'Every subject open to you this session, with its choices and their prices. Pick one choice per subject; your parent approves and pays.':
     'كل مادة متاحة لك في هذه الجلسة، بخياراتها وأسعارها. اختر خيارًا واحدًا لكل مادة؛ يوافق ولي أمرك ويدفع.',
   'Every subject this student may take, with only the choices open to them and their prices. Pick what the parent asks for; the total is at the bottom.':
@@ -431,13 +455,13 @@ export const familyArabic: Record<string, string> = {
   'Not taking new reservations.': 'لا تقبل حجوزات جديدة.',
   'Sat before: only the retake choices are shown.': 'امتُحن فيها من قبل: تظهر خيارات الإعادة فقط.',
   'Sat it before? Show the retake choices': 'امتُحن فيها من قبل؟ اعرض خيارات الإعادة',
-  'What will your child take?': 'ماذا سيأخذ ابنك؟',
+  'What will your child take?': 'ماذا سيأخذ ابنك/ابنتك؟',
   'What will you take?': 'ماذا ستأخذ؟',
   'What will the student take?': 'ماذا سيأخذ الطالب؟',
-  'When did your child sit it?': 'متى امتحن ابنك فيها؟',
+  'When did your child sit it?': 'متى امتُحن ابنك/ابنتك فيها؟',
   'When did you sit it?': 'متى امتحنتَ فيها؟',
   'When did the student sit it?': 'متى امتحن الطالب فيها؟',
-  'When did your child sit the A.S.?': 'متى امتحن ابنك في A.S.؟',
+  'When did your child sit the A.S.?': 'متى امتُحن ابنك/ابنتك في A.S.؟',
   'When did you sit the A.S.?': 'متى امتحنتَ في A.S.؟',
   'When did the student sit the A.S.?': 'متى امتحن الطالب في A.S.؟',
   'Not taking it': 'لن تُؤخذ',
@@ -486,7 +510,7 @@ export const familyArabic: Record<string, string> = {
   'Tick the refund policy and the declaration': 'حدد سياسة الاسترداد والإقرار',
   '* Prices are not final yet: payable once the school confirms them.': '* الأسعار ليست نهائية بعد: تُدفع حين تؤكدها المدرسة.',
   // The register page
-  'One page per child: pick the subjects, agree once, and reserve. You pay at the checkout.': 'صفحة لكل ابن: اختر المواد، ووافق مرة واحدة، واحجز. الدفع في صفحة الدفع.',
+  'One page per child: pick the subjects, agree once, and reserve. You pay at the checkout.': 'صفحة لكل ابن/ابنة: اختر المواد، ووافق مرة واحدة، واحجز. الدفع في صفحة الدفع.',
   'Pick what you will sit; your parent approves and pays.': 'اختر ما ستمتحن فيه؛ يوافق ولي أمرك ويدفع.',
   'Reserve for': 'الحجز لـ',
   'Your subjects': 'موادك',
@@ -560,7 +584,7 @@ export const familyArabic: Record<string, string> = {
   'once the school confirms its prices.': 'حين تؤكد المدرسة أسعارها.',
   'Payable once the school confirms its prices.': 'تُدفع حين تؤكد المدرسة أسعارها.',
   'You need a linked child before you can register subjects or pay fees. If your child already has an account, request the link; otherwise the school office can set both up for you in one visit.':
-    'تحتاج إلى ربط ابنك قبل أن تحجز المواد أو تدفع الرسوم. إن كان لابنك حساب فاطلب الربط؛ وإلا فيمكن لمكتب المدرسة إعداد الحسابين لك في زيارة واحدة.',
+    'تحتاج إلى ربط حساب ابنك/ابنتك قبل أن تحجز المواد أو تدفع الرسوم. إن كان لابنك/ابنتك حساب فاطلب الربط؛ وإلا فيمكن لمكتب المدرسة إعداد الحسابين لك في زيارة واحدة.',
   'You’re all caught up': 'لا شيء ينتظرك',
   'Nothing is owed and nothing is waiting for your approval.': 'لا شيء مستحق ولا شيء بانتظار موافقتك.',
   'Nothing is waiting on you right now.': 'لا شيء ينتظرك الآن.',
@@ -684,7 +708,20 @@ const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^(.+) carries an earlier exam forward: name the one it is carried from$/, (m) => `${m[1]} تنقل نتيجة امتحان سابق: سمِّ الامتحان المنقول منه`],
   [/^(.+) is not one of the earlier exams (.+) is carried from$/, (m) => `${dateAr(m[1]!)} ليس من الامتحانات السابقة التي تُنقل منها ${m[2]}`],
   [/^(.+) and (.+) cannot be reserved together$/, (m) => `لا يمكن حجز ${m[1]} و${m[2]} معًا`],
-  [/^(.+) is already reserved in (.+) \((.+)\): the board takes one entry$/, (m) => `${m[1]} محجوزة بالفعل في ${dateAr(m[2]!)} (${m[3]}): يقبل المجلس قيدًا واحدًا`],
+  [/^(.+) is already reserved in (.+) \((.+)\): the board takes one entry$/, (m) => `${m[1]} محجوزة بالفعل في ${dateAr(m[2]!)} (${dateAr(m[3]!)}): يقبل المجلس قيدًا واحدًا`],
+  [/^(.+): already reserved\.$/, (m) => `${m[1]}: محجوزة بالفعل.`],
+  [/^(.+) is self study on a second entry only: name the earlier exam, or ask for the exception$/,
+    (m) => `${m[1]} دراسة ذاتية في القيد الثاني فقط: اذكر الامتحان السابق، أو اطلب استثناءً`],
+  [/^Subjects can only be taken outside school when retaking or when the school does not offer them$/,
+    () => 'لا تُدرس المواد خارج المدرسة إلا عند الإعادة أو حين لا تقدمها المدرسة'],
+  [/^The earlier exam of (.+) must come before the exam it is entered in$/, (m) => `يجب أن يسبق الامتحانُ السابق لـ ${m[1]} الامتحانَ الذي يُقيَّد فيه`],
+  [/^An exam of (.+) more than two years before this exam is declared at the finance desk, with the board's statement$/,
+    (m) => `امتحان ${m[1]} السابق بأكثر من عامين يُصرَّح به في مكتب المالية، مع كشف المجلس`],
+  [/^A subject under an instalment plan is paid by its instalments: pay the next instalment instead$/, () => 'المادة المقسّطة تُدفع بأقساطها: ادفع القسط التالي بدلًا من ذلك'],
+  [/^Not enough in the balance: EGP ([\d,.]+) available$/, (m) => `الرصيد لا يكفي: المتاح ${m[1]} جنيه`],
+  [/^The amount from the balance cannot be more than the total cost$/, () => 'لا يمكن أن يزيد المبلغ المأخوذ من الرصيد على التكلفة الإجمالية'],
+  [/^Some of these subjects were paid or changed meanwhile: they are now shown apart\. Pay for the others\.$/,
+    () => 'دُفعت بعض هذه المواد أو تغيّرت في الأثناء: تظهر الآن منفصلة. ادفع البقية.'],
   [/^(.+) is not offered as (a first entry in school|a first entry in self study|a retake in school|a retake in self study)$/, (m) => `${m[1]} غير معروضة ${OPTION_AR[m[2]!]}`],
   [/^(.+) is not offered in this session$/, (m) => `${m[1]} غير معروضة في هذه الجلسة`],
   [/^(.+) is a retake of one paper: it takes no first entry$/, (m) => `${m[1]} إعادة لورقة واحدة: لا تقبل قيدًا أول`],

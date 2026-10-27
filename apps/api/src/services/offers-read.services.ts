@@ -336,6 +336,9 @@ export async function familyOfferings(
         .map((p) => ({ id: p.id, label: sittingLabel(p.month, p.year) }));
       const rowTeachers = (r.teachers.length ? r.teachers : o.teachers).map((t) => ({ id: t.teacherId, name: t.name, online: t.online }));
       const options = [];
+      // Options past their board deadline (C6: nothing lifts it): a row whose every option is past reads closed, so a
+      // family cannot keep picking it and keep being refused (BOARD_DEADLINE_PASSED).
+      let pastBoard = 0;
       for (const cell of ticked) {
         const attempt = cell === 'firstInSchool' || cell === 'firstSelfStudy' ? 'first' as const : 'retake' as const;
         const mode = cell === 'firstInSchool' || cell === 'retakeInSchool' ? 'in_school' as const : 'self_study' as const;
@@ -353,6 +356,13 @@ export async function familyOfferings(
           if (!(err instanceof PricingError)) throw err;
           price = null;
         }
+        if (r.series?.id) {
+          const d = await effectiveDeadlineFor(db, { boardSeriesId: r.series.id, attempt, priorSittingSeriesId: null, declarationRejected: false });
+          if (d.at && d.at <= now) pastBoard++;
+        }
+        // D6 with an emptied list: the coordinator saved no earlier exam to carry from, and the line rules then take any
+        // earlier exam of the board (line-rules.services, "row with no list"): the family picks among the board's.
+        const carriesFromAny = r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2') && !allowedSittings.length;
         options.push({
           attempt, mode,
           label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), { attempt, mode }, { selfStudyShare: r.selfStudyFee !== null ? null : s.selfStudyPercent, lang })),
@@ -361,14 +371,15 @@ export async function familyOfferings(
           needsCarriedFrom: r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2'),
           allowedSittings: r.needsCarriedFrom ? allowedSittings : [],
           // A retake of a row that carries nothing forward: the exams it may follow, latest first (none filled in).
-          retakeFrom: attempt === 'retake' && !r.needsCarriedFrom ? retakeFromOf(o.board.code, o.group, r.series) : [],
+          // An emptied carried-from list: the board's earlier exams, the same window.
+          retakeFrom: (attempt === 'retake' && !r.needsCarriedFrom) || carriesFromAny ? retakeFromOf(o.board.code, o.group, r.series) : [],
           teachers: mode === 'in_school' && !o.teacherTbc ? rowTeachers : [],
         });
       }
       if (!options.length) continue;
       rows.push({
         id: r.id, label: both((lang) => rowLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), lang)), kind: r.kind, sitting: r.sitting,
-        closed: closedOffering || !!(r.closesAt && r.closesAt <= now), payBy: r.payBy, exclusiveGroup: r.exclusiveGroup,
+        closed: closedOffering || !!(r.closesAt && r.closesAt <= now) || pastBoard === options.length, payBy: r.payBy, exclusiveGroup: r.exclusiveGroup,
         knownSitting: known ? { id: known.id, label: sittingLabel(known.month, known.year) } : null,
         options,
       });

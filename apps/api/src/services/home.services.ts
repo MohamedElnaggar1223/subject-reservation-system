@@ -10,6 +10,7 @@
 
 import { db } from '@repo/db';
 import { cutOffsOf } from './window.services';
+import { linesUnderPlan } from './payment.services';
 import { academicYearForDate, getSchoolFeeStanding } from './school-fee.services';
 import { standingToday, type StudentStanding } from './eligibility.services';
 import { sectionOf } from './academic.services';
@@ -74,7 +75,9 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
   // (E6); one past its cut-off is no longer payable (the sweep expires it).
   const cutOffs = await cutOffsOf(db, registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id));
   const now = new Date();
-  const payable = registrations.filter((r) => r.status === 'pending_payment' && !r.priceProvisional && !((cutOffs.get(r.id)?.cutOff ?? Infinity) <= now));
+  // A line under a live instalment plan is paid by its instalments, not by "Pay now" (the checkout refuses it).
+  const planned = await linesUnderPlan(db, registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id));
+  const payable = registrations.filter((r) => r.status === 'pending_payment' && !r.priceProvisional && !planned.has(r.id) && !((cutOffs.get(r.id)?.cutOff ?? Infinity) <= now));
   const owing = payable.reduce((sum, r) => sum + r.priceAtRegistration, 0);
 
   // Receipts the family must physically bring back before a drop completes

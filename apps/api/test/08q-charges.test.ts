@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow, passCutOff,
+  admin, staff, onboard, subject, session, refused, refusedWithCode, one, sql, money, takings, takingsDelta, openWindow, futureWindow, passCutOff,
   runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, CONSENT, confirmed, type Client, type Impact,
 } from './helpers';
 
@@ -558,6 +558,14 @@ describe('08q: instalment plans', () => {
     expect(Math.abs(new Date(due.due).getTime() - inDays(9).getTime())).toBeLessThan(60_000);
     // A second payment for the line is refused: only the capture pays it.
     expect((await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!], paymentMethod: 'in_school' } }))).error).toContain('instalment plan');
+    // P3's fix round: the refusal carries its code (UNDER_PLAN); the checkout names the line as under a plan, so the page
+    // shows it apart and pays the other; home's "Pay now" leaves it out.
+    expect((await refusedWithCode(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!, other!], paymentMethod: 'in_school' } }))).code).toBe('UNDER_PLAN');
+    const checkoutView = await apiResponse(f.parent.api.v1.payments['checkout-summary'].$get({ query: { registrationIds: [line!, other!].join(',') } }));
+    expect(checkoutView.linesUnderPlan).toEqual([line]);
+    const homeView = await apiResponse(f.parent.api.v1.users.me['home-summary'].$get());
+    expect(homeView.children[0]!.owingRegistrationIds).not.toContain(line);
+    expect(homeView.children[0]!.owingRegistrationIds).toContain(other);
 
     const before = await takings(officer);
     const first = await payAtDesk(f, [p.i[0]!]);

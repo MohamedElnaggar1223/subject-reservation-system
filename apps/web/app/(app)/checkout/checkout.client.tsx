@@ -107,7 +107,10 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
     const c = summary?.lineCutOffs.find((x) => x.registrationId === id)?.cutOff;
     return !!c && new Date(c).getTime() <= openedAt;
   };
-  const payableIds = (summary?.registrations ?? []).filter((r) => !r.priceProvisional && !pastLastDay(r.id)).map((r) => r.id);
+  // Only a line still waiting for payment and not under an instalment plan (paid by its instalments): one the desk
+  // collected while this page was open, or one under a plan, is shown apart, never sent to be refused.
+  const waitingHere = (r: { id: string; status: string }) => r.status === 'pending_payment' && !(summary?.linesUnderPlan ?? []).includes(r.id);
+  const payableIds = (summary?.registrations ?? []).filter((r) => waitingHere(r) && !r.priceProvisional && !pastLastDay(r.id)).map((r) => r.id);
   const initiateMutation = useMutation({
     mutationFn: async () => {
       const payableCost = (summary?.registrations ?? []).filter((r) => payableIds.includes(r.id)).reduce((a, r) => a + r.priceAtRegistration, 0);
@@ -173,8 +176,12 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
       // The subject the sentence names (lineNamedBy: the longest name, never a guess between two alike).
       const named = lineNamedBy(sentence, summary?.registrations ?? [], (r) => refusalName.get(r.id) ?? r.subject.name);
       setRefusal({ sentence, code, registrationId: named?.id ?? null });
-      setSubmitError(named ? '' : sentence);
-      if (code === 'PRICE_CHANGED' || code === 'NOT_WAITING' || code === 'PRICES_NOT_FINAL' || code === 'CUT_OFF_PASSED' || code === 'BOARD_DEADLINE_PASSED') {
+      // Paid or changed meanwhile (the desk, another tab), or under a plan: the re-read shows those apart, and the
+      // others can be paid; the API's sentence names no subject.
+      setSubmitError(named ? '' : code === 'NOT_WAITING' || code === 'UNDER_PLAN'
+        ? 'Some of these subjects were paid or changed meanwhile: they are now shown apart. Pay for the others.'
+        : sentence);
+      if (code === 'PRICE_CHANGED' || code === 'NOT_WAITING' || code === 'UNDER_PLAN' || code === 'PRICES_NOT_FINAL' || code === 'CUT_OFF_PASSED' || code === 'BOARD_DEADLINE_PASSED') {
         queryClient.invalidateQueries({ queryKey: ['payments', 'checkout-summary', summaryKey] });
       }
     },
@@ -270,8 +277,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
 
   // A subject whose prices are not final yet is reserved, not paid (E6): said, and left out of this payment; so is one
   // past its last day to pay.
-  const notFinal = summary.registrations.filter((r) => r.priceProvisional);
-  const past = summary.registrations.filter((r) => !r.priceProvisional && pastLastDay(r.id));
+  const apart = summary.registrations.filter((r) => !waitingHere(r));
+  const notFinal = summary.registrations.filter((r) => waitingHere(r) && r.priceProvisional);
+  const past = summary.registrations.filter((r) => waitingHere(r) && !r.priceProvisional && pastLastDay(r.id));
   const payable = summary.registrations.filter((r) => payableIds.includes(r.id));
   const payableTotal = Math.round(payable.reduce((a, r) => a + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = applyEscrow
@@ -405,11 +413,12 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {/* Summary footer */}
             <div className="mt-6 pt-6 border-t border-border flex justify-between text-sm text-muted-foreground">
               <span>Amount due</span>
+              {/* The server's amounts: the summary's balance was already lowered by this payment (onSuccess). */}
               <span className="font-semibold text-foreground">
-                <Money amount={amountDue} />
-                {escrowToApply > 0 && (
+                <Money amount={completed ? 0 : result.amount ?? 0} />
+                {(result.escrowAmountApplied ?? 0) > 0 && (
                   <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 ml-1">
-                    (+ <Money amount={escrowToApply} /> <span>from your balance</span>)
+                    (+ <Money amount={result.escrowAmountApplied ?? 0} /> <span>from your balance</span>)
                   </span>
                 )}
               </span>
@@ -545,7 +554,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                         {words && <p className="text-xs text-muted-foreground" data-i18n-skip="true">{words}</p>}
                         <p className="text-xs text-muted-foreground">
                           <bdi data-i18n-skip="true">{reg.session.name}</bdi>
-                          {reg.priceProvisional
+                          {!waitingHere(reg)
+                            ? <> · <span>{reg.status === 'confirmed' ? 'already paid' : (summary.linesUnderPlan ?? []).includes(reg.id) ? 'paid by its instalments' : 'no longer waiting for payment'}</span></>
+                            : reg.priceProvisional
                             ? <> · <span>prices not final yet: paid once the school confirms them</span></>
                             : pastLastDay(reg.id) ? <> · <span>its last day to pay has passed</span> (<Day iso={String(cut)} />)</>
                               : cut && <> · <span>last day to pay</span> <Day iso={String(cut)} /></>}
@@ -578,11 +589,21 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             </div>
             {payBy && payable.length > 0 && (
               <p className="px-4 sm:px-6 py-2 text-xs text-muted-foreground border-t border-border">
-                <span>Pay by</span> <Day iso={String(payBy)} />
-                {cutOffs.size > 1 && <> <span>(the earliest last day to pay of these subjects)</span></>}
+                <span>Last day to pay</span> <Day iso={String(payBy)} />
+                {cutOffs.size > 1 && <> <span>(the earliest of these subjects)</span></>}
               </p>
             )}
           </div>
+
+          {apart.length > 0 && (
+            <div className="rounded-xl border border-border bg-muted p-4 text-sm text-foreground">
+              <p>
+                <bdi data-i18n-skip="true">{apart.map((r) => r.subject.name).join(', ')}</bdi><span>:</span>{' '}
+                <span>not in this payment (already paid, paid by instalments, or no longer waiting).</span>
+              </p>
+              {payable.length > 0 && <p className="mt-1 text-muted-foreground">This payment is for the others.</p>}
+            </div>
+          )}
 
           {past.length > 0 && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">

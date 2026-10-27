@@ -54,6 +54,12 @@ export const REFUSAL_CODES = [
   'EXCLUSIVE_OPTIONS',
   /** The board takes one entry per row code per sitting (`gate.sameEntryOnce`). */
   'SAME_ENTRY_ONCE',
+  // Paying, again.
+  /** A line under an instalment plan is paid by its instalments only (§3.10 item 7). */
+  'UNDER_PLAN',
+  // Reserving, again.
+  /** The student already holds this row in the session (reserved meanwhile: a request, the desk, another tab). */
+  'ALREADY_RESERVED',
 ] as const;
 
 export type RefusalCode = (typeof REFUSAL_CODES)[number];

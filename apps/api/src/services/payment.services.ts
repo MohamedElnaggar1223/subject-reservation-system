@@ -2200,6 +2200,8 @@ export async function getCheckoutSummary(
     student: regs[0]!.student,
     openPayment,
     lineCutOffs,
+    // Lines under a live instalment plan: paid by their instalments, never in a checkout (assertNoLivePlan refuses).
+    linesUnderPlan: [...(await linesUnderPlan(db, registrationIds))],
     endsAt: ends.length ? new Date(Math.min(...ends.map((d) => d.getTime()))) : null,
     // Lines the school reserved (grade 10) whose family has not given its own consent yet: the
     // checkout asks for it (step B, RESERVATIONS_REWORK.md §3.5), showing the refund terms each
@@ -2227,11 +2229,17 @@ export async function getCheckoutSummary(
 
 /** Refuse when any of these lines is under a live plan: only the plan's capture pays it (§3.10 item 7). */
 export async function assertNoLivePlan(tx: Tx, registrationIds: string[]) {
-  if (!registrationIds.length) return;
-  const [plan] = await tx.select({ id: exception.id }).from(exception)
-    .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.status, 'active'), inArray(exception.registrationId, registrationIds)))
-    .limit(1);
-  if (plan) throw new Error('A subject under an instalment plan is paid by its instalments: pay the next instalment instead');
+  if ((await linesUnderPlan(tx, registrationIds)).size) {
+    throw coded(new Error('A subject under an instalment plan is paid by its instalments: pay the next instalment instead'), 'UNDER_PLAN');
+  }
+}
+
+/** The lines of these under a live instalment plan (paid by its instalments only): the checkout and home leave them out. */
+export async function linesUnderPlan(executor: typeof db | Tx, registrationIds: string[]): Promise<Set<string>> {
+  if (!registrationIds.length) return new Set();
+  const rows = await executor.select({ id: exception.registrationId }).from(exception)
+    .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.status, 'active'), inArray(exception.registrationId, registrationIds)));
+  return new Set(rows.map((r) => r.id).filter((id): id is string => !!id));
 }
 
 export type ChargeGroup = { key: string; deadline: Date | null; lineId: string | null; planId: string | null; instalments: boolean; charges: ChargeRow[]; total: number };

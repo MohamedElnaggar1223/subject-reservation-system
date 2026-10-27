@@ -95,8 +95,8 @@ test('the Arabic a dictionary gives a phrase of these screens is checked: the tr
 });
 
 test('the words: plain words pass, every forbidden one is caught', () => {
-  for (const ok of ['Last day to pay', 'prices not final yet', 'the earlier exam', 'آخر يوم للدفع', 'الأسعار ليست نهائية بعد', 'Exam month', 'كلمة مرور مؤقتة', 'كلمات المرور المؤقتة']) assert.equal(familyForbidden(ok), false, ok);
-  for (const bad of ['Sittings', 'series', 'Award', 'suite', 'component', 'mapping', 'option code', 'provisionally', 'cut-off', 'cutoff day', 'Offer items', 'للدورة', 'مؤقتة']) {
+  for (const ok of ['Last day to pay', 'prices not final yet', 'the earlier exam', 'آخر يوم للدفع', 'الأسعار ليست نهائية بعد', 'Exam month', 'كلمة مرور مؤقتة', 'كلمات المرور المؤقتة', 'ماذا سيأخذ ابنك/ابنتك؟', 'صفحة لكل ابن/ابنة', 'الابن/الابنة']) assert.equal(familyForbidden(ok), false, ok);
+  for (const bad of ['Sittings', 'series', 'Award', 'suite', 'component', 'mapping', 'option code', 'provisionally', 'cut-off', 'cutoff day', 'Offer items', 'للدورة', 'مؤقتة', 'ماذا سيأخذ ابنك؟', 'صفحة لكل ابن:', 'متاحة لابنك في']) {
     assert.equal(familyForbidden(bad === 'cutoff day' ? 'cut off day' : bad), true, bad);
   }
 });

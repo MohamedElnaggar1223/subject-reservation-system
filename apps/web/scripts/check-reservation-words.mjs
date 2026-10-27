@@ -67,8 +67,9 @@ export const FAMILY_SHARED = [
 ];
 
 export const FAMILY_FORBIDDEN_EN = /\b(awards?|suites?|series|sittings?|components?|mappings?|option[ -]codes?|provisional(?:ly)?|cut[- ]offs?|offer[ -]items?)\b/i;
-// مؤقت is "provisional" (a fee, a price); a temporary password (كلمة مرور مؤقتة) is not jargon.
-export const FAMILY_FORBIDDEN_AR = /(^|[^\p{L}])[وفبكل]?(?:ال|لل)?(دورة|دورت|دورات|سلسلة|سلاسل|مكوّ?ن)|(?<!مرور\s?)(?<!المرور\s?)(?:^|[^\p{L}])(?:ال)?مؤقت/u;
+// مؤقت is "provisional" (a fee, a price); a temporary password (كلمة مرور مؤقتة) is not jargon. ابن alone ("son",
+// "your son") speaks of every child as a boy: the app says ابنك/ابنتك (ابن/ابنة).
+export const FAMILY_FORBIDDEN_AR = /(^|[^\p{L}])[وفبكل]?(?:ال|لل)?(دورة|دورت|دورات|سلسلة|سلاسل|مكوّ?ن)|(?<!مرور\s?)(?<!المرور\s?)(?:^|[^\p{L}])(?:ال)?مؤقت|(?:^|[^\p{L}/])[وفبكل]?(?:ال|لل)?ابن(?:ك|ه|ي)?(?![\p{L}\p{M}/])/u;
 export const familyForbidden = (s) => FAMILY_FORBIDDEN_EN.test(s) || FAMILY_FORBIDDEN_AR.test(s);
 
 /** JSX attributes whose value is never read as words. */
