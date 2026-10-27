@@ -22,8 +22,8 @@
  * in self-study elsewhere is the student's exception, asked by assertLineRules.
  */
 
-import { db, sql, registrationSession, sessionQuestion, boardSeries, subject, and, eq, isNull, inArray, asc } from '@repo/db';
-import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, type SeriesMonth } from '@repo/validations';
+import { db, sql, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc } from '@repo/db';
+import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, IGCSE_NEVER_MONTHS, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
 import { availabilityConstraints } from './offer.services';
 import { priceLine, PricingError } from './pricing.services';
@@ -288,6 +288,32 @@ export async function familyOfferings(
   const priorIds = [...new Set(all.flatMap((o) => o.rows.flatMap((r) => r.allowedPriorSittings.map((p) => p.id))))];
   const priors = new Map((priorIds.length ? await db.select().from(boardSeries).where(inArray(boardSeries.id, priorIds)) : []).map((p) => [p.id, p]));
   const order = (m: string, y: number) => y * 12 + (MONTH_ORDER[m] ?? 0);
+  // A retake on a row that carries nothing forward still names the exam it follows (the line rules keep "a retake
+  // names the sitting it follows", RETAKE_SITTING_REQUIRED): a student with none on record picks one of the board's
+  // exams of the two years before the row's (what a family may declare, resolveReservationLines), sent by its id
+  // when on record, else by its month and year. An O.L. subject never sat October or January (IGCSE_NEVER_MONTHS).
+  const boardCodes = [...new Set(all.map((o) => o.board.code))];
+  const boardMonths = new Map((boardCodes.length
+    ? await db.select({ code: examBoard.code, months: examBoard.seriesMonths }).from(examBoard).where(inArray(examBoard.code, boardCodes)) : [])
+    .map((b) => [b.code, b.months]));
+  const declarable = boardCodes.length
+    ? await db.select({ id: boardSeries.id, boardCode: boardSeries.boardCode, month: boardSeries.month, year: boardSeries.year })
+      .from(boardSeries).where(and(inArray(boardSeries.boardCode, boardCodes), eq(boardSeries.label, ''))) : [];
+  const sessionFirst = sessionSeriesMonths(s.sessionType, s.seriesYear)[0]!;
+  const retakeFromOf = (boardCode: string, group: string, here: { month: string; year: number } | null) => {
+    const at = here ?? sessionFirst;
+    const until = order(at.month, at.year);
+    const out: { id: string | null; month: SeriesMonth; year: number; label: { en: string; ar: string } }[] = [];
+    for (let y = at.year - 2; y <= at.year; y++) {
+      for (const m of boardMonths.get(boardCode) ?? []) {
+        const when = order(m, y);
+        if (when >= until || until - when > 24) continue;
+        if (group === 'O.L.' && (IGCSE_NEVER_MONTHS as readonly string[]).includes(m)) continue;
+        out.push({ id: declarable.find((d) => d.boardCode === boardCode && d.month === m && d.year === y)?.id ?? null, month: m as SeriesMonth, year: y, label: sittingLabel(m, y) });
+      }
+    }
+    return out.sort((a, b) => order(b.month, b.year) - order(a.month, a.year));
+  };
   const offerings = [];
   for (const o of all) {
     if (!preview && !o.offeredToFamilies) continue;
@@ -332,6 +358,8 @@ export async function familyOfferings(
           // D6: an A.2. and a one-paper retake (where the board asks) name the sitting they carry from.
           needsCarriedFrom: r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2'),
           allowedSittings: r.needsCarriedFrom ? allowedSittings : [],
+          // A retake of a row that carries nothing forward: the exams it may follow, latest first (none filled in).
+          retakeFrom: attempt === 'retake' && !r.needsCarriedFrom ? retakeFromOf(o.board.code, o.group, r.series) : [],
           teachers: mode === 'in_school' && !o.teacherTbc ? rowTeachers : [],
         });
       }

@@ -1,4 +1,5 @@
 import type { ClientResponse } from 'hono/client';
+import { REFUSAL_CODES, type RefusalCode } from './refusal-codes';
 
 type SuccessBody<B> = Extract<B, { success: true; data: any }>;
 type InferData<B> = SuccessBody<B> extends never ? never : SuccessBody<B>['data'];
@@ -34,8 +35,42 @@ export function errorSentence(body: string, status: number): string {
 }
 
 /**
- * Unwrap an API response shaped as { success, data } | { success: false, error }.
- * - Throws on HTTP errors, with the API's sentence as the message
+ * A refused request, as `apiResponse` throws it: the API's sentence is the message (what a screen shows), with
+ * the refusal's machine-readable code when the API gave one (`RefusalCode`, refusal-codes.ts) and the HTTP status.
+ * A screen acts on the code — points at the line it concerns, offers the next step — and never shows it.
+ */
+export class ApiRefusal extends Error {
+  readonly status: number;
+  readonly code: RefusalCode | undefined;
+  constructor(message: string, status: number, code?: RefusalCode) {
+    super(message);
+    this.name = 'ApiRefusal';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/** The refusal code of an error `apiResponse` threw, when the API gave one. */
+export function refusalCodeOf(err: unknown): RefusalCode | undefined {
+  return err instanceof ApiRefusal ? err.code : undefined;
+}
+
+function codeIn(body: unknown): RefusalCode | undefined {
+  const code = (body as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && (REFUSAL_CODES as readonly string[]).includes(code) ? (code as RefusalCode) : undefined;
+}
+
+function codeOfText(text: string): RefusalCode | undefined {
+  try {
+    return codeIn(JSON.parse(text));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Unwrap an API response shaped as { success, data } | { success: false, error, code? }.
+ * - Throws on HTTP errors an ApiRefusal: the API's sentence as the message, its refusal code when given
  * - Throws on API errors or missing data
  * - Infers return type from Hono RPC automatically (no generics needed)
  */
@@ -46,14 +81,14 @@ export async function apiResponse<R extends Promise<ClientResponse<any>>>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(errorSentence(text, res.status));
+    throw new ApiRefusal(errorSentence(text, res.status), res.status, codeOfText(text));
   }
 
   const json: any = await res.json();
 
   if (!json || typeof json !== 'object' || !json.success || !('data' in json)) {
-    const message = json?.error || `Request failed (${res.status})`;
-    throw new Error(message);
+    const message = typeof json?.error === 'string' && json.error ? json.error : `Request failed (${res.status})`;
+    throw new ApiRefusal(message, res.status, codeIn(json));
   }
 
   return json.data as InferResponseData<R>;
