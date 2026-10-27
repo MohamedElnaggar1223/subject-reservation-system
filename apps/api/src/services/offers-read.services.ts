@@ -23,7 +23,7 @@
  */
 
 import { db, sql, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc } from '@repo/db';
-import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, IGCSE_NEVER_MONTHS, type SeriesMonth } from '@repo/validations';
+import { sessionSeriesMonths, SERIES_MONTH_LABELS, DECLARATION_TEXT, IGCSE_NEVER_MONTHS, IAL_UNIT_MONTHS, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
 import { availabilityConstraints } from './offer.services';
 import { priceLine, PricingError } from './pricing.services';
@@ -291,7 +291,8 @@ export async function familyOfferings(
   // A retake on a row that carries nothing forward still names the exam it follows (the line rules keep "a retake
   // names the sitting it follows", RETAKE_SITTING_REQUIRED): a student with none on record picks one of the board's
   // exams of the two years before the row's (what a family may declare, resolveReservationLines), sent by its id
-  // when on record, else by its month and year. An O.L. subject never sat October or January (IGCSE_NEVER_MONTHS).
+  // when on record, else by its month and year. An O.L. subject never sat October or January (IGCSE_NEVER_MONTHS); a
+  // Pearson A.S./A.L. subject (IAL) sits October, January and June, never November (IAL_UNIT_MONTHS).
   const boardCodes = [...new Set(all.map((o) => o.board.code))];
   const boardMonths = new Map((boardCodes.length
     ? await db.select({ code: examBoard.code, months: examBoard.seriesMonths }).from(examBoard).where(inArray(examBoard.code, boardCodes)) : [])
@@ -306,6 +307,7 @@ export async function familyOfferings(
     const out: { id: string | null; month: SeriesMonth; year: number; label: { en: string; ar: string } }[] = [];
     for (let y = at.year - 2; y <= at.year; y++) {
       for (const m of boardMonths.get(boardCode) ?? []) {
+        if (boardCode === 'pearson_edexcel' && group !== 'O.L.' && !(IAL_UNIT_MONTHS as readonly string[]).includes(m)) continue;
         const when = order(m, y);
         if (when >= until || until - when > 24) continue;
         if (group === 'O.L.' && (IGCSE_NEVER_MONTHS as readonly string[]).includes(m)) continue;

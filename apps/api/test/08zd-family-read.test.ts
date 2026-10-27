@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, one, refusedWithCode, openWindow, CONSENT, type Client } from './helpers';
+import { admin, staff, onboard, subject, session, offer, one, refusedWithCode, openWindow, CONSENT, type Client } from './helpers';
 
 /**
  * 08zd — the family read the reservation page is built on (COORDINATOR_REWORK.md P3; Appendix A's
@@ -10,7 +10,8 @@ import { admin, staff, onboard, subject, session, one, refusedWithCode, openWind
  * RETAKE_SITTING_REQUIRED). A row that carries an earlier exam forward lists her choices (`allowedSittings`, D6); a
  * row that does not — an all-papers retake — listed none, so a family with no record of the subject could not
  * reserve its retake from the page. Each such retake option now carries `retakeFrom`: the board's exams of the two
- * years before the row's (what a family may declare), latest first, by id when on record.
+ * years before the row's (what a family may declare), latest first, by id when on record. A Pearson A.S./A.L. subject
+ * (IAL) lists the months IAL sits — October, January and June — never November (IAL_UNIT_MONTHS).
  */
 
 const RUN = Math.random().toString(36).slice(2, 6);
@@ -72,5 +73,38 @@ describe('08zd: the family read', () => {
     const listed = again.offerings.find((o) => o.name === name)!.rows[0]!.options.find((o) => o.attempt === 'retake' && o.mode === 'in_school')!.retakeFrom[0]!;
     expect(listed.id).not.toBeNull();
     expect([listed.month, listed.year]).toEqual([pick.month, pick.year]);
+  });
+
+  it('the oldest exam listed is one a family may still declare (two years before the row, not more)', async () => {
+    const f = await onboard(officer, `zd08o-${RUN}`, 11);
+    const read = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: S, studentId: f.studentId } }));
+    const row = read.offerings.find((o) => o.name === name)!.rows[0]!;
+    const retake = row.options.find((o) => o.attempt === 'retake' && o.mode === 'in_school')!;
+    const oldest = retake.retakeFrom.at(-1)!;
+    const [made] = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: {
+      sessionId: S, studentId: f.studentId, consent: CONSENT,
+      lines: [{ offerItemId: row.id, attempt: 'retake', mode: 'in_school', expectedPrice: retake.price!.total,
+        ...(oldest.id ? { priorSittingSeriesId: oldest.id } : { priorSitting: { month: oldest.month, year: oldest.year } }) }],
+    } }));
+    const l = await one<{ status: string; source: string; month: string; year: number }>(
+      `select r.status, r.prior_sitting_source as source, ps.month, ps.year from registration r
+       join board_series ps on ps.id = r.prior_sitting_series_id where r.id = $1`, [made!.id]);
+    expect(l).toEqual({ status: 'pending_payment', source: 'declared_by_family', month: oldest.month, year: oldest.year });
+  });
+
+  it('a Pearson A.S./A.L. subject lists the months IAL sits: October, January and June, never November', async () => {
+    const ialName = `Chemistry IAL (08zd ${RUN})`;
+    const ial = await subject(adm, `ZD08I${RUN}`, ialName, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    await offer(adm, S, ial);
+    const f = await onboard(officer, `zd08i-${RUN}`, 12);
+    const read = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: S, studentId: f.studentId } }));
+    const o = read.offerings.find((x) => x.name === ialName)!;
+    expect(o.group).toBe('A.S./A.L.');
+    const months = await one<{ months: string[] }>(`select series_months as months from exam_board where code = 'pearson_edexcel'`);
+    expect(months.months).toContain('november');
+    const listed = o.rows.flatMap((r) => r.options.filter((x) => x.attempt === 'retake' && !x.needsCarriedFrom).flatMap((x) => x.retakeFrom));
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.map((x) => x.month).filter((m) => m === 'november')).toEqual([]);
+    expect(listed.some((x) => x.month === 'october' || x.month === 'january')).toBe(true);
   });
 });
