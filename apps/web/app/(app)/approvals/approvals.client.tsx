@@ -11,7 +11,7 @@ import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { useI18n } from '~/lib/i18n';
 import { familyWords } from '~/lib/i18n-reservations';
-import { fetchReserveOffers, reserveOffersKey, optionOfLine } from '~/components/reservations/offers';
+import { fetchReserveOffers, reserveOffersKey, optionOfLine, lineNamedBy } from '~/components/reservations/offers';
 
 // ─── Types, from the fetcher (PATTERNS.md: never by hand) ────────────────────
 
@@ -133,7 +133,7 @@ export default function ApprovalsClient(): React.JSX.Element {
     },
     onError: (err: Error) => {
       const sentence = familyWords(err.message);
-      const named = [...pending].sort((a, b) => b.subject.name.length - a.subject.name.length).find((r) => selectedIds.has(r.id) && sentence.includes(r.subject.name));
+      const named = lineNamedBy(sentence, pending.filter((r) => selectedIds.has(r.id)), (r) => r.subject.name);
       setRefusedId(named ? { id: named.id, sentence } : null);
       setActionError(sentence);
       setShowApproveModal(false);

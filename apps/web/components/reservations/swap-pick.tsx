@@ -17,6 +17,9 @@ import { DECLARATION_TEXT } from '@repo/validations';
 import { useI18n } from '~/lib/i18n';
 import { useRefundTerms, RefundTermsSentence, type RefundTermsState } from './reserve';
 import { fetchReserveOffers, reserveOffersKey, optionKey } from './offers';
+import { fetchStatement, statementKey } from './statement';
+
+const LIVE = ['pending_approval', 'pending_payment', 'confirmed'];
 
 type SwapLine = InferRequestType<(typeof api.v1.registrations)[':id']['swap']['$post']>['json']['line'];
 
@@ -24,8 +27,17 @@ export function useSwapChoices(sessionId: string, studentId: string, currentItem
   const { language } = useI18n();
   const q = useQuery({ queryKey: reserveOffersKey(sessionId, studentId), queryFn: () => fetchReserveOffers(sessionId, studentId), retry: false });
   const pricesFinal = !!q.data?.session.pricesFinal;
+  // What the student already holds in the session, but the line being swapped: never offered again (SAME_ENTRY_ONCE),
+  // nor a row it excludes (D8, EXCLUSIVE_OPTIONS).
+  const statementQuery = { studentId };
+  const statement = useQuery({ queryKey: statementKey(statementQuery), queryFn: () => fetchStatement(statementQuery), retry: false });
+  const heldItems = new Set((statement.data?.students.find((s) => s.student.id === studentId) ?? statement.data?.students[0])
+    ?.sessions.find((x) => x.id === sessionId)?.lines
+    .filter((l) => LIVE.includes(l.status) && l.offerItemId !== currentItemId).map((l) => l.offerItemId) ?? []);
+  const excluded = (o: { rows: { id: string; exclusiveGroup: string | null }[] }, r: { id: string; exclusiveGroup: string | null }) =>
+    heldItems.has(r.id) || (!!r.exclusiveGroup && o.rows.some((x) => x.exclusiveGroup === r.exclusiveGroup && heldItems.has(x.id)));
   const choices = (q.data?.offerings ?? []).filter((o) => o.accepting).flatMap((o) => o.rows
-    .filter((r) => r.id !== currentItemId && !r.closed)
+    .filter((r) => r.id !== currentItemId && !r.closed && !excluded(o, r))
     .flatMap((r) => r.options
       // A retake, or a row that carries an earlier exam, only where the school knows it (it is filled in).
       .filter((x) => x.price && (x.attempt === 'first' && !x.needsCarriedFrom ? true : !!r.knownSitting))

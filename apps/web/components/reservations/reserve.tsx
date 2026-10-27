@@ -29,6 +29,7 @@ import {
   formatEgp,
   refundConsentText,
   type RefusalCode,
+  type SeriesMonth,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
@@ -142,14 +143,20 @@ const titleOf = (o: Offering) => `${ownName(o.name, o.group)} ${o.group}`;
 /** A DOM id for a group or a question, unique per child. */
 const domId = (studentId: string, k: string) => `reserve-${studentId}-${k}`.replace(/[^\w-]/g, '-');
 
-/** The earlier exam a picked option must name, and the choices it has (none when the school knows it, or it asks none). */
+/**
+ * The earlier exam a picked option names: the one the school knows (F2: filled in, and sent, so the line records
+ * the exam the family saw), else the family's pick among its choices; none for a first entry that carries nothing.
+ * A carried row whose known exam is not one it carries from asks among those it does.
+ */
 function earlierOf(row: OfferRow, option: RowOption) {
-  if (row.knownSitting) return { asks: false, choices: [] as { value: string; label: { en: string; ar: string } }[] };
-  if (option.needsCarriedFrom) return { asks: true, choices: option.allowedSittings.map((s) => ({ value: `id:${s.id}`, label: s.label })) };
-  if (option.attempt === 'retake') {
-    return { asks: true, choices: option.retakeFrom.map((s) => ({ value: s.id ? `id:${s.id}` : `my:${s.month}|${s.year}`, label: s.label })) };
+  const none = { asks: false, known: null as OfferRow['knownSitting'], choices: [] as { value: string; label: { en: string; ar: string } }[] };
+  if (option.needsCarriedFrom) {
+    if (row.knownSitting && option.allowedSittings.some((s) => s.id === row.knownSitting!.id)) return { ...none, known: row.knownSitting };
+    return { ...none, asks: true, choices: option.allowedSittings.map((s) => ({ value: `id:${s.id}`, label: s.label })) };
   }
-  return { asks: false, choices: [] };
+  if (option.attempt !== 'retake') return none;
+  if (row.knownSitting) return { ...none, known: row.knownSitting };
+  return { ...none, asks: true, choices: option.retakeFrom.map((s) => ({ value: s.id ? `id:${s.id}` : `my:${s.month}|${s.year}`, label: s.label })) };
 }
 
 /** Whether the family chooses this option's teacher (D5: in school, several teachers, the families' choice). */
@@ -223,16 +230,21 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     patch({ picks });
   };
 
-  // A picked subject the read no longer offers (switched off or closed while the page was open, a refusal's
-  // read-again): off the choices, and said in the summary with the refusal's sentence when there was one.
+  // A pick the read no longer offers as picked (the subject switched off or closed while the page was open, a choice
+  // taken off its row, first entries gone once the school knows the student sat it; a refusal's read-again): off the
+  // choices, and said in the summary with the refusal's sentence when there was one. Never left out unsaid.
   const [gone, setGone] = useState<{ key: string; sentence: string }[]>([]);
   useEffect(() => {
     if (!data) return;
-    const rows = new Set(data.offerings.flatMap((o) => o.rows.map((r) => r.id)));
-    const missing = Object.entries(draft.picks).filter(([, p]) => !rows.has(p.rowId));
+    const rows = new Map(data.offerings.flatMap((o) => o.rows.map((r) => [r.id, r] as const)));
+    const missing = Object.entries(draft.picks).flatMap(([key, p]) => {
+      const row = rows.get(p.rowId);
+      if (!row) return [{ key, p, why: `${p.title}: no longer taking reservations.` }];
+      return row.options.some((x) => optionKey(x) === optionKey(p)) ? [] : [{ key, p, why: `${p.title}: this choice is no longer offered.` }];
+    }).map(({ key, p, why }) => [key, p, why] as const);
     if (!missing.length) return;
-    setGone((g) => [...g, ...missing.map(([key, p]) => ({
-      key, sentence: refusal?.key === key ? refusal.sentence : `${p.title}: no longer taking reservations.`,
+    setGone((g) => [...g, ...missing.map(([key, , why]) => ({
+      key, sentence: refusal?.key === key ? refusal.sentence : why,
     }))]);
     if (missing.some(([key]) => refusal?.key === key)) setRefusal(null);
     const picks = { ...draft.picks };
@@ -269,9 +281,11 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
   const linesOut = (): Line[] => chosen.map((c) => {
     const line: Line = { offerItemId: c.r.id, attempt: c.p.attempt, mode: c.p.mode, ...(c.option.price ? { expectedPrice: c.option.price.total } : {}) };
     if (choosesTeacher(c.o, c.option)) line.teacherId = c.p.teacherId;
-    if (c.p.earlier.startsWith('id:')) line.priorSittingSeriesId = c.p.earlier.slice(3);
+    const known = earlierOf(c.r, c.option).known;
+    if (known) line.priorSittingSeriesId = known.id;
+    else if (c.p.earlier.startsWith('id:')) line.priorSittingSeriesId = c.p.earlier.slice(3);
     else if (c.p.earlier.startsWith('my:')) {
-      const [month, year] = c.p.earlier.slice(3).split('|') as ['january' | 'june' | 'october' | 'november', string];
+      const [month, year] = c.p.earlier.slice(3).split('|') as [SeriesMonth, string];
       line.priorSitting = { month, year: Number(year) };
     }
     return line;
@@ -282,7 +296,11 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
   });
   const consent = { refundPolicy: true as const, declaration: true as const };
 
-  /** Where a refusal belongs: the picked subject its sentence names (the longest name, then the row's words). */
+  /**
+   * Where a refusal belongs: the picked subject its sentence names (the longest name, then the row's words). Two
+   * picks the sentence names alike (Biology O.L. and Biology A.S./A.L., both all papers) leave it at the page: a
+   * refusal is never pinned to a guess.
+   */
   function locate(sentence: string): string | null {
     const named = chosen.filter((c) => sentence.includes(c.o.name)).sort((a, b) => b.o.name.length - a.o.name.length);
     if (!named.length) {
@@ -290,7 +308,11 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
       return q ? `q:${q.id}` : null;
     }
     const top = named.filter((c) => c.o.name === named[0]!.o.name);
-    return (top.find((c) => sentence.includes(c.r.label.en)) ?? top[0]!).key;
+    const byRow = top.filter((c) => c.r.kind !== 'all_papers' && sentence.includes(`${c.o.name} — `) && sentence.includes(c.r.label.en));
+    if (byRow.length === 1) return byRow[0]!.key;
+    const whole = top.filter((c) => c.r.kind === 'all_papers' && !sentence.includes(`${c.o.name} — `));
+    if (whole.length === 1) return whole[0]!.key;
+    return top.length === 1 ? top[0]!.key : null;
   }
   const refused = (e: unknown) => {
     const code = refusalCodeOf(e);
@@ -336,7 +358,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
     mutationFn: (collect: boolean) => reserveDesk({
       studentId, sessionId, lines: linesOut(), answers: answersOut(), consent,
       ...(collect ? { collectNow: {
-        instrumentUsed: instrument, escrowAmountToApply: Number(escrow) > 0 ? Number(escrow) : 0,
+        instrumentUsed: instrument, escrowAmountToApply: Math.min(Math.max(Number(escrow) || 0, 0), total),
         // The year's school fee first (the registration's gate asks for it) and the charges after, each its own payment.
         ...(deskExtras?.schoolFeeYear ? { schoolFeeYear: deskExtras.schoolFeeYear } : {}),
         ...(deskExtras?.chargeIds.length ? { chargeIds: deskExtras.chargeIds } : {}),
@@ -380,7 +402,9 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
   if (data.session.status === 'draft') return <EmptyState title="Reservations have not opened yet" />;
   if (!offerings.length) return <EmptyState title="Nothing is offered in this session yet" />;
 
-  const payableNow = pricesFinal ? Math.max(0, total + (deskExtras?.total ?? 0) - (Number(escrow) > 0 ? Number(escrow) : 0)) : 0;
+  // The balance used: at most the subjects' total (the API refuses more; the charges are paid apart).
+  const fromBalance = Math.min(Math.max(Number(escrow) || 0, 0), total);
+  const payableNow = pricesFinal ? Math.max(0, total + (deskExtras?.total ?? 0) - fromBalance) : 0;
   const pageProblem = problems.page ?? (refusal && !refusal.key ? refusal.sentence : null);
 
   return (
@@ -486,7 +510,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
         {Object.keys(problems).some((k) => k !== 'page') && <ErrorLine message="Some choices are not finished: they are marked in red above." />}
         <ErrorLine message={pageProblem} />
 
-        {/* "Then one collection" (§5 Desk): subjects already waiting are collected with the new ones in one payment. */}
+        {/* "Then one collection" (§5 Desk): subjects already waiting are collected with the new ones in one payment, under
+            "To collect now" — "Reserve and collect" would pay the new ones alone, so it waits until nothing else does. */}
         {desk && waitingHere > 0 && (
           <p className="text-sm text-foreground">
             <span>{waitingHere}</span> <span>{waitingHere === 1 ? 'subject is already waiting for payment:' : 'subjects are already waiting for payment:'}</span>{' '}
@@ -504,9 +529,9 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
             </div>
             <div>
               <label htmlFor={domId(studentId, 'escrow')} className="mb-1 block text-xs font-medium text-foreground">Balance to use (EGP)</label>
-              <input id={domId(studentId, 'escrow')} type="number" min="0" step="0.01" inputMode="decimal" className={cn(INPUT_CLASS, 'w-32')} value={escrow} onChange={(e) => setEscrow(e.target.value)} placeholder="0" />
+              <input id={domId(studentId, 'escrow')} type="number" min="0" max={total} step="0.01" inputMode="decimal" className={cn(INPUT_CLASS, 'w-32')} value={escrow} onChange={(e) => setEscrow(e.target.value)} placeholder="0" />
             </div>
-            <Button disabled={pending || closedSession || !pricesFinal || (chosen.length > 0 && total <= 0)} onClick={() => submit(() => deskMutation.mutate(true))}>
+            <Button disabled={pending || closedSession || !pricesFinal || waitingHere > 0 || (chosen.length > 0 && total <= 0)} onClick={() => submit(() => deskMutation.mutate(true))}>
               <span>Reserve and collect</span> <Money amount={payableNow} />
             </Button>
             {!pricesFinal && <p className="w-full text-xs text-muted-foreground">Prices are not final yet: reserve now, and collect once they are.</p>}
@@ -543,7 +568,9 @@ function SubjectCard({ o, lang, words, viewer, studentId, draft, held, disabled,
   const known = o.rows.some((r) => r.knownSitting);
   const hasFirst = o.rows.some((r) => r.options.some((x) => x.attempt === 'first'));
   const hasRetake = o.rows.some((r) => r.options.some((x) => x.attempt === 'retake'));
-  // F2: a student with no record sees first entries; "Sat it before?" shows the retakes (never hidden for good).
+  // F2 as the lead decided on P2's mock (26 Oct 2026, coordinator-rework.tsv; the coordinator's preview shows the same):
+  // a student with no record sees first entries, and "Sat it before?" shows the retakes — one click, never hidden for
+  // good; shown at once when there is no first entry; a student the school knows sat it gets the retakes only.
   const showRetakes = known || !hasFirst || !!draft.reveal[o.id] || picks.some((p) => p.attempt === 'retake');
   const allOnline = o.rows.every((r) => r.options.every((x) => x.mode !== 'in_school' || (x.teachers.length > 0 && x.teachers.every((t) => t.online))))
     && o.rows.some((r) => r.options.some((x) => x.mode === 'in_school' && x.teachers.length > 0));
@@ -617,7 +644,8 @@ function GroupPicker({ g, o, lang, words, viewer, studentId, pick, held, legend,
           return (
             <div key={`${r.id}|${optionKey(x)}`}>
               <OptionLine name={name} checked={on} disabled={disabled || off}
-                onChange={() => onPick({ rowId: r.id, attempt: x.attempt, mode: x.mode, teacherId: '', earlier: '', title: titleOf(o) })}
+                // D5: where the family chooses among several teachers, one is preselected; the family may change it.
+                onChange={() => onPick({ rowId: r.id, attempt: x.attempt, mode: x.mode, teacherId: choosesTeacher(o, x) ? x.teachers[0]!.id : '', earlier: '', title: titleOf(o) })}
                 end={x.price ? <Money amount={x.price.total} className="font-semibold" /> : <span className="text-xs text-muted-foreground">price not set yet</span>}>
                 <span data-i18n-skip="true">{x.label[lang]}</span>
                 {r.closed && <> <span className="text-xs text-muted-foreground">(closed to new reservations)</span></>}
@@ -679,8 +707,8 @@ function PickDetails({ o, r, x, lang, words, pick, id, disabled, problem, onChan
               </div>
             ) : null
       )}
-      {r.knownSitting && (x.attempt === 'retake' || x.needsCarriedFrom) && (
-        <p className="text-foreground"><span>Sat in</span> <span data-i18n-skip="true">{r.knownSitting.label[lang]}</span></p>
+      {earlier.known && (
+        <p className="text-foreground"><span>Sat in</span> <span data-i18n-skip="true">{earlier.known.label[lang]}</span></p>
       )}
       {earlier.asks && (
         <div>

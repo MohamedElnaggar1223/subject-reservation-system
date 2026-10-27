@@ -30,3 +30,24 @@ export function optionOfLine(read: OffersRead | undefined, line: { offerItemId: 
   }
   return null;
 }
+
+/**
+ * The one line a refusal's sentence names, else null. The API names a line by its subject, and by its row unless it
+ * is all papers ("Mathematics — Paper 1": window.services lineNames); `nameOf` gives that name where the caller has
+ * it (the statement's line label), else the subject's. The longest name found wins ("Human Biology" over "Biology");
+ * a subject's name followed by " — " names one of its rows, not the subject. Two lines named alike (Biology O.L. and
+ * Biology A.S./A.L.) give null: a refusal is never pinned to a guess, it stays at the page.
+ */
+export function lineNamedBy<T>(sentence: string, lines: readonly T[], nameOf: (l: T) => string): T | null {
+  const names = (l: T) => {
+    const name = nameOf(l);
+    for (let at = sentence.indexOf(name); at >= 0; at = sentence.indexOf(name, at + 1)) {
+      if (name.includes(' — ') || !sentence.startsWith(' — ', at + name.length)) return name.length;
+    }
+    return 0;
+  };
+  const hits = lines.map((l) => ({ l, n: names(l) })).filter((h) => h.n > 0);
+  const top = Math.max(0, ...hits.map((h) => h.n));
+  const best = hits.filter((h) => h.n === top);
+  return best.length === 1 ? best[0]!.l : null;
+}

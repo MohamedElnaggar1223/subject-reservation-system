@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, schoolDateString, refusalCodeOf } from '@repo/validations';
 import { familyWords } from '~/lib/i18n-reservations';
+import { lineNamedBy } from '~/components/reservations/offers';
 import { Notice } from '~/components/ui/tone';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import {
@@ -100,7 +101,8 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
     onError: (err: Error) => {
       // A refusal at the subject it names (CUT_OFF_PASSED, PRICES_NOT_FINAL, NOT_WAITING…): untick it, say why there.
       const sentence = familyWords(err.message);
-      const named = [...owed.lines].sort((a, b) => b.subject.name.length - a.subject.name.length).find((l) => sentence.includes(l.subject.name));
+      // lineNamedBy: the longest name, never a guess between two lines named alike (then the refusal stays at the top).
+      const named = lineNamedBy(sentence, owed.lines, (l) => l.subject.name);
       if (named && refusalCodeOf(err)) {
         setRefusedLine({ id: named.id, sentence });
         setPicked((m) => new Map(m).set(`l:${named.id}`, false));

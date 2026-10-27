@@ -32,7 +32,7 @@ import { useI18n } from '~/lib/i18n';
 import { familyWords } from '~/lib/i18n-reservations';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
-import { fetchReserveOffers, reserveOffersKey, optionOfLine } from '~/components/reservations/offers';
+import { fetchReserveOffers, reserveOffersKey, optionOfLine, lineNamedBy } from '~/components/reservations/offers';
 import { fetchStatement, statementKey } from '~/components/reservations/statement';
 
 interface CheckoutClientProps {
@@ -88,20 +88,29 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   });
   const wordsOf = (r: { sessionId: string; offerItemId: string; attempt: string; mode: string }) =>
     optionOfLine(reads[sessionIds.indexOf(r.sessionId)]?.data, r)?.option?.label[language] ?? null;
-  // A transfer being checked keeps its subjects until a date the statement gives (the earliest exam board date among them).
+  // The statement: until when a transfer being checked keeps its subjects (the earliest exam board date among them),
+  // and each line's name as a refusal gives it ("Mathematics — Paper 1").
   const statementQuery = { studentId: summary?.student.id };
   const statement = useQuery({
     queryKey: statementKey(statementQuery),
     queryFn: () => fetchStatement(statementQuery),
-    enabled: !!summary?.openPayment && summary.openPayment.status === 'pending_verification',
+    enabled: !!summary,
   });
   const keptUntil = (paymentId: string) =>
     statement.data?.students.flatMap((s) => s.payments).find((p) => p.id === paymentId)?.deadline ?? null;
+  const refusalName = new Map(statement.data?.students.flatMap((s) => s.sessions.flatMap((x) => x.lines.map((l) => [l.id, l.label] as const))) ?? []);
 
-  const payableIds = (summary?.registrations ?? []).filter((r) => !r.priceProvisional).map((r) => r.id);
+  // Paid now: a line whose price is final and whose last day to pay has not passed (the sweep expires it within the
+  // minute; until then it is shown apart, never sent to be refused).
+  const [openedAt] = useState(() => Date.now());
+  const pastLastDay = (id: string) => {
+    const c = summary?.lineCutOffs.find((x) => x.registrationId === id)?.cutOff;
+    return !!c && new Date(c).getTime() <= openedAt;
+  };
+  const payableIds = (summary?.registrations ?? []).filter((r) => !r.priceProvisional && !pastLastDay(r.id)).map((r) => r.id);
   const initiateMutation = useMutation({
     mutationFn: async () => {
-      const payableCost = (summary?.registrations ?? []).filter((r) => !r.priceProvisional).reduce((a, r) => a + r.priceAtRegistration, 0);
+      const payableCost = (summary?.registrations ?? []).filter((r) => payableIds.includes(r.id)).reduce((a, r) => a + r.priceAtRegistration, 0);
       const escrowToApply = applyEscrow ? Math.min(escrowAmount, summary?.escrowBalance ?? 0, payableCost) : 0;
 
       return initiatePayment({
@@ -161,9 +170,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
     onError: (err: Error) => {
       const code = refusalCodeOf(err);
       const sentence = familyWords(err.message);
-      // The subject the sentence names (the longest name first: "Human Biology" before "Biology").
-      const named = [...(summary?.registrations ?? [])].sort((a, b) => b.subject.name.length - a.subject.name.length)
-        .find((r) => sentence.includes(r.subject.name));
+      // The subject the sentence names (lineNamedBy: the longest name, never a guess between two alike).
+      const named = lineNamedBy(sentence, summary?.registrations ?? [], (r) => refusalName.get(r.id) ?? r.subject.name);
       setRefusal({ sentence, code, registrationId: named?.id ?? null });
       setSubmitError(named ? '' : sentence);
       if (code === 'PRICE_CHANGED' || code === 'NOT_WAITING' || code === 'PRICES_NOT_FINAL' || code === 'CUT_OFF_PASSED' || code === 'BOARD_DEADLINE_PASSED') {
@@ -260,9 +268,11 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   }
 
 
-  // A subject whose prices are not final yet is reserved, not paid (E6): said, and left out of this payment.
+  // A subject whose prices are not final yet is reserved, not paid (E6): said, and left out of this payment; so is one
+  // past its last day to pay.
   const notFinal = summary.registrations.filter((r) => r.priceProvisional);
-  const payable = summary.registrations.filter((r) => !r.priceProvisional);
+  const past = summary.registrations.filter((r) => !r.priceProvisional && pastLastDay(r.id));
+  const payable = summary.registrations.filter((r) => payableIds.includes(r.id));
   const payableTotal = Math.round(payable.reduce((a, r) => a + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = applyEscrow
     ? Math.min(escrowAmount, summary.escrowBalance, payableTotal)
@@ -535,7 +545,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                           <bdi data-i18n-skip="true">{reg.session.name}</bdi>
                           {reg.priceProvisional
                             ? <> · <span>prices not final yet: paid once the school confirms them</span></>
-                            : cut && <> · <span>last day to pay</span> <Day iso={String(cut)} /></>}
+                            : pastLastDay(reg.id) ? <> · <span>its last day to pay has passed</span> (<Day iso={String(cut)} />)</>
+                              : cut && <> · <span>last day to pay</span> <Day iso={String(cut)} /></>}
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-foreground shrink-0">
@@ -570,6 +581,16 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               </p>
             )}
           </div>
+
+          {past.length > 0 && (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+              <p>
+                <bdi data-i18n-skip="true">{past.map((r) => r.subject.name).join(', ')}</bdi><span>:</span>{' '}
+                <span>the last day to pay has passed, so it can no longer be paid. Reserve it again while it is offered.</span>
+              </p>
+              {payable.length > 0 && <p className="mt-1">This payment is for the others.</p>}
+            </div>
+          )}
 
           {notFinal.length > 0 && (
             <div className="rounded-xl border border-border bg-muted p-4 text-sm text-foreground">

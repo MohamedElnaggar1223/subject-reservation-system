@@ -405,6 +405,8 @@ export function familyWords(text: string): string {
 
 /** The family's and the desk's phrases (merged after the other dictionaries in lib/i18n.tsx: these win). */
 export const familyArabic: Record<string, string> = {
+  'its last day to pay has passed': 'مرّ آخر يوم للدفع',
+  'the last day to pay has passed, so it can no longer be paid. Reserve it again while it is offered.': 'مرّ آخر يوم للدفع، فلم يعد دفعها ممكنًا. احجزها مرة أخرى ما دامت معروضة.',
   'Reserved at the school desk.': 'حُجزت في مكتب المدرسة.',
   // The reservation page
   'Reserve now': 'احجز الآن',
@@ -587,8 +589,6 @@ export const familyArabic: Record<string, string> = {
   'No student matches "': 'لا يوجد طالب يطابق «',
   '". If they are new, use': '». إن كان جديدًا فاستخدم',
   'to create their accounts.': 'لإنشاء حساباتهم.',
-  'Transferred': 'انتقل',
-  'Withdrawn': 'انسحب',
   'Started grade 10 in': 'بدأ الصف 10 في',
   'Hide academic record': 'إخفاء السجل الدراسي',
   'Academic record': 'السجل الدراسي',
@@ -675,6 +675,7 @@ const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^(.+) is not taking reservations \(it closed on (.+)\)$/, (m) => `${m[1]} لا تقبل حجوزات (أُغلقت في ${dateAr(m[2]!)})`],
   [/^(.+) is not taking reservations$/, (m) => `${m[1]} لا تقبل حجوزات`],
   [/^(.+): no longer taking reservations\.$/, (m) => `${m[1]}: لم تعد تقبل حجوزات.`],
+  [/^(.+): this choice is no longer offered\.$/, (m) => `${m[1]}: لم يعد هذا الخيار متاحًا.`],
   [/^(.+) is not open for reservations yet$/, (m) => `${dateAr(m[1]!)} لم تُفتح للحجز بعد`],
   [/^Choose the teacher of (.+)$/, (m) => `اختر معلم ${m[1]}`],
   [/^Answer: (.+)$/, (m) => `أجب: ${m[1]}`],
