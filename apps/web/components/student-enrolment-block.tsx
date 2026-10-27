@@ -14,12 +14,14 @@ import { apiResponse } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { Badge } from '~/components/ui/tone';
 import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
+import { useViewerRole } from '~/lib/viewer-role';
 
 const fetchStudentYear = (studentId: string) =>
   apiResponse(api.v1.enrolments.student[':studentId'].$get({ param: { studentId }, query: {} }));
 
 export function StudentEnrolmentBlock({ studentId, canEdit }: { studentId: string; canEdit: boolean }) {
   const q = useQuery({ queryKey: ['enrolments', 'student', studentId, 'current'], queryFn: () => fetchStudentYear(studentId) });
+  const role = useViewerRole();
   if (q.isLoading || q.isError || !q.data || !q.data.academicYear) return null;
   const open = q.data.enrolments.filter((e) => !e.endedOn);
   const unenrolled = q.data.flags.registeredNotEnrolled.length;
@@ -29,7 +31,7 @@ export function StudentEnrolmentBlock({ studentId, canEdit }: { studentId: strin
         {/* In the cycle's words (the lead's decision of 16 Oct 2026, 9): the desk reads who teaches the student what. */}
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">This year&apos;s subjects and teachers</h3>
         {/* F6b: course enrolment is outside the reservation cycle for now (lib/reservation-focus.ts). */}
-        {canEdit && !leadsOutsideTheCycle('/academic/enrolment') && (
+        {canEdit && !leadsOutsideTheCycle('/academic/enrolment', role) && (
           <Link href={`/academic/enrolment?tab=student&student=${studentId}` as Route} className="text-xs font-medium underline hover:no-underline">
             Change the enrolment
           </Link>

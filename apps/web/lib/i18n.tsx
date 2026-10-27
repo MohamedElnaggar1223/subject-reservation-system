@@ -21,6 +21,7 @@ import { uiAuditArabic } from './i18n-ui-audit';
 import { decisionsArabic, translateDecisionsText } from './i18n-decisions';
 import { findingsArabic, translateFindingsText } from './i18n-findings';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
+import { setupArabic, translateSetupText } from './i18n-setup';
 import { LANGUAGE_COOKIE } from './language';
 
 export type Language = 'en' | 'ar';
@@ -1598,6 +1599,9 @@ Object.assign(autoArabicText, uiAuditArabic);
 Object.assign(autoArabicText, decisionsArabic);
 // The fix round of F8's findings (lib/i18n-findings.ts): after the decisions', so a sentence it rewrote wins.
 Object.assign(autoArabicText, findingsArabic);
+// The coordinator's screens (lib/i18n-setup.ts): only words not already translated, so a word her screens share
+// with the others keeps the app's Arabic.
+for (const [en, ar] of Object.entries(setupArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1617,6 +1621,9 @@ function translateDynamicText(text: string): string | null {
   // The fix round of F8's findings (lib/i18n-findings.ts): its sentences with data, each anchored to its end.
   const findingsText = translateFindingsText(text);
   if (findingsText) return findingsText;
+  // The coordinator's screens (lib/i18n-setup.ts): her sentences with a name, a number or a date, each anchored to its end.
+  const setupText = translateSetupText(text);
+  if (setupText) return setupText;
 
   const gradeMatch = /^Grade (\d+)$/.exec(text);
   if (gradeMatch) return `الصف ${gradeMatch[1]}`;
@@ -1940,7 +1947,8 @@ function localizeDom(language: Language): boolean {
     if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
   }
 
-  const attrNames = ['placeholder', 'title', 'aria-label', 'alt'];
+  // `label`: an <optgroup>'s heading in a select ("The school's teachers"), read like the rest.
+  const attrNames = ['placeholder', 'title', 'aria-label', 'alt', 'label'];
   for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
     if (!ownedByReact(element)) {
       if (attrNames.some((a) => element.hasAttribute(a))) waiting = true;
@@ -2037,7 +2045,7 @@ export function I18nProvider({ children, initialLanguage = 'en' }: { children: R
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['placeholder', 'title', 'aria-label', 'alt'],
+      attributeFilter: ['placeholder', 'title', 'aria-label', 'alt', 'label'],
     });
 
     return () => {

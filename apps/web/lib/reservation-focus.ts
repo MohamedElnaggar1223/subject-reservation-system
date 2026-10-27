@@ -11,7 +11,7 @@
  * - the sidebar (`components/nav-shell.tsx`): a role's items less its list below, in the cycle's
  *   order (`CYCLE_STAGES`), its landing first;
  * - the landing after sign-in and on "/" (`CYCLE_LANDING`);
- * - every link on a kept screen that opens a screen outside the cycle (`leadsOutsideTheCycle`).
+ * - every link on a kept screen that opens a screen outside the cycle for the viewer (`leadsOutsideTheCycle`).
  *
  * The cycle, as the school lives it: the admin sets it up (the session's sheet, the teachers it
  * names, the subjects' papers on the Catalogue, the fees, the boards' dates, the settings behind
@@ -37,6 +37,17 @@ export const RESERVATION_CYCLE_ONLY: boolean = true;
 const TIMETABLE_SCREENS = ['/timetable/versions', '/timetable/groups', '/timetable/rules', '/timetable/cover', '/my-timetable'] as const;
 
 /**
+ * The coordinator rework (COORDINATOR_REWORK.md §9.3, A6, G1, G2, G5): the screens set-up no longer goes
+ * through — the Exam Catalogue, Board Series, Board Services, School Fees, the exam deadlines, candidates,
+ * entries and entry lists, Subject Management — hidden for the coordinator and the admin. Each still opens
+ * by its URL; her Set up is Sessions (and Team for the admin).
+ */
+const SET_UP_PARKED = [
+  '/exams/catalogue', '/exams/series', '/exams/services', '/admin/school-fees',
+  '/exams/deadlines', '/exams/candidates', '/exams/entries', '/exams/entry-lists', '/admin/subjects',
+] as const;
+
+/**
  * What is outside the cycle, per role: the screens that role would otherwise reach from its
  * sidebar or from a link on one of its kept screens. A path hides itself and everything under it
  * ("/academic/sections" hides "/academic/sections?section=…"). Why each line is here is in
@@ -57,6 +68,7 @@ export const OUTSIDE_THE_CYCLE: Readonly<Record<Role, readonly string[]>> = {
     // uses the old bank transfer, InstaPay is confirmed on the Finance Workbench. Both reachable by URL.
     '/admin/subjects', '/admin/payments',
     ...TIMETABLE_SCREENS, // F1: the timetable
+    ...SET_UP_PARKED, // the coordinator rework (§9.3)
   ],
   coordinator: [
     '/today',
@@ -64,6 +76,9 @@ export const OUTSIDE_THE_CYCLE: Readonly<Record<Role, readonly string[]>> = {
     '/academic/sections', '/academic/enrolment', '/academic/years', '/academic/calendar', '/academic/bells', '/academic/rooms',
     '/exams/timetable', '/exams/days', '/exams/results', '/exams/certificates', '/exams/my',
     ...TIMETABLE_SCREENS,
+    // The coordinator rework (§9.3): set-up is the session's. Settings holds no session rule of hers any more
+    // (G3), and the day-one import is parked with the Catalogue it maps onto (§9.2).
+    ...SET_UP_PARKED, '/settings', '/imports',
   ],
   finance_admin: [
     '/teaching', '/exams/forecasts', '/exams/invigilation',
@@ -102,13 +117,17 @@ export const CYCLE_LANDING: Readonly<Record<Role, string>> = {
  * Financial, Account), which already run in the cycle's order.
  */
 export const CYCLE_STAGES: readonly { titleKey: string; hrefs: readonly string[] }[] = [
+  // The coordinator rework (§9.3): the coordinator's Set up is Sessions, the admin's Sessions and Team (the
+  // parked screens are on their lists above; a finance admin keeps School Fees and Board Services here).
   {
     titleKey: 'nav.cycleSetUp',
-    hrefs: ['/admin/sessions', '/exams/catalogue', '/admin/subjects', '/exams/series', '/exams/services', '/admin/school-fees', '/settings', '/imports', '/admin/team'],
+    hrefs: ['/admin/sessions', '/exams/catalogue', '/admin/subjects', '/exams/series', '/exams/services', '/admin/school-fees', '/admin/team'],
   },
   { titleKey: 'nav.cycleReserve', hrefs: ['/desk', '/students', '/charges', '/admin/payments'] },
   { titleKey: 'nav.cycleFollowUp', hrefs: ['/admin/exceptions', '/admin/messages', '/admin/escrow'] },
   { titleKey: 'nav.cycleMoney', hrefs: ['/finance', '/takings'] },
+  // The school's settings and the day-one import, out of Set up (§9.3): the admin's and the finance admin's.
+  { titleKey: 'nav.school', hrefs: ['/settings', '/imports'] },
   // Candidates (the lead's decision of 16 Oct 2026, 5): the entry lists refuse an entry without a candidate
   // number, legal name, date of birth or UCI — a step of the hand-off, before the entries.
   { titleKey: 'nav.cycleBoard', hrefs: ['/exams/deadlines', '/exams/candidates', '/exams/entries', '/exams/entry-lists'] },
@@ -126,6 +145,17 @@ export const STAGE_OVERRIDE: Readonly<Partial<Record<Role, Readonly<Record<strin
 const pathOf = (href: string) => href.split(/[?#]/)[0] ?? href;
 const under = (path: string, screen: string) => path === screen || path.startsWith(`${screen}/`);
 
+/**
+ * The coordinator rework's hiding (§9.3), whatever the switch above says: the parked set-up screens leave the
+ * coordinator's and the admin's sidebars (with the switch off too), and the coordinator's Settings and import.
+ */
+export function parkedForSetUp(role: string | null | undefined, href: string): boolean {
+  const path = pathOf(href);
+  if (role === 'admin') return SET_UP_PARKED.some((screen) => under(path, screen));
+  if (role === 'coordinator') return [...SET_UP_PARKED, '/settings', '/imports'].some((screen) => under(path, screen));
+  return false;
+}
+
 /** Whether a screen is outside the cycle for this role (always false with the switch off). */
 export function isOutsideTheCycle(role: string | null | undefined, href: string): boolean {
   if (!RESERVATION_CYCLE_ONLY || !role || !isRole(role)) return false;
@@ -135,16 +165,23 @@ export function isOutsideTheCycle(role: string | null | undefined, href: string)
 
 const ON_ANY_LIST = [...new Set(Object.values(OUTSIDE_THE_CYCLE).flat())];
 
-/**
- * Whether a link on a kept screen opens a screen outside the cycle (always false with the switch
- * off). A screen is outside the cycle or not whoever looks at it — the lists above differ only in
- * which screens each role reaches — so a link reads every role's list, and the component that
- * draws it need not know the viewer.
- */
-export function leadsOutsideTheCycle(href: string): boolean {
+/** Whether a screen is on any role's list (always false with the switch off): a part of the cycle hidden for all. */
+function onAnyList(href: string): boolean {
   if (!RESERVATION_CYCLE_ONLY) return false;
   const path = pathOf(href);
   return ON_ANY_LIST.some((screen) => under(path, screen));
+}
+
+/**
+ * Whether a link on a kept screen opens a screen hidden for the signed-in role: outside the cycle for it (with the
+ * switch on), or a set-up screen the coordinator rework parked for it. Each role's list is its own, so a screen the
+ * rework parked for the coordinator and the admin (Candidates, Entries) no longer hides a link from a role whose list
+ * does not hold it; whether that role may open the screen is still the page's own guard. Without a role (a component
+ * that cannot know the viewer) a link is hidden when any role's list holds it, as before.
+ */
+export function leadsOutsideTheCycle(href: string, role: string | null | undefined): boolean {
+  if (role && isRole(role)) return isOutsideTheCycle(role, href) || parkedForSetUp(role, href);
+  return onAnyList(href);
 }
 
 /**
@@ -153,7 +190,7 @@ export function leadsOutsideTheCycle(href: string): boolean {
  * so the block comes back with the screens when the switch is off or the timetable leaves the lists.
  */
 export function timetableHidden(): boolean {
-  return leadsOutsideTheCycle('/my-timetable');
+  return onAnyList('/my-timetable');
 }
 
 /**
@@ -163,7 +200,7 @@ export function timetableHidden(): boolean {
  * true (the lead's decision of 16 Oct 2026, 7). The API is untouched; the switch off shows them again.
  */
 export function remarksHidden(): boolean {
-  return leadsOutsideTheCycle('/remarks-desk');
+  return onAnyList('/remarks-desk');
 }
 
 /**
@@ -173,7 +210,7 @@ export function remarksHidden(): boolean {
  * outside the cycle, their screens on the lists above.
  */
 export function entryDatesOnly(): boolean {
-  return leadsOutsideTheCycle('/exams/results');
+  return onAnyList('/exams/results');
 }
 
 /** Where a role lands after sign-in while the switch is on. */

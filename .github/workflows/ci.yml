@@ -85,5 +85,15 @@ jobs:
       - name: Gate 2 - web type-check
         run: pnpm --filter web check-types
 
+      # COORDINATOR_REWORK.md §13 P2: none of award, suite, series, sitting, component, mapping, option code
+      # on the coordinator's screens or in her wording (lib/i18n-setup.ts), English or Arabic.
+      - name: The coordinator's words
+        run: node apps/web/scripts/check-setup-words.mjs
+
+      # The words check's planted-word controls: each forbidden word planted in a screen, a shared component and a
+      # @repo/validations sentence is caught; a value the code only tests is not.
+      - name: The coordinator's words - controls
+        run: node --test apps/web/scripts/check-setup-words.test.mjs
+
       - name: Gate 3 - integration suite
         run: pnpm --filter @repo/api test

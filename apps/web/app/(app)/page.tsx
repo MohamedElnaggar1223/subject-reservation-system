@@ -213,7 +213,7 @@ export default async function Home(): Promise<JSX.Element> {
   ];
 
   // F6b: a link to a screen outside the reservation cycle (Browse Subjects) is hidden.
-  const visibleLinks = links.filter((l) => l.visible && !leadsOutsideTheCycle(l.href));
+  const visibleLinks = links.filter((l) => l.visible && !leadsOutsideTheCycle(l.href, role));
   const studentNotices = (
     <StudentNotices role={role} profileLoaded={profileLoaded} standing={standing} leftKind={leftKind} leftOn={leftOn} isGraduated={isGraduated} mayRegisterNow={mayRegisterNow} />
   );

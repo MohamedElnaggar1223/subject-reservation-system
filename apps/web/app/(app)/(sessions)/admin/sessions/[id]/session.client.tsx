@@ -1,52 +1,54 @@
 'use client';
 
 /**
- * Session (RESERVATIONS_REWORK.md §4.2) — the links sheet.
+ * Session (COORDINATOR_REWORK.md §5.3, §9.3; Appendix A): one cycle, set up the way she works.
  *
- * The spreadsheet version: the links sheet (one row per subject: its teachers, its form link,
- * its fee), three Google Forms per cycle, two printed fee PDFs, and the boards' deadlines in
- * someone's head. Here the header says when families reserve, when the course starts and when
- * money is due, and every series the session's subjects are entered in with its deadlines (a
- * series with no dates takes no reservation, and says so). The tabs: Subjects (who teaches what,
- * what can be entered, the course and board fees), Fees (the boards' fee lists per series),
- * Money (every line's price, due date and what is owed) and Grade 10 (the school registers the
- * core in one step).
+ * The spreadsheet version: a links sheet (one row per subject, its teachers and its form's link), a
+ * Google Form per subject copied from last cycle and edited by hand, the boards' fee lists as PDFs, the
+ * refund policy typed into every form, and the dates in her head. Here the header holds the switch
+ * families see (Accepting reservations), prices final and the three dates; "Check before you open"
+ * lists what blocks or deserves a look, each line with the button that deals with it; the tabs are the
+ * subjects (a tile each), the prices (paste a board's list as printed), what families agree to, and
+ * who reserved — read only, with the export. The Money tab stays for finance (and the admin).
+ *
+ * The admin sees the same screen; finance reads it (B3): no switch, no date to change, the prices read
+ * only. Removed with the rework (§9.3): the Grade 10 and To verify tabs, "Correct the sitting" and the
+ * Deadlines line; the old Subjects sheet and the fee grid are replaced by the subject editor and Prices.
  */
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, refundPolicySentence, seriesAcademicYearStart, ROLES, IMPACT_CHANGED_REFUSAL, impactSentence, type RefundPolicy, type ImpactType } from '@repo/validations';
+import { apiResponse, ROLES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
-import { ErrorState, LoadingState } from '~/components/ui/query-state';
+import { Switch } from '~/components/ui/switch';
 import { ReasonModal } from '~/components/ui/reason-modal';
-import { InstantText, SeriesName, fetchBoardSeries, SERIES_KEY } from '~/app/(app)/exams/exams-shared';
-import { DatesForm } from '~/app/(app)/exams/series/series.client';
+import { ErrorState, LoadingState } from '~/components/ui/query-state';
+import { cn } from '~/lib/utils';
+import { Day, Modal, ErrorLine, INPUT_CLASS, fetchSession, sessionKey, STATUS_TONE } from '../sessions-shared';
 import {
-  fetchSession, sessionKey, SESSIONS_KEY, StatusBadge, Day, Modal, Field, INPUT_CLASS, ErrorLine, errorText, toLocalInput, type SessionDetail,
-} from '../sessions-shared';
+  STATUS_WORDS, pickerValue, endOfSchoolDay, useImpactSave, ImpactDialog, refusalText,
+  type SetupSession,
+} from '../setup-shared';
+import { CheckList, openWaitsFor } from '../check-list.client';
 import SubjectsTab from './subjects-tab.client';
-import FeesTab from './fees-tab.client';
+import PricesTab from './prices-tab.client';
+import AgreeTab from './agree-tab.client';
+import ReservationsTab from './reservations-tab.client';
 import MoneyTab from './money-tab.client';
-import Grade10Tab from './grade10-tab.client';
-import ToVerifyTab from './to-verify-tab.client';
 
-type Tab = 'subjects' | 'fees' | 'money' | 'grade10' | 'verify';
-const TAB_LABEL: Record<Tab, string> = { subjects: 'Subjects', fees: 'Fees', money: 'Money', grade10: 'Grade 10', verify: 'To verify' };
+type Tab = 'subjects' | 'prices' | 'agree' | 'reservations' | 'money';
+const TAB_WORDS: Record<Tab, string> = { subjects: 'Subjects', prices: 'Prices', agree: 'What families agree to', reservations: 'Reservations', money: 'Money' };
 
-/** Which tabs a role reads (each endpoint still checks its own role). */
-function tabsFor(role: string, isJune: boolean): Tab[] {
-  const tabs: Tab[] = [];
-  if (role === ROLES.ADMIN || role === ROLES.COORDINATOR) tabs.push('subjects');
-  if (role === ROLES.ADMIN || role === ROLES.FINANCE_ADMIN || role === ROLES.COORDINATOR) tabs.push('fees');
-  if (role === ROLES.ADMIN || role === ROLES.FINANCE_ADMIN || role === ROLES.FINANCE_OFFICER) tabs.push('money');
-  if (isJune && (role === ROLES.ADMIN || role === ROLES.COORDINATOR)) tabs.push('grade10');
-  // Step B (§3.5): the declared sittings — the coordinator's; the admin's and the finance desk's too.
-  if (role === ROLES.ADMIN || role === ROLES.COORDINATOR || role === ROLES.FINANCE_ADMIN || role === ROLES.FINANCE_OFFICER) tabs.push('verify');
-  return tabs;
+/** Which tabs a role reads (B1–B3; each endpoint still checks its own role). */
+function tabsFor(role: string): Tab[] {
+  if (role === ROLES.COORDINATOR) return ['subjects', 'prices', 'agree', 'reservations'];
+  if (role === ROLES.ADMIN) return ['subjects', 'prices', 'agree', 'reservations', 'money'];
+  if (role === ROLES.FINANCE_ADMIN || role === ROLES.FINANCE_OFFICER) return ['money', 'prices', 'reservations'];
+  return [];
 }
 
 export default function SessionClient({ id, viewerRole }: { id: string; viewerRole: string }): React.JSX.Element {
@@ -54,8 +56,10 @@ export default function SessionClient({ id, viewerRole }: { id: string; viewerRo
   const [tab, setTab] = useState<Tab | null>(null);
   useEffect(() => {
     const read = () => {
-      const h = window.location.hash.replace('#', '') as Tab;
-      if (h && TAB_LABEL[h]) setTab(h);
+      const h = window.location.hash.replace('#', '');
+      if (h in TAB_WORDS) setTab(h as Tab);
+      // The check list's "Set them": the dates in the header, focused.
+      if (h === 'dates') window.setTimeout(() => document.getElementById('sess-due')?.focus(), 50);
     };
     read();
     window.addEventListener('hashchange', read);
@@ -64,292 +68,213 @@ export default function SessionClient({ id, viewerRole }: { id: string; viewerRo
 
   if (isLoading) return <LoadingState />;
   if (isError || !s) return <div className="mx-auto max-w-6xl px-6 py-8"><ErrorState onRetry={() => refetch()} /></div>;
-  const tabs = tabsFor(viewerRole, s.sessionType === 'june');
+  const tabs = tabsFor(viewerRole);
   const current = tab && tabs.includes(tab) ? tab : tabs[0];
   const choose = (t: Tab) => { setTab(t); window.history.replaceState(null, '', `#${t}`); };
+  const canSetUp = viewerRole === ROLES.ADMIN || viewerRole === ROLES.COORDINATOR;
+  const count: Partial<Record<Tab, number>> = { subjects: s.offerings.length, reservations: s.counts.lines };
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <Link href="/admin/sessions" className="text-sm text-muted-foreground hover:text-foreground">← <span>Sessions</span></Link>
-      <Header s={s} viewerRole={viewerRole} />
-      <Deadlines s={s} viewerRole={viewerRole} />
+      <Header s={s} canSetUp={canSetUp} isAdmin={viewerRole === ROLES.ADMIN} />
+      {canSetUp && (
+        <section id="checks" className="mt-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+          <CheckList s={s} viewerRole={viewerRole} place="session" />
+        </section>
+      )}
       <div className="mt-6 flex flex-wrap gap-1 border-b border-border" role="tablist" aria-label="Session">
         {tabs.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={current === t} onClick={() => choose(t)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${current === t ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            {TAB_LABEL[t]}
+          <button key={t} type="button" role="tab" id={`tab-${t}`} aria-selected={current === t} aria-controls="session-tabpanel" onClick={() => choose(t)}
+            className={cn('-mb-px border-b-2 px-4 py-2 text-sm font-medium', current === t ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+            <span>{TAB_WORDS[t]}</span>{count[t] !== undefined && <> <span className="text-muted-foreground">(<span>{count[t]}</span>)</span></>}
           </button>
         ))}
       </div>
-      <div className="mt-6" role="tabpanel">
-        {current === 'subjects' && <SubjectsTab session={s} viewerRole={viewerRole} />}
-        {current === 'fees' && <FeesTab session={s} viewerRole={viewerRole} />}
+      <div className="mt-6" role="tabpanel" id="session-tabpanel" aria-labelledby={current ? `tab-${current}` : undefined}>
+        {current === 'subjects' && <SubjectsTab s={s} />}
+        {current === 'prices' && <PricesTab s={s} canEdit={canSetUp} />}
+        {current === 'agree' && <AgreeTab s={s} />}
+        {current === 'reservations' && <ReservationsTab s={s} />}
         {current === 'money' && <MoneyTab session={s} />}
-        {current === 'grade10' && <Grade10Tab session={s} />}
-        {current === 'verify' && <ToVerifyTab session={s} viewerRole={viewerRole} />}
         {!current && <Notice tone="neutral">Nothing on this session is yours to see.</Notice>}
       </div>
     </div>
   );
 }
 
-function Header({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
-  const isAdmin = viewerRole === ROLES.ADMIN;
+/**
+ * The session's header: its name and status, the Accepting switch, prices final, the three dates (C4, C5, E6),
+ * and for the admin, while it is a draft, "Delete this draft" (F8-01: a duplicate or mistaken draft goes; the API
+ * refuses a draft anyone reserved in).
+ */
+function Header({ s, canSetUp, isAdmin }: { s: SetupSession; canSetUp: boolean; isAdmin: boolean }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [opening, setOpening] = useState(false);
-  const [correcting, setCorrecting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
-  const refresh = () => queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
-  // F8-01: a draft nobody reserved in goes (a stale sample draft, one made by mistake); the API refuses otherwise.
-  // Deleted, the screen goes back to the Sessions list at once, and only the lists are fetched again: the deleted
-  // session's own queries are left alone, since each would answer 404 (the review of 744e553, item 2: the lead's
-  // drive stayed on the deleted session's address with four of them).
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
+  const [closing, setClosing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Deleted, the screen goes back to Sessions at once and only the lists are read again: the deleted session's own
+  // queries would each answer 404 (the review of 744e553, item 2).
   const remove = useMutation({
     mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].$delete({ param: { id: s.id }, json: { reason } })),
     onSuccess: () => {
       router.replace('/admin/sessions');
-      void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY, predicate: (q) => q.queryKey[1] !== s.id });
+      void queryClient.invalidateQueries({ queryKey: ['sessions'], predicate: (q) => q.queryKey[1] !== s.id });
     },
   });
-  const close = useMutation({
-    mutationFn: async (reason: string) => apiResponse(api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: { reason } })),
-    onSuccess: () => { setClosing(false); refresh(); },
+  const waits = s.status === 'draft' ? openWaitsFor(s) : [];
+  const accepting = useMutation({
+    mutationFn: async (on: boolean) => {
+      if (on && s.status === 'draft') return apiResponse(api.v1.sessions[':id'].open.$post({ param: { id: s.id } }));
+      if (on) return apiResponse(api.v1.sessions[':id'].reopen.$post({ param: { id: s.id }, json: {} }));
+      return apiResponse(api.v1.sessions[':id'].close.$post({ param: { id: s.id }, json: {} }));
+    },
+    onSuccess: async () => { setClosing(false); await refresh(); },
   });
-  const activate = useMutation({
-    mutationFn: async () => apiResponse(api.v1.sessions[':id'].activate.$post({ param: { id: s.id } })),
-    onSuccess: () => { setOpening(false); refresh(); },
-  });
-  const policy = s.refundPolicy as RefundPolicy | null;
+  const pricesFinal = useImpactSave(
+    (final: boolean, expected) => apiResponse(api.v1.sessions[':id']['prices-final'].$put({ param: { id: s.id }, json: { final, ...(expected ? { expected } : {}) } })),
+    () => refresh(),
+  );
+  // One-way once any line exists, as the API decides it (any status, cancelled ones too): the live count, or a row's.
+  const oneWay = s.pricesFinal && (s.counts.lines > 0 || s.offerings.some((o) => o.rows.some((r) => r.lines.all > 0)));
 
   return (
-    <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-display text-2xl font-bold text-foreground"><bdi>{s.name}</bdi></h1>
-          <StatusBadge status={s.status} />
+    <section className="mt-3 rounded-xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-2xl font-bold text-foreground"><bdi>{s.name}</bdi></h1>
+            <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{STATUS_WORDS[s.status] ?? s.status}</Badge>
+            {s.copiedFrom && <Badge tone="neutral"><span>copied from</span>&nbsp;<bdi>{s.copiedFrom.name}</bdi></Badge>}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            <span>{s.offerings.length}</span> <span>{s.offerings.length === 1 ? 'subject' : 'subjects'}</span> · <span>{s.counts.offeredToFamilies}</span> <span>offered to families</span> · <span>self study pays</span> <span>{s.selfStudyPercent}%</span> <span>of the course fee</span>
+          </p>
         </div>
-        <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span><span>Reserve</span> {s.startDate ? <InstantText iso={s.startDate} /> : '—'} – {s.endDate ? <InstantText iso={s.endDate} /> : '—'}</span>
-          <span><span>Course starts</span> <Day iso={s.courseStartsOn} /></span>
-          <span><span>Due</span> <InstantText iso={s.paymentDueAt} /></span>
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          <span>Refunds:</span> {policy ? <span>{refundPolicySentence(policy)}</span> : <span>by the refund windows (a converted session)</span>}
-          {s.refundPolicyLocked && <> · <span>fixed: a family has agreed to it</span></>}
-        </p>
+        <div className="w-full space-y-3 sm:w-auto sm:min-w-80">
+          <div className="flex items-center justify-between gap-4">
+            <span id="sw-accepting" className="text-sm font-medium text-foreground">Accepting reservations</span>
+            <Switch checked={s.status === 'active'} label="Accepting reservations" describedBy={waits.length ? 'open-waits' : undefined}
+              disabled={!canSetUp || accepting.isPending || (s.status === 'draft' && waits.length > 0)}
+              onChange={(on) => (on ? accepting.mutate(true) : setClosing(true))} />
+          </div>
+          {waits.length > 0 && (
+            <p id="open-waits" className="text-xs text-amber-700 dark:text-amber-400">
+              <span>Opening waits for:</span> {waits.map((w, i) => <span key={w}>{i > 0 && '; '}<span>{w}</span></span>)}
+            </p>
+          )}
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm font-medium text-foreground"><span>Prices final</span> <span className="text-xs font-normal text-muted-foreground">— families can pay</span></span>
+            <Switch checked={s.pricesFinal} label="Prices final" disabled={!canSetUp || pricesFinal.isPending || oneWay}
+              describedBy={oneWay ? 'prices-one-way' : undefined} onChange={(on) => pricesFinal.save(on)} />
+          </div>
+          {oneWay && <p id="prices-one-way" className="text-xs text-muted-foreground">Families have reserved: prices stay final.</p>}
+          <ErrorLine message={accepting.error ? refusalText(accepting.error) : pricesFinal.error} />
+          {isAdmin && s.status === 'draft' && (
+            <div className="flex justify-end">
+              <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(true)}>Delete this draft</Button>
+            </div>
+          )}
+        </div>
       </div>
-      {isAdmin && s.status !== 'closed' && (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setEditing(true)}>Edit</Button>
-          {s.status === 'draft' && <Button variant="outline" onClick={() => setOpening(true)}>Open now</Button>}
-          {s.status === 'active' && <Button variant="outline" onClick={() => setClosing(true)}>Close</Button>}
-          <Button variant="ghost" onClick={() => setCorrecting(true)}>Correct the sitting</Button>
-          {s.status === 'draft' && <Button variant="ghost" className="text-destructive" onClick={() => setDeleting(true)}>Delete this draft</Button>}
-        </div>
-      )}
+      <Dates s={s} canSetUp={canSetUp} />
+      <ImpactDialog save={pricesFinal} />
       {deleting && (
-        <ReasonModal title="Delete this draft session" description="Only a draft nobody has reserved in can be deleted. Its subjects, items and fees on this sheet go with it; the subjects stay in the catalogue and the boards' series keep their dates and fee lists. Recorded in the audit trail with your reason."
-          confirmLabel="Delete the draft" destructive minLength={5} isPending={remove.isPending || remove.isSuccess} error={remove.error ? errorText(remove.error) : undefined}
+        <ReasonModal title={`Delete ${s.name}`}
+          description="Only a draft nobody has reserved in can be deleted. Its subjects, rows, teachers and prices in this session go with it; the boards' lists and the school's teachers stay. Kept in the audit trail with your reason."
+          confirmLabel="Delete the draft" destructive minLength={5} isPending={remove.isPending || remove.isSuccess}
+          error={remove.error ? refusalText(remove.error) : undefined}
           onConfirm={(reason) => remove.mutate(reason)} onClose={() => setDeleting(false)} />
       )}
-      {correcting && <CorrectSeries s={s} onClose={() => setCorrecting(false)} />}
-      {editing && <EditHeader s={s} onClose={() => setEditing(false)} />}
       {closing && (
-        <ReasonModal title="Close this session" description="Families can no longer reserve or pay here. Unpaid lines expire; their checkouts close and any money held comes back to the family."
-          confirmLabel="Close session" destructive minLength={5} isPending={close.isPending} error={close.error ? errorText(close.error) : undefined}
-          onConfirm={(reason) => close.mutate(reason)} onClose={() => setClosing(false)} />
-      )}
-      {opening && (
-        <Modal title="Open this session now" onClose={() => setOpening(false)}>
-          <div className="space-y-4">
-            <p className="text-sm text-foreground">{"Families can reserve from now. Preregistrations are captured: a paid one is confirmed, an unpaid one waits for payment — and one whose series' deadline has passed is refunded in full instead."}</p>
-            <ErrorLine message={activate.error ? errorText(activate.error) : null} />
+        <Modal title={`Close ${s.name}`} onClose={() => setClosing(false)}>
+          <div className="space-y-3 text-sm text-foreground">
+            <p>Families can no longer reserve here. You can open it again later.</p>
+            <p>{CLOSE_KEEPS_WAITING}</p>
+            {s.counts.unpaid > 0 && <p><span>Unpaid reservations now:</span> <span className="tabular-nums">{s.counts.unpaid}</span></p>}
+            <ErrorLine message={accepting.error ? refusalText(accepting.error) : null} />
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpening(false)}>Cancel</Button>
-              <Button onClick={() => activate.mutate()} disabled={activate.isPending}>{activate.isPending ? 'Opening…' : 'Open now'}</Button>
+              <Button variant="outline" onClick={() => setClosing(false)}>Cancel</Button>
+              <Button variant="destructive" disabled={accepting.isPending} onClick={() => accepting.mutate(false)}>{accepting.isPending ? 'Closing…' : 'Close it'}</Button>
             </div>
           </div>
         </Modal>
       )}
+    </section>
+  );
+}
+
+/** What closing does to waiting reservations (C10): nothing; they stay payable until their own cut-off. Said under the switch and the close date. */
+export const CLOSE_KEEPS_WAITING = 'Reservations already made can still be paid, each until its last day to pay: closing cancels nothing.';
+
+/** C5: the three dates, each a date picker, saved when she leaves the field (a payment date that moves due dates asks first). */
+function Dates({ s, canSetUp }: { s: SetupSession; canSetUp: boolean }) {
+  const queryClient = useQueryClient();
+  const save = useImpactSave(
+    (json: { closesAt?: string | null; paymentDueAt?: string; courseStartsOn?: string }, expected) =>
+      apiResponse(api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { ...json, ...(expected ? { expected } : {}) } })),
+    () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+    () => { sentClose.current = null; setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn); },
+  );
+  const [close, setClose] = useState(pickerValue(s.closesAt));
+  const [due, setDue] = useState(pickerValue(s.paymentDueAt));
+  const [first, setFirst] = useState(s.courseStartsOn);
+  // The close date last sent and not read back yet: leaving the field does not send it a second time (the API would
+  // answer "Nothing to change" under a save that worked). Forgotten once read back, cancelled or refused.
+  const sentClose = useRef<string | null>(null);
+  const saveClose = (v: string) => { sentClose.current = v; save.save({ closesAt: v ? endOfSchoolDay(v) : null }); };
+  useEffect(() => { if (save.error) sentClose.current = null; }, [save.error]);
+  useEffect(() => {
+    sentClose.current = null;
+    setClose(pickerValue(s.closesAt)); setDue(pickerValue(s.paymentDueAt)); setFirst(s.courseStartsOn);
+  }, [s.closesAt, s.paymentDueAt, s.courseStartsOn]);
+  // Clear pressed while another date was being saved or asked about: sent once that is settled (saved, cancelled or
+  // refused), so the two never race and a question she has open is never dismissed by the clear.
+  const clearNext = useRef(false);
+  useEffect(() => {
+    if (save.isPending || save.asking || save.busy() || !clearNext.current) return;
+    clearNext.current = false;
+    saveClose('');
+  }, [save.isPending, save.asking]); // eslint-disable-line react-hooks/exhaustive-deps
+  const valid = (d: string) => /^\d{4}-\d\d-\d\d$/.test(d) && Number(d.slice(0, 4)) >= 2000;
+  const field = 'mt-1 h-10';
+  return (
+    <div id="dates" className="mt-5 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
+      <div>
+        <label htmlFor="sess-close" className="block text-sm font-medium text-foreground"><span>Reservations close</span> <span className="font-normal text-muted-foreground">(optional)</span></label>
+        <div className="flex items-center gap-2">
+          <input id="sess-close" type="date" className={cn(INPUT_CLASS, field)} value={close} disabled={!canSetUp || s.status === 'closed'}
+            onChange={(e) => setClose(e.target.value)}
+            onBlur={() => { if (close !== pickerValue(s.closesAt) && close !== sentClose.current && (close === '' || valid(close))) saveClose(close); }} />
+          {/* Clear takes the place of a close date typed and not saved yet: pressed from the close field it keeps the
+              focus there, so leaving the field never sends the typed date first. From another date field, that field
+              is left (and saved) as usual; a save running or asking is let settle, then the close date is cleared. */}
+          {canSetUp && s.closesAt && (
+            <Button type="button" size="sm" variant="ghost" onMouseDown={(e) => { if (document.activeElement?.id === 'sess-close') e.preventDefault(); }}
+              onClick={() => { setClose(''); if (save.busy()) clearNext.current = true; else saveClose(''); }}>Clear</Button>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Switches Accepting off at the end of that day.</p>
+        {s.status !== 'closed' && <p className="mt-1 text-xs text-muted-foreground">{CLOSE_KEEPS_WAITING}</p>}
+      </div>
+      <div>
+        <label htmlFor="sess-due" className="block text-sm font-medium text-foreground">Payment due</label>
+        <input id="sess-due" type="date" className={cn(INPUT_CLASS, field)} value={due} disabled={!canSetUp || s.status === 'closed'}
+          onChange={(e) => setDue(e.target.value)}
+          onBlur={() => { if (due !== pickerValue(s.paymentDueAt) && valid(due)) save.save({ paymentDueAt: endOfSchoolDay(due) }); }} />
+        <p className="mt-1 text-xs text-muted-foreground"><span>Unpaid reservations are cancelled</span> <span>{s.unpaidCancelDays}</span> <span>{s.unpaidCancelDays === 1 ? 'day after it.' : 'days after it.'}</span></p>
+      </div>
+      <div>
+        <label htmlFor="sess-first" className="block text-sm font-medium text-foreground">First lesson</label>
+        <input id="sess-first" type="date" className={cn(INPUT_CLASS, field)} value={first} disabled={!canSetUp || s.status === 'closed'}
+          onChange={(e) => setFirst(e.target.value)}
+          onBlur={() => { if (first !== s.courseStartsOn && valid(first)) save.save({ courseStartsOn: first }); }} />
+        <p className="mt-1 text-xs text-muted-foreground">The refund weeks count from it.</p>
+      </div>
+      {save.error && <div className="sm:col-span-3"><ErrorLine message={save.error} /></div>}
+      {s.status === 'closed' && <p className="text-xs text-muted-foreground sm:col-span-3"><span>Closed on</span> <Day iso={s.closedAt} />. <span>Switch Accepting on to open it again.</span></p>}
+      <ImpactDialog save={save} />
     </div>
-  );
-}
-
-function EditHeader({ s, onClose }: { s: SessionDetail; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const draft = s.status === 'draft';
-  const [startDate, setStartDate] = useState(toLocalInput(s.startDate));
-  const [endDate, setEndDate] = useState(toLocalInput(s.endDate));
-  const [courseStartsOn, setCourseStartsOn] = useState(s.courseStartsOn);
-  const [paymentDueAt, setPaymentDueAt] = useState(toLocalInput(s.paymentDueAt));
-  const [reason, setReason] = useState('');
-  // A change that affects families (a payment date moving unpaid reservations' due dates) is answered with its
-  // counts first and saved only when they are sent back (the coordinator rework's impact pattern).
-  const [impact, setImpact] = useState<ImpactType | null>(null);
-  const [countsChanged, setCountsChanged] = useState(false);
-  const edited = <T,>(set: (v: T) => void) => (v: T) => { set(v); setImpact(null); setCountsChanged(false); };
-  const body = () => {
-    const json: { startDate?: string; endDate?: string; courseStartsOn?: string; paymentDueAt?: string; reason?: string } = {};
-    if (draft && startDate !== toLocalInput(s.startDate)) json.startDate = new Date(startDate).toISOString();
-    if (endDate !== toLocalInput(s.endDate)) json.endDate = new Date(endDate).toISOString();
-    if (courseStartsOn !== s.courseStartsOn) json.courseStartsOn = courseStartsOn;
-    if (paymentDueAt !== toLocalInput(s.paymentDueAt)) json.paymentDueAt = new Date(paymentDueAt).toISOString();
-    if (reason.trim()) json.reason = reason.trim();
-    return json;
-  };
-  const send = (expected?: ImpactType) => apiResponse(api.v1.sessions[':id'].$put({ param: { id: s.id }, json: { ...body(), ...(expected ? { expected } : {}) } }));
-  const done = async () => { await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }); onClose(); };
-  const save = useMutation({
-    mutationFn: async (expected?: ImpactType) => {
-      try {
-        return { answer: await send(expected), countsChanged: false };
-      } catch (err) {
-        // The counts moved while she was looking (409 IMPACT_CHANGED): ask again with the new ones.
-        if (errorText(err) !== IMPACT_CHANGED_REFUSAL) throw err;
-        return { answer: await send(), countsChanged: true };
-      }
-    },
-    onSuccess: async ({ answer, countsChanged: changed }) => {
-      if (!answer.saved) {
-        setImpact(answer.impact);
-        setCountsChanged(changed);
-        return;
-      }
-      await done();
-    },
-  });
-  return (
-    <Modal title="Edit the session" onClose={onClose}>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(undefined); }}>
-        <ErrorLine message={save.error ? errorText(save.error) : null} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Reserve from" htmlFor="eh-from"><input id="eh-from" className={INPUT_CLASS} type="datetime-local" value={startDate} disabled={!draft} onChange={(e) => edited(setStartDate)(e.target.value)} /></Field>
-          <Field label="Reserve to" htmlFor="eh-to"><input id="eh-to" className={INPUT_CLASS} type="datetime-local" value={endDate} onChange={(e) => edited(setEndDate)(e.target.value)} /></Field>
-          <Field label="Course starts" htmlFor="eh-course"><input id="eh-course" className={INPUT_CLASS} type="date" value={courseStartsOn} onChange={(e) => edited(setCourseStartsOn)(e.target.value)} /></Field>
-          <Field label="Payment due" htmlFor="eh-due"><input id="eh-due" className={INPUT_CLASS} type="datetime-local" value={paymentDueAt} onChange={(e) => edited(setPaymentDueAt)(e.target.value)} /></Field>
-        </div>
-        <Field label="Why" htmlFor="eh-why" hint="Kept with the change. An open session's end needs one.">
-          <input id="eh-why" className={INPUT_CLASS} value={reason} onChange={(e) => edited(setReason)(e.target.value)} />
-        </Field>
-        <p className="text-xs text-muted-foreground">{"Moving the payment date moves the due date of every unpaid line with it (never past its series' deadline)."}</p>
-        {impact ? (
-          <Notice tone="warning" title={countsChanged ? 'The counts changed while you were looking' : 'Before this is saved'}>
-            <p>{impactSentence(impact)}</p>
-            <div className="mt-3 flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="button" onClick={() => save.mutate(impact)} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save it'}</Button>
-            </div>
-          </Notice>
-        ) : (
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save'}</Button>
-          </div>
-        )}
-      </form>
-    </Modal>
-  );
-}
-
-/**
- * "Deadlines:" — every series the session's subjects are entered in, each a line in the school's
- * words ("Cambridge International June 2027: entries by 20 Feb 2027 · retakes by …", or "Dates not
- * set"). For the admin and the coordinator each line is a button opening the Board Series page's
- * dates form in place (F6a): the board's deadlines are set from the session, no page change.
- */
-function Deadlines({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const canSet = viewerRole === ROLES.ADMIN || viewerRole === ROLES.COORDINATOR;
-  if (!s.series.length) {
-    return <p className="mt-3 text-sm text-muted-foreground">{"No sittings yet: a subject's sitting is added with the subject."}</p>;
-  }
-  const chosen = s.series.find((b) => b.id === open) ?? null;
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-      <span className="font-medium text-foreground">Deadlines</span>
-      {s.series.map((b) => {
-        const line = (
-          <span>
-            <SeriesName boardName={b.boardName} month={b.month} year={b.year} label={b.label} /><span>:</span>{' '}
-            {b.entryDeadline
-              ? <span className={b.entryDeadlinePassed ? 'text-destructive' : 'text-foreground'}><span>entries by</span> <InstantText iso={b.entryDeadline} time={false} />{b.entryDeadlinePassed && <> (<span>passed</span>)</>}</span>
-              : b.examsStart ? <span><span>exams</span> <Day iso={b.examsStart} /></span> : <span className="font-medium text-amber-700 dark:text-amber-400">Dates not set</span>}
-            {b.retakeDeadline && <> · <span><span>retakes by</span> <InstantText iso={b.retakeDeadline} time={false} /></span></>}
-          </span>
-        );
-        return canSet ? (
-          <button key={b.id} type="button" onClick={() => setOpen(b.id)}
-            className="rounded-lg border border-border bg-card px-2.5 py-1 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            {line}
-          </button>
-        ) : <span key={b.id} className="rounded-lg border border-border px-2.5 py-1">{line}</span>;
-      })}
-      {chosen && <SeriesDates s={s} seriesId={chosen.id} isAdmin={viewerRole === ROLES.ADMIN} onClose={() => setOpen(null)} />}
-    </div>
-  );
-}
-
-/** The Board Series page's dates form, in a dialog over the session (its own endpoint, its required reason). */
-function SeriesDates({ s, seriesId, isAdmin, onClose }: { s: SessionDetail; seriesId: string; isAdmin: boolean; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const ay = seriesAcademicYearStart(s.sessionType, s.seriesYear);
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: [...SERIES_KEY, ay], queryFn: () => fetchBoardSeries(ay) });
-  const row = (data ?? []).find((b) => b.id === seriesId) ?? null;
-  const done = () => {
-    queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
-    onClose();
-  };
-  return (
-    <Modal title="The board's dates" onClose={onClose} wide>
-      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : !row ? <Notice tone="neutral">This sitting was not found.</Notice> : (
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-foreground"><SeriesName boardName={row.boardName} month={row.month} year={row.year} label={row.label} /></p>
-          <DatesForm s={row} isAdmin={isAdmin} onDone={done} />
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-/**
- * Correct the session's series (F0a): its type and year decide the academic year every line is
- * judged by. Its items go to the corresponding series of the new year, with their lines; lines a
- * student may no longer sit expire. Refused once a line's entry is made (past its deadline).
- */
-function CorrectSeries({ s, onClose }: { s: SessionDetail; onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [type, setType] = useState<'june' | 'winter'>(s.sessionType === 'june' ? 'june' : 'winter');
-  const [year, setYear] = useState(String(s.seriesYear));
-  const [reason, setReason] = useState('');
-  const go = useMutation({
-    mutationFn: async () => apiResponse(api.v1.sessions[':id'].series.$put({ param: { id: s.id }, json: { sessionType: type, seriesYear: Number(year), reason: reason.trim() } })),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: SESSIONS_KEY }); onClose(); },
-  });
-  return (
-    <Modal title="Correct the sitting" onClose={onClose}>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); go.mutate(); }}>
-        <p className="text-sm text-muted-foreground">The sitting decides the academic year every reservation is judged by. The subjects go to the same sitting of the new year with their reservations; a reservation whose student may no longer sit it expires, and its checkout closes.</p>
-        <ErrorLine message={go.error ? errorText(go.error) : null} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Type" htmlFor="cs-type">
-            <select id="cs-type" className={INPUT_CLASS} value={type} onChange={(e) => setType(e.target.value as 'june' | 'winter')}>
-              <option value="june">June</option>
-              <option value="winter">Winter (November – January)</option>
-            </select>
-          </Field>
-          <Field label={type === 'june' ? 'June of' : 'November of'} htmlFor="cs-year">
-            <input id="cs-year" className={INPUT_CLASS} type="number" min={2000} max={2100} value={year} onChange={(e) => setYear(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Why" htmlFor="cs-why"><input id="cs-why" className={INPUT_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={reason.trim().length < 5 || go.isPending}>Correct</Button>
-        </div>
-      </form>
-    </Modal>
   );
 }

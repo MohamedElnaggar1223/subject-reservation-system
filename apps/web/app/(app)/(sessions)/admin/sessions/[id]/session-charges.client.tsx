@@ -23,7 +23,7 @@ export function SessionCharges({ sessionId }: { sessionId: string }) {
   return (
     <section aria-labelledby="session-charges" className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
-        <h3 id="session-charges" className="font-display text-sm font-semibold text-foreground">Charges</h3>
+        <h2 id="session-charges" className="font-display text-sm font-semibold text-foreground">Charges</h2>
         <p className="text-sm text-muted-foreground">
           <span>Owed</span> <Money amount={owed} /> · <span>Paid</span> <Money amount={paid} /> · <Link href="/charges" className="text-primary underline">Charges</Link>
         </p>

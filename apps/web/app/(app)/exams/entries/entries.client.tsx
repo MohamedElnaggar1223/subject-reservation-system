@@ -37,11 +37,13 @@ import { DerivePanel } from './derive.client';
 import { AddEntryPanel } from './add-entry.client';
 import { EntriesTable } from './entries-table.client';
 import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
+import { useViewerRole } from '~/lib/viewer-role';
 
 export default function EntriesClient(): React.JSX.Element {
   const { series, chosen, choose, isLoading } = useSeriesChoice();
   const params = useSearchParams();
   const studentId = params.get('student');
+  const role = useViewerRole();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 animate-fade-up">
@@ -60,7 +62,7 @@ export default function EntriesClient(): React.JSX.Element {
                 <Link href={`/exams/entry-lists?series=${chosen.id}` as Route}>The board&apos;s entry list</Link>
               </Button>
               {/* F6b: forecast grades are outside the reservation cycle for now (lib/reservation-focus.ts). */}
-              {!leadsOutsideTheCycle('/exams/forecasts') && (
+              {!leadsOutsideTheCycle('/exams/forecasts', role) && (
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/exams/forecasts?series=${chosen.id}` as Route}>Forecast grades</Link>
                 </Button>
