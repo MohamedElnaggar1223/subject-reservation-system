@@ -280,6 +280,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   const amountDue = Math.max(0, payableTotal - escrowToApply);
   const cutOffOf = (id: string) => summary.lineCutOffs.find((c) => c.registrationId === id)?.cutOff ?? null;
   const cutOffs = new Set(payable.map((r) => cutOffOf(r.id)).filter(Boolean).map(String));
+  // Paid by the earliest last day to pay of the subjects in this payment (the API's endsAt counts a line past its own).
+  const payBy = [...cutOffs].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] ?? (past.length ? null : summary.endsAt);
 
   // ─── Post-payment Result View ────────────────────────────────────────────
 
@@ -574,9 +576,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                 <Money amount={payableTotal} />
               </span>
             </div>
-            {summary.endsAt && payable.length > 0 && (
+            {payBy && payable.length > 0 && (
               <p className="px-4 sm:px-6 py-2 text-xs text-muted-foreground border-t border-border">
-                <span>Pay by</span> <Day iso={String(summary.endsAt)} />
+                <span>Pay by</span> <Day iso={String(payBy)} />
                 {cutOffs.size > 1 && <> <span>(the earliest last day to pay of these subjects)</span></>}
               </p>
             )}
