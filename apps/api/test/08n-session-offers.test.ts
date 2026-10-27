@@ -316,13 +316,13 @@ describe('08n: a winter session, each row cut off at its own deadline (§3.3)', 
       .rejects.toThrow(/deadline/);
     const [line] = await reserve(f.studentId, w, [{ offerItemId: physNov, attempt: 'retake', mode: 'in_school', teacherId, priorSittingSeriesId: camJune, priorSittingSource: 'declared_by_desk' }]);
     retakeLine = line!.id;
-    // The family's read (offerings → rows, P1c) works out each option's board deadline for a first entry or a retake with
-    // no earlier exam named: every option is past the entry deadline, so the row reads closed — although a retake of the
-    // previous June is still taken until the retake deadline, as above (reported to the lead with P1c).
+    // The family's read (offerings → rows, P1c) closes an option at its board deadline: the first entry at the entry
+    // deadline, a retake at the latest deadline an earlier sitting it may follow gives — the retake deadline, as a retake
+    // of the previous June is still taken until then (above). The row reads open (the review of P1c, (a)).
     const listed = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: w, studentId: f.studentId } }));
     const row = listed.offerings.find((o) => o.id === physOffering)!.rows.find((r) => r.id === physNov)!;
-    expect(row).toMatchObject({ sitting: 'november', closed: true });
-    expect(row.options.map((o) => [o.attempt, o.mode])).toEqual([['first', 'in_school'], ['retake', 'in_school'], ['retake', 'self_study']]);
+    expect(row).toMatchObject({ sitting: 'november', closed: false });
+    expect(row.options.map((o) => [o.attempt, o.mode, o.closed])).toEqual([['first', 'in_school', true], ['retake', 'in_school', false], ['retake', 'self_study', false]]);
     const l = await lineOf(line!.id);
     expect([l.status, l.attempt, l.board_series_id]).toEqual(['pending_payment', 'retake', camNov]);
     const retake = new Date((await one<{ d: string }>(`select retake_deadline as d from board_series where id = $1`, [camNov])).d);
@@ -407,6 +407,11 @@ describe('08n: a winter session, each row cut off at its own deadline (§3.3)', 
     await sql(`update board_series set retake_deadline = now() - interval '1 minute' where id = $1`, [camNov]);
     await runPaymentDeadlines();
     expect((await lineOf(retakeLine)).status).toBe('expired');
+    // Past the retake deadline too, every option of the row is past: it reads closed.
+    const h = await onboard(officer, `n08w-closed-${RUN}`, 12);
+    const listed = await apiResponse(h.parent.api.v1.registrations.offers.$get({ query: { sessionId: w, studentId: h.studentId } }));
+    const row = listed.offerings.find((o) => o.id === physOffering)!.rows.find((r) => r.id === physNov)!;
+    expect([row.closed, row.options.map((o) => o.closed)]).toEqual([true, [true, true, true]]);
     expect(await one(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [retakeLine])).toEqual({ reason: 'entry_deadline' });
   });
 });

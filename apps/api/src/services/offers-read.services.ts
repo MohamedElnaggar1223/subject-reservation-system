@@ -9,7 +9,7 @@
  * (`GET /registrations/offers/preview`, F6a) left with P1c. Nothing here writes.
  */
 
-import { db, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc } from '@repo/db';
+import { db, registrationSession, sessionQuestion, boardSeries, examBoard, subject, and, eq, isNull, inArray, asc, sql } from '@repo/db';
 import { sessionSeriesMonths, IGCSE_NEVER_MONTHS, IAL_UNIT_MONTHS, type SeriesMonth } from '@repo/validations';
 import { mayRegisterFor } from './eligibility.services';
 import { priceLine, PricingError } from './pricing.services';
@@ -105,6 +105,15 @@ export async function familyOfferings(
     }
     return out.sort((a, b) => order(b.month, b.year) - order(a.month, a.year));
   };
+  // C6, a retake's later deadline (the review of P1c, (a)): a retake of the board's previous sitting enters until the
+  // series' retake deadline (line_effective_deadline), so each row's series' retake deadline and previous sitting,
+  // read once.
+  const rowSeriesIds = [...new Set(all.flatMap((o) => o.rows.map((r) => r.series?.id).filter((x): x is string => !!x)))];
+  const retakeDates = new Map((rowSeriesIds.length ? (await db.execute(sql`
+    select b.id, b.retake_deadline as retake, prev.month, prev.year from board_series b
+    cross join lateral board_previous_sitting(b.board_code, b.month, b.year) prev
+    where b.id in (${sql.join(rowSeriesIds.map((id) => sql`${id}`), sql`, `)})`)).rows as { id: string; retake: string | Date | null; month: string; year: number }[] : [])
+    .map((x) => [x.id, { retake: x.retake ? new Date(x.retake) : null, previous: { month: x.month, year: Number(x.year) } }]));
   // Decision 1's exception (gate.selfStudyFirstEntry, the line rules' only way to a first entry in self study the row
   // does not tick): the student's, read once (without locking: a GET marks nothing used; the reservation asks again).
   const firstEntryGates = studentId ? await lineExceptions.held(db, studentId, ['gate.selfStudyFirstEntry']) : [];
@@ -136,7 +145,26 @@ export async function familyOfferings(
       const rowTeachers = (r.teachers.length ? r.teachers : o.teachers).map((t) => ({ id: t.teacherId, name: t.name, online: t.online }));
       const options = [];
       // Options past their board deadline (C6: nothing lifts it): a row whose every option is past reads closed, so a
-      // family cannot keep picking it and keep being refused (BOARD_DEADLINE_PASSED).
+      // family cannot keep picking it and keep being refused (BOARD_DEADLINE_PASSED). A first entry's deadline is the
+      // series' entry deadline; a retake's is the latest any earlier sitting it may follow would give (the row's list
+      // when it carries one, else the board's exams it may name): the retake deadline for the board's previous
+      // sitting, the entry deadline for an older one — so a retake of last June still reads open after the November
+      // entry deadline, until the retake deadline (the review of P1c, (a)).
+      const entryAt = r.series?.id
+        ? (await effectiveDeadlineFor(db, { boardSeriesId: r.series.id, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false })).at
+        : null;
+      const retakeAt = (() => {
+        const dates = r.series?.id ? retakeDates.get(r.series.id) : undefined;
+        if (!dates?.retake) return entryAt;
+        const follows = r.needsCarriedFrom && allowedSittings.length
+          ? r.allowedPriorSittings.map((p) => priors.get(p.id)).filter((p): p is NonNullable<typeof p> => !!p).map((p) => ({ month: p.month, year: p.year }))
+          : retakeFromOf(o.board.code, o.group, r.series);
+        const previous = follows.some((p) => p.month === dates.previous.month && p.year === dates.previous.year);
+        const older = follows.some((p) => p.month !== dates.previous.month || p.year !== dates.previous.year);
+        if (!previous) return entryAt;
+        if (!older || !entryAt) return older ? null : dates.retake;
+        return dates.retake > entryAt ? dates.retake : entryAt;
+      })();
       let pastBoard = 0;
       for (const cell of cellsOffered) {
         const attempt = cell === 'firstInSchool' || cell === 'firstSelfStudy' ? 'first' as const : 'retake' as const;
@@ -155,15 +183,16 @@ export async function familyOfferings(
           if (!(err instanceof PricingError)) throw err;
           price = null;
         }
-        if (r.series?.id) {
-          const d = await effectiveDeadlineFor(db, { boardSeriesId: r.series.id, attempt, priorSittingSeriesId: null, declarationRejected: false });
-          if (d.at && d.at <= now) pastBoard++;
-        }
+        const deadline = attempt === 'retake' ? retakeAt : entryAt;
+        const closed = !!deadline && deadline <= now;
+        if (closed) pastBoard++;
         // D6 with an emptied list: the coordinator saved no earlier exam to carry from, and the line rules then take any
         // earlier exam of the board (line-rules.services, "row with no list"): the family picks among the board's.
         const carriesFromAny = r.needsCarriedFrom && (attempt === 'retake' || r.kind === 'a2') && !allowedSittings.length;
         options.push({
           attempt, mode,
+          // Past its board deadline (C6): picked, it is refused (BOARD_DEADLINE_PASSED).
+          closed,
           label: both((lang) => optionLabel(labelRowOf({ kind: r.kind, label: r.label, short: r.short, referenceCodes: r.referenceCodes, fromReference: r.fromReference }), { attempt, mode }, { selfStudyShare: r.selfStudyFee !== null ? null : s.selfStudyPercent, lang })),
           price,
           // D6: an A.2. and a one-paper retake (where the board asks) name the sitting they carry from.
