@@ -108,7 +108,7 @@ export default function DeskToday(): React.JSX.Element | null {
         <Tile href={moneyTab} label="Overdue" amount={overdueAmount}
           detail={
             <>
-              <span>{overdueCount}</span> <span>{overdueCount === 1 ? 'item past its due date' : 'items past their due date'}</span>
+              <span>{overdueCount}</span> <span>{overdueCount === 1 ? 'item past its pay-by date' : 'items past their pay-by date'}</span>
               {lastDayToday > 0 && <span className="block font-medium text-foreground"><span>{lastDayToday}</span> <span>{lastDayToday === 1 ? 'reaches its last day to pay today' : 'reach their last day to pay today'}</span></span>}
             </>
           }

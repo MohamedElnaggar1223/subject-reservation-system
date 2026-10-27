@@ -141,7 +141,7 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   const takenNotice = taken && (
     <Notice tone="success" title="Taken at the desk">
       <span><Money amount={taken.amount} /></span>{taken.reference && <> · <span>reference</span> <bdi dir="ltr" className="font-mono">{taken.reference}</bdi></>}{' · '}
-      <span>{taken.subjects}</span> <span>{taken.subjects === 1 ? 'subject paid: its receipt is under Registrations, to hand over.' : 'subjects paid: their receipts are under Registrations, to hand over.'}</span>
+      <span>{taken.subjects}</span> <span>{taken.subjects === 1 ? 'subject paid: its receipt is under Reservations, to hand over.' : 'subjects paid: their receipts are under Reservations, to hand over.'}</span>
     </Notice>
   );
   if (!owed.lines.length && !owed.underWay.length && !owed.started.length && !owed.provisional.length && !owed.pastLastDay.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
