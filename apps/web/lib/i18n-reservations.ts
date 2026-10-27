@@ -490,7 +490,7 @@ export const familyArabic: Record<string, string> = {
   // P4a: Approvals in the families' words.
   'Waiting for your approval': 'بانتظار موافقتك',
   'Nothing is waiting for your approval': 'لا شيء بانتظار موافقتك',
-  'When your child asks for a subject, or to drop or change one, it comes here for you to approve.': 'حين يطلب ابنك أو ابنتك مادة، أو سحب مادة أو تغييرها، يصل الطلب إلى هنا لتوافق عليه.',
+  'When your child asks for a subject, or to drop or change one, it comes here for you to approve.': 'حين يطلب ابنك/ابنتك مادة، أو سحب مادة أو تغييرها، يصل الطلب إلى هنا لتوافق عليه.',
   'request waiting for your decision': 'طلب بانتظار قرارك',
   'requests waiting for your decision': 'طلبات بانتظار قرارك',
   'reference': 'المرجع',
