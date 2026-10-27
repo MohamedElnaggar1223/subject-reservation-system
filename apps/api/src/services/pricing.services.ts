@@ -42,11 +42,12 @@ export class PricingError extends Error {
 
 /**
  * A checkout's refusal when a line's price changed between the family's (or the desk's) reading
- * and the checkout's lock: a re-price committed in between (§3.4). The payment would otherwise
+ * and the checkout's lock: a re-price committed in between (§3.4) — a row's fee, the session's self-study share or a
+ * grant changed by the school. The payment would otherwise
  * charge the old price for a line that now costs another (09: a payment charges exactly what it
  * covers).
  */
-export const PRICE_CHANGED_REFUSAL = 'The price of one or more of these subjects changed while this was open (the exam board confirmed its fee) — look at the new price and pay again';
+export const PRICE_CHANGED_REFUSAL = 'The price of one or more of these subjects changed while this was open (the school updated it) — look at the new price and pay again';
 
 /**
  * The prices a checkout or a desk collection was shown (P1c), against the lines' prices under their locks: a line
@@ -58,9 +59,6 @@ export function assertExpectedPrices(locked: { id: string; price: number }[], ex
   const shown = new Map(expected.map((e) => [e.registrationId, e.price]));
   if (locked.some((l) => shown.has(l.id) && round2(shown.get(l.id)!) !== round2(l.price))) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
 }
-
-/** The desk's and the checkout's refusal for a line whose board fee is not yet confirmed (§3.4). */
-export const PROVISIONAL_REFUSAL = 'Board fee provisional, confirmed before payment: this line can be reserved but not paid until the exam board publishes its fee and the school confirms it';
 
 /** PRICE_NOT_SET (Appendix A): a row whose exam fee or course fee is not set is not offered to families. */
 export const PRICE_NOT_SET_REFUSAL = (what: string, part: 'exam fee' | 'course fee') =>

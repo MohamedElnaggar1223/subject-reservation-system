@@ -139,6 +139,8 @@ describe('08ze: P1c follow-ups', () => {
       registrationIds: [id], paymentMethod: 'in_school', escrowAmountToApply: 0, expectedPrices: [{ registrationId: id, price: shown }],
     } }));
     expect(refusedPay.code).toBe('PRICE_CHANGED');
+    // In the family's words (the fix round's L3): the school changed the price, not the exam board (the fee grid left).
+    expect(refusedPay.error).toBe('The price of one or more of these subjects changed while this was open (the school updated it) — look at the new price and pay again');
     expect(await sql(`select pr.payment_id from payment_registration pr where pr.registration_id = $1`, [id])).toEqual([]);
     // Read again, the new price is paid.
     const made = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: {
@@ -162,6 +164,7 @@ describe('08ze: P1c follow-ups', () => {
       studentId: f.studentId, registrationIds: [id], instrumentUsed: 'cash', expectedPrices: [{ registrationId: id, price: shown }],
     } }));
     expect(refusedCollect.code).toBe('PRICE_CHANGED');
+    expect(refusedCollect.error).toMatch(/\(the school updated it\)/);
     expect(await sql(`select pr.payment_id from payment_registration pr where pr.registration_id = $1`, [id])).toEqual([]);
     expect((await line(id)).status).toBe('pending_payment');
     const collected = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: {

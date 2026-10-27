@@ -464,10 +464,8 @@ export function translateSessionsText(text: string): string | null {
     [/^New amount for (.+)$/, (m) => `المبلغ الجديد لـ ${m[1]}`],
     [/^\((\d+)\)$/, (m) => `(${m[1]})`],
     // The API's refusals on these screens.
-    [/^Board fee provisional, confirmed before payment: this line can be reserved but not paid until the exam board publishes its fee and the school confirms it$/,
-      () => 'رسوم المجلس مؤقتة وتُؤكَّد قبل الدفع: يمكن حجز هذا السطر لا دفعه حتى ينشر المجلس رسومه وتؤكدها المدرسة'],
-    [/^The price of one or more of these subjects changed while this was open \(the exam board confirmed its fee\) — look at the new price and pay again$/,
-      () => 'تغيّر سعر مادة أو أكثر أثناء فتح هذه الصفحة (أكد المجلس رسومه) — راجع السعر الجديد وادفع مرة أخرى'],
+    [/^The price of one or more of these subjects changed while this was open \(the school updated it\) — look at the new price and pay again$/,
+      () => 'تغيّر سعر مادة أو أكثر أثناء فتح هذه الصفحة (حدّثته المدرسة) — راجع السعر الجديد وادفع مرة أخرى'],
     [/^(.+) is already in this session$/, (m) => `${m[1]} موجودة في هذه الجلسة بالفعل`],
     [/^Who teaches (.+)\? An open subject names its teachers — or make it self-study only$/, (m) => `من يدرّس ${m[1]}؟ المادة المفتوحة تحدد معلميها — أو اجعلها دراسة ذاتية فقط`],
     // MO-9: self-study only at 0 says why (F7's review of 2ca07a4, item 2).
