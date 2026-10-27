@@ -100,6 +100,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ─── Registration Card ────────────────────────────────────────────────────────
 
+/** The note the desk writes on what it reserves (desk.services.ts); any other comment is what a person wrote. */
+const DESK_NOTE = '[DESK] Registered at the finance desk';
+
 function RegistrationCard({
   reg,
   userRole,
@@ -178,7 +181,7 @@ function RegistrationCard({
                   ? 'bg-destructive/10 text-destructive'
                   : 'bg-muted text-muted-foreground'
               }`}>
-                &ldquo;{reg.approvalComments}&rdquo;
+                {reg.approvalComments === DESK_NOTE ? 'Reserved at the school desk.' : <>&ldquo;<span data-i18n-skip="true">{reg.approvalComments}</span>&rdquo;</>}
               </div>
             )}
           </div>
@@ -797,7 +800,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
               {isParent ? "Children's Registrations" : 'My Registrations'}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {registrations.length} registration{registrations.length !== 1 ? 's' : ''} total
+              {`${registrations.length} ${registrations.length === 1 ? 'registration' : 'registrations'} in all`}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

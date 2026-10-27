@@ -405,6 +405,7 @@ export function familyWords(text: string): string {
 
 /** The family's and the desk's phrases (merged after the other dictionaries in lib/i18n.tsx: these win). */
 export const familyArabic: Record<string, string> = {
+  'Reserved at the school desk.': 'حُجزت في مكتب المدرسة.',
   // The reservation page
   'Reserve now': 'احجز الآن',
   'Reserving for': 'الحجز لـ',
@@ -665,6 +666,7 @@ const countAr = (n: number, one: string, many: string) => (n === 1 ? `${one} و�
 
 /** The family's and the desk's sentences with data: the reservation's results and the refusals they show (after familyWords). */
 const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
+  [/^(\d+) registrations? in all$/, (m) => `${countAr(Number(m[1]), 'تسجيل', 'تسجيلات')} في المجموع`],
   [/^Reserved: (\d+) reservations? waiting for payment\.$/, (m) => `تم الحجز: ${countAr(Number(m[1]), 'حجز', 'حجوزات')} بانتظار الدفع.`],
   [/^Reserved: (\d+) reservations?\.$/, (m) => `تم الحجز: ${countAr(Number(m[1]), 'حجز', 'حجوزات')}.`],
   [/^(\d+) reserved, not collected: prices are not final yet\.$/, (m) => `${countAr(Number(m[1]), 'حجز', 'حجوزات')} دون تحصيل: الأسعار ليست نهائية بعد.`],
