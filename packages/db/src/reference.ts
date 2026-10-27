@@ -18,10 +18,41 @@
  */
 
 import { randomUUID } from 'crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { BoardsFile, SubjectsFile, ReferenceBoardCode } from '@repo/validations';
 import type * as schema from './schema';
+
+/**
+ * The directory of the reference data files (packages/db/reference), found from this module wherever it runs —
+ * from src (tsx) or from dist (the built package the API runs): the nearest ancestor holding reference/boards.json.
+ */
+export function referenceDataDir(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 6; i++) {
+    const candidate = join(dir, 'reference');
+    if (existsSync(join(candidate, 'boards.json'))) return candidate;
+    dir = dirname(dir);
+  }
+  throw new Error('The reference data files (packages/db/reference/boards.json) were not found');
+}
+
+/**
+ * The reference data files as JSON, not yet parsed: boards.json and subjects/<board>.json for each board named.
+ * The caller parses them through P0's schemas (@repo/validations) before loading them (P1c: the API loads them at
+ * its start, so every database it runs on holds the board's list).
+ */
+export function readReferenceDataFiles(boardCodes: readonly string[]): { boards: unknown; subjects: Record<string, unknown> } {
+  const dir = referenceDataDir();
+  const read = (path: string) => JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  return {
+    boards: read(join(dir, 'boards.json')),
+    subjects: Object.fromEntries(boardCodes.map((code) => [code, read(join(dir, 'subjects', `${code}.json`))])),
+  };
+}
 
 /** What the loader takes: the boards file and, per board, its subjects file (parsed by P0's schemas). */
 export type ReferenceData = {

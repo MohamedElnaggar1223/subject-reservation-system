@@ -30,6 +30,7 @@ import type {
   AddOfferingType, UpdateOfferingType, OfferingRowInputType, OfferingTeacherInputType, QuestionInputType, Sitting,
 } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
+import { redateLines } from '../deadline.services';
 import { findOrCreateSeries, attachSeries, detachUnusedSeries, OfferError } from '../offer.services';
 import { seriesRuleSentence } from '../series.services';
 import { teacherDuplicates, duplicateTeacherRefusal } from './teacher-names';
@@ -39,7 +40,7 @@ import { rowLabel, labelRowOf } from './labels';
 import { WHOLE_ITEM_LABEL } from '@repo/validations';
 import {
   availabilityOf, exclusiveGroupFor, needsPriorFor, seriesOfSitting, sittingOfSeries, defaultSitting, defaultCells, KIND_ORDER,
-  NO_CELLS, isLiveStatus, type Cells,
+  NO_CELLS, isLiveStatus, LIVE_LINE_STATUSES, type Cells,
 } from './model';
 import {
   planReprice, applyReprice, settleImpact, addImpact, tellRepriced, ImpactPending, NO_IMPACT, type Impact, type RepricedLine,
@@ -47,6 +48,9 @@ import {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
+
+/** The lines waiting to be paid (or approved) whose due date a row's pay-by makes (deadline.services redateLines). */
+const WAITING_STATUSES = ['pending_approval', 'pending_payment', 'preregistered'];
 
 export class SetupError extends Error {
   constructor(message: string, public readonly status: 400 | 403 | 404 | 409 = 400) {
@@ -304,7 +308,7 @@ async function linesOfRows(executor: Executor, itemIds: string[]) {
     .groupBy(registration.offerItemId, registration.attempt, registration.mode, registration.status);
 }
 
-type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: boolean; closedNow: boolean };
+type RowWrite = { id: string; created: boolean; priceChanged: boolean; changed: boolean; closedNow: boolean; payByChanged: boolean };
 
 /**
  * Create or change one row in the caller's transaction (the offering and its rows held). Only what
@@ -405,7 +409,7 @@ async function writeRow(
     });
     if (own?.length) await writeRowTeachers(tx, id, own);
     await logAction(c.actorId, 'OFFER_ITEM_CREATED', 'offer_item', id, null, { offerId: c.offer.id, ...values, teachers: own ?? [], via: 'the subject editor' }, undefined, tx);
-    return { id, created: true, priceChanged: false, changed: true, closedNow: false };
+    return { id, created: true, priceChanged: false, changed: true, closedNow: false, payByChanged: false };
   }
   const before = {
     label: existing.label, kind: existing.kind, referenceKey: existing.referenceKey, referenceCodes: existing.referenceCodes, boardSeriesId: existing.boardSeriesId,
@@ -418,7 +422,7 @@ async function writeRow(
   const currentTeachers = (await tx.select().from(sessionOfferItemTeacher).where(eq(sessionOfferItemTeacher.itemId, existing.id)).orderBy(asc(sessionOfferItemTeacher.sortOrder)))
     .map((t) => ({ teacherId: t.teacherId, mode: t.mode }));
   const teachersChange = own !== undefined && !sameTeachers(own, currentTeachers);
-  if (!Object.keys(diff).length && !teachersChange) return { id: existing.id, created: false, priceChanged: false, changed: false, closedNow: false };
+  if (!Object.keys(diff).length && !teachersChange) return { id: existing.id, created: false, priceChanged: false, changed: false, closedNow: false, payByChanged: false };
   if (Object.keys(diff).length) await tx.update(sessionOfferItem).set({ ...diff, updatedAt: now }).where(eq(sessionOfferItem.id, existing.id));
   if (teachersChange) await writeRowTeachers(tx, existing.id, own!);
   await logAction(c.actorId, 'OFFER_ITEM_UPDATED', 'offer_item', existing.id,
@@ -426,7 +430,8 @@ async function writeRow(
     { ...diff, ...(teachersChange ? { teachers: own } : {}), via: 'the subject editor' }, undefined, tx);
   const priceChanged = 'examFee' in diff || 'courseFee' in diff || 'selfStudyFee' in diff;
   const closedNow = !!(closesAt && closesAt <= now) && !(existing.closesAt && existing.closesAt <= now);
-  return { id: existing.id, created: false, priceChanged, changed: true, closedNow };
+  // D12, §6: a row's pay-by is its waiting lines' due date — the caller re-dates them (P1c).
+  return { id: existing.id, created: false, priceChanged, changed: true, closedNow, payByChanged: 'payBy' in diff };
 }
 
 /** A row left out of the set: removed when nothing ever used it, closed (kept for its history) when only history does; refused with live lines. */
@@ -607,8 +612,9 @@ export type OfferingSave = { saved: boolean; impact: Impact; repriced: RepricedL
  * course fee, who chooses the teacher, the teachers, the rows (the whole set when sent) and the
  * subject's questions. Only what differs is written, each change with its audit row; the same body
  * twice writes nothing. A price change (the course fee, a row's exam fee, course fee or self-study
- * amount) re-prices the unpaid lines it reaches and lists the rest for finance; closing the subject or
- * a row counts the reservations that stand. Answered first when it affects families (`expected`).
+ * amount) re-prices the unpaid lines it reaches and lists the rest for finance; a row's pay-by moved re-dates
+ * its waiting lines (dueDatesMoved, as the session's payment due date does); closing the subject or a row counts
+ * the reservations that stand. Answered first when it affects families (`expected`).
  */
 export async function updateOffering(sessionId: string, offeringId: string, data: UpdateOfferingType, actorId: string, ctx?: AuditContext): Promise<OfferingSave> {
   try {
@@ -663,6 +669,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
 
       // The rows: each sent changed or made; each left out removed or closed.
       const priceRows = new Set<string>();
+      const payByRows = new Set<string>();
       if (data.rows) {
         const ids = data.rows.map((r) => r.id).filter((x): x is string => !!x);
         if (new Set(ids).size !== ids.length) throw new SetupError('A row is sent twice');
@@ -696,6 +703,7 @@ export async function updateOffering(sessionId: string, offeringId: string, data
           const w = await writeRow(tx, c, r, r.id ? byId.get(r.id)! : null, pos, lines, { defaultsReviewed: !!data.defaultsReviewed });
           if (w.changed) changed = true;
           if (w.priceChanged) priceRows.add(w.id);
+          if (w.payByChanged) payByRows.add(w.id);
           if (w.closedNow) linesAffected += live([w.id]);
         }
         for (const r of rows.filter((x) => !ids.includes(x.id))) {
@@ -736,9 +744,23 @@ export async function updateOffering(sessionId: string, offeringId: string, data
         priceRows.add(id);
         changed = true;
       }
+      // A row's pay-by moved (D12): its waiting lines' due dates follow, as the session's payment due date does
+      // (§6: the row's pay-by if set, else the session's). Their lines and the re-priced rows' are locked in one
+      // pass, in id order, after the rows (§9.2), so neither pass waits on the other's set.
+      if (payByRows.size) {
+        await tx.select({ id: registration.id }).from(registration)
+          .where(and(inArray(registration.offerItemId, [...new Set([...priceRows, ...payByRows])]), inArray(registration.status, [...LIVE_LINE_STATUSES])))
+          .orderBy(asc(registration.id)).for('update');
+      }
       const plan = await planReprice(tx, { rowIds: [...priceRows] });
       const { told: repriced, impact: priced } = await applyReprice(tx, plan, { actorId, reason: `${subjectRow.name}: its price changed in ${session.name}`, entity: { type: 'session_offer', id: offeringId }, ctx });
-      const impact = addImpact(priced, { linesAffected });
+      let dueDatesMoved = 0;
+      if (payByRows.size) {
+        const waiting = await tx.select({ id: registration.id }).from(registration)
+          .where(and(inArray(registration.offerItemId, [...payByRows]), inArray(registration.status, WAITING_STATUSES))).orderBy(asc(registration.id));
+        dueDatesMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, `the pay-by date of a row of ${subjectRow.name} changed`);
+      }
+      const impact = addImpact(priced, { linesAffected, dueDatesMoved });
       settleImpact(impact, data.expected);
       return { saved: true, impact: changed || plan.repriced.length ? impact : NO_IMPACT, repriced, subjectName: subjectRow.name, sessionName: session.name };
     });

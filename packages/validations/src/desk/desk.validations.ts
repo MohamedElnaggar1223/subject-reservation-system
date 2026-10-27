@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { RoleSchema } from '../roles';
 import { EntryGradeSchema } from '../academic/academic-year';
 import { CommonSchemas, isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
-import { ReservationLines, ReservationConsent, ReservationAnswers } from '../registration/reservation.validations';
+import { ReservationLines, ReservationConsent, ReservationAnswers, ExpectedLinePrices } from '../registration/reservation.validations';
 
 // ─── Team management (G7) ────────────────────────────────────────────────────
 
@@ -127,6 +127,8 @@ export const DeskCollect = z.object({
   // A line the school reserved (grade 10, §4.2) carries the school's consent only: the family's
   // own pair is taken when it is paid — here, "read and signed by the parent".
   consent: ReservationConsent.optional(),
+  // The price of each subject as the desk's screen showed it (P1c): a re-price landing since is refused, PRICE_CHANGED.
+  expectedPrices: ExpectedLinePrices.optional(),
 }).refine((d) => d.registrationIds.length + d.chargeIds.length > 0 || !!d.schoolFeeYear, { message: 'Select something to collect', path: ['registrationIds'] });
 export type DeskCollectType = z.infer<typeof DeskCollect>;
 

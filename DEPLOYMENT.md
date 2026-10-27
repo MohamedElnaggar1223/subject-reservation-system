@@ -39,7 +39,11 @@ Locally nothing changes: `API_URL` unset means no rewrite and the browser calls
   `NODE_ENV=production` at runtime only).
 - Start: `pnpm --filter @repo/db db:migrate && pnpm --filter @repo/db seed && pnpm --filter @repo/api start`.
   Migrations run on every boot; the seed (admin promotion only, no samples) is
-  idempotent and promotes the `ADMIN_EMAIL` account when it exists.
+  idempotent and promotes the `ADMIN_EMAIL` account when it exists. The API itself loads the
+  board's list (the reference data in `packages/db/reference`) at every start, before it serves
+  (P1c, 27 Oct 2026): idempotent, so no deploy step is needed for it, and a database copied from
+  an older one holds the list the coordinator picks subjects from. Its log line reads
+  `[reference] loaded at start: …`.
 - Environment: `DATABASE_URL` (internal), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
   `APP_URL`, `CORS_ORIGINS`, `RESEND_API_KEY`, `EMAIL_FROM`, `NODE_VERSION`,
   `REQUIRE_EMAIL_VERIFICATION=false`, `ADMIN_EMAIL`, the rate-limit ceilings and the

@@ -69,7 +69,7 @@ import { schoolDateTime, assertMayPay, mayPay, cutOffsOf, lineNames, BOARD_DEADL
 import { coded } from '../lib/refusal';
 import { effectiveDeadlineFor, effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
 import { senderNames } from './settings.services';
-import { PRICE_CHANGED_REFUSAL } from './pricing.services';
+import { PRICE_CHANGED_REFUSAL, assertExpectedPrices } from './pricing.services';
 import { consentStanding, writeConsents, refundTermsFor, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { seriesPastDeadline, seriesDisplayName } from './series.services';
 import { expireOverdueLines } from './overdue.services';
@@ -340,7 +340,9 @@ export async function initiatePayment(
     if (locked.length !== data.registrationIds.length || locked.some((r) => r.status !== expected)) {
       throw coded(new Error('One or more registrations are not ready for payment'), 'NOT_WAITING');
     }
-    // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
+    // The prices the family was shown (P1c) and the prices read before the lock still hold: a re-price may have
+    // committed since the checkout was read, or in between (§3.4).
+    assertExpectedPrices(locked, data.expectedPrices);
     if (locked.some((l) => l.price !== regs.find((r) => r.id === l.id)?.priceAtRegistration)) throw coded(new Error(PRICE_CHANGED_REFUSAL), 'PRICE_CHANGED');
     // May pay, asked again under the lines' locks (L2 of the P1b review): the cut-off may have passed, or the
     // student left, since the check above.

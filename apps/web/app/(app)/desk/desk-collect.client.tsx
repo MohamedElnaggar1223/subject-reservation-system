@@ -103,6 +103,8 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   const collect = useMutation({
     mutationFn: (instrumentUsed: Parameters<typeof collectAtDesk>[0]['instrumentUsed']) => collectAtDesk({
       studentId, registrationIds: lineIds, chargeIds, instrumentUsed, escrowAmountToApply: fromBalance,
+      // The prices this screen shows: a re-price landing since it was read is refused (PRICE_CHANGED), not collected.
+      expectedPrices: owed.lines.filter((l) => lineIds.includes(l.id)).map((l) => ({ registrationId: l.id, price: l.priceAtRegistration })),
       ...(fee ? { schoolFeeYear: fee.academicYear } : {}),
       ...(consent && owed.lines.some((l) => l.familyConsentNeeded && lineIds.includes(l.id)) ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
     }),
@@ -117,7 +119,11 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
         setPicked((m) => new Map(m).set(`l:${named.id}`, false));
         setError('');
         onDone();
-      } else setError(sentence);
+      } else {
+        setError(sentence);
+        // A price changed since this screen was read: read it again, so the new price is what is collected next.
+        if (refusalCodeOf(err) === 'PRICE_CHANGED') onDone();
+      }
     },
   });
 
