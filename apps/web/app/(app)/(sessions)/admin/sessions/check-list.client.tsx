@@ -133,7 +133,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
   // A check-list button saves nothing families would feel: a subject whose save answers that it would (a fee that
   // follows another re-derived, closing with reservations) is not saved, and she is sent to the subject to see it.
   // Every subject is tried; the ones not saved are named with the reason, and the list is read again either way.
-  const putOfferings = async (ids: string[], json: { notesReviewed?: true; defaultsReviewed?: true; accepting?: boolean }) => {
+  const putOfferings = async (ids: string[], json: { notesReviewed?: true; defaultsReviewed?: true; olderSittingsKept?: true; accepting?: boolean }) => {
     const notSaved: NotSaved[] = [];
     for (const offeringId of ids) {
       const o = byId.get(offeringId);
@@ -287,23 +287,39 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     });
   }
 
-  // D6: an earlier exam older than the board carries a result forward — kept (her list wins), warned.
+  // D6: an earlier exam older than the board carries a result forward — her list wins, so it stays, with a warning.
+  // One line per subject: "Keep it" says she means it (olderSittingsKept, P1c item 10a) — the line leaves, the editor
+  // says it is kept, and a copy of the session keeps it so; or she opens the subject and unticks it.
+  const old = new Map<string, { o: Offering; items: { r: Offering['rows'][number]; p: Offering['rows'][number]['allowedPriorSittings'][number] }[] }>();
   for (const c of of('carried_from_too_old')) {
     const o = byId.get(c.offeringId ?? '');
     const r = o?.rows.find((x) => x.id === c.rowId);
     if (!o || !r) continue;
-    for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward)) {
-      entries.push({
-        key: `old-${r.id}-${p.id}`, severity: 'look', forHome: true,
-        body: (
-          <>
-            <Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{label(r)}</span><span>:</span> <span>{examMonth(p.month, p.year)}</span>{' '}
-            <span>is older than</span> <Name>{o.board.name}</Name> <span>carries a result forward. It stays, since your list wins; the board may refuse the entry.</span>
-          </>
-        ),
-        actions: [{ kind: 'link', label: 'Open the subject', href: subjectHref(o.id) }],
-      });
+    const g = old.get(o.id) ?? { o, items: [] };
+    for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward && !x.kept)) {
+      if (!g.items.some((x) => x.r.id === r.id && x.p.id === p.id)) g.items.push({ r, p });
     }
+    old.set(o.id, g);
+  }
+  for (const { o, items } of old.values()) {
+    if (!items.length) continue;
+    entries.push({
+      key: `old-${o.id}`, severity: 'look', forHome: true,
+      body: (
+        <>
+          <Name>{subjectTitle(o)}</Name> — {items.map(({ r, p }, i) => (
+            <span key={`${r.id}-${p.id}`}>{i > 0 && <span>; </span>}<span data-i18n-skip="true">{label(r)}</span><span>:</span> <span>{examMonth(p.month, p.year)}</span></span>
+          ))}{' '}
+          <span>{items.length === 1 ? 'is older than' : 'are older than'}</span> <Name>{o.board.name}</Name>{' '}
+          <span>carries a result forward. It stays, since your list wins; the board may refuse the entry.</span>{' '}
+          <span>Keep it, or untick it on the subject.</span>
+        </>
+      ),
+      actions: [
+        { kind: 'run', label: 'Keep it', primary: true, run: () => putOfferings([o.id], { olderSittingsKept: true }) },
+        { kind: 'link', label: 'Open the subject', href: subjectHref(o.id) },
+      ],
+    });
   }
 
   // A date after a board's deadline: one line per deadline and what is late. Where the browser's reading of the
