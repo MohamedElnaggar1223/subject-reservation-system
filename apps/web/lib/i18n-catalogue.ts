@@ -13,6 +13,8 @@
  */
 
 export const catalogueArabic: Record<string, string> = {
+  // P4a B6: the board's rules the reference data owns, read on the parked screens, no longer edited there.
+  'This comes with the board\'s reference data, kept by us; it is not changed here.': 'يأتي هذا مع البيانات المرجعية للمجلس التي نحتفظ بها؛ ولا يُغيَّر هنا.',
   // ── Shared ──
   'No entry deadline yet': 'لا يوجد آخر موعد للقيد بعد',
   'Passed': 'انقضى',
