@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Write docs/admin-guide/index.html and docs/admin-guide/img/ from the steps (steps.py), the session's data
-(guide-data.json) and the drive's screenshots (SHOTS, default /tmp/ag/shots).
+"""Write docs/admin-guide/index.html and docs/admin-guide/img/ from the steps (steps.py) and the drive's screenshots
+(SHOTS, default /tmp/ag/shots).
 
-Forked from the F8 walkthrough's generator (.audit/walkthrough-cycle-evidence/drive/gen*.py). Each step: a number
-(given in order), a title, where the admin is, what to click or type (the screen's labels marked), what she sees, the
-school's form wording beside it where there is one, and the screenshot(s) taken at that step. A screenshot missing
-from SHOTS is taken from the img/ folder already there (so the words can be regenerated without the drive)."""
+Forked from the F8 walkthrough's generator (.audit/walkthrough-cycle-evidence/drive/gen*.py). The guide is in parts;
+each part's steps are numbered with its letter (A1, A2…). A part marked counted is scored by its number of steps
+(COORDINATOR_REWORK.md §13, P4): the counts are worked out here and written into the page. Each step: a title, who
+does it when it is not the coordinator (the admin), where she is, what to click or type (the screen's labels marked),
+what she sees, the school's form wording beside it where there is one, and the screenshot(s) taken at that step. A
+screenshot missing from SHOTS is taken from the img/ folder already there (so the words can be regenerated without
+the drive)."""
 import glob, html, json, os, re, shutil, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.dirname(HERE)
 SHOTS = os.environ.get('SHOTS', '/tmp/ag/shots')
-D = json.load(open(os.path.join(HERE, 'guide-data.json')))
 CSS = open(os.path.join(HERE, 'style.css')).read()
 
 def L(s):
@@ -23,18 +25,15 @@ def esc(s):
 
 CHAPTERS = []
 
-def chapter(cid, title, intro):
-    CHAPTERS.append({'id': cid, 'title': title, 'intro': intro, 'steps': []})
+def chapter(cid, title, intro, prefix, counted=False, limit=None, body=''):
+    """A part of the guide: its steps are numbered prefix + n; a counted part is scored by its steps (at most limit)."""
+    CHAPTERS.append({'id': cid, 'title': title, 'intro': intro, 'prefix': prefix, 'counted': counted, 'limit': limit,
+                     'body': body, 'steps': []})
 
-def step(title, where='', do='', see='', form=None, img=None, cap=None, tall=False, key=None, after=''):
+def step(title, where='', do='', see='', form=None, img=None, cap=None, tall=False, key=None, after='', who=None):
     imgs = [] if img is None else (img if isinstance(img, list) else [img])
     CHAPTERS[-1]['steps'].append({'title': title, 'where': where, 'do': do, 'see': see, 'form': form, 'imgs': imgs,
-                                  'cap': cap, 'tall': tall, 'key': key, 'after': after})
-
-def paste(lines):
-    """A block to copy and paste, with a Copy button (works offline; hidden in print)."""
-    text = '\n'.join(lines)
-    return f'<div class="paste"><button type="button" onclick="copyBlock(this)">Copy</button><pre>{esc(text)}</pre></div>'
+                                  'cap': cap, 'tall': tall, 'key': key, 'after': after, 'who': who})
 
 def table(head, rows, num_cols=()):
     th = ''.join(f'<th>{h}</th>' for h in head)
@@ -43,15 +42,19 @@ def table(head, rows, num_cols=()):
 
 NS = {**globals()}
 exec(open(os.path.join(HERE, 'steps.py')).read(), NS)
-HEADER = NS['HEADER']
+HEADER, TITLE, BRAND, SUB = NS['HEADER'], NS['TITLE'], NS['BRAND'], NS['SUB']
 
 def build():
     keys, n_steps = {}, 0
+    counts = {}
     for c_i, c in enumerate(CHAPTERS, 1):
         c['num'] = c_i
+        counts[c['prefix']] = len(c['steps'])
+        if c['counted'] and c['limit'] is not None and len(c['steps']) > c['limit']:
+            sys.exit(f'part {c["prefix"]} has {len(c["steps"])} steps, over its {c["limit"]}')
         for k, s in enumerate(c['steps'], 1):
-            s['num'] = f'{c_i}.{k}'
-            s['anchor'] = f's{c_i}-{k}'
+            s['num'] = f'{c["prefix"]}{k}'
+            s['anchor'] = f's-{c["prefix"].lower().strip(".")}{k}'
             if s['key']:
                 if s['key'] in keys:
                     sys.exit(f'step key used twice: {s["key"]}')
@@ -63,12 +66,17 @@ def build():
                 c = next((c for c in CHAPTERS if c['id'] == k[3:]), None)
                 if not c:
                     sys.exit(f'unknown chapter {k}')
-                return f'<a href="#{c["id"]}">{"Chapter" if cap else "chapter"} {c["num"]}</a>'
+                return f'<a href="#{c["id"]}">{esc(c["title"])}</a>'
+            if k.startswith('count:'):
+                p = k[6:].upper()
+                if p not in counts:
+                    sys.exit(f'unknown part {k}')
+                return str(counts[p])
             s = keys.get(k)
             if not s:
                 sys.exit(f'unknown step key {k}')
             return f'<a href="#{s["anchor"]}">{"Step" if cap else "step"} {s["num"]}</a>'
-        return re.sub(r'\[\[(\^?)([a-z0-9:-]+)\]\]', sub, text)
+        return re.sub(r'\[\[(\^?)([a-zA-Z0-9:-]+)\]\]', sub, text)
 
     # Images: each named by its step and the drive's shot name; a shot missing from SHOTS is kept from img/.
     img_dir = os.path.join(OUT, 'img')
@@ -78,7 +86,8 @@ def build():
         for s in c['steps']:
             s['files'] = []
             for shot in s['imgs']:
-                name = f'{s["num"].split(".")[0]}-{int(s["num"].split(".")[1]):02d}-{shot}.jpg'
+                m = re.match(r'([A-Z0-9.]*?)\.?(\d+)$', s['num'])
+                name = f'{m.group(1).strip(".") or "0"}{int(m.group(2)):02d}-{shot}.jpg'
                 src = os.path.join(SHOTS, shot + '.jpg')
                 if not os.path.exists(src):
                     old = glob.glob(os.path.join(img_dir, f'*-{shot}.jpg'))
@@ -99,16 +108,26 @@ def build():
     shutil.copytree(stage, img_dir)
     shutil.rmtree(stage)
 
+    def tally(c):
+        """A part's heading tail: its step count, and whether it is scored or for reference."""
+        if c['counted']:
+            return f'{len(c["steps"])} steps (at most {c["limit"]})'
+        return f'{len(c["steps"])} steps, not counted' if c['steps'] else ''
+
     nav, body = [], []
     for c in CHAPTERS:
-        nav.append(f'<h2><a href="#{c["id"]}">{c["num"]}. {esc(c["title"])}</a></h2><ol>')
-        body.append(f'<section class="chapter" id="{c["id"]}"><h2>{c["num"]}. {esc(c["title"])}</h2><p class="intro">{refs(c["intro"])}</p>')
+        t = tally(c)
+        nav.append(f'<h2><a href="#{c["id"]}">{esc(c["title"])}</a>{f" <span>{t}</span>" if t else ""}</h2><ol>')
+        head = f'<h2>{esc(c["title"])}{f" <span class=tally>{t}</span>" if t else ""}</h2>'
+        body.append(f'<section class="chapter{" counted" if c["counted"] else ""}" id="{c["id"]}" data-part="{c["prefix"]}" data-steps="{len(c["steps"])}">'
+                    f'{head}<p class="intro">{refs(c["intro"])}</p>{refs(c["body"])}')
         for s in c['steps']:
             n_steps += 1
-            nav.append(f'<li><a href="#{s["anchor"]}"><span>{s["num"]}</span>{esc(s["title"])}</a></li>')
+            badge = f'<span class="who">{esc(s["who"])}</span>' if s['who'] else ''
+            nav.append(f'<li><a href="#{s["anchor"]}"><span>{s["num"]}</span>{esc(s["title"])}{" (" + esc(s["who"]) + ")" if s["who"] else ""}</a></li>')
             form = ''
             if s['form']:
-                form = '<aside class="form"><div class="t">The school\'s form says</div>' + ''.join(f'<p>{esc(x)}</p>' for x in s['form']) + '</aside>'
+                form = '<aside class="form"><div class="t">Your form says</div>' + ''.join(f'<p>{esc(x)}</p>' for x in s['form']) + '</aside>'
             where = f'<p class="where"><b>Where you are:</b> {refs(s["where"])}</p>' if s['where'] else ''
             see = f'<p class="see"><b>You see:</b> {refs(s["see"])}</p>' if s['see'] else ''
             figs = ''
@@ -118,28 +137,21 @@ def build():
                 capt = f'<figcaption>{refs(cap)}</figcaption>' if cap else ''
                 figs += f'<figure><img{cls} loading="lazy" src="img/{name}" alt="Step {s["num"]}: {esc(s["title"])}">{capt}</figure>'
             cols = 'cols' if form else 'cols single'
-            body.append(f'<section class="step" id="{s["anchor"]}"><h3><span class="n">{s["num"]}</span>{esc(s["title"])}</h3>'
+            body.append(f'<section class="step{" admin" if s["who"] else ""}" id="{s["anchor"]}"><h3><span class="n">{s["num"]}</span>{badge}{esc(s["title"])}</h3>'
                         f'<div class="{cols}"><div class="do">{where}{refs(s["do"])}{see}</div>{form}</div>{refs(s["after"])}{figs}</section>')
         nav.append('</ol>')
         body.append('</section>')
-    toc = ''.join(f'<li><a href="#{c["id"]}">{c["num"]}. {esc(c["title"])}</a></li>' for c in CHAPTERS)
+    toc = ''.join(f'<li><a href="#{c["id"]}">{esc(c["title"])}</a>{f" — {tally(c)}" if tally(c) else ""}</li>' for c in CHAPTERS)
     page = f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Building the June 2027 session — the admin's guide</title>
+<title>{esc(TITLE)}</title>
 <style>{CSS}</style>
-<script>
-// Copy a block for pasting. The plain copy first: it works offline, from the file, in every browser; the newer
-// clipboard call only if it fails. If both fail, the block is left selected for Ctrl+C.
-function copyBlock(b){{var pre=b.nextElementSibling,t=pre.textContent,done=false;var a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.top='-1000px';document.body.appendChild(a);a.select();try{{done=document.execCommand('copy');}}catch(e){{done=false;}}document.body.removeChild(a);
-function ok(){{b.textContent='Copied';b.className='done';setTimeout(function(){{b.textContent='Copy';b.className='';}},2000);}}
-function sel(){{var r=document.createRange();r.selectNodeContents(pre);var s=window.getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Press Ctrl+C';}}
-if(done){{ok();return;}}if(navigator.clipboard){{navigator.clipboard.writeText(t).then(ok,sel);}}else{{sel();}}}}
-</script></head>
+</head>
 <body>
-<nav aria-label="Chapters and steps"><p class="brand">Building the June 2027 session</p><p class="sub">The admin's guide, step by step</p>{''.join(nav)}</nav>
+<nav aria-label="Parts and steps"><p class="brand">{esc(BRAND)}</p><p class="sub">{esc(SUB)}</p>{''.join(nav)}</nav>
 <main>
 <header class="top">
-<h1>Building the June 2027 session on the system</h1>
+<h1>{esc(TITLE)}</h1>
 {refs(HEADER)}
 <ol class="toc">{toc}</ol>
 </header>
@@ -147,8 +159,8 @@ if(done){{ok();return;}}if(navigator.clipboard){{navigator.clipboard.writeText(t
 </main></body></html>'''
     with open(os.path.join(OUT, 'index.html'), 'w') as f:
         f.write(page)
-    print(f'{len(CHAPTERS)} chapters, {n_steps} steps, {n_imgs} images ({from_old} kept from img/), index.html {len(page) // 1024} KB')
+    print(f'{len(CHAPTERS)} parts, {n_steps} steps, {n_imgs} images ({from_old} kept from img/), index.html {len(page) // 1024} KB')
     for c in CHAPTERS:
-        print(f'  {c["num"]:>2}. {c["title"]}: {len(c["steps"])} steps, {sum(len(s["files"]) for s in c["steps"])} images')
+        print(f'  {c["prefix"]:>3} {c["title"]}: {len(c["steps"])} steps{" (counted, at most " + str(c["limit"]) + ")" if c["counted"] else ""}, {sum(len(s["files"]) for s in c["steps"])} images')
 
 build()

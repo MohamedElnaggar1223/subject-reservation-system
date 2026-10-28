@@ -1,5 +1,5 @@
 // Open the admin guide offline (file://) and check it: every image loads, every in-page link has its target, no request
-// leaves the file. Forked from the walkthrough's check (.audit/walkthrough-cycle-evidence/drive/check-page.mjs).
+// leaves the file; it prints each part's step count (the score of the counted parts). Forked from the walkthrough's check (.audit/walkthrough-cycle-evidence/drive/check-page.mjs).
 // Usage: node check-page.mjs [path/to/index.html] [folder for the review shots]
 import { chromium } from 'playwright-core';
 import path from 'node:path';
@@ -24,14 +24,14 @@ const res = await page.evaluate(() => {
   const anchors = [...document.querySelectorAll('a[href^="#"]')].map((a) => a.getAttribute('href').slice(1));
   const missing = [...new Set(anchors.filter((id) => !document.getElementById(id)))];
   const otherLinks = [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')).filter((h) => !h.startsWith('#'));
-  return { chapters: document.querySelectorAll('section.chapter').length, steps: document.querySelectorAll('section.step').length,
-    images: imgs.length, broken, links: anchors.length, missing, otherLinks, pasteBlocks: document.querySelectorAll('.paste').length };
+  const parts = [...document.querySelectorAll('section.chapter')].map((c) => ({ part: c.dataset.part, steps: c.querySelectorAll('section.step').length, counted: c.classList.contains('counted'), title: c.querySelector('h2').textContent }));
+  return { parts, steps: document.querySelectorAll('section.step').length, images: imgs.length, broken, links: anchors.length, missing, otherLinks };
 });
 const onDisk = fs.readdirSync(path.join(path.dirname(file), 'img')).length;
 console.log(JSON.stringify({ file: path.relative(process.cwd(), file), ...res, imageFilesOnDisk: onDisk, externalRequests: external, pageErrors: errors }, null, 1));
 if (shotsDir) {
   fs.mkdirSync(shotsDir, { recursive: true });
-  for (const [id, name] of [['start', 'page-start'], ['s8-3', 'page-sheet-arabic'], ['next', 'page-end']]) {
+  for (const [id, name] of [['start', 'page-start'], ['s-a3', 'page-a3'], ['s-c2', 'page-c2'], ['wrong', 'page-end']]) {
     await page.evaluate((x) => document.getElementById(x)?.scrollIntoView(), id);
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${shotsDir}/${name}.jpg`, type: 'jpeg', quality: 70 });
