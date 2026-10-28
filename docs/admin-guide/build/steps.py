@@ -40,8 +40,8 @@ chapter('start', 'Before you start',
 
 step('Have these at hand', do=f'''<ul>
 <li><b>The boards' fee lists</b>, the PDFs the school receives: Cambridge's “Registration Fees” list and Edexcel's. The June
-2027 lists are not published yet; until they are, the June 2026 lists are the ones to use (the session already carries their
-fees, so you only paste them again if a figure changed). When June 2027's arrive, you paste them the same way.</li>
+2027 lists are not published yet. The session already carries the June 2026 figures; pasting a list checks them against it and
+takes any figure that changed ([[cambridge-paste]]). When June 2027's arrive, you paste them the same way.</li>
 <li><b>The school's course fee for each subject</b> this cycle: the school's own figure, on top of the board's exam fee.
 No list holds it, so you type it.</li>
 <li><b>Your dates:</b> the day families should pay by, the first lesson (the refund weeks count from it) and, if you want one,
@@ -58,7 +58,7 @@ step('An account for you', who=ADMIN, where=f'{L("Team")} in the column on the l
 coordinator sets up the sessions, subjects, teachers, prices and dates, and reads who reserved and who paid.)</li>
 <li>Click {L("Create Account")}, and give her the address below, her email and the password yourself.</li></ol>
 <p>The desk gets its account the same way, with {L("Role")}: {L("Finance Officer")}.</p>''',
-     see=f'{L("Account created for")} and her email. She appears in the {L("Staff")} list.', img='team-coordinator')
+     see=f'{L("Account created for")} and her email. She appears in the {L("Staff")} list.', img=['team-coordinator', 'team-list'])
 
 step('Open the system', do=f'''<ol>
 <li>On a computer (the screens are wide; a laptop is fine), open Chrome, Edge, Safari or Firefox.</li>
@@ -152,7 +152,7 @@ every price it needs is set.</p>''',
 
 step("Paste Cambridge's list", where=f'{L("Prices")}, the box {L("Paste a list as printed")}.', do=f'''<ol>
 <li>{L("Board")}: {L("Cambridge International")}.</li>
-<li>{L("The board's fees for")}: the list you have, {L("June 2026")} today ({L("June 2027")} once Cambridge publishes it).
+<li>{L("The board's fees for")}: the list you are pasting, {L("June 2026")} today ({L("June 2027")} once Cambridge publishes it).
 {L("Its name:")} shows the name the list will carry.</li>
 <li>In the PDF, select the table's lines (code, name and amount on each), copy them, click in {L("The list, pasted")} and
 paste. As it is: no tidying, old codes such as 9608 and pairs such as “9700 S1 / S2” are understood.</li>
@@ -167,14 +167,14 @@ the old amount when it does, {L("not set")} when the row had none.</li>
 <ol><li>Click {L("Use these prices")}.</li></ol>''',
      see=f'''{L("Used: 2 rows priced from Cambridge International June 2026.")} Only rows whose fee changed are counted. Here every
 row the school offers already had the list's fee; the 2 are rows it does not offer, which had none. The list appears under
-{L("Price lists in use")}.''', img=['a-read-cambridge', 'a-lists-in-use'], key='cambridge-use')
+{L("Price lists in use")}.''', img=['a-read-cambridge', 'a-use-cambridge'], key='cambridge-use')
 
 step("Edexcel's list", where=f'{L("Prices")}, the box {L("Paste a list as printed")}.', do=f'''<ol>
 <li>{L("Board")}: {L("Pearson Edexcel")}, and {L("The board's fees for")}: the list you have.</li>
 <li>Paste Edexcel's list as in [[^cambridge-paste]], click {L("Read the list")}, check it, and click {L("Use these prices")}.</li></ol>
 <p>Human Biology O.L. and Biology A.S./A.L.'s units 1–4 keep the Edexcel November 2026 figures they came with: the June list does
 not print them. OxfordAQA sends the school no list: its two subjects' fees are typed in the next step.</p>''',
-     img='a-read-edexcel')
+     see=f'both lists under {L("Price lists in use")}.', img=['a-read-edexcel', 'a-lists-in-use'])
 
 step('The exam fees no list holds', where=f'{L("Prices")}, {L("Missing exam fees (9)")}.', do=f'''<p>Nine rows have no fee on any
 list the school has: the two OxfordAQA subjects, the subjects whose code is still to check (Environmental Management, Global
@@ -194,10 +194,10 @@ the check list.''', img='a-course-fees')
 
 step('Pay by', where='the session, the dates in the header (scroll to the top).', do=f'''<ol>
 <li>{L("Pay by")}: the day families should pay by. Pick it in the calendar or type it; it saves when you click elsewhere.</li></ol>
-<p>Under it: {L("Last day to pay: 3 days after it. Unpaid reservations are cancelled after that.")} (the 3 days are set in
-[[agree-more]]). A family that reserves after the pay-by date has a few days of its own to pay.</p>
-<p>If the dates already shown are the ones you want, click {L("Keep them")} on the check list's dates line instead of
-[[^pay-by]] to [[close-date]].</p>''', img='a-date-pay-by', key='pay-by')
+<p>Under it, {L("Last day to pay: 3 days after it. Unpaid reservations are cancelled after that.")} The 3 days are set in
+[[agree-more]]. A family that reserves after the pay-by date has a few days of its own to pay.</p>
+<p>If the dates already shown are the ones you want, click {L("Keep them")} on the check list's dates line instead, and go on
+to [[refund]].</p>''', img='a-date-pay-by', key='pay-by')
 
 step('First lesson', where='the session, the dates.', do=f'''<ol><li>{L("First lesson")}: the day teaching starts. {L("The refund weeks count from it.")}</li></ol>''',
      see='the check list\'s dates line has left: you set the dates.', img='a-date-first')
@@ -237,7 +237,7 @@ have nothing to do.</p>
 {L("Entry deadline")}. Leave {L("Retake deadline (if the board has one)")} empty: Cambridge's June series has none.</li>
 <li>Click {L("Save the date")}.</li></ol>
 <p>It is entered once, for every session that uses Cambridge June 2027. If a saved date turns out wrong, tell us.</p>''',
-     see='the line leaves; Opening waits for nothing more.', img='a-admin-date', key='admin-date')
+     see=f'the line leaves. On your screen, {L("Waiting for the admin: …")} and {L("Opening waits for: …")} go.', img='a-admin-date', key='admin-date')
 
 step('Prices final', where='the session, the header.', do=f'''<ol><li>When the prices are the ones families will pay, switch
 {L("Prices final")} on.</li></ol>
@@ -271,7 +271,8 @@ rows, and the declaration. Then {L("Reserve now (3)")}.</p>''', see=f'{L("Reserv
 
 step('The second child, with a retake', where=f'{L("Reserve for Karim Two")}.', do=f'''<p>The same page for the other child. A
 retake asks what your form asked: {L("When did your child sit it?")}, from the earlier exams you allowed. Each choice shows the
-exam fee and the course fee.</p>''', img='b-reserve-retake')
+exam fee and the course fee.</p>''',
+     see=f'both children\'s subjects under {L("My reservations")}, {L("Waiting for payment")}, each with its pay-by date.', img=['b-reserve-retake', 'b-my-reservations'])
 
 step('Pay: at the school or by InstaPay', where="the parent's Home, then the checkout.", do=f'''<p>Home now says
 {L("June 2027: EGP 47,900 to pay — pay by 15 Jan 2027")} and {L("Last day to pay: 18 Jan 2027; after it the subject can no longer be paid.")}
@@ -279,7 +280,8 @@ step('Pay: at the school or by InstaPay', where="the parent's Home, then the che
      img=['b-pay-now', 'b-checkout'])
 
 step('A reference to quote at the desk', where=f'{L("Payment started")}.', do=f'''<p>Paying at the school gives a reference,
-{L("SCH-…")}, with {L("Quote this reference (or the student's name) at the desk.")} Home shows it too.</p>''', img='b-payment-started')
+{L("SCH-…")}, with {L("Quote this reference (or the student's name) at the desk.")} Home shows it too:
+{L("Quote this reference at the desk: SCH-…")}</p>''', img=['b-payment-started', 'b-parent-home-after'])
 
 step('The desk: a walk-in family', where=f'{L("The Desk")}, signed in as the finance officer.', do=f'''<p>The officer types in
 {L("Type a student's name, email, ID, or a payment reference…")}, opens the student, and clicks {L("+ Reserve")}.</p>''',

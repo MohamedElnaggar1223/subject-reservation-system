@@ -122,8 +122,10 @@ for (const [board, list, tag] of [['cambridge', 'Cambridge June 2026', 'cambridg
   await page.locator('#pl-board').selectOption(board);
   await page.locator('#pl-text').fill(listText(list));
   facts.lists[tag] = { name: await page.locator('#pl-for').locator('xpath=..').locator('xpath=..').locator('strong').innerText().catch(() => '') };
-  await toTop(page, page.getByRole('heading', { name: 'Paste a list as printed' }), 70);
-  await shotMarked(page, `a-paste-${tag}`, page.getByRole('button', { name: 'Read the list' }));
+  if (tag === 'cambridge') {
+    await toTop(page, page.getByRole('heading', { name: 'Paste a list as printed' }), 70);
+    await shotMarked(page, `a-paste-${tag}`, page.getByRole('button', { name: 'Read the list' }));
+  }
   await page.getByRole('button', { name: 'Read the list' }).click();
   await page.getByRole('button', { name: 'Use these prices' }).waitFor();
   await settle(page);
@@ -137,8 +139,10 @@ for (const [board, list, tag] of [['cambridge', 'Cambridge June 2026', 'cambridg
     await shot(page, `a-tocheck-${tag}`);
     facts.lists[tag].toCheckText = await sec.locator('h3', { hasText: 'To check' }).locator('xpath=..').innerText();
   }
-  await toTop(page, page.getByRole('button', { name: 'Use these prices' }), 500);
-  await shotMarked(page, `a-use-${tag}`, page.getByRole('button', { name: 'Use these prices' }));
+  if (tag === 'cambridge') {
+    await toTop(page, page.getByRole('button', { name: 'Use these prices' }), 500);
+    await shotMarked(page, `a-use-${tag}`, page.getByRole('button', { name: 'Use these prices' }));
+  }
   await page.getByRole('button', { name: 'Use these prices' }).click();
   await page.waitForTimeout(600);
   const ask = page.getByRole('button', { name: 'Save it' });
