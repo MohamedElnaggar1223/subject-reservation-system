@@ -34,7 +34,7 @@ const isStaff = (role: string | null) => (STAFF_ROLES as readonly string[]).incl
 const ROLE_HINTS: Partial<Record<Role, string>> = {
   finance_officer: 'Runs the desk: payments, receipts and registrations on a family’s behalf.',
   finance_admin: 'The desk, plus refunds, exceptions and fee schedules.',
-  coordinator: 'The academic lead: calendar, sections, the student record and grade-10 exceptions.',
+  coordinator: 'Sets up each session: its subjects, prices, dates and what families agree to; sees the reservations, not the money.',
   teacher: 'Their own teaching. Needs a teacher record — pick one or create one.',
   gate: 'Reception and security: the school day and, later, the leave list.',
   admin: 'Everything, except what only a parent may do for their own family.',

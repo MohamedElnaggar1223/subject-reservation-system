@@ -149,7 +149,11 @@ function PasteList({ s, data }: { s: SetupSession; data: PricesData }) {
         {parsed && <Button variant="outline" onClick={() => parse.reset()}>Discard</Button>}
       </div>
       <ErrorLine message={parse.error ? refusalText(parse.error) : apply.error} />
-      {done && <Notice tone="success" className="mt-3"><span>Used:</span> <span>{done.rows}</span> <span>rows priced from</span> <bdi data-i18n-skip="true">{done.name}</bdi>.</Notice>}
+      {/* The rows whose exam fee changed (offered or not); none when every row the list prices already had its amount. */}
+      {done && <Notice tone="success" className="mt-3"><bdi data-i18n-skip="true">{done.name}</bdi> <span>saved.</span>{' '}
+        {done.rows > 0
+          ? <><span>Exam fees changed:</span> <span>{done.rows}</span></>
+          : <span>No exam fee changed: every row it prices already had that amount.</span>}</Notice>}
       {parsed && (
         <div className="mt-4 space-y-4">
           <div>

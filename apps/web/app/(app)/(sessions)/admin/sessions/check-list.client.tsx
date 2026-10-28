@@ -24,6 +24,7 @@
  */
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
@@ -441,7 +442,7 @@ function CheckLine({ e, refresh, sessionId }: { e: Entry; refresh: () => Promise
       {e.actions.length > 0 && (
         <div className="flex w-full shrink-0 flex-wrap items-center gap-2 ps-5 sm:w-auto sm:ps-0">
           {e.actions.map((a) => a.kind === 'link'
-            ? <Button key={a.label} asChild size="sm" variant="ghost"><Link href={a.href as never}>{a.label}</Link></Button>
+            ? <Button key={a.label} asChild size="sm" variant="ghost"><PageLink href={a.href}>{a.label}</PageLink></Button>
             : <Button key={a.label} size="sm" variant={a.primary ? 'outline' : 'ghost'} disabled={run.isPending} onClick={() => run.mutate(a)}>{a.label}</Button>)}
         </div>
       )}
@@ -512,4 +513,24 @@ export function openWaitsFor(s: SetupSession): string[] {
     } else out.push(herWords(c.message));
   }
   return [...new Set(out)];
+}
+
+/**
+ * A link to a tab or the dates of the session screen: from that screen itself it sets the address's hash so the screen
+ * hears it (a Next.js navigation to the same page changes the address without a hashchange, so the tab did not move —
+ * the guide's drive found it); from another page (her Home) a normal link.
+ */
+function PageLink({ href, children, ...rest }: { href: string; children: React.ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const pathname = usePathname();
+  const [path, hash] = href.split('#');
+  if (hash && path === pathname) {
+    return (
+      <a {...rest} href={`#${hash}`} onClick={(e) => {
+        e.preventDefault();
+        if (window.location.hash === `#${hash}`) window.dispatchEvent(new HashChangeEvent('hashchange'));
+        else window.location.hash = hash;
+      }}>{children}</a>
+    );
+  }
+  return <Link {...rest} href={href as never}>{children}</Link>;
 }
