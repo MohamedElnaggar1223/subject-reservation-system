@@ -1,31 +1,62 @@
 #!/bin/zsh
-# The admin guide's final run: an empty database built the way the deployed one is (migrations, the admin signed
-# up on the sign-up page and promoted by the seed, no samples), then every chapter driven through the screens in the
-# guide's order. Stops only the API it started (by the PID in /tmp/ag/api.pid) and starts it again on the new database.
+# The guide's final run, end to end: a fresh database built the way the deployed one is after its reset (migrations;
+# the admin signed up on the sign-up page and promoted by the db seed; the board's list loaded at the API's start; the
+# June 2027 pre-load with its placeholder teachers), then every part driven through the screens in the guide's order:
+# the staff on Team, Part A (review and open), the families made at the desk, Part B (a parent, the desk), Part C (June
+# 2028 by copying). Then gen.py writes the page and check-page.mjs checks it.
+#
+# It starts its own API on API_PORT against DB and stops only that one, by the PID it wrote. The web must already run
+# against that API (cd apps/web && NEXT_PUBLIC_API_URL=http://localhost:$API_PORT npx next dev --webpack -p $WEB_PORT).
+# Never point it at the deployed system: it builds a practice copy.
 set -e
-WT=${WT:-$(cd "$(dirname "$0")/../../../.." && pwd)}
+HERE=$(cd "$(dirname "$0")" && pwd)
+WT=${WT:-$(cd "$HERE/../../../.." && pwd)}
 DB=${DB:-igcse_guide_dev}
-cd "$(dirname "$0")"
-echo "== $(date -u +%FT%TZ) stop the API started for the guide"
-if [ -f /tmp/ag/api.pid ]; then
-  P=$(cat /tmp/ag/api.pid)
-  for c in $(pgrep -P $P); do for g in $(pgrep -P $c); do kill $g 2>/dev/null || true; done; kill $c 2>/dev/null || true; done
-  kill $P 2>/dev/null || true
-  sleep 3
+API_PORT=${API_PORT:-3299}
+WEB_PORT=${WEB_PORT:-3300}
+OUT=${OUT:-/tmp/ag}
+export WT BASE=http://localhost:$WEB_PORT API=http://localhost:$API_PORT SHOTS=$OUT/shots
+DBURL=postgresql://audit:auditpass@127.0.0.1:5433/$DB
+mkdir -p $OUT
+say() { echo "== $(date -u +%FT%TZ) $*"; }
+killtree() { for c in $(pgrep -P $1); do killtree $c; done; kill $1 2>/dev/null || true; }
+
+# The guide never shows a real teacher's name: the pre-load must use its placeholders.
+if [ -e $WT/packages/db/seeds/local/june-2027.teachers.json ]; then
+  echo "refusing: $WT/packages/db/seeds/local/june-2027.teachers.json holds the real teachers' names"; exit 1
 fi
-echo "== $(date -u +%FT%TZ) recreate $DB"
-docker exec igcse-dev-db psql -U audit -d postgres -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB"
-cd $WT && DATABASE_URL=postgresql://audit:auditpass@127.0.0.1:5433/$DB pnpm --filter @repo/db db:migrate 2>&1 | tail -1
-echo "migrations: $(docker exec igcse-dev-db psql -U audit -d $DB -At -c 'select count(*) from drizzle.__drizzle_migrations')"
-cd $WT && (nohup pnpm --filter @repo/api dev > /tmp/ag/api.log 2>&1 & echo $! > /tmp/ag/api.pid)
-for i in $(seq 1 40); do curl -s -o /dev/null -w "%{http_code}" http://localhost:3231/health 2>/dev/null | grep -q 200 && break; sleep 2; done
-echo "== $(date -u +%FT%TZ) API up (pnpm pid $(cat /tmp/ag/api.pid))"
-rm -rf /tmp/ag/shots && mkdir -p /tmp/ag/shots
-cd "$(dirname "$0")" && node s00-signup.mjs
-cd $WT && DATABASE_URL=postgresql://audit:auditpass@127.0.0.1:5433/$DB pnpm --filter @repo/db seed 2>&1 | grep -E "Promoted|samples|Seed" || true
-cd "$(dirname "$0")"
-for s in d1-start d2-team d3-subjects d4-catalogue d5-settings d6-session d7-fees-dates d8-preview-open; do
-  echo "== $(date -u +%FT%TZ) $s"
+
+say "stop the API this script started before"
+if [ -f $OUT/api.pid ]; then killtree $(cat $OUT/api.pid); sleep 3; rm -f $OUT/api.pid; fi
+if lsof -iTCP:$API_PORT -sTCP:LISTEN >/dev/null 2>&1; then echo "port $API_PORT is taken by another process: stop it or set API_PORT"; exit 1; fi
+curl -s -o /dev/null $BASE/sign-in || { echo "no web on $BASE (see the header of this script)"; exit 1; }
+
+say "recreate $DB"
+docker exec igcse-dev-db psql -U audit -d postgres -qc "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB"
+cd $WT && DATABASE_URL=$DBURL pnpm --filter @repo/db db:migrate 2>&1 | tail -1
+echo "migrations: $(docker exec igcse-dev-db psql -U audit -d $DB -At -c 'select count(*) from drizzle.__drizzle_migrations') of $(ls $WT/packages/db/drizzle/*.sql | wc -l | tr -d ' ')"
+
+say "start the API on $API_PORT"
+cd $WT && (DATABASE_URL=$DBURL PORT=$API_PORT BETTER_AUTH_URL=$API APP_URL=$BASE CORS_ORIGINS=$BASE nohup pnpm --filter @repo/api dev > $OUT/api.log 2>&1 & echo $! > $OUT/api.pid)
+for i in $(seq 1 60); do curl -s -o /dev/null -w "%{http_code}" $API/health 2>/dev/null | grep -q 200 && break; sleep 2; done
+grep -m1 "\[reference\] loaded at start" $OUT/api.log || { echo "the board's list was not loaded at the API's start"; exit 1; }
+
+rm -rf $SHOTS && mkdir -p $SHOTS
+say "the admin signs up, the seed promotes"
+cd $HERE && node s00-signup.mjs
+cd $WT && DATABASE_URL=$DBURL pnpm --filter @repo/db seed 2>&1 | grep -E "Promoted" || { echo "the admin was not promoted"; exit 1; }
+say "the June 2027 pre-load"
+cd $WT && DATABASE_URL=$DBURL pnpm --filter @repo/api seed:june-2027 2>&1 | grep "seed:june-2027" | tee $OUT/seed.log
+grep -q "teachers as placeholders" $OUT/seed.log || { echo "the pre-load did not use its placeholder teachers"; exit 1; }
+
+cd $HERE
+for s in a0-team a1-review b0-families b1-parent b2-desk c1-copy; do
+  say "$s"
   node $s.mjs
 done
-echo "== $(date -u +%FT%TZ) done: $(ls /tmp/ag/shots | wc -l) shots"
+say "done: $(ls $SHOTS | wc -l | tr -d ' ') shots in $SHOTS"
+
+say "stop the API this script started"
+killtree $(cat $OUT/api.pid); rm -f $OUT/api.pid
+
+cd $HERE/.. && SHOTS=$SHOTS python3 gen.py && node check-page.mjs ../index.html $OUT/page

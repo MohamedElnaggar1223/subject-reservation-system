@@ -21,6 +21,15 @@ header.top p{max-width:900px}
 .step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
 .step h3{font-size:18.5px;margin:0 0 10px}
 .step h3 .n{display:inline-block;min-width:52px;color:var(--brand);font-variant-numeric:tabular-nums}
+.step h3 .who{display:inline-block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:#5b3a8c;color:#fff;border-radius:5px;padding:2px 7px;margin-right:8px;vertical-align:2px}
+.step.admin{border-left:5px solid #5b3a8c}
+.chapter>h2 .tally{font-size:15px;font-weight:600;color:var(--muted);margin-left:8px}
+.chapter.counted>h2 .tally{color:var(--brand)}
+nav h2 span{font-weight:400;color:#9fbab2;font-size:11.5px}
+.score{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0;max-width:900px}
+.score div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.score b{display:block;font-size:26px;color:var(--brand);line-height:1.2}
+.wrong li{margin:6px 0}
 .cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px}
 .cols.single{grid-template-columns:1fr}
 .where{font-size:14px;color:var(--muted);margin:0 0 8px}
@@ -35,10 +44,6 @@ header.top p{max-width:900px}
 .form p{margin:5px 0}
 .lbl{font-weight:600;background:var(--brand-2);border-radius:4px;padding:0 4px}
 code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;background:#eceae3;border-radius:4px;padding:1px 4px}
-.paste{position:relative;margin:8px 0}
-.paste pre{background:#fbfaf6;color:var(--code);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0;white-space:pre}
-.paste button{position:absolute;top:8px;right:8px;font:600 13px/1 inherit;font-family:inherit;background:var(--brand);color:#fff;border:0;border-radius:6px;padding:7px 10px;cursor:pointer}
-.paste button.done{background:#3b7d6c}
 figure{margin:16px 0 0}
 figure img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
 figure img.tall{max-width:560px}
@@ -53,10 +58,10 @@ table.t td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:no
 .redframe{display:inline-block;border:2.5px solid var(--mark);border-radius:4px;padding:0 4px;font-size:13px}
 .toc{columns:2;column-gap:32px;margin:10px 0 0;padding-left:20px}
 .toc li{margin:2px 0;break-inside:avoid}
-@media (max-width:1000px){nav{position:static;width:auto}main{margin-left:0;padding:18px}.cols{grid-template-columns:1fr}.toc{columns:1}}
+@media (max-width:1000px){nav{position:static;width:auto}main{margin-left:0;padding:18px}.cols{grid-template-columns:1fr}.toc{columns:1}.score{grid-template-columns:1fr}}
 @media print{
   body{background:#fff;font-size:11pt}
-  nav,.paste button{display:none}
+  nav{display:none}
   main{margin:0;padding:0;max-width:none}
   .chapter{break-before:page;margin-top:0}
   .step{break-inside:auto;box-shadow:none;border-color:#ccc;padding:10px 12px}
@@ -66,5 +71,5 @@ table.t td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:no
   figure img{max-height:16cm;width:auto;max-width:100%}
   figure img.tall{max-height:18cm}
   a{color:inherit;text-decoration:none}
-  .paste pre{white-space:pre-wrap;font-size:9pt}
+  .step.admin{border-left:4px solid #5b3a8c}
 }
