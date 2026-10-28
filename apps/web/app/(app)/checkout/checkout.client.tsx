@@ -34,6 +34,7 @@ import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-share
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 import { fetchReserveOffers, reserveOffersKey, optionOfLine, lineNamedBy } from '~/components/reservations/offers';
 import { fetchStatement, statementKey } from '~/components/reservations/statement';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 
 interface CheckoutClientProps {
   registrationIds: string[];
@@ -262,14 +263,14 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
         <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
           <p className="text-destructive font-medium">Unable to load checkout details.</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Verify the registrations belong to a linked child and are ready for payment.
+            Check that these reservations belong to your child and are waiting for payment.
           </p>
           <Button
             variant="outline"
             onClick={() => router.push('/registrations' as never)}
             className="mt-4"
           >
-            Back to Registrations
+            Back to my reservations
           </Button>
         </div>
       </div>
@@ -309,12 +310,12 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                 </svg>
               </div>
               <h1 className="text-xl font-bold text-foreground font-display">
-                {completed ? 'Payment Complete' : 'Payment Initiated'}
+                {completed ? 'Payment complete' : 'Payment started'}
               </h1>
               <p className="text-sm text-muted-foreground text-center">
                 {completed
-                  ? 'Your registrations have been confirmed — no payment was required because your balance covered the full amount.'
-                  : 'Your payment is pending. Follow the instructions below to complete it.'}
+                  ? 'Your reservations are paid: your balance covered the full amount.'
+                  : 'Follow the steps below to finish it.'}
               </p>
             </div>
 
@@ -341,8 +342,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   {result.externalReference}
                 </p>
                 <p className="text-xs text-brand-700 dark:text-brand-400 mt-3">
-                  Quote this reference (or the student&apos;s name) at the desk. Your registrations
-                  are confirmed as soon as the finance officer records your payment.
+                  Quote this reference (or the student&apos;s name) at the desk. Your reservations
+                  are paid as soon as the finance officer takes your payment.
                 </p>
               </div>
             )}
@@ -378,8 +379,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   </p>
                   {refSubmitted ? (
                     <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg text-center text-sm text-emerald-700 dark:text-emerald-400">
-                      Reference submitted. The finance team will verify your transfer against the
-                      bank statement and confirm your registrations — usually within one school day.
+                      Reference submitted. The finance team checks your transfer against the bank
+                      statement, and then your reservations are paid — usually within one school day.
                     </div>
                   ) : (
                     <>
@@ -431,7 +432,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               onClick={() => router.push('/registrations' as never)}
               className="mt-6 w-full"
             >
-              Back to Registrations
+              Back to my reservations
             </Button>
           </div>
         </div>
@@ -518,7 +519,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           {open.status === 'pending' && !refSubmitted && cancelButton(open.id)}
 
           <Button variant="ghost" onClick={() => router.push('/registrations' as never)} className="mt-6 w-full">
-            Back to Registrations
+            Back to my reservations
           </Button>
         </div>
       </div>
@@ -552,7 +553,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   <li key={reg.id} className={`px-4 sm:px-6 py-3 ${here ? 'bg-destructive/5' : ''}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground"><bdi data-i18n-skip="true">{reg.subject.name}</bdi></p>
+                        <p className="text-sm font-medium text-foreground"><bdi data-i18n-skip="true">{titleFor(reg.subject.name, groupOfLevel(reg.subject.qualificationLevel))}</bdi></p>
                         {words && <p className="text-xs text-muted-foreground" data-i18n-skip="true">{words}</p>}
                         <p className="text-xs text-muted-foreground">
                           <bdi data-i18n-skip="true">{reg.session.name}</bdi>
@@ -710,15 +711,15 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {/* Method-specific notices */}
             {selectedMethod === 'in_school' && (
               <div className="mx-4 mb-4 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-lg text-xs text-brand-700 dark:text-brand-400">
-                You&apos;ll get a payment reference to quote at the school finance desk. Pay by
-                cash, card, or InstaPay at the desk — registrations confirm on the spot.
+                You&apos;ll get a payment reference to quote at the school finance desk. Pay with
+                cash, card, or InstaPay at the desk — your reservations are paid on the spot.
               </div>
             )}
             {selectedMethod === 'instapay' && (
               <div className="mx-4 mb-4 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-lg text-xs text-violet-700 dark:text-violet-400">
                 You&apos;ll get the school&apos;s account details to transfer the exact amount via
-                InstaPay, then submit your transaction reference. The finance team verifies the
-                transfer before your registrations are confirmed.
+                InstaPay, then submit your transaction reference. The finance team checks the
+                transfer, and then your reservations are paid.
               </div>
             )}
           </div>

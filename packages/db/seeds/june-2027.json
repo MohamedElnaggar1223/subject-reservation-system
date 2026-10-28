@@ -107,7 +107,7 @@
         }
       ],
       "flags": [
-        "The June form offers a one-paper retake from June 2026 without asking which paper; the Paper 1 and Paper 2 rows follow her November form."
+        "Your June form offers a one-paper retake from June 2026 without asking which paper; the Paper 1 and Paper 2 rows follow your November form."
       ]
     },
     {
@@ -345,7 +345,7 @@
         }
       ],
       "flags": [
-        "Spelling (Q15): the form spells {T-CHEMISTRY-OL-3-FORM}, the links sheet {T-CHEMISTRY-OL-3}."
+        "One teacher, two spellings: your form says {T-CHEMISTRY-OL-3-FORM}, the links sheet {T-CHEMISTRY-OL-3}. Check the teacher on the subject."
       ]
     },
     {
@@ -383,7 +383,7 @@
         }
       ],
       "flags": [
-        "Q14: the form's 'Paper 41/42' retake question (offering June 2025 / November 2025) is not pre-loaded: 0984 has no such paper. Add a one-paper row if she means one."
+        "Your form's 'Paper 41/42' retake question (June 2025 / November 2025) is not pre-loaded: 0984 has no such paper. Add a one-paper row if you meant one."
       ]
     },
     {
@@ -426,7 +426,7 @@
         }
       ],
       "flags": [
-        "Q15: the links sheet names {T-ESL-SHEET-1} where the form names {T-ESL-2}.",
+        "Two names for one teacher: the links sheet says {T-ESL-SHEET-1}, your form {T-ESL-2}. Check the teacher on the subject.",
         "Code to check: OxfordAQA International GCSE ESL is 9280; the school's artefacts print no code. No OxfordAQA fee list: exam fee not set."
       ]
     },
@@ -575,7 +575,7 @@
         }
       ],
       "flags": [
-        "Spelling (Q15): the form spells {T-GLOBAL-PERSPECTIVES-1-FORM}, the links sheet {T-GLOBAL-PERSPECTIVES-1}.",
+        "One teacher, two spellings: your form says {T-GLOBAL-PERSPECTIVES-1-FORM}, the links sheet {T-GLOBAL-PERSPECTIVES-1}. Check the teacher on the subject.",
         "Code to check: IGCSE 0457 (O Level is 2069). On no fee list: exam fee not set."
       ]
     },
@@ -614,7 +614,7 @@
         }
       ],
       "flags": [
-        "Q15: the form names {T-GLOBAL-CITIZENSHIP-1-FORM}, the links sheet {T-GLOBAL-CITIZENSHIP-1}.",
+        "Two names for one teacher: your form says {T-GLOBAL-CITIZENSHIP-1-FORM}, the links sheet {T-GLOBAL-CITIZENSHIP-1}. Check the teacher on the subject.",
         "Code to check: no Cambridge syllabus named Global Citizenship was found. On no fee list: exam fee not set."
       ]
     },
@@ -792,7 +792,7 @@
       ],
       "flags": [
         "Price to check: the June 2026 list prices each paper 4,600 (printed 4WM1H, 4WM2H), so all papers 9,200, the figures pre-loaded. The November 2026 list prints 4MA1H and 4MA2H at 9,840 each: either per paper (more than double June's) or, more likely, the whole qualification (Human Biology 4HB1 is 9,840 on the same list, and 9,200 plus about 7%, the IAL units' June-to-November rise, is about 9,840). The June figures stand until the school says which.",
-        "Q15: the links sheet names {T-MATHS-OL-SHEET-1} where the form names {T-MATHS-OL-2}."
+        "Two names for one teacher: the links sheet says {T-MATHS-OL-SHEET-1}, your form {T-MATHS-OL-2}. Check the teacher on the subject."
       ]
     },
     {
@@ -964,7 +964,7 @@
         }
       ],
       "flags": [
-        "Q13: self study is offered on both A Levels.",
+        "Self study is offered on both A Levels, as on your form.",
         "Code 9AA0: the form prints 9AA01, the links sheet 9AA1.",
         "The GCE A Level (9AA0) is on no fee list: exam fee not set."
       ]
@@ -1078,7 +1078,7 @@
       ],
       "flags": [
         "Price source: units 1–4 from the Edexcel November 2026 list (the June 2026 list prices units 5 and 6 only; January 2026 priced units 3 and 4 at 4,550).",
-        "Q10: the form offers units 5 and 6 as 'First entry 100%' or 'Self Study 50% 2nd entry ONLY', no retake in school."
+        "Your form offers units 5 and 6 as 'First entry 100%' or 'Self Study 50% 2nd entry ONLY', with no retake in school."
       ]
     },
     {
@@ -1133,8 +1133,8 @@
         }
       ],
       "flags": [
-        "Q12: retake self study on every route offered.",
-        "Spelling (Q15): the form spells {T-CHEMISTRY-OL-1-FORM}, the links sheet {T-CHEMISTRY-OL-1}."
+        "Retake in self study is offered on every route, as on your form.",
+        "One teacher, two spellings: your form says {T-CHEMISTRY-OL-1-FORM}, the links sheet {T-CHEMISTRY-OL-1}. Check the teacher on the subject."
       ]
     },
     {
@@ -1210,7 +1210,7 @@
       ],
       "flags": [
         "Teacher to be confirmed: the form lists none; the November links sheet says External.",
-        "Q12: retake self study on every route offered.",
+        "Retake in self study is offered on every route, as on your form.",
         "The A.S. fee is the list's '9608 SY' row (the previous syllabus code)."
       ]
     },
@@ -1266,7 +1266,7 @@
         }
       ],
       "flags": [
-        "Q12: retake self study on every route offered.",
+        "Retake in self study is offered on every route, as on your form.",
         "Codes to check: AS French Language 8028, A Level French Language & Literature 9898. On no fee list: exam fees not set."
       ]
     },
@@ -1447,7 +1447,7 @@
         }
       ],
       "flags": [
-        "Q10: the form offers a teacher or self study per unit; retake in school is ticked by default.",
+        "Your form offers a teacher or self study per unit; retake in school is ticked by default: untick it if the school does not offer it.",
         "P1 and P2 are taught online only."
       ]
     },
@@ -1510,8 +1510,8 @@
         }
       ],
       "flags": [
-        "Q11: one A.2. row, first entry self study and retake self study, carried from June 2026 or November 2025 (her two options).",
-        "November 2025 is older than Cambridge's 13 months before June 2027: kept (her list), warned (D6)."
+        "One A.2. row, first entry and retake in self study, carried from June 2026 or November 2025 (your form's two options).",
+        "November 2025 is more than 13 months before June 2027, the longest Cambridge carries a result: kept because your form lists it; the board may refuse the entry."
       ]
     },
     {

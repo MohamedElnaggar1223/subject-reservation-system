@@ -360,7 +360,8 @@ export const users = new Hono<HonoEnv>()
    * Finance staff need to find the family at the desk. GET /users is
    * admin-only, so without this the Desk's search returned 403 and an
    * empty dropdown — every downstream desk action needs a studentId.
-   * Field-limited, and students/parents only.
+   * Field-limited, and students/parents only. Also by the whole reference
+   * of a payment the family started (P4a: the one it quotes at the desk).
    */
   .get('/search',
     requireFinance(),

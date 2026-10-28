@@ -125,7 +125,6 @@ function RulesForm({ rule, onDone }: { rule: BoardRuleRow; onDone: (saved: boole
     amendmentFeeNote: rule.amendmentFeeNote ?? '',
     withdrawalRefundUntil: rule.withdrawalRefundUntil,
     withdrawalFeeNote: rule.withdrawalFeeNote ?? '',
-    carryForwardMonths: rule.carryForwardMonths ? String(rule.carryForwardMonths) : '',
     resultsKey: rule.resultsKey,
     notes: rule.notes ?? '',
   });
@@ -145,8 +144,6 @@ function RulesForm({ rule, onDone }: { rule: BoardRuleRow; onDone: (saved: boole
       const t = v[k].trim() || null;
       if (t !== (rule[k] ?? null)) p[k] = t;
     }
-    const months = v.carryForwardMonths ? Number(v.carryForwardMonths) : null;
-    if (months !== (rule.carryForwardMonths ?? null)) p.carryForwardMonths = months;
     return p;
   };
 
@@ -171,7 +168,6 @@ function RulesForm({ rule, onDone }: { rule: BoardRuleRow; onDone: (saved: boole
         const p = patch();
         if (Object.keys(p).length === 1) return setError('Nothing changed.');
         if (reason.trim().length < 3) return setError('Say why the rules change (for example, the page of the board\'s handbook) — it is recorded.');
-        if (v.carryForwardMonths && !/^\d{1,2}$/.test(v.carryForwardMonths)) return setError('The carry-forward period is a number of months, 1 to 60.');
         setError('');
         save.mutate(p);
       }}
@@ -208,11 +204,15 @@ function RulesForm({ rule, onDone }: { rule: BoardRuleRow; onDone: (saved: boole
             {RESULTS_KEYS.map((x) => <option key={x} value={x}>{RESULTS_KEY_LABEL[x]}</option>)}
           </select>
         </div>
-        <div>
-          <Label htmlFor="rule-cf" className="mb-1 text-xs text-muted-foreground">Carry forward within (months; empty: none)</Label>
-          <Input id="rule-cf" inputMode="numeric" maxLength={2} value={v.carryForwardMonths} onChange={(e) => setV({ ...v, carryForwardMonths: e.target.value })} dir="ltr" />
-        </div>
       </div>
+      {/* The carry-forward period is the reference data's (COORDINATOR_REWORK.md §7), loaded at every start; the API
+          refuses a change here (P1c's S3), so it is read, not edited. */}
+      <p className="text-xs text-muted-foreground">
+        {rule.carryForwardMonths
+          ? <><span>Marks carry forward to an entry within</span> <strong className="tabular-nums">{rule.carryForwardMonths}</strong> <span>months</span></>
+          : <span>No carry forward.</span>}{' '}
+        <span>This comes with the board&apos;s reference data, kept by us; it is not changed here.</span>
+      </p>
       <div className="grid gap-3 md:grid-cols-3">
         {([['amendmentFeeNote', 'About the fee for a change'], ['withdrawalFeeNote', 'About the fee for a withdrawal'], ['notes', 'Notes']] as const).map(([k, label]) => (
           <div key={k}>

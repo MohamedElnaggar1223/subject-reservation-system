@@ -16,7 +16,7 @@ import { apiResponse } from '@repo/validations';
 import RegistrationsClient from './registrations.client';
 
 export const metadata = {
-  title: 'My Registrations — IGCSE Reservation',
+  title: 'My reservations — IGCSE Reservation',
 };
 
 export default async function RegistrationsPage(): Promise<React.JSX.Element> {

@@ -69,9 +69,7 @@ export const setupArabic: Record<string, string> = {
   'New session': 'جلسة جديدة',
   'No sessions yet': 'لا توجد جلسات بعد',
   'A session is one cycle — June, or November / January — with every subject in it.': 'الجلسة موسم تسجيل واحد — يونيو، أو نوفمبر / يناير — بكل موادها.',
-  '— (optional)': '— (اختياري)',
   '(optional)': '(اختياري)',
-  'Payment due': 'موعد السداد',
   'First lesson': 'أول درس',
   'Money': 'المال',
   'paid': 'مدفوع',
@@ -132,7 +130,6 @@ export const setupArabic: Record<string, string> = {
   'Enter it once when it does: it joins the reference data for every session.': 'أدخله مرة واحدة عند نشره: ينضم إلى البيانات المرجعية لكل الجلسات.',
   'The copy moved the dates one year:': 'نقل النسخ التواريخ سنة واحدة:',
   'The dates are the defaults:': 'التواريخ هي الافتراضية:',
-  'payment due': 'موعد السداد',
   'first lesson': 'أول درس',
   'Set them in the header, or keep them.': 'حدّدها في أعلى الصفحة، أو أبقِها كما هي.',
   'Keep them': 'أبقِها كما هي',
@@ -144,7 +141,6 @@ export const setupArabic: Record<string, string> = {
   'exam fees': 'رسوم امتحان',
   'Go to Prices': 'إلى الأسعار',
   'The prices are last cycle\'s, copied: paste this year\'s lists, check what is left, then switch prices final.': 'الأسعار منسوخة من الموسم الماضي: الصق قوائم هذا العام، وراجع ما تبقى، ثم اجعل الأسعار نهائية.',
-  'The payment due date has passed and prices are not final: families cannot pay yet.': 'مضى موعد السداد والأسعار غير نهائية: لا تستطيع العائلات الدفع بعد.',
   'On your forms a retaker who picks a teacher retakes in school, so retake in school starts ticked wherever first entry in school is. Untick any the school does not offer.': 'في نماذجك، من يعيد ويختار معلمًا يعيد في المدرسة، لذا تبدأ «إعادة في المدرسة» محددة حيثما كان «قيد أول في المدرسة». ألغِ تحديد ما لا تقدمه المدرسة.',
   'Looks right': 'يبدو صحيحًا',
   'Open the subject': 'افتح المادة',
@@ -166,6 +162,14 @@ export const setupArabic: Record<string, string> = {
   'one person or two?': 'شخص واحد أم شخصان؟',
   'Switch it on': 'شغّلها',
   'is older than': 'أقدم مما يحتفظ به',
+  'are older than': 'أقدم مما يحتفظ به',
+  'Keep it, or untick it on the subject.': 'أبقِه، أو ألغِ تحديده في المادة.',
+  'Keep it': 'أبقِه',
+  // The read-only tables, scrollable at a phone: their regions' names.
+  'Who reserved what': 'من حجز ماذا',
+  'Money of the session': 'أموال الجلسة',
+  'You kept it: it is no longer on the list to check.': 'أبقيتَه: لم يعد في قائمة المراجعة.',
+  'Keep the older exams of this subject, and take them off the list to check (saved with the subject)': 'أبقِ الامتحانات الأقدم لهذه المادة واحذفها من قائمة المراجعة (يُحفظ مع المادة)',
   'carries a result forward. It stays, since your list wins; the board may refuse the entry.': 'من نتائج سابقة. تبقى لأن قائمتك هي المعتمدة؛ وقد يرفض المجلس القيد.',
   'The board\'s deadline cancels unpaid reservations first. Move your dates earlier?': 'موعد المجلس يلغي الحجوزات غير المدفوعة أولًا. هل تقدّم تواريخك؟',
   'Set the dates': 'حدّد التواريخ',
@@ -197,9 +201,14 @@ export const setupArabic: Record<string, string> = {
   'Reservations already made can still be paid, each until its last day to pay: closing cancels nothing.': 'يمكن دفع الحجوزات القائمة، كلٌّ حتى آخر يوم لدفعه: الإغلاق لا يلغي شيئًا.',
   'Clear': 'مسح',
   'Switches Accepting off at the end of that day.': 'يوقف قبول الحجوزات في نهاية ذلك اليوم.',
-  'Unpaid reservations are cancelled': 'تُلغى الحجوزات غير المدفوعة بعد',
-  'day after it.': 'يوم من موعد السداد.',
-  'days after it.': 'أيام من موعد السداد.',
+  'day after it.': 'يوم بعد موعد الدفع.',
+  'days after it.': 'أيام بعد موعد الدفع.',
+  'Unpaid reservations are cancelled after that.': 'وتُلغى الحجوزات غير المدفوعة بعده.',
+  'The last day to pay is the same day; unpaid reservations are cancelled after it.': 'آخر يوم للدفع هو اليوم نفسه؛ وتُلغى الحجوزات غير المدفوعة بعده.',
+  'when you switch them off': 'حين توقفه',
+  'The pay-by date has passed and prices are not final: families cannot pay yet.': 'مضى موعد الدفع والأسعار غير نهائية: لا تستطيع العائلات الدفع بعد.',
+  'the pay-by date itself': 'يوم موعد الدفع نفسه',
+  'Unpaid reservations are cancelled after it, or at the board\'s deadline if that is earlier. Reminders go before.': 'تُلغى الحجوزات غير المدفوعة بعده، أو عند موعد المجلس إن كان أبكر. وتُرسل التذكيرات قبله.',
   'The refund weeks count from it.': 'تُحسب أسابيع الاسترداد منه.',
   'Closed on': 'أُغلقت في',
   'Switch Accepting on to open it again.': 'شغّل قبول الحجوزات لفتحها مرة أخرى.',
@@ -311,7 +320,6 @@ export const setupArabic: Record<string, string> = {
   'Self study pays': 'الدراسة الذاتية تدفع',
   'and the whole exam fee. Shown on every subject; a row may have its own amount.': 'ورسوم الامتحان كاملة. تظهر على كل مادة؛ وقد يكون لصف مبلغه الخاص.',
   'Grades that may reserve': 'الصفوف التي يحق لها الحجز',
-  'on the payment due date': 'في موعد السداد',
   'or at the board\'s deadline, if that is earlier. Reminders go before.': 'أو في موعد المجلس إن كان أبكر. وتُرسل التذكيرات قبله.',
   'Refund policy': 'سياسة الاسترداد',
   'Of the course fee, counted from the first lesson. Families read the sentence below, made from these rows, so the words and the money cannot disagree.': 'من رسوم المقرر، محسوبة من أول درس. تقرأ العائلات الجملة أدناه المصنوعة من هذه الصفوف، فلا تختلف الكلمات عن المال.',
@@ -414,7 +422,7 @@ export const setupArabic: Record<string, string> = {
   'as the subject': 'كالمادة',
   'Add…': 'إضافة…',
   'Exam in': 'الامتحان في',
-  'Pay by': 'السداد قبل',
+  'Pay by': 'الدفع قبل',
   'Families taking it say which earlier exam it follows, from the subject\'s list below.': 'العائلات التي تختاره تحدد الامتحان السابق الذي يتبعه، من قائمة المادة أدناه.',
   'does not ask which earlier exam a one-paper retake follows.': 'لا يسأل عن الامتحان السابق الذي تتبعه إعادة الورقة الواحدة.',
   'new': 'جديد',
@@ -540,7 +548,7 @@ export function translateSetupText(text: string): string | null {
   // The share, the cancel days.
   if ((m = /^(\d+)% of the course fee$/.exec(text))) return `${m[1]}% من رسوم المقرر`;
   if ((m = /^the session's (\d+)% of the course fee$/.exec(text))) return `نسبة الجلسة ${m[1]}% من رسوم المقرر`;
-  if ((m = /^(\d+) days? after the payment due date$/.exec(text))) return `بعد ${m[1]} ${m[1] === '1' ? 'يوم' : 'أيام'} من موعد السداد`;
+  if ((m = /^(\d+) days? after the pay-by date$/.exec(text))) return `بعد ${m[1]} ${m[1] === '1' ? 'يوم' : 'أيام'} من موعد الدفع`;
   // New session's "start from"; closing a session.
   if ((m = /^Copy the last (June|November \/ January) session \((.+)\)$/.exec(text))) return `انسخ آخر جلسة ${m[1] === 'June' ? 'يونيو' : 'نوفمبر / يناير'} (${months(m[2]!)})`;
   if ((m = /^Close ((?:June|November) \d{4}.*)$/.exec(text))) return `إغلاق ${months(m[1]!)}`;
@@ -556,8 +564,10 @@ export function translateSetupText(text: string): string | null {
   if ((m = /^The subject's fee \(the board's rule\): ([\d.,]+)$/.exec(text))) return `رسوم المادة (قاعدة المجلس): ${m[1]}`;
   if ((m = /^(.+)'s entry deadline \(the admin\)$/.exec(text))) return `آخر موعد للقيد لدى ${m[1]} (الإدارة)`;
   // The check list's counted lines.
-  if ((m = /^(\d+) of (\d+) subjects are not offered to families: a price is not set \((\d+) course fees?, (\d+) exam fees?\)\.$/.exec(text))) {
-    return `${m[1]} من ${m[2]} مادة لا تُعرض على العائلات: سعر غير محدد (${m[3]} رسوم مقرر، ${m[4]} رسوم امتحان).`;
+  // Only the missing fees are counted (B2 of P4a): either count may be left out, and both when neither is counted.
+  if ((m = /^(\d+) of (\d+) subjects? (?:is|are) not offered to families: a price is not set(?: \((?:(\d+) course fees?)?(?:, )?(?:(\d+) exam fees?)?\))?\.$/.exec(text))) {
+    const parts = [...(m[3] ? [`${m[3]} رسوم مقرر`] : []), ...(m[4] ? [`${m[4]} رسوم امتحان`] : [])];
+    return `${m[1]} من ${m[2]} مادة لا تُعرض على العائلات: سعر غير محدد${parts.length ? ` (${parts.join('، ')})` : ''}.`;
   }
   if ((m = /^Ticked by a default, not by your forms: (\d+) ticks? on (\d+) subjects?\.$/.exec(text))) return `محدد افتراضيًا، لا من نماذجك: ${m[1]} تحديد في ${m[2]} مادة.`;
   if ((m = /^(.+) after (.+)'s entry deadline \((.+)\): (\d+) rows?\.$/.exec(text))) {
@@ -580,7 +590,7 @@ export function translateSetupText(text: string): string | null {
       if ((x = /^re-prices (\d+) unpaid reservations? \(the families are told\)$/.exec(p))) return `يعيد تسعير ${x[1]} حجز غير مدفوع (تُبلَّغ العائلات)`;
       if ((x = /^lists (\d+) paid reservations? for finance \(their price stays\)$/.exec(p))) return `يدرج ${x[1]} حجز مدفوع للمالية (يبقى سعرها)`;
       if ((x = /^changes (\d+) reservations? \(made payable, or closed to new ones\)$/.exec(p))) return `يغيّر ${x[1]} حجز (يصبح قابلًا للدفع، أو يُغلق أمام الجديد)`;
-      if ((x = /^moves the due date of (\d+) unpaid reservations?$/.exec(p))) return `ينقل موعد سداد ${x[1]} حجز غير مدفوع`;
+      if ((x = /^moves the pay-by date of (\d+) unpaid reservations?$/.exec(p))) return `ينقل موعد دفع ${x[1]} حجز غير مدفوع`;
       if ((x = /^brings forward the last day to pay of (\d+) unpaid reservations?(?: \((\d+) of them past it already: (?:it expires|they expire) at once\))?$/.exec(p))) {
         return `يقدّم آخر يوم لدفع ${x[1]} حجز غير مدفوع${x[2] ? ` (${x[2]} منها فات موعده بالفعل: ينتهي فورًا)` : ''}`;
       }

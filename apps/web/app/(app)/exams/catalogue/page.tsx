@@ -27,7 +27,7 @@ export default async function CataloguePage({ searchParams }: { searchParams: Pr
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       {/* F8-02: adding a subject is the admin's (the Subjects page's endpoint); the coordinator maps. A board's
-          one-paper fee rule is the admin's too (the review of 744e553, item 1). */}
+          one-paper fee rule is the reference data's since P1c (read here, refused if sent). */}
       <CatalogueClient initialTab={initialTab} isAdmin={session.user.role === 'admin'} />
     </HydrationBoundary>
   );

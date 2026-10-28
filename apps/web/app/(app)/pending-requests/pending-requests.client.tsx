@@ -66,7 +66,7 @@ export default function PendingRequestsClient() {
           </p>
         </div>
         <Link href={"/registrations" as never}>
-          <Button variant="outline" size="sm">Back to Registrations</Button>
+          <Button variant="outline" size="sm">Back to my reservations</Button>
         </Link>
       </div>
 
@@ -106,7 +106,7 @@ export default function PendingRequestsClient() {
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <p className="text-muted-foreground text-sm">No change requests submitted yet.</p>
           <p className="text-muted-foreground text-xs mt-1">
-            Visit your registrations to request a drop or swap.
+            To drop or swap a subject, ask from My reservations.
           </p>
         </div>
       )}

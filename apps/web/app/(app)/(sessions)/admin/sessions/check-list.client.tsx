@@ -74,6 +74,15 @@ const DAY = 24 * 60 * 60 * 1000;
 /** A deadline as the school reads it, in one piece for a sentence ("21 March 2027", Cairo). */
 const longDay = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' }).format(new Date(iso));
 
+/** The missing fees counted in brackets, each only when there is one ("(4 exam fees)"); nothing when neither is counted. */
+export const missingFees = (course: number, exam: number) => {
+  const parts = [
+    ...(course ? [`${course} ${course === 1 ? 'course fee' : 'course fees'}`] : []),
+    ...(exam ? [`${exam} ${exam === 1 ? 'exam fee' : 'exam fees'}`] : []),
+  ];
+  return parts.length ? ` (${parts.join(', ')})` : '';
+};
+
 const Name = ({ children }: { children: React.ReactNode }) => <bdi data-i18n-skip="true" className="font-medium">{children}</bdi>;
 
 /** The board and exam month of a sitting the session uses, from its rows. */
@@ -124,7 +133,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
   // A check-list button saves nothing families would feel: a subject whose save answers that it would (a fee that
   // follows another re-derived, closing with reservations) is not saved, and she is sent to the subject to see it.
   // Every subject is tried; the ones not saved are named with the reason, and the list is read again either way.
-  const putOfferings = async (ids: string[], json: { notesReviewed?: true; defaultsReviewed?: true; accepting?: boolean }) => {
+  const putOfferings = async (ids: string[], json: { notesReviewed?: true; defaultsReviewed?: true; olderSittingsKept?: true; accepting?: boolean }) => {
     const notSaved: NotSaved[] = [];
     for (const offeringId of ids) {
       const o = byId.get(offeringId);
@@ -159,7 +168,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
       body: (
         <>
           <span>{s.copiedFrom ? 'The copy moved the dates one year:' : 'The dates are the defaults:'}</span>{' '}
-          <span>payment due</span> <Day iso={s.paymentDueAt} /><span>,</span> <span>first lesson</span> <Day iso={`${s.courseStartsOn}T12:00:00.000Z`} /><span>.</span>{' '}
+          <span>pay by</span> <Day iso={s.paymentDueAt} /><span>,</span> <span>first lesson</span> <Day iso={`${s.courseStartsOn}T12:00:00.000Z`} /><span>.</span>{' '}
           <span>Set them in the header, or keep them.</span>
         </>
       ),
@@ -179,7 +188,8 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     const course = unpriced.filter((o) => o.rows.some((r) => ticked(r) && (r.courseFee ?? o.courseFee) === null)).length;
     entries.push({
       key: 'prices', severity: 'look', forHome: true,
-      body: <span>{`${unpriced.length} of ${s.offerings.length} subjects are not offered to families: a price is not set (${course} ${course === 1 ? 'course fee' : 'course fees'}, ${exam} ${exam === 1 ? 'exam fee' : 'exam fees'}).`}</span>,
+      // Only the fees that are missing are counted: "(4 exam fees)", never "(0 course fees, 4 exam fees)".
+      body: <span>{`${unpriced.length} of ${s.offerings.length} subjects ${unpriced.length === 1 ? 'is' : 'are'} not offered to families: a price is not set${missingFees(course, exam)}.`}</span>,
       actions: [{ kind: 'link', label: 'Go to Prices', href: `/admin/sessions/${s.id}#prices` }],
     });
   }
@@ -193,7 +203,7 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
   if (of('payment_date_passed').length) {
     entries.push({
       key: 'due-passed', severity: 'look', forHome: true,
-      body: <span>The payment due date has passed and prices are not final: families cannot pay yet.</span>,
+      body: <span>The pay-by date has passed and prices are not final: families cannot pay yet.</span>,
       actions: [{ kind: 'link', label: 'Set it', href: `/admin/sessions/${s.id}#dates` }],
     });
   }
@@ -277,23 +287,39 @@ export function useCheckEntries(s: SetupSession, viewerRole: string) {
     });
   }
 
-  // D6: an earlier exam older than the board carries a result forward — kept (her list wins), warned.
+  // D6: an earlier exam older than the board carries a result forward — her list wins, so it stays, with a warning.
+  // One line per subject: "Keep it" says she means it (olderSittingsKept, P1c item 10a) — the line leaves, the editor
+  // says it is kept, and a copy of the session keeps it so; or she opens the subject and unticks it.
+  const old = new Map<string, { o: Offering; items: { r: Offering['rows'][number]; p: Offering['rows'][number]['allowedPriorSittings'][number] }[] }>();
   for (const c of of('carried_from_too_old')) {
     const o = byId.get(c.offeringId ?? '');
     const r = o?.rows.find((x) => x.id === c.rowId);
     if (!o || !r) continue;
-    for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward)) {
-      entries.push({
-        key: `old-${r.id}-${p.id}`, severity: 'look', forHome: true,
-        body: (
-          <>
-            <Name>{subjectTitle(o)}</Name> — <span data-i18n-skip="true">{label(r)}</span><span>:</span> <span>{examMonth(p.month, p.year)}</span>{' '}
-            <span>is older than</span> <Name>{o.board.name}</Name> <span>carries a result forward. It stays, since your list wins; the board may refuse the entry.</span>
-          </>
-        ),
-        actions: [{ kind: 'link', label: 'Open the subject', href: subjectHref(o.id) }],
-      });
+    const g = old.get(o.id) ?? { o, items: [] };
+    for (const p of r.allowedPriorSittings.filter((x) => x.beyondCarryForward && !x.kept)) {
+      if (!g.items.some((x) => x.r.id === r.id && x.p.id === p.id)) g.items.push({ r, p });
     }
+    old.set(o.id, g);
+  }
+  for (const { o, items } of old.values()) {
+    if (!items.length) continue;
+    entries.push({
+      key: `old-${o.id}`, severity: 'look', forHome: true,
+      body: (
+        <>
+          <Name>{subjectTitle(o)}</Name> — {items.map(({ r, p }, i) => (
+            <span key={`${r.id}-${p.id}`}>{i > 0 && <span>; </span>}<span data-i18n-skip="true">{label(r)}</span><span>:</span> <span>{examMonth(p.month, p.year)}</span></span>
+          ))}{' '}
+          <span>{items.length === 1 ? 'is older than' : 'are older than'}</span> <Name>{o.board.name}</Name>{' '}
+          <span>carries a result forward. It stays, since your list wins; the board may refuse the entry.</span>{' '}
+          <span>Keep it, or untick it on the subject.</span>
+        </>
+      ),
+      actions: [
+        { kind: 'run', label: 'Keep it', primary: true, run: () => putOfferings([o.id], { olderSittingsKept: true }) },
+        { kind: 'link', label: 'Open the subject', href: subjectHref(o.id) },
+      ],
+    });
   }
 
   // A date after a board's deadline: one line per deadline and what is late. Where the browser's reading of the
@@ -411,8 +437,9 @@ function CheckLine({ e, refresh, sessionId }: { e: Entry; refresh: () => Promise
         {run.error && <NotSavedLines err={run.error} sessionId={sessionId} />}
         {e.boardDate && <BoardDateForm seriesId={e.boardDate.seriesId} refresh={refresh} />}
       </div>
+      {/* On a phone the buttons take their own line under the words (beside them the words were a narrow column). */}
       {e.actions.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 ps-5 sm:w-auto sm:ps-0">
           {e.actions.map((a) => a.kind === 'link'
             ? <Button key={a.label} asChild size="sm" variant="ghost"><Link href={a.href as never}>{a.label}</Link></Button>
             : <Button key={a.label} size="sm" variant={a.primary ? 'outline' : 'ghost'} disabled={run.isPending} onClick={() => run.mutate(a)}>{a.label}</Button>)}

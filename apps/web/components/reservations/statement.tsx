@@ -27,6 +27,7 @@ import { familyWords } from '~/lib/i18n-reservations';
 import { ClassFollowNotice } from './class-follow';
 import { followSentences, type FollowSentence } from '~/lib/groups-followed';
 import { labelFor } from '~/lib/format';
+import { useI18n } from '~/lib/i18n';
 
 /** At a phone a statement row stacks, each figure under its name (the table's header is hidden there). */
 function PhoneLabel({ children }: { children: React.ReactNode }) {
@@ -39,8 +40,26 @@ type StudentStatement = StatementData['students'][number];
 type StatementLine = StudentStatement['sessions'][number]['lines'][number];
 export const statementKey = (q: { studentId?: string; familyId?: string }) => ['statement', q.studentId ?? '', q.familyId ?? ''] as const;
 
-/** A line's status in the words every family screen uses (the reservation page, checkout, home): not the staff's labels. */
-const LINE_STATUS_WORDS: Record<string, string> = { pending_payment: 'Waiting for payment', pending_approval: 'Waiting for approval' };
+/**
+ * A line's status in the words every family and desk screen uses (the reservation page, checkout, home, the statement,
+ * the registrations, the desk; her Reservations tab says the same): one word per concept, not the staff's old labels
+ * ("Pending Payment", "Confirmed"). Given in both languages here, since "Paid" is also a column's name elsewhere.
+ */
+export const LINE_STATUS: Record<string, { en: string; ar: string }> = {
+  pending_approval: { en: 'Waiting for approval', ar: 'بانتظار الموافقة' },
+  pending_payment: { en: 'Waiting for payment', ar: 'بانتظار الدفع' },
+  confirmed: { en: 'Paid', ar: 'مدفوعة' },
+  dropped_pending_receipt: { en: 'Dropped: the receipt is to come back to the school', ar: 'أُلغيت: يُعاد الإيصال إلى المدرسة' },
+  dropped: { en: 'Dropped', ar: 'أُلغيت' },
+  rejected: { en: 'Rejected', ar: 'مرفوضة' },
+  expired: { en: 'Expired', ar: 'انتهت' },
+  preregistered: { en: 'Preregistered', ar: 'مسجّلة مسبقًا' },
+};
+export function LineStatusWords({ status }: { status: string }) {
+  const { language } = useI18n();
+  const w = LINE_STATUS[status];
+  return <span data-i18n-skip="true">{w ? w[language] : labelFor(REGISTRATION_STATUS_LABELS, status)}</span>;
+}
 const STATUS_TONE: Record<string, Tone> = {
   pending_approval: 'warning', pending_payment: 'warning', preregistered: 'info', confirmed: 'success',
   dropped_pending_receipt: 'warning', dropped: 'neutral', rejected: 'neutral', expired: 'neutral',
@@ -218,7 +237,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                           ) : <span className="text-muted-foreground">—</span>}
                         </td>
                       )}
-                      <td className="px-3 py-2 max-sm:w-full max-sm:pt-0"><Badge tone={STATUS_TONE[l.status] ?? 'neutral'}>{LINE_STATUS_WORDS[l.status] ?? labelFor(REGISTRATION_STATUS_LABELS, l.status)}</Badge></td>
+                      <td className="px-3 py-2 max-sm:w-full max-sm:pt-0"><Badge tone={STATUS_TONE[l.status] ?? 'neutral'}><LineStatusWords status={l.status} /></Badge></td>
                       {teacherChange && (
                         <td className="px-3 py-2 text-end">
                           {['pending_approval', 'pending_payment', 'preregistered', 'confirmed'].includes(l.status) && (

@@ -264,7 +264,10 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   // The Reserve page's school-fee notice (the year isolated left-to-right).
   [/^The (\d{4}-\d{4}) school fee(?: \(EGP ([\d,.]+)\))? is paid before reserving\.$/,
     (m) => `تُدفع المصاريف الدراسية \u2066${m[1]}\u2069${m[2] ? ` (${m[2]} جنيه)` : ''} قبل الحجز.`],
-  // The pricing basis, on hover and under a price.
+  // The pricing basis, on hover and under a price, in the family's words (familyWords: course fee, exam fee).
+  [/^course fee ([\d,.]+)(?: × ([\d.]+)%)? \+ exam fee ([\d,.]+)(?: × ([\d.]+)%)?(?: = ([\d,.]+), less exceptions = ([\d,.]+))?( \(prices not final yet\)| \(recorded before the rework\))?$/, (m) =>
+    `رسوم المقرر ${m[1]}${m[2] ? ` × ${m[2]}%` : ''} + رسوم الامتحان ${m[3]}${m[4] ? ` × ${m[4]}%` : ''}${m[5] ? ` = ${m[5]}، بعد الاستثناءات = ${m[6]}` : ''}${m[7] === ' (prices not final yet)' ? ' (الأسعار ليست نهائية بعد)' : m[7] ? ' (مسجل قبل إعادة التصميم)' : ''}`],
+  [/^custom price ([\d,.]+) \(an exception; exam fee included\)$/, (m) => `سعر خاص ${m[1]} (استثناء؛ يشمل رسوم الامتحان)`],
   [/^course ([\d,.]+) × ([\d.]+)% \+ board ([\d,.]+) × ([\d.]+)%( \(board fee provisional\))?$/, (m) =>
     `التدريس ${m[1]} × ${m[2]}% + المجلس ${m[3]} × ${m[4]}%${m[5] ? ' (رسوم المجلس مؤقتة)' : ''}`],
   [/^course ([\d,.]+) \+ board ([\d,.]+) \(recorded before the rework\)$/, (m) => `التدريس ${m[1]} + المجلس ${m[2]} (مسجل قبل إعادة التصميم)`],
@@ -377,6 +380,11 @@ export function translateReservationsText(text: string): string | null {
  */
 const FAMILY_WORDS: [RegExp, string][] = [
   [/\bWhole subject\b/g, 'All papers'],
+  // The statement's pricing basis (statement.services basisText) in the words the reservation page uses: course fee and
+  // exam fee, a share said only when it is not the whole (P4a: "course 9,000 × 100% + board 4,450 × 100%").
+  [/^course ([\d,.]+)( × [\d.]+%)? \+ board ([\d,.]+)( × [\d.]+%)?/, 'course fee $1$2 + exam fee $3$4'],
+  [/ × 100%/g, ''],
+  [/\(an exception; board fee included\)/, '(an exception; exam fee included)'],
   [/\bboard fee provisional\b/gi, 'prices not final yet'],
   [/\bprovisional\b/gi, 'not final yet'],
   [/\bcut-offs?\b/gi, 'last day to pay'],
@@ -472,6 +480,85 @@ export const familyArabic: Record<string, string> = {
   "waiting for the parent's approval": 'بانتظار موافقة ولي الأمر',
   'price not set yet': 'السعر لم يُحدد بعد',
   '(closed to new reservations)': '(مغلقة أمام الحجوزات الجديدة)',
+  // B3 of P4a: the desk finds the family by the reference it quotes and takes the payment it started.
+  "Type a student's name, email, ID, or a payment reference…": 'اكتب اسم الطالب أو بريده أو رقمه أو مرجع دفعة…',
+  'Pay at the school, started by the family': 'الدفع في المدرسة، بدأته الأسرة',
+  'Quote this reference at the desk:': 'اذكر هذا المرجع في المكتب:',
+  'Back to my reservations': 'العودة إلى حجوزاتي',
+  'Payment started': 'بدأ الدفع',
+  'Follow the steps below to finish it.': 'اتبع الخطوات أدناه لإتمامه.',
+  // P4a: Approvals in the families' words.
+  'Waiting for your approval': 'بانتظار موافقتك',
+  'Nothing is waiting for your approval': 'لا شيء بانتظار موافقتك',
+  'When your child asks for a subject, or to drop or change one, it comes here for you to approve.': 'حين يطلب ابنك/ابنتك مادة، أو سحب مادة أو تغييرها، يصل الطلب إلى هنا لتوافق عليه.',
+  'request waiting for your decision': 'طلب بانتظار قرارك',
+  'requests waiting for your decision': 'طلبات بانتظار قرارك',
+  'reference': 'المرجع',
+  'Take it': 'استلمها',
+  'Taking it…': 'جارٍ الاستلام…',
+  'Taken at the desk': 'استُلمت في المكتب',
+  'item past its pay-by date': 'بند تجاوز موعد الدفع',
+  'items past their pay-by date': 'بنود تجاوزت موعد الدفع',
+  'No reservations yet.': 'لا حجوزات بعد.',
+  'an InstaPay transfer the family started, no reference yet': 'تحويل InstaPay بدأته الأسرة، بلا مرجع بعد',
+  // The fix round of P4a: every started payment at the desk (subjects, charges, the school fee).
+  'Paid:': 'دُفع:',
+  'Receipts for subjects are under Reservations, to hand over.': 'إيصالات المواد في الحجوزات أدناه، للتسليم.',
+  'The reference quoted': 'المرجع المذكور',
+  'a payment the family started another way, not finished': 'دفعة بدأتها الأسرة بطريقة أخرى ولم تكتمل',
+  // The instruments the desk takes (IN_SCHOOL_INSTRUMENT_LABELS), left in English on the Arabic desk until P4a.
+  'Credit / Debit Card': 'بطاقة ائتمان / خصم',
+  'InstaPay (at desk)': 'InstaPay (في المكتب)',
+  // P4a: the registrations page in the families' words (reservations, waiting for payment, paid).
+  "Children's reservations": 'حجوزات الأبناء',
+  'My reservations': 'حجوزاتي',
+  'My reservations — IGCSE Reservation': 'حجوزاتي - حجز IGCSE',
+  'Your reservations and where each stands': 'حجوزاتك وحالة كل منها',
+  'reservation in all': 'حجز في المجموع',
+  'reservations in all': 'حجوزات في المجموع',
+  '+ Reserve more': '+ احجز المزيد',
+  'No reservations match this filter.': 'لا توجد حجوزات تطابق هذا الاختيار.',
+  'Not open yet': 'لم تُفتح بعد',
+  'Closed to new reservations': 'مغلقة أمام الحجوزات الجديدة',
+  'Approved by your parent — waiting for payment.': 'وافق ولي أمرك — بانتظار الدفع.',
+  'Waiting for your parent to approve these: they have been told, and find them under Approvals when they sign in.': 'بانتظار موافقة ولي أمرك عليها: أُبلغ بذلك، ويجدها في «الموافقات» عند تسجيل الدخول.',
+  // The fix round of P4a: the family's screens without the old words (registration, pending payment, board fee).
+  'Check that these reservations belong to your child and are waiting for payment.': 'تأكد أن هذه الحجوزات لابنك/ابنتك وأنها بانتظار الدفع.',
+  'Payment complete': 'اكتمل الدفع',
+  'Your reservations are paid: your balance covered the full amount.': 'حجوزاتك مدفوعة: غطى رصيدك المبلغ كاملًا.',
+  'Reference submitted. The finance team checks your transfer against the bank statement, and then your reservations are paid — usually within one school day.': 'أُرسل المرجع. يراجع فريق المالية تحويلك مقابل كشف البنك، ثم تُدفع حجوزاتك — عادةً خلال يوم دراسي واحد.',
+  "You'll get the school's account details to transfer the exact amount via InstaPay, then submit your transaction reference. The finance team checks the transfer, and then your reservations are paid.": 'ستحصل على بيانات حساب المدرسة لتحويل المبلغ بالضبط عبر إنستاباي، ثم ترسل مرجع التحويل. يراجع فريق المالية التحويل، ثم تُدفع حجوزاتك.',
+  'Payment reversed — its reservations wait for payment again, receipts voided. The money returned counts as money out today.': 'عُكست الدفعة — تعود حجوزاتها إلى انتظار الدفع، وأُلغيت الإيصالات. يُحسب المبلغ المُعاد كمال خارج اليوم.',
+  'Payment reversed — its reservations wait for payment again, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.': 'عُكست الدفعة — تعود حجوزاتها إلى انتظار الدفع، وأُلغيت الإيصالات. سُجلت تصحيحًا ليوم تأكيدها؛ ولم يتغير درج اليوم.',
+  'reserving needs it first': 'الحجز يحتاجها أولًا',
+  '(collected first: reserving needs it)': '(تُحصَّل أولًا: الحجز يحتاجها)',
+  'Approvals': 'الموافقات',
+  'Your children’s requests, waiting for your approval': 'طلبات أبنائك بانتظار موافقتك',
+  'Your student record shows you have graduated. Graduates may retake subjects, and reservations are open now.': 'يشير سجلك إلى أنك تخرجت. يمكن للخريجين إعادة المواد، والحجز مفتوح الآن.',
+  'Your student record shows you have graduated. Reserving, dropping and swapping subjects are not open to you now.': 'يشير سجلك إلى أنك تخرجت. حجز المواد وسحبها وتبديلها غير متاح لك الآن.',
+  'Reserving is closed. Your reservations, receipts and any balance stay available here.': 'الحجز مغلق. تبقى حجوزاتك وإيصالاتك وأي رصيد متاحة هنا.',
+  'Reserving subjects opens to you from grade 10.': 'يُفتح لك حجز المواد بدءًا من الصف 10.',
+  'Reservation history': 'سجل الحجوزات',
+  'Reservation history — IGCSE Reservation': 'سجل الحجوزات - حجز IGCSE',
+  'Pick a child above to see their reservation history.': 'اختر ابنك/ابنتك أعلاه لرؤية سجل الحجوزات.',
+  'No reservations found.': 'لا توجد حجوزات.',
+  'To drop or swap a subject, ask from My reservations.': 'لسحب مادة أو تبديلها، اطلب ذلك من «حجوزاتي».',
+  'Exam fee': 'رسوم الامتحان',
+  'Subject reservation receipt': 'إيصال حجز مادة',
+  'Approvals — IGCSE Reservation': 'الموافقات - حجز IGCSE',
+  'A drop or swap request for this reservation is already waiting for approval. Cancel it under My requests before asking again.': 'يوجد بالفعل طلب سحب أو تبديل لهذا الحجز بانتظار الموافقة. ألغِه من «طلباتي» قبل أن تطلب مرة أخرى.',
+  'No reservations yet': 'لا حجوزات بعد',
+  'Nothing is reserved for your children yet.': 'لا شيء محجوز لأبنائك بعد.',
+  'You have not reserved any subjects yet.': 'لم تحجز أي مادة بعد.',
+  'Reserve subjects': 'احجز المواد',
+  'reservation approved: it is now waiting for payment.': 'حجز تمت الموافقة عليه: صار بانتظار الدفع.',
+  'reservations approved: they are now waiting for payment.': 'حجوزات تمت الموافقة عليها: صارت بانتظار الدفع.',
+  'reservation': 'حجز',
+  'reservations': 'حجوزات',
+  '— approved, they wait for payment.': '— بعد الموافقة تنتظر الدفع.',
+  'A rejected reservation cannot be brought back: your child can ask again.': 'لا يمكن استرجاع حجز مرفوض: يمكن لابنك/ابنتك أن يطلب مرة أخرى.',
+  // B5 of P4a: an option past its own board date while its row is open for the others.
+  'Closed: the exam board\'s last date for this choice has passed.': 'مغلق: انقضى آخر موعد يقبله مجلس الامتحانات لهذا الاختيار.',
   'Teacher to be announced': 'سيُعلَن المعلم لاحقًا',
   'The school assigns the teacher': 'تحدد المدرسة المعلم',
   'Teacher:': 'المعلم:',
@@ -517,8 +604,8 @@ export const familyArabic: Record<string, string> = {
   'Reserved for': 'تم الحجز لـ',
   // The checkout
   'Cancel this checkout': 'ألغِ عملية الدفع هذه',
-  "Quote this reference (or the student's name) at the desk. Your registrations are confirmed as soon as the finance officer records your payment.":
-    'اذكر هذا المرجع (أو اسم الطالب) في المكتب. تُؤكَّد حجوزاتك بمجرد أن يسجل موظف المالية دفعتك.',
+  "Quote this reference (or the student's name) at the desk. Your reservations are paid as soon as the finance officer takes your payment.":
+    'اذكر هذا المرجع (أو اسم الطالب) في المكتب. تُدفع حجوزاتك فور أن يستلم موظف المالية دفعتك.',
   '1 — Transfer via InstaPay to the school account': '1 — حوّل عبر إنستاباي إلى حساب المدرسة',
   '2 — Submit your transaction reference': '2 — أرسل مرجع التحويل',
   'Reference submitted. The finance team will verify your transfer against the bank statement and confirm your registrations — usually within one school day.':
@@ -542,8 +629,8 @@ export const familyArabic: Record<string, string> = {
   'Prices are not final yet for': 'الأسعار ليست نهائية بعد لـ',
   'they stay reserved, and you can pay them once the school confirms them.': 'تبقى محجوزة، ويمكنك دفعها حين تؤكدها المدرسة.',
   'This payment is for the others.': 'هذه الدفعة للمواد الأخرى.',
-  "You'll get a payment reference to quote at the school finance desk. Pay by cash, card, or InstaPay at the desk — registrations confirm on the spot.":
-    'ستحصل على مرجع دفع تذكره في مكتب المالية بالمدرسة. ادفع نقدًا أو بالبطاقة أو بإنستاباي في المكتب — تُؤكَّد الحجوزات في الحال.',
+  "You'll get a payment reference to quote at the school finance desk. Pay with cash, card, or InstaPay at the desk — your reservations are paid on the spot.":
+    'ستحصل على مرجع دفع تذكره في مكتب المالية بالمدرسة. ادفع نقدًا أو بالبطاقة أو بإنستاباي في المكتب — تُدفع حجوزاتك في الحال.',
   "You'll get the school's account details to transfer the exact amount via InstaPay, then submit your transaction reference. The finance team verifies the transfer before your registrations are confirmed.":
     'ستحصل على بيانات حساب المدرسة لتحويل المبلغ بالضبط عبر إنستاباي، ثم ترسل مرجع التحويل. يراجع فريق المالية التحويل قبل تأكيد حجوزاتك.',
   // Registrations
@@ -700,6 +787,11 @@ const FAMILY_RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^(.+) is not taking reservations$/, (m) => `${m[1]} لا تقبل حجوزات`],
   [/^(.+): no longer taking reservations\.$/, (m) => `${m[1]}: لم تعد تقبل حجوزات.`],
   [/^(.+): this choice is no longer offered\.$/, (m) => `${m[1]}: لم يعد هذا الخيار متاحًا.`],
+  [/^Select (.+) for payment$/, (m) => `حدد ${m[1]} للدفع`],
+  [/^(.+)\. Its reservations wait for payment again and their receipts are voided — only possible while the paper has not left the desk\. This is recorded in the audit trail\.$/, (m) => `${m[1]}. تعود حجوزاتها إلى انتظار الدفع وتُلغى إيصالاتها — ممكن فقط ما دام الإيصال الورقي لم يغادر المكتب. يُسجَّل هذا في سجل التدقيق.`],
+  [/^The new reservation \((.+)\) is to be paid\.$/, (m) => `الحجز الجديد (${m[1]}) مطلوب دفعه.`],
+  [/^The new reservation is (.+) cheaper, leaving that amount available if the balance is used at checkout\.$/, (m) => `الحجز الجديد أرخص بمقدار ${m[1]}، فيبقى هذا المبلغ متاحًا إن استُخدم الرصيد عند الدفع.`],
+  [/^(.+): the exam board's last date for this choice has passed\.$/, (m) => `${m[1]}: انقضى آخر موعد يقبله مجلس الامتحانات لهذا الاختيار.`],
   [/^(.+) is not open for reservations yet$/, (m) => `${dateAr(m[1]!)} لم تُفتح للحجز بعد`],
   [/^Choose the teacher of (.+)$/, (m) => `اختر معلم ${m[1]}`],
   [/^Answer: (.+)$/, (m) => `أجب: ${m[1]}`],

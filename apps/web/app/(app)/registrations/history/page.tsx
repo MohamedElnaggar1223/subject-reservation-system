@@ -23,7 +23,7 @@ import { apiResponse } from '@repo/validations';
 import HistoryClient from './history.client';
 
 export const metadata = {
-  title: 'Registration History — IGCSE Reservation',
+  title: 'Reservation history — IGCSE Reservation',
 };
 
 interface PageProps {

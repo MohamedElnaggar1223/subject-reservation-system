@@ -15,7 +15,7 @@ import { apiResponse } from '@repo/validations';
 import ApprovalsClient from './approvals.client';
 
 export const metadata = {
-  title: 'Pending Approvals — IGCSE Reservation',
+  title: 'Approvals — IGCSE Reservation',
 };
 
 export default async function ApprovalsPage(): Promise<React.JSX.Element> {

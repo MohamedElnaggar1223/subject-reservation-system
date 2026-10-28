@@ -16,7 +16,6 @@ import { api } from '~/lib/hono';
 import {
   apiResponse,
   gradeLabel,
-  REGISTRATION_STATUS_LABELS,
   RECEIPT_STATUS_LABELS,
 
   EXCEPTION_TYPE_LABELS,
@@ -30,9 +29,10 @@ import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
 import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
 import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
-import { StatementView } from '~/components/reservations/statement';
+import { StatementView, LineStatusWords } from '~/components/reservations/statement';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { familyWords } from '~/lib/i18n-reservations';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 import { RESERVATION_CYCLE_ONLY } from '~/lib/reservation-focus';
 import DeskToday from './desk-today.client';
 
@@ -136,8 +136,8 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       setReverseTarget(null);
       done(
         v.moneyReturned
-          ? 'Payment reversed — registrations back to pending payment, receipts voided. The money returned counts as money out today.'
-          : 'Payment reversed — registrations back to pending payment, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.'
+          ? 'Payment reversed — its reservations wait for payment again, receipts voided. The money returned counts as money out today.'
+          : 'Payment reversed — its reservations wait for payment again, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.'
       );
     },
     onError: fail,
@@ -187,8 +187,8 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
           type="search"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setStudentId(null); }}
-          placeholder="Type a student's name, email, or ID…"
-          aria-label="Type a student's name, email, or ID…"
+          placeholder="Type a student's name, email, ID, or a payment reference…"
+          aria-label="Type a student's name, email, ID, or a payment reference…"
           className="w-full max-w-xl px-4 py-2.5 text-sm border border-border bg-background rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           autoFocus={!initialStudentId}
         />
@@ -360,15 +360,15 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
               for payment after a reversal, a rejected transfer, a cancelled checkout or a
               register-only visit, the student's charges and the year's school fee — ticked and
               taken in one action, each part its own payment. */}
-          <DeskCollectPanel studentId={summary.student.id} summary={summary} onDone={refresh} />
+          <DeskCollectPanel studentId={summary.student.id} summary={summary} onDone={refresh} quoted={search} />
 
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
-              <h3 id="desk-registrations" className="text-sm font-semibold text-foreground font-display">Registrations</h3>
+              <h3 id="desk-registrations" className="text-sm font-semibold text-foreground font-display">Reservations</h3>
             </div>
             {summary.registrations.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground">No registrations yet.</p>
+              <p className="px-5 py-6 text-sm text-muted-foreground">No reservations yet.</p>
             ) : (
               <div className="overflow-x-auto" role="region" aria-labelledby="desk-registrations" tabIndex={0}>
               <table className="w-full min-w-[720px] text-sm">
@@ -377,7 +377,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                     <tr key={r.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-5 py-2.5">
                         <div className="font-medium text-foreground">
-                          {r.subject.name}
+                          <bdi data-i18n-skip="true">{titleFor(r.subject.name, groupOfLevel(r.subject.qualificationLevel))}</bdi>
                           <span className="text-xs text-muted-foreground font-mono ms-1">{r.subject.code}</span>
                           {r.takenOutsideSchool && <span className="text-xs text-muted-foreground ms-1">(outside)</span>}
                         </div>
@@ -396,7 +396,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-xs">
-                        {labelFor(REGISTRATION_STATUS_LABELS, r.status)}
+                        <LineStatusWords status={r.status} />
                         {/* A waiting subject: its last day to pay (C10), or that its prices are not final yet (E6). */}
                         {r.status === 'pending_payment' && (r.priceProvisional
                           ? <span className="block text-muted-foreground">prices not final yet</span>
@@ -533,7 +533,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       {reverseTarget && (
         <ReasonModal
           title="Reverse this payment?"
-          description={`${reverseTarget.label}. The registrations go back to pending payment and their receipts are voided — only possible while the paper has not left the desk. This is recorded in the audit trail.`}
+          description={`${reverseTarget.label}. Its reservations wait for payment again and their receipts are voided — only possible while the paper has not left the desk. This is recorded in the audit trail.`}
           label="Reason for the reversal"
           placeholder="e.g. Wrong student — money returned to the parent"
           confirmLabel="Reverse Payment"

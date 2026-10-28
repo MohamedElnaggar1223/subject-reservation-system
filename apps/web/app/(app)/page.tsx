@@ -135,8 +135,8 @@ export default async function Home(): Promise<JSX.Element> {
     },
     {
       href: '/registrations',
-      title: 'My Registrations',
-      description: 'View current registrations and status',
+      title: 'My reservations',
+      description: 'Your reservations and where each stands',
       icon: (
         <svg className="size-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V19.5a2.25 2.25 0 0 0 2.25 2.25h.75m0 0h3m-3 0h-3" />
@@ -201,8 +201,8 @@ export default async function Home(): Promise<JSX.Element> {
     },
     {
       href: '/approvals',
-      title: 'Pending Approvals',
-      description: 'Review and approve student requests',
+      title: 'Approvals',
+      description: 'Your children’s requests, waiting for your approval',
       icon: (
         <svg className="size-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -325,8 +325,8 @@ function StudentNotices({ role, profileLoaded, standing, leftKind, leftOn, isGra
               </h2>
               <p className="text-brand-700 mt-1 text-sm leading-relaxed">
                 {mayRegisterNow
-                  ? 'Your student record shows you have graduated. The school lets graduates retake subjects in the October, November and January series, and a window is open now.'
-                  : 'Your student record shows you have graduated. Registration, drop, and swap features are no longer available.'}
+                  ? 'Your student record shows you have graduated. Graduates may retake subjects, and reservations are open now.'
+                  : 'Your student record shows you have graduated. Reserving, dropping and swapping subjects are not open to you now.'}
               </p>
               <p className="text-brand-700 mt-1 text-sm leading-relaxed">
                 If you believe this is an error, please contact the school administration.
@@ -340,7 +340,7 @@ function StudentNotices({ role, profileLoaded, standing, leftKind, leftOn, isGra
       {role === 'student' && profileLoaded && standing === 'left' && (
         <Notice tone="neutral" className="animate-fade-up stagger-1 mb-8" title={leftKind === 'transferred' ? 'You transferred to another school' : 'You have left the school'}>
           <p>
-            <span>Your record shows you left on</span> <span>{leftOn}</span>. <span>Registration is closed. Your registrations, receipts and any balance stay available here.</span>
+            <span>Your record shows you left on</span> <span>{leftOn}</span>. <span>Reserving is closed. Your reservations, receipts and any balance stay available here.</span>
           </p>
           <p className="mt-1">If you believe this is an error, please contact the school administration.</p>
         </Notice>
@@ -352,7 +352,7 @@ function StudentNotices({ role, profileLoaded, standing, leftKind, leftOn, isGra
       )}
       {role === 'student' && profileLoaded && standing === 'upcoming' && (
         <Notice tone="info" className="animate-fade-up stagger-1 mb-8" title="You start grade 10 next academic year">
-          <p>Exam registration opens to you from grade 10.</p>
+          <p>Reserving subjects opens to you from grade 10.</p>
         </Notice>
       )}
     </>

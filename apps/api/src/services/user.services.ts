@@ -8,7 +8,7 @@
  * - Admin user management
  */
 
-import { db, user, session, teacher, auditLog, eq, ilike, or, and, inArray, sql, gradeTodaySql, gradeTodayExtras } from '@repo/db';
+import { db, user, session, teacher, auditLog, payment, eq, ilike, or, and, inArray, sql, gradeTodaySql, gradeTodayExtras } from '@repo/db';
 import { logAction } from './audit.services';
 import { randomUUID } from 'crypto';
 import { academicYearStartOf, cohortFromGrade, type UpdateProfileType, type AdminUpdateUserType, type UserQueryFiltersType } from '@repo/validations';
@@ -389,6 +389,11 @@ export async function userExists(userId: string): Promise<boolean> {
  */
 export async function searchPeople(params: { search?: string; role?: 'student' | 'parent' }) {
   const term = params.search?.trim();
+  // The reference a family quotes at the desk for a payment it started ("Pay at the school": SCH-…), whole, in any
+  // case (P4a B3): the student and the parent of that payment, while it is open (pending: not taken, failed or
+  // cancelled yet). A part of it matches nothing (every reference begins alike).
+  const byReference = (column: typeof payment.studentId | typeof payment.parentId) =>
+    db.select({ id: column }).from(payment).where(and(sql`upper(${payment.externalReference}) = upper(${term ?? ''})`, eq(payment.status, 'pending')));
   return db.query.user.findMany({
     where: (u, { and, or, ilike, inArray, eq }) => {
       const scope = params.role
@@ -400,7 +405,9 @@ export async function searchPeople(params: { search?: string; role?: 'student' |
         or(
           ilike(u.name, `%${term}%`),
           ilike(u.email, `%${term}%`),
-          ilike(u.studentId, `%${term}%`)
+          ilike(u.studentId, `%${term}%`),
+          inArray(u.id, byReference(payment.studentId)),
+          inArray(u.id, byReference(payment.parentId)),
         )
       );
     },

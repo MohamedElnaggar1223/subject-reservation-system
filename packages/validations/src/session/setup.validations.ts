@@ -88,7 +88,7 @@ export function impactSentence(i: ImpactType): string {
   if (i.repriced) parts.push(`re-prices ${n(i.repriced, 'unpaid reservation', 'unpaid reservations')} (the families are told)`);
   if (i.listedForFinance) parts.push(`lists ${n(i.listedForFinance, 'paid reservation', 'paid reservations')} for finance (their price stays)`);
   if (i.linesAffected) parts.push(`changes ${n(i.linesAffected, 'reservation', 'reservations')} (made payable, or closed to new ones)`);
-  if (i.dueDatesMoved) parts.push(`moves the due date of ${n(i.dueDatesMoved, 'unpaid reservation', 'unpaid reservations')}`);
+  if (i.dueDatesMoved) parts.push(`moves the pay-by date of ${n(i.dueDatesMoved, 'unpaid reservation', 'unpaid reservations')}`);
   if (i.cutOffsEarlier) {
     parts.push(`brings forward the last day to pay of ${n(i.cutOffsEarlier, 'unpaid reservation', 'unpaid reservations')}${i.cutOffsPassed
       ? ` (${i.cutOffsPassed} of them past it already: ${i.cutOffsPassed === 1 ? 'it expires' : 'they expire'} at once)` : ''}`);

@@ -128,14 +128,10 @@ function Tile({ s, o }: { s: SetupSession; o: Offering }) {
   const code = shownCode(o.subject.code);
   const href = `/admin/sessions/${s.id}/subjects/${o.id}`;
   return (
-    <article className={cn('rounded-xl border border-border bg-card p-4 shadow-sm', !o.accepting && 'bg-muted/40')}>
-      <div className="flex items-start justify-between gap-3">
-        <Link href={href as never} className="font-display text-base font-semibold text-foreground hover:underline"><bdi data-i18n-skip="true">{subjectTitle(o)}</bdi></Link>
-        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          <span>{o.accepting ? (s.status === 'active' ? 'Accepting' : 'Opens with the session') : 'Switched off'}</span>
-          <Switch checked={o.accepting} label={`${subjectTitle(o)}: accepting reservations`} disabled={toggle.isPending || s.status === 'closed'} onChange={(on) => toggle.save(on)} />
-        </span>
-      </div>
+    <article className={cn('flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm', !o.accepting && 'bg-muted/40')}>
+      {/* The name has the tile's width (it wrapped over two or three lines beside the switch); the switch and what it
+          means sit at the foot of the tile. */}
+      <Link href={href as never} className="font-display text-base font-semibold text-foreground hover:underline"><bdi data-i18n-skip="true">{subjectTitle(o)}</bdi></Link>
       <p className="mt-0.5 text-xs text-muted-foreground">
         <bdi data-i18n-skip="true">{o.board.name}</bdi>{code && <> · <span dir="ltr" data-i18n-skip="true">{code}</span></>}{o.notOnTheList && <> · <span>not on the board&apos;s list we hold</span></>}
       </p>
@@ -165,6 +161,10 @@ function Tile({ s, o }: { s: SetupSession; o: Offering }) {
       {o.accepting && o.priceNotSet.length > 0 && <p className="mt-2"><Badge tone="warning">Not offered to families: a price is not set</Badge></p>}
       {o.lines > 0 && <p className="mt-1 text-xs text-muted-foreground"><span>{o.lines}</span> <span>{o.lines === 1 ? 'reservation' : 'reservations'}</span></p>}
       <ErrorLine message={toggle.error} />
+      <div className="mt-auto flex items-center justify-between gap-3 pt-3 text-xs text-muted-foreground">
+        <span>{o.accepting ? (s.status === 'active' ? 'Accepting' : 'Opens with the session') : 'Switched off'}</span>
+        <Switch checked={o.accepting} label={`${subjectTitle(o)}: accepting reservations`} disabled={toggle.isPending || s.status === 'closed'} onChange={(on) => toggle.save(on)} />
+      </div>
       <ImpactDialog save={toggle} />
     </article>
   );

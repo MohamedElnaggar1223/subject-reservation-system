@@ -20,10 +20,14 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, schoolDateString, refusalCodeOf } from '@repo/validations';
+import { apiResponse, schoolDateString, refusalCodeOf, IN_SCHOOL_INSTRUMENTS, IN_SCHOOL_INSTRUMENT_LABELS } from '@repo/validations';
+import { Button } from '~/components/ui/button';
 import { familyWords } from '~/lib/i18n-reservations';
+import { useI18n } from '~/lib/i18n';
 import { lineNamedBy } from '~/components/reservations/offers';
-import { Notice } from '~/components/ui/tone';
+import { Notice, Badge } from '~/components/ui/tone';
+import { cn } from '~/lib/utils';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 import { Money, Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import {
   fetchCharges, collectAtDesk, CHARGES_KEY, CollectBar, CollectedNotice, kindLabel, type Collected, type ChargeRow,
@@ -31,9 +35,11 @@ import {
 
 const fetchSummary = (id: string) => apiResponse(api.v1.users[':id'].summary.$get({ param: { id } }));
 type Summary = Awaited<ReturnType<typeof fetchSummary>>;
+type OpenPayment = Summary['openPayments'][number];
 
 /** What the student owes now, as the desk collects it. */
 function useOwed(studentId: string, summary: Summary | undefined) {
+  const { language } = useI18n();
   const charges = useQuery({ queryKey: [...CHARGES_KEY, 'student', studentId], queryFn: () => fetchCharges({ studentId }) });
   return useMemo(() => {
     const rows = charges.data ?? [];
@@ -42,9 +48,25 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     // instalments stay paid; their deposits went back to escrow).
     const waiting = (summary?.registrations ?? []).filter((r) => r.status === 'pending_payment' && !r.livePlan);
     const lines = waiting.filter((r) => r.payableNow);
-    // F8-09: a line whose payment is under way (the family's transfer waiting for finance's check, a checkout
-    // they started) is listed apart, never ticked: the Finance Workbench confirms or rejects that payment.
-    const underWay = waiting.filter((r) => r.paymentInProgress);
+    // F8-09: what a payment under way covers is listed apart, never ticked into the desk's own payment. Every payment
+    // the family started and has not finished, whatever it pays for — subjects, charges, instalments, the school fee
+    // (summary.openPayments, with its own amount and reference): a pay-at-school one is taken here with the instrument,
+    // one payment as the family made it (P4a B3 and its fix round: the officer is not sent to another screen); a transfer
+    // is checked against the bank on the Finance Workbench; any other is named for what it is.
+    const regById = new Map((summary?.registrations ?? []).map((r) => [r.id, r]));
+    const coversOf = (p: OpenPayment) => [
+      ...p.registrationIds.map((id) => regById.get(id)).filter((r): r is NonNullable<typeof r> => !!r).map((r) => titleFor(r.subject.name, groupOfLevel(r.subject.qualificationLevel))),
+      ...p.charges.map((c) => c.description),
+      // The school's own words for these two, in the reader's language (the covers are names, read as data).
+      ...(p.purpose === 'school_fee' ? [`${language === 'ar' ? 'المصاريف الدراسية' : 'School fee'} ${p.academicYear ?? ''}`.trim()] : []),
+      ...(p.purpose === 'remark' ? [language === 'ar' ? 'رسوم إعادة التصحيح' : 'A remark fee'] : []),
+    ];
+    const openPayments = summary?.openPayments ?? [];
+    const started = openPayments.filter((p) => p.status === 'pending' && p.method === 'in_school')
+      .map((p) => ({ ...p, covers: coversOf(p), subjects: p.registrationIds.length }));
+    const underWay = openPayments.filter((p) => !(p.status === 'pending' && p.method === 'in_school'))
+      .map((p) => ({ ...p, covers: coversOf(p) }));
+    const startedYears = new Set(started.filter((p) => p.purpose === 'school_fee').map((p) => p.academicYear));
     // E6: prices not final yet — reserved, collected once the school confirms them.
     const provisional = waiting.filter((r) => !r.payableNow && !r.paymentInProgress && r.priceProvisional);
     // C10: past its last day to pay — no longer payable (the cut-off sweep expires it).
@@ -52,7 +74,9 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     const payable = rows.filter((c) => c.status === 'pending_payment' && c.kind !== 'school_fee_push' && !c.openPaymentId);
     const requested = rows.filter((c) => c.status === 'requested');
     const pushes = rows.filter((c) => c.kind === 'school_fee_push' && c.status === 'pending_payment');
-    const fees = (summary?.schoolFeesDue ?? []).map((f) => ({ ...f, push: pushes.find((p) => p.academicYear === f.academicYear) ?? null }));
+    // A school fee the family started to pay at the school is taken from its started payment, not collected again.
+    const fees = (summary?.schoolFeesDue ?? []).filter((f) => !startedYears.has(f.academicYear))
+      .map((f) => ({ ...f, push: pushes.find((p) => p.academicYear === f.academicYear) ?? null }));
     // An instalment plan is paid over time: only each plan's next instalment (and any already due) is
     // ticked at first, not the whole plan (F6: the desk offered all three instalments, EGP 24,850, for a
     // plan whose first falls due in three days). The officer can still tick the rest.
@@ -67,11 +91,12 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     const laterInstalments = new Set(payable
       .filter((c) => c.kind === 'instalment' && nextOfPlan.get(c.registration?.id ?? c.id) !== c.id && !(c.dueAt && schoolDateString(new Date(c.dueAt)) <= today))
       .map((c) => `c:${c.id}`));
-    return { lines, underWay, provisional, pastLastDay, payable, requested, fees, laterInstalments, loading: charges.isLoading };
-  }, [charges.data, charges.isLoading, summary]);
+    return { lines, underWay, started, provisional, pastLastDay, payable, requested, fees, laterInstalments, loading: charges.isLoading };
+  }, [charges.data, charges.isLoading, summary, language]);
 }
 
-export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: string; summary: Summary; onDone: () => void }) {
+/** `quoted`: what the officer typed in the search — a started payment whose reference it is, is marked as the one quoted. */
+export function DeskCollectPanel({ studentId, summary, onDone, quoted = '' }: { studentId: string; summary: Summary; onDone: () => void; quoted?: string }) {
   const queryClient = useQueryClient();
   const owed = useOwed(studentId, summary);
   // What the officer changed from the first ticks (everything owed, less a plan's later instalments).
@@ -85,6 +110,8 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   // The family's balance, used only as far as the parent asks (0 at first): it pays the subjects and the charges
   // other than instalments, never the school fee (desk.services: at most their total).
   const [balanceText, setBalanceText] = useState('');
+  // A payment the family started, taken here: what was taken, said once it leaves the list.
+  const [taken, setTaken] = useState<{ amount: number; reference: string | null; covers: string[]; subjects: number } | null>(null);
   const isOn = (key: string) => picked.get(key) ?? !owed.laterInstalments.has(key);
   const flip = (key: string) => setPicked((m) => new Map(m).set(key, !isOn(key)));
   const lineIds = owed.lines.filter((l) => isOn(`l:${l.id}`)).map((l) => l.id);
@@ -127,8 +154,15 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
     },
   });
 
-  if (!owed.lines.length && !owed.underWay.length && !owed.provisional.length && !owed.pastLastDay.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
-    return result ? <Notice tone="success" title="Collected at the desk"><CollectedNotice r={result} /></Notice> : null;
+  const takenNotice = taken && (
+    <Notice tone="success" title="Taken at the desk">
+      <span><Money amount={taken.amount} /></span>{taken.reference && <> · <span>reference</span> <bdi dir="ltr" className="font-mono">{taken.reference}</bdi></>}{' · '}
+      <span>Paid:</span> <bdi data-i18n-skip="true">{taken.covers.join(' · ')}</bdi>{!taken.covers.join('').endsWith('.') && '.'}
+      {taken.subjects > 0 && <> <span>Receipts for subjects are under Reservations, to hand over.</span></>}
+    </Notice>
+  );
+  if (!owed.lines.length && !owed.underWay.length && !owed.started.length && !owed.provisional.length && !owed.pastLastDay.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
+    return result || taken ? <div className="space-y-3">{result && <Notice tone="success" title="Collected at the desk"><CollectedNotice r={result} /></Notice>}{takenNotice}</div> : null;
   }
   return (
     <section aria-labelledby="desk-owed" className="rounded-xl border border-border bg-card shadow-sm">
@@ -161,12 +195,12 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
         {owed.fees.map((f) => (
           <Row key={`f:${f.academicYear}`} checked={isOn(`f:${f.academicYear}`)} onChange={() => flip(`f:${f.academicYear}`)}
             title={<><span>School fee</span> <bdi dir="ltr">{f.academicYear}</bdi></>}
-            detail={f.push ? <><span>pushed, due</span> <Day iso={f.push.dueAt} /></> : <span>the registration gate asks for it</span>}
+            detail={f.push ? <><span>pushed, due</span> <Day iso={f.push.dueAt} /></> : <span>reserving needs it first</span>}
             amount={f.amount} />
         ))}
         {owed.lines.map((l) => (
           <Row key={`l:${l.id}`} checked={isOn(`l:${l.id}`)} onChange={() => flip(`l:${l.id}`)}
-            title={<bdi data-i18n-skip="true">{l.subject.name}</bdi>}
+            title={<bdi data-i18n-skip="true">{titleFor(l.subject.name, groupOfLevel(l.subject.qualificationLevel))}</bdi>}
             detail={<>
               <span>waiting for payment</span> · <bdi data-i18n-skip="true">{l.session.name}</bdi>
               {l.cutOff && <> · <span>last day to pay</span> <Day iso={String(l.cutOff)} /></>}
@@ -178,31 +212,38 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
           <Row key={`c:${c.id}`} checked={isOn(`c:${c.id}`)} onChange={() => flip(`c:${c.id}`)}
             title={<bdi>{c.description}</bdi>} detail={<><span>{kindLabel(c.kind)}</span> · <span>due</span> <Day iso={c.dueAt} /></>} amount={c.amount} />
         ))}
-        {owed.underWay.map((l) => (
-          <li key={`w:${l.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
+        {owed.started.map((p) => (
+          <StartedPayment key={p.id} p={p} quoted={!!p.reference && quoted.trim().toUpperCase() === p.reference.toUpperCase()}
+            onTaken={() => { setTaken({ amount: p.amount, reference: p.reference, covers: p.covers, subjects: p.subjects }); onDone(); }} />
+        ))}
+        {owed.underWay.map((p) => (
+          <li key={`w:${p.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
             <span className="flex min-w-0 items-start gap-3">
               <span aria-hidden className="mt-1 h-4 w-4 shrink-0" />
               <span>
-                <span className="block font-medium text-foreground"><bdi data-i18n-skip="true">{l.subject.name}</bdi></span>
+                <span className="block font-medium text-foreground"><bdi data-i18n-skip="true">{p.covers.join(' · ')}</bdi></span>
                 <span className="block text-xs">
-                  <span>{l.paymentInProgress?.status === 'pending_verification' ? "awaiting the transfer's check" : 'a payment the family started'}</span>
-                  {' · '}<bdi data-i18n-skip="true">{l.session.name}</bdi>{' · '}
-                  <span>confirm or reject it on the</span> <Link href="/finance" className="text-primary underline">Finance Workbench</Link>
+                  {/* What it is, by its method: a transfer being checked, an InstaPay transfer not referenced yet, or a payment
+                      by a method the school no longer offers (started before; the Finance Workbench ends it). */}
+                  <span>{p.status === 'pending_verification' ? "awaiting the transfer's check"
+                    : p.method === 'instapay' ? 'an InstaPay transfer the family started, no reference yet'
+                      : 'a payment the family started another way, not finished'}</span>
+                  {' · '}<span>confirm or reject it on the</span> <Link href="/finance" className="text-primary underline">Finance Workbench</Link>
                 </span>
               </span>
             </span>
-            <Money amount={l.priceAtRegistration} />
+            <Money amount={p.amount} />
           </li>
         ))}
         {owed.provisional.length > 0 && (
           <li className="px-5 py-2.5 text-xs text-muted-foreground">
-            <span>Prices not final yet, collected once the school confirms them:</span> <bdi data-i18n-skip="true">{owed.provisional.map((r) => r.subject.name).join(' · ')}</bdi>
+            <span>Prices not final yet, collected once the school confirms them:</span> <bdi data-i18n-skip="true">{owed.provisional.map((r) => titleFor(r.subject.name, groupOfLevel(r.subject.qualificationLevel))).join(' · ')}</bdi>
           </li>
         )}
         {owed.pastLastDay.map((l) => (
           <li key={`x:${l.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
             <span>
-              <span className="block font-medium text-foreground"><bdi data-i18n-skip="true">{l.subject.name}</bdi></span>
+              <span className="block font-medium text-foreground"><bdi data-i18n-skip="true">{titleFor(l.subject.name, groupOfLevel(l.subject.qualificationLevel))}</bdi></span>
               <span className="block text-xs">
                 <span>Past its last day to pay</span>{l.cutOff && <> (<Day iso={String(l.cutOff)} />)</>}<span>: it can no longer be paid. Reserve it again while it is offered.</span>
               </span>
@@ -226,7 +267,54 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
       )}
       {error && <div className="px-5 pb-4"><Notice tone="danger">{familyWords(error)}</Notice></div>}
       {result && <div className="px-5 pb-4"><Notice tone={result.notCollected.length ? 'warning' : 'success'} title="Collected at the desk"><CollectedNotice r={result} /></Notice></div>}
+      {takenNotice && <div className="px-5 pb-4">{takenNotice}</div>}
     </section>
+  );
+}
+
+/**
+ * A pay-at-school payment the family started (P4a B3 and its fix round), whatever it pays for — subjects, charges,
+ * instalments, the school fee: the reference they quote, what it pays and what it asks for, taken here with the
+ * instrument — the confirm the Finance Workbench makes (POST /payments/:id/confirm, the officer's), noted "Taken at the
+ * desk" so the audit tells the two apart. The one whose reference the officer searched for is marked.
+ */
+function StartedPayment({ p, quoted, onTaken }: {
+  p: { id: string; covers: string[]; reference: string | null; amount: number; escrowApplied: number };
+  quoted: boolean;
+  onTaken: () => void;
+}) {
+  const [instrument, setInstrument] = useState<(typeof IN_SCHOOL_INSTRUMENTS)[number]>('cash');
+  const take = useMutation({
+    mutationFn: () => apiResponse(api.v1.payments[':id'].confirm.$post({ param: { id: p.id }, json: { instrumentUsed: instrument, notes: 'Taken at the desk' } })),
+    onSuccess: onTaken,
+  });
+  return (
+    <li className={cn('space-y-2 px-5 py-3', quoted && 'bg-accent ring-1 ring-inset ring-primary')}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block font-medium text-foreground">
+            <span>Pay at the school, started by the family</span>{p.reference && <> · <span>reference</span> <bdi dir="ltr" className="font-mono">{p.reference}</bdi></>}
+            {quoted && <> <Badge tone="info">The reference quoted</Badge></>}
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            <bdi data-i18n-skip="true">{p.covers.join(' · ')}</bdi>
+            {p.escrowApplied > 0 && <> · <span>from the balance</span> <Money amount={p.escrowApplied} /></>}
+          </span>
+        </span>
+        <Money amount={p.amount} className="font-medium text-foreground" />
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <label className="text-sm text-muted-foreground" htmlFor={`started-${p.id}`}>Paid with</label>
+        <select id={`started-${p.id}`} value={instrument} onChange={(e) => setInstrument(e.target.value as typeof instrument)}
+          className="h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground">
+          {IN_SCHOOL_INSTRUMENTS.map((i) => <option key={i} value={i}>{IN_SCHOOL_INSTRUMENT_LABELS[i]}</option>)}
+        </select>
+        <Button size="sm" disabled={take.isPending} onClick={() => take.mutate()}>
+          {take.isPending ? <span>Taking it…</span> : <><span>Take it</span> <Money amount={p.amount} /></>}
+        </Button>
+      </div>
+      {take.error && <p role="alert" className="text-sm text-destructive">{familyWords(take.error.message)}</p>}
+    </li>
   );
 }
 
@@ -276,7 +364,7 @@ export function AlsoCollect({ studentId, value, onChange }: { studentId: string;
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={value.schoolFeeYear === f.academicYear}
                 onChange={(e) => change({ ...value, schoolFeeYear: e.target.checked ? f.academicYear : undefined })} className="h-4 w-4" />
-              <span><span>School fee</span> <bdi dir="ltr">{f.academicYear}</bdi> <span className="text-xs text-muted-foreground">(collected first: the registration needs it)</span></span>
+              <span><span>School fee</span> <bdi dir="ltr">{f.academicYear}</bdi> <span className="text-xs text-muted-foreground">(collected first: reserving needs it)</span></span>
             </label>
             <Money amount={f.amount} />
           </li>

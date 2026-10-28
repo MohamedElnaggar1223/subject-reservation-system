@@ -60,6 +60,8 @@ type Question = QuestionInputType;
 type Draft = {
   accepting: boolean; closesAt: string; courseFee: string; note: string; teacherChoice: TeacherChoice; teacherTbc: boolean;
   teachers: TeacherPick[]; rows: DraftRow[]; earlier: Earlier[]; questions: Question[];
+  /** Her "Keep it" on the earlier exams older than the board carries a result forward (olderSittingsKept), sent with the save. */
+  keepOlder: boolean;
 };
 
 const NO_CELLS: Cells = { firstInSchool: false, retakeInSchool: false, retakeSelfStudy: false, firstSelfStudy: false };
@@ -87,6 +89,7 @@ function draftOf(o: OfferingData): Draft {
     teachers: o.teachers.map((t) => ({ teacherId: t.teacherId, name: t.name, online: t.online, external: t.external })),
     rows: o.rows.map((r) => rowDraft(r)),
     earlier,
+    keepOlder: false,
     questions: o.questions.map((q) => ({ id: q.id, kind: QuestionKindSchema.parse(q.kind), prompt: q.prompt, choices: q.choices, required: q.required })),
   };
 }
@@ -160,6 +163,7 @@ function bodyOf(d: Draft, o: OfferingData, s: SetupSession) {
       };
     }),
     ...(changed('questions') ? { questions: d.questions } : {}),
+    ...(d.keepOlder ? { olderSittingsKept: true as const } : {}),
     ...(o.rows.some((r) => r.cellsByDefault.length) ? { defaultsReviewed: true as const } : {}),
   };
 }
@@ -757,6 +761,10 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
   const ticked = (e: Earlier) => d.earlier.some((x) => x.month === e.month && x.year === e.year);
   const toggle = (e: Earlier) => setD({ ...d, earlier: ticked(e) ? d.earlier.filter((x) => !(x.month === e.month && x.year === e.year)) : [...d.earlier, e] });
   const carry = board?.carryForwardMonths ?? null;
+  // The older exams she kept on purpose (her "Keep it", stored on the rows).
+  const kept = new Set(o.rows.flatMap((r) => r.allowedPriorSittings.filter((p) => p.kept).map((p) => `${p.month}-${p.year}`)));
+  // An older exam ticked and not kept yet: the one "keep" control shows.
+  const unkeptOld = carry !== null && shown.some((e) => ticked(e) && hereIdx - monthIndex(e.month, e.year) > carry && !kept.has(`${e.month}-${e.year}`));
   return (
     <section className={CARD} aria-labelledby="earlier-title">
       <h2 id="earlier-title" className="font-display text-base font-semibold text-foreground">Earlier exams a retake carries from</h2>
@@ -774,15 +782,26 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
                 <span>{examMonth(e.month, e.year)}</span>
               </label>
               {old && (
-                <p role="status" className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  <span>{`${examMonth(e.month, e.year)} is ${age} months before this exam: older than ${o.board.name} carries a result forward (${carry} months).`}</span>{' '}
-                  <span>It stays, since your list wins; the board may refuse the entry.</span>
-                </p>
+                <div role="status" className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <p>
+                    <span>{`${examMonth(e.month, e.year)} is ${age} months before this exam: older than ${o.board.name} carries a result forward (${carry} months).`}</span>{' '}
+                    <span>It stays, since your list wins; the board may refuse the entry.</span>
+                  </p>
+                  {kept.has(`${e.month}-${e.year}`) && <p className="mt-1 font-medium">You kept it: it is no longer on the list to check.</p>}
+                </div>
               )}
             </li>
           );
         })}
       </ul>
+      {/* P1c item 10a: one flag for the subject (olderSittingsKept) — one control, said once, under the list: every
+          older exam ticked here is kept on purpose, the check list stops asking, and a copy keeps it so. */}
+      {unkeptOld && (
+        <label className="mt-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <input type="checkbox" className="size-4 accent-primary" checked={d.keepOlder} disabled={!canEdit} onChange={() => setD({ ...d, keepOlder: !d.keepOlder })} />
+          <span>Keep the older exams of this subject, and take them off the list to check (saved with the subject)</span>
+        </label>
+      )}
       {canEdit && cand.length > 0 && (
         <CommitSelect className={cn(INPUT_CLASS, 'mt-3 w-auto')} value="" reset aria-label="Add an older earlier exam"
           onCommit={(v) => {

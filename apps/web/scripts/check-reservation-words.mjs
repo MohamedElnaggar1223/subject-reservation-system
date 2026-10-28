@@ -48,6 +48,15 @@ export const FAMILY_SCREENS = [
   'app/(app)/desk/desk-collect.client.tsx',
   'app/(app)/desk/desk-today.client.tsx',
   'app/(app)/statement/statement.client.tsx',
+  // The fix round of P4a: the family's Home, its reservation history, its requests, the receipt it prints, and the
+  // pages' titles of Approvals and the history.
+  'app/(app)/page.tsx',
+  'app/(app)/registrations/history/history.client.tsx',
+  'app/(app)/registrations/history/page.tsx',
+  'app/(app)/registrations/page.tsx',
+  'app/(app)/pending-requests/pending-requests.client.tsx',
+  'app/(app)/receipt-print/[id]/page.tsx',
+  'app/(app)/approvals/page.tsx',
 ];
 
 /** The shared components these screens render; `only` names the pieces they use. */
@@ -71,6 +80,14 @@ export const FAMILY_FORBIDDEN_EN = /\b(awards?|suites?|series|sittings?|componen
 // "your son") speaks of every child as a boy: the app says ابنك/ابنتك (ابن/ابنة).
 export const FAMILY_FORBIDDEN_AR = /(^|[^\p{L}])[وفبكل]?(?:ال|لل)?(دورة|دورت|دورات|سلسلة|سلاسل|مكوّ?ن)|(?<!مرور\s?)(?<!المرور\s?)(?:^|[^\p{L}])(?:ال)?مؤقت|(?:^|[^\p{L}/])[وفبكل]?(?:ال|لل)?ابن(?:ك|ه|ي)?(?![\p{L}\p{M}/])/u;
 export const familyForbidden = (s) => FAMILY_FORBIDDEN_EN.test(s) || FAMILY_FORBIDDEN_AR.test(s);
+/**
+ * The older words of the family's screens (the fix round of P4a): one word per concept — the pay-by date, waiting for
+ * payment, the exam fee, a reservation. Read on these screens' own rendered strings only: a route ('/registrations'), a
+ * query key or a value the code tests is not a word, and the shared components (the desk's academic record) and the
+ * staff's labels of @repo/validations are not read for them.
+ */
+export const FAMILY_OLD_WORDS = /\b(payment due|pending payment|board fees?|registrations?)\b/i;
+export const familyOldWord = (s) => !/^\//.test(s.trim()) && FAMILY_OLD_WORDS.test(s);
 
 /** JSX attributes whose value is never read as words. */
 const NOT_WORDS = new Set(['className', 'id', 'htmlFor', 'key', 'href', 'type', 'role', 'variant', 'size', 'tone', 'dir', 'lang', 'inputMode',
@@ -95,6 +112,8 @@ export function familyStringsOf(file, only) {
     const p = node.parent;
     return (ts.isBinaryExpression(p) && [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(p.operatorToken.kind))
       || ts.isCaseClause(p) || ts.isLiteralTypeNode(p)
+      // A value the code looks for in a text (comments.startsWith('Swap from registration')): a value, not a word.
+      || (ts.isCallExpression(p) && ts.isPropertyAccessExpression(p.expression) && ['startsWith', 'endsWith', 'includes', 'test', 'match'].includes(p.expression.name.text))
       // A status the code looks for in a list (['pending_payment', 'confirmed'].includes(…)) is a value, not a word.
       || (ts.isArrayLiteralExpression(p) && p.elements.every((e) => ts.isStringLiteral(e) && /^[a-z_]+$/.test(e.text)));
   };
@@ -137,7 +156,7 @@ export const FAMILY_SAMPLES = {
   paidByWords: [['in_school', 'cash'], ['in_school', 'card'], ['in_school', 'instapay'], ['in_school', 'other'], ['instapay', null], ['card', null], ['fawry', null]],
   gradeLabel: [[9], [10], [11], [12], [13], [null]],
 };
-export const FAMILY_NOT_SENTENCES = new Set(['hasRole', 'apiResponse', 'refusalCodeOf', 'formatEgp', 'schoolDateString', 'gradeInAcademicYear', 'seriesAcademicYearStart', 'isRegistryPolicyKey']);
+export const FAMILY_NOT_SENTENCES = new Set(['hasRole', 'gradeStanding', 'apiResponse', 'refusalCodeOf', 'formatEgp', 'schoolDateString', 'gradeInAcademicYear', 'seriesAcademicYearStart', 'isRegistryPolicyKey']);
 
 /** Every dictionary: the lib/i18n files and the files of the lib/i18n- folders (the foundation's, the exams'). */
 export const ALL_DICTIONARIES = (web = WEB) => [
@@ -150,16 +169,17 @@ export const ALL_DICTIONARIES = (web = WEB) => [
 export async function checkFamily({ web = WEB, screens = FAMILY_SCREENS, shared = FAMILY_SHARED, wording = 'lib/i18n-reservations.ts', dictionaries, lib, list = false } = {}) {
   const hits = [];
   const seen = new Set();
-  const read = (rel, only) => {
+  const read = (rel, only, oldWords = false) => {
     const file = path.join(web, rel);
     if (!existsSync(file)) { hits.push(`${rel}: missing`); return; }
     for (const s of familyStringsOf(file, only)) {
       if (list && !seen.has(s.v)) console.log(s.v);
       seen.add(s.v);
       if (familyForbidden(s.v)) hits.push(`${rel}:${s.line}: ${s.v}`);
+      else if (oldWords && familyOldWord(s.v)) hits.push(`${rel}:${s.line}: ${s.v} (an older word: pay by, waiting for payment, exam fee, reservation)`);
     }
   };
-  for (const rel of screens) read(rel);
+  for (const rel of screens) read(rel, undefined, true);
   for (const s of shared) read(s.file, s.only);
   // This check's wording: the P3 section of lib/i18n-reservations.ts (from its marker), both languages. The older
   // phrases above it are other screens' (the To verify tab, the old Reserve page): read only where a screen uses them.
@@ -205,6 +225,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
       console.error(`The family's and the desk's screens carry ${hits.length} forbidden word(s):\n${hits.join('\n')}`);
       process.exit(1);
     }
-    console.log(`The family's and the desk's words: ${files} files, lib/i18n-reservations.ts and ${sentences} names from @repo/validations checked; none of award, suite, series, sitting, component, mapping, option code, provisional, cut-off, offer item.`);
+    console.log(`The family's and the desk's words: ${files} files, lib/i18n-reservations.ts and ${sentences} names from @repo/validations checked; none of award, suite, series, sitting, component, mapping, option code, provisional, cut-off, offer item; on the screens none of payment due, pending payment, board fee, registration.`);
   }
 }
