@@ -497,12 +497,15 @@ export const familyArabic: Record<string, string> = {
   'Take it': 'استلمها',
   'Taking it…': 'جارٍ الاستلام…',
   'Taken at the desk': 'استُلمت في المكتب',
-  'subject paid: its receipt is under Reservations, to hand over.': 'مادة مدفوعة: إيصالها في الحجوزات أدناه، للتسليم.',
-  'subjects paid: their receipts are under Reservations, to hand over.': 'مواد مدفوعة: إيصالاتها في الحجوزات أدناه، للتسليم.',
   'item past its pay-by date': 'بند تجاوز موعد الدفع',
   'items past their pay-by date': 'بنود تجاوزت موعد الدفع',
   'No reservations yet.': 'لا حجوزات بعد.',
   'an InstaPay transfer the family started, no reference yet': 'تحويل InstaPay بدأته الأسرة، بلا مرجع بعد',
+  // The fix round of P4a: every started payment at the desk (subjects, charges, the school fee).
+  'Paid:': 'دُفع:',
+  'Receipts for subjects are under Reservations, to hand over.': 'إيصالات المواد في الحجوزات أدناه، للتسليم.',
+  'The reference quoted': 'المرجع المذكور',
+  'a payment the family started another way, not finished': 'دفعة بدأتها الأسرة بطريقة أخرى ولم تكتمل',
   // The instruments the desk takes (IN_SCHOOL_INSTRUMENT_LABELS), left in English on the Arabic desk until P4a.
   'Credit / Debit Card': 'بطاقة ائتمان / خصم',
   'InstaPay (at desk)': 'InstaPay (في المكتب)',

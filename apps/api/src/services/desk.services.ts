@@ -16,7 +16,7 @@
  *   on one screen.
  */
 
-import { db, payment, paymentRegistration, registration, parentStudentLink, charge, user as userTable, eq, and, inArray, notInArray, sql, gradeTodayExtras } from '@repo/db';
+import { db, payment, paymentRegistration, paymentCharge, registration, parentStudentLink, charge, user as userTable, eq, and, inArray, notInArray, sql, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -721,7 +721,8 @@ export async function getStudentSummary(studentId: string) {
       db.query.registration.findMany({
         where: (r, { eq }) => eq(r.studentId, studentId),
         with: {
-          subject: { columns: { id: true, name: true, code: true, council: true } },
+          // Its level gives the subject's group, as every screen names it ("Biology O.L.", P4a fix round 5).
+          subject: { columns: { id: true, name: true, code: true, council: true, qualificationLevel: true } },
           session: { columns: { id: true, name: true, status: true } },
           teacher: { columns: { id: true, name: true } },
         },
@@ -806,12 +807,43 @@ export async function getStudentSummary(studentId: string) {
   // or a checkout they started (pay at the desk, a transfer with no reference yet). Such a line is not collected
   // at the desk — the collection would be refused — until the Finance Workbench confirms or rejects it.
   const waitingLineIds = registrations.filter((r) => r.status === 'pending_payment').map((r) => r.id);
+  // The payment's own amount, what the balance paid and its reference ride with it (P4a fix round 4): the desk shows the
+  // figure recorded, not a sum of line prices, whatever the payment's age.
   const underWay = waitingLineIds.length
-    ? await db.select({ registrationId: paymentRegistration.registrationId, paymentId: payment.id, status: payment.status, method: payment.paymentMethod })
+    ? await db.select({
+      registrationId: paymentRegistration.registrationId, paymentId: payment.id, status: payment.status, method: payment.paymentMethod,
+      amount: payment.amount, escrowApplied: payment.escrowAmountApplied, reference: payment.externalReference,
+    })
       .from(paymentRegistration).innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
       .where(and(inArray(paymentRegistration.registrationId, waitingLineIds), inArray(payment.status, ['pending', 'pending_verification'])))
     : [];
-  const inProgressOf = new Map(underWay.map((u) => [u.registrationId, { paymentId: u.paymentId, status: u.status as 'pending' | 'pending_verification', method: u.method }]));
+  const inProgressOf = new Map(underWay.map((u) => [u.registrationId, {
+    paymentId: u.paymentId, status: u.status as 'pending' | 'pending_verification', method: u.method,
+    amount: u.amount, escrowApplied: u.escrowApplied, reference: u.reference,
+  }]));
+
+  // Every payment the family started and has not finished, whatever it pays for (P4a fix round 2): subjects, charges
+  // (board services, instalments, adjustments), the school fee, a remark. A pay-at-school one is taken at the desk with
+  // the instrument (the officer's confirm route); the others are named with what to do.
+  const open = await db.select({
+    id: payment.id, purpose: payment.purpose, status: payment.status, method: payment.paymentMethod, amount: payment.amount,
+    escrowApplied: payment.escrowAmountApplied, reference: payment.externalReference, academicYear: payment.academicYear, createdAt: payment.createdAt,
+  }).from(payment).where(and(eq(payment.studentId, studentId), inArray(payment.status, ['pending', 'pending_verification'])));
+  const openIds = open.map((p) => p.id);
+  const openCharges = openIds.length
+    ? await db.select({ paymentId: paymentCharge.paymentId, chargeId: charge.id, description: charge.description, kind: charge.kind })
+      .from(paymentCharge).innerJoin(charge, eq(charge.id, paymentCharge.chargeId)).where(inArray(paymentCharge.paymentId, openIds))
+    : [];
+  const openLines = openIds.length
+    ? await db.select({ paymentId: paymentRegistration.paymentId, registrationId: paymentRegistration.registrationId })
+      .from(paymentRegistration).where(inArray(paymentRegistration.paymentId, openIds))
+    : [];
+  const openPayments = open.map((p) => ({
+    ...p,
+    status: p.status as 'pending' | 'pending_verification',
+    registrationIds: openLines.filter((l) => l.paymentId === p.id).map((l) => l.registrationId),
+    charges: openCharges.filter((c) => c.paymentId === p.id).map((c) => ({ id: c.chargeId, description: c.description, kind: c.kind })),
+  }));
 
   // What does the family owe right now (mayPay, §6)? A line whose prices are not final is reserved, not payable,
   // until they are (E6); a line past its cut-off is no longer payable (the sweep expires it). A line with a
@@ -874,6 +906,7 @@ export async function getStudentSummary(studentId: string) {
     owing,
     // Owed by lines whose payment is under way (the transfer's check, a started checkout): "Owes now" says it apart.
     owingInProgress,
+    openPayments,
     registrations: registrations.map((r) => ({
       ...r,
       payableNow: payableNow(r),

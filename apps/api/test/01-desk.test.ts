@@ -182,12 +182,13 @@ describe('the desk', () => {
  * of being sent to another screen.
  */
 describe('the desk takes a payment the family started', () => {
-  let adm: Client, officer: Client, parent: Client, studentId: string, sessionId: string, physics: string, chemistry: string;
+  let adm: Client, officer: Client, finadmin: Client, parent: Client, studentId: string, sessionId: string, physics: string, chemistry: string;
   let reference: string, paymentId: string;
 
   beforeAll(async () => {
     adm = await admin('desk-started');
     officer = await staff(adm, 'finance_officer', 'desk-started');
+    finadmin = await staff(adm, 'finance_admin', 'desk-started');
     physics = await subject(adm, 'T5625', 'Physics', { course: 1200, registration: 300 });
     chemistry = await subject(adm, 'T5620', 'Chemistry', { course: 1200, registration: 300 });
     sessionId = await session(adm, 'November (desk, started)', 'november', 'igcse', { ...openWindow(), activate: true });
@@ -211,17 +212,20 @@ describe('the desk takes a payment the family started', () => {
   it("shows the started payment on the student's summary and takes it at the desk with the instrument", async () => {
     const summary = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: studentId } }));
     const waiting = summary.registrations.filter((r) => r.status === 'pending_payment');
+    // The payment's own figure and reference ride with each line (whatever the payment's age), and the payment is listed
+    // with what it covers.
     expect(waiting.map((r) => r.paymentInProgress)).toEqual([
-      { paymentId, status: 'pending', method: 'in_school' },
-      { paymentId, status: 'pending', method: 'in_school' },
+      { paymentId, status: 'pending', method: 'in_school', amount: 3000, escrowApplied: 0, reference },
+      { paymentId, status: 'pending', method: 'in_school', amount: 3000, escrowApplied: 0, reference },
     ]);
-    expect(summary.payments.find((p) => p.id === paymentId)).toMatchObject({ externalReference: reference, amount: 3000, escrowAmountApplied: 0, status: 'pending' });
+    expect(summary.openPayments).toMatchObject([{ id: paymentId, purpose: 'registration', status: 'pending', method: 'in_school', amount: 3000, reference, charges: [] }]);
+    expect([...summary.openPayments[0]!.registrationIds].sort()).toEqual(waiting.map((r) => r.id).sort());
     expect(summary.owingInProgress).toBe(3000);
 
     // An in-school payment is confirmed with the instrument the officer took.
     const bare = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: paymentId }, json: {} }));
     expect(bare.status).toBe(400);
-    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: paymentId }, json: { instrumentUsed: 'card' } }));
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: paymentId }, json: { instrumentUsed: 'card', notes: 'Taken at the desk' } }));
     const pay = await one<{ status: string; instrument: string; amount: string }>(`select status, instrument_used as instrument, amount from payment where id = $1`, [paymentId]);
     expect({ ...pay, amount: money(pay.amount) }).toEqual({ status: 'completed', instrument: 'card', amount: 3000 });
     const after = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: studentId } }));
@@ -230,5 +234,25 @@ describe('the desk takes a payment the family started', () => {
       ['confirmed', null, 'pending_issue'],
     ]);
     expect([after.owing, after.owingInProgress]).toEqual([0, 0]);
+    expect(after.openPayments).toEqual([]);
+    // Taken, its reference finds nobody: the search matches open payments only.
+    expect(await apiResponse(officer.api.v1.users.search.$get({ query: { role: 'student', search: reference } }))).toEqual([]);
+    const audit = await one<{ notes: string | null }>(`select new_data->>'notes' as notes from audit_log where entity_id = $1 and action = 'PAYMENT_CONFIRMED'`, [paymentId]);
+    expect(audit.notes).toBe('Taken at the desk');
+  });
+
+  it('a charge started at school is found by its reference, listed with what it pays, and taken at the desk', async () => {
+    const chargeId = (await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId, kind: 'custom', amount: 250, reason: 'a replacement ID card' } }))).id;
+    const pay = await apiResponse(parent.api.v1.payments.initiate.$post({ json: { chargeIds: [chargeId], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+    expect(pay.externalReference).toMatch(/^SCH-/);
+    const found = await apiResponse(officer.api.v1.users.search.$get({ query: { role: 'student', search: pay.externalReference!.toLowerCase() } }));
+    expect(found.map((u) => u.id)).toEqual([studentId]);
+    const summary = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: studentId } }));
+    expect(summary.openPayments).toMatchObject([{ id: pay.id, purpose: 'charge', status: 'pending', method: 'in_school', amount: 250, reference: pay.externalReference, registrationIds: [], charges: [{ id: chargeId }] }]);
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash', notes: 'Taken at the desk' } }));
+    expect((await one<{ status: string }>(`select status from charge where id = $1`, [chargeId])).status).toBe('paid');
+    expect((await one<{ status: string }>(`select status from payment where id = $1`, [pay.id])).status).toBe('completed');
+    const after = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: studentId } }));
+    expect(after.openPayments).toEqual([]);
   });
 });

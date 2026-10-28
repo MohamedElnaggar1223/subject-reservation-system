@@ -32,6 +32,7 @@ import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/res
 import { StatementView, LineStatusWords } from '~/components/reservations/statement';
 import { Day } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { familyWords } from '~/lib/i18n-reservations';
+import { titleFor, groupOfLevel } from '~/app/(app)/(sessions)/admin/sessions/setup-shared';
 import { RESERVATION_CYCLE_ONLY } from '~/lib/reservation-focus';
 import DeskToday from './desk-today.client';
 
@@ -359,7 +360,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
               for payment after a reversal, a rejected transfer, a cancelled checkout or a
               register-only visit, the student's charges and the year's school fee — ticked and
               taken in one action, each part its own payment. */}
-          <DeskCollectPanel studentId={summary.student.id} summary={summary} onDone={refresh} />
+          <DeskCollectPanel studentId={summary.student.id} summary={summary} onDone={refresh} quoted={search} />
 
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -376,7 +377,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
                     <tr key={r.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-5 py-2.5">
                         <div className="font-medium text-foreground">
-                          {r.subject.name}
+                          <bdi data-i18n-skip="true">{titleFor(r.subject.name, groupOfLevel(r.subject.qualificationLevel))}</bdi>
                           <span className="text-xs text-muted-foreground font-mono ms-1">{r.subject.code}</span>
                           {r.takenOutsideSchool && <span className="text-xs text-muted-foreground ms-1">(outside)</span>}
                         </div>

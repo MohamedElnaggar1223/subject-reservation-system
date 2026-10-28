@@ -390,10 +390,10 @@ export async function userExists(userId: string): Promise<boolean> {
 export async function searchPeople(params: { search?: string; role?: 'student' | 'parent' }) {
   const term = params.search?.trim();
   // The reference a family quotes at the desk for a payment it started ("Pay at the school": SCH-…), whole, in any
-  // case (P4a B3): the student and the parent of that payment. A part of it matches nothing (every reference begins
-  // alike).
+  // case (P4a B3): the student and the parent of that payment, while it is open (pending: not taken, failed or
+  // cancelled yet). A part of it matches nothing (every reference begins alike).
   const byReference = (column: typeof payment.studentId | typeof payment.parentId) =>
-    db.select({ id: column }).from(payment).where(sql`upper(${payment.externalReference}) = upper(${term ?? ''})`);
+    db.select({ id: column }).from(payment).where(and(sql`upper(${payment.externalReference}) = upper(${term ?? ''})`, eq(payment.status, 'pending')));
   return db.query.user.findMany({
     where: (u, { and, or, ilike, inArray, eq }) => {
       const scope = params.role
