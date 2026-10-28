@@ -289,7 +289,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.line} htmlFor="exc-scope-line" hint={!readsFamilies ? 'The finance desk picks a line.' : !studentId ? 'Pick the student first.' : undefined}>
                 <select id="exc-scope-line" value={scope.registrationId ?? ''} disabled={!summary.data} onChange={(e) => setScopeField('registrationId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">{policy.nullScope === null && accepts.size === 1 ? 'Pick a line…' : 'Any'}</option>
-                  {lines.map((l) => <option key={l.id} value={l.id}>{`${l.subject?.name ?? '—'}${l.subject && !l.subject.code.startsWith('X-') ? ` (${l.subject.code})` : ''} · ${l.session?.name ?? ''} · ${formatEgp(l.priceAtRegistration)}`}</option>)}
+                  {lines.map((l) => <option key={l.id} value={l.id}>{`${l.subject ? titleFor(l.subject.name, groupOfLevel(l.subject.qualificationLevel)) : '—'} · ${l.session?.name ?? ''} · ${formatEgp(l.priceAtRegistration)}`}</option>)}
                 </select>
               </Field>
             )}
