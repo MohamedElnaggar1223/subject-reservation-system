@@ -127,6 +127,9 @@ export async function getHomeSummary(
     const links = await db.query.parentStudentLink.findMany({
       where: (l, { eq, and }) => and(eq(l.parentId, userId), eq(l.status, 'approved')),
       columns: { studentId: true },
+      // In the order the children were linked, as the reservation page lists them (getLinkedChildren): the same order
+      // every time (it had none, and changed between reads).
+      orderBy: (l, { asc }) => [asc(l.createdAt)],
     });
     studentIds = links.map((l) => l.studentId);
   }

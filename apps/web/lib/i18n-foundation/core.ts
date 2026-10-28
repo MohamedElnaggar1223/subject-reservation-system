@@ -125,7 +125,7 @@ export const coreArabic: Record<string, string> = {
   'Search by name or email…': 'ابحث بالاسم أو البريد الإلكتروني…',
   'Runs the desk: payments, receipts and registrations on a family’s behalf.': 'يدير المكتب: المدفوعات والإيصالات والتسجيلات نيابة عن الأسرة.',
   'The desk, plus refunds, exceptions and fee schedules.': 'المكتب، إضافة إلى المبالغ المستردة والاستثناءات وجداول الرسوم.',
-  'The academic lead: calendar, sections, the student record and grade-10 exceptions.': 'المسؤول الأكاديمي: التقويم والفصول وسجل الطالب واستثناءات الصف 10.',
+  'Sets up each session: its subjects, prices, dates and what families agree to; sees the reservations, not the money.': 'يُعِدّ كل جلسة: موادها وأسعارها ومواعيدها وما توافق عليه العائلات؛ ويرى الحجوزات، لا الأموال.',
   'Their own teaching. Needs a teacher record — pick one or create one.': 'تدريسه الخاص. يحتاج إلى سجل معلم - اختر سجلًا أو أنشئ واحدًا.',
   'Reception and security: the school day and, later, the leave list.': 'الاستقبال والأمن: اليوم الدراسي، ولاحقًا قائمة الانصراف.',
   'Everything, except what only a parent may do for their own family.': 'كل شيء، عدا ما لا يفعله إلا ولي الأمر لأسرته.',
