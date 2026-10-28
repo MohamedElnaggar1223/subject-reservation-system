@@ -763,6 +763,8 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
   const carry = board?.carryForwardMonths ?? null;
   // The older exams she kept on purpose (her "Keep it", stored on the rows).
   const kept = new Set(o.rows.flatMap((r) => r.allowedPriorSittings.filter((p) => p.kept).map((p) => `${p.month}-${p.year}`)));
+  // An older exam ticked and not kept yet: the one "keep" control shows.
+  const unkeptOld = carry !== null && shown.some((e) => ticked(e) && hereIdx - monthIndex(e.month, e.year) > carry && !kept.has(`${e.month}-${e.year}`));
   return (
     <section className={CARD} aria-labelledby="earlier-title">
       <h2 id="earlier-title" className="font-display text-base font-semibold text-foreground">Earlier exams a retake carries from</h2>
@@ -785,21 +787,21 @@ function EarlierExams({ o, s, d, setD, canEdit }: { o: OfferingData; s: SetupSes
                     <span>{`${examMonth(e.month, e.year)} is ${age} months before this exam: older than ${o.board.name} carries a result forward (${carry} months).`}</span>{' '}
                     <span>It stays, since your list wins; the board may refuse the entry.</span>
                   </p>
-                  {/* P1c item 10a: kept on purpose — the check list stops asking, and a copy keeps it so. */}
-                  {kept.has(`${e.month}-${e.year}`)
-                    ? <p className="mt-1 font-medium">You kept it: it is no longer on the list to check.</p>
-                    : (
-                      <label className="mt-1 flex items-center gap-2 font-medium">
-                        <input type="checkbox" className="size-4 accent-primary" checked={d.keepOlder} disabled={!canEdit} onChange={() => setD({ ...d, keepOlder: !d.keepOlder })} />
-                        <span>Keep it, and take it off the list to check (saved with the subject)</span>
-                      </label>
-                    )}
+                  {kept.has(`${e.month}-${e.year}`) && <p className="mt-1 font-medium">You kept it: it is no longer on the list to check.</p>}
                 </div>
               )}
             </li>
           );
         })}
       </ul>
+      {/* P1c item 10a: one flag for the subject (olderSittingsKept) — one control, said once, under the list: every
+          older exam ticked here is kept on purpose, the check list stops asking, and a copy keeps it so. */}
+      {unkeptOld && (
+        <label className="mt-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <input type="checkbox" className="size-4 accent-primary" checked={d.keepOlder} disabled={!canEdit} onChange={() => setD({ ...d, keepOlder: !d.keepOlder })} />
+          <span>Keep the older exams of this subject, and take them off the list to check (saved with the subject)</span>
+        </label>
+      )}
       {canEdit && cand.length > 0 && (
         <CommitSelect className={cn(INPUT_CLASS, 'mt-3 w-auto')} value="" reset aria-label="Add an older earlier exam"
           onCommit={(v) => {

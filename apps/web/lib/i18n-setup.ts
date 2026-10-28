@@ -169,7 +169,7 @@ export const setupArabic: Record<string, string> = {
   'Who reserved what': 'من حجز ماذا',
   'Money of the session': 'أموال الجلسة',
   'You kept it: it is no longer on the list to check.': 'أبقيتَه: لم يعد في قائمة المراجعة.',
-  'Keep it, and take it off the list to check (saved with the subject)': 'أبقِه واحذفه من قائمة المراجعة (يُحفظ مع المادة)',
+  'Keep the older exams of this subject, and take them off the list to check (saved with the subject)': 'أبقِ الامتحانات الأقدم لهذه المادة واحذفها من قائمة المراجعة (يُحفظ مع المادة)',
   'carries a result forward. It stays, since your list wins; the board may refuse the entry.': 'من نتائج سابقة. تبقى لأن قائمتك هي المعتمدة؛ وقد يرفض المجلس القيد.',
   'The board\'s deadline cancels unpaid reservations first. Move your dates earlier?': 'موعد المجلس يلغي الحجوزات غير المدفوعة أولًا. هل تقدّم تواريخك؟',
   'Set the dates': 'حدّد التواريخ',
