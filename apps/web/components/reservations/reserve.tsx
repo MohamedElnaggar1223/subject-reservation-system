@@ -247,8 +247,11 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras, draf
       if (groups.find((g) => g.key === key)?.rows.some((r) => held.has(r.id))) return [{ key, p, why: `${p.title}: already reserved.` }];
       const option = row.options.find((x) => optionKey(x) === optionKey(p));
       if (!option) return [{ key, p, why: `${p.title}: this choice is no longer offered.` }];
-      // Its board date passed while the page was open (C6): it would be refused.
-      return option.closed && !row.closed ? [{ key, p, why: `${p.title}: the exam board's last date for this choice has passed.` }] : [];
+      // Its board date passed while the page was open (C6), or its row closed — the read marks the row closed when its
+      // last open option passes its board date, or when the subject or the row stops taking reservations: picked, it
+      // would stay ticked and disabled, count in the total and be refused. Off the choices, with why.
+      if (option.closed) return [{ key, p, why: `${p.title}: the exam board's last date for this choice has passed.` }];
+      return row.closed ? [{ key, p, why: `${p.title}: no longer taking reservations.` }] : [];
     }).map(({ key, p, why }) => [key, p, why] as const);
     if (!missing.length) return;
     setGone((g) => [...g, ...missing.map(([key, , why]) => ({
