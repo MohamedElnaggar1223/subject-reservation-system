@@ -9,8 +9,9 @@
 # against that API (cd apps/web && NEXT_PUBLIC_API_URL=http://localhost:$API_PORT npx next dev --webpack -p $WEB_PORT).
 # Never point it at the deployed system: it builds a practice copy.
 set -e
-HERE=$(cd "$(dirname "$0")" && pwd)
-WT=${WT:-$(cd "$HERE/../../../.." && pwd)}
+HERE=$(cd "$(dirname "$0")" && pwd)   # docs/admin-guide/build
+DRIVE=$HERE/drive
+WT=${WT:-$(cd "$HERE/../../.." && pwd)}
 DB=${DB:-igcse_guide_dev}
 API_PORT=${API_PORT:-3299}
 WEB_PORT=${WEB_PORT:-3300}
@@ -20,6 +21,8 @@ DBURL=postgresql://audit:auditpass@127.0.0.1:5433/$DB
 mkdir -p $OUT
 say() { echo "== $(date -u +%FT%TZ) $*"; }
 killtree() { for c in $(pgrep -P $1); do killtree $c; done; kill $1 2>/dev/null || true; }
+# Whatever happens, the API this script started is stopped when it ends (by the PID it wrote, never by name).
+trap 'if [ -f $OUT/api.pid ]; then killtree $(cat $OUT/api.pid); rm -f $OUT/api.pid; fi' EXIT
 
 # The guide never shows a real teacher's name: the pre-load must use its placeholders.
 if [ -e $WT/packages/db/seeds/local/june-2027.teachers.json ]; then
@@ -43,13 +46,13 @@ grep -m1 "\[reference\] loaded at start" $OUT/api.log || { echo "the board's lis
 
 rm -rf $SHOTS && mkdir -p $SHOTS
 say "the admin signs up, the seed promotes"
-cd $HERE && node s00-signup.mjs
+cd $DRIVE && node s00-signup.mjs
 cd $WT && DATABASE_URL=$DBURL pnpm --filter @repo/db seed 2>&1 | grep -E "Promoted" || { echo "the admin was not promoted"; exit 1; }
 say "the June 2027 pre-load"
 cd $WT && DATABASE_URL=$DBURL pnpm --filter @repo/api seed:june-2027 2>&1 | grep "seed:june-2027" | tee $OUT/seed.log
 grep -q "teachers as placeholders" $OUT/seed.log || { echo "the pre-load did not use its placeholder teachers"; exit 1; }
 
-cd $HERE
+cd $DRIVE
 for s in a0-team a1-review b0-families b1-parent b2-desk c1-copy; do
   say "$s"
   node $s.mjs
@@ -59,4 +62,4 @@ say "done: $(ls $SHOTS | wc -l | tr -d ' ') shots in $SHOTS"
 say "stop the API this script started"
 killtree $(cat $OUT/api.pid); rm -f $OUT/api.pid
 
-cd $HERE/.. && SHOTS=$SHOTS python3 gen.py && node check-page.mjs ../index.html $OUT/page
+cd $HERE && SHOTS=$SHOTS python3 gen.py && node check-page.mjs ../index.html $OUT/page

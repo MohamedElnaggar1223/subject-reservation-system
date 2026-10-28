@@ -63,10 +63,8 @@ for (const [board, list, tag] of [['cambridge', 'Cambridge June 2026', 'cambridg
   await page.getByRole('button', { name: 'Use these prices' }).waitFor();
   await settle(page);
   facts.lists[tag].read = (await sec.locator('h3').allInnerTexts()).join(' | ');
-  if (tag === 'cambridge') {
-    await toTop(page, sec.locator('h3').first(), 80);
-    await shotMarked(page, 'c-read-cambridge', page.getByRole('button', { name: 'Use these prices' }));
-  }
+  await toTop(page, sec.locator('h3').first(), 80);
+  await shotMarked(page, `c-read-${tag}`, page.getByRole('button', { name: 'Use these prices' }));
   await page.getByRole('button', { name: 'Use these prices' }).click();
   await page.waitForTimeout(600);
   const ask = page.getByRole('button', { name: 'Save it' });
@@ -114,6 +112,7 @@ await page.goto(`${BASE}${sessionPath}`, { waitUntil: 'domcontentloaded' });
 await settle(page);
 await page.evaluate(() => window.scrollTo(0, 0));
 facts.beforeOpen = (await checks.locator('li').allInnerTexts()).map((x) => x.split('\n')[0]);
+await shotMarked(page, 'c-prices-final', page.getByRole('switch', { name: 'Prices final', exact: true }));
 await page.getByRole('switch', { name: 'Prices final', exact: true }).click();
 await page.waitForTimeout(800);
 if (await page.getByRole('button', { name: 'Save it' }).count()) { facts.finalAsked = await page.getByRole('dialog').innerText(); await page.getByRole('button', { name: 'Save it' }).click(); }

@@ -137,7 +137,9 @@ step('An older exam: Keep it', where=f'the session, the line {L("Physics A.S./A.
      do=f'''<p>Your form lets a student carry an A.S. result from November 2025. That is more than the 13 months Cambridge carries a
 result forward, so Cambridge may refuse such an entry. Your list wins: it stays offered unless you take it off.</p>
 <ol><li>Click {L("Keep it")}. (Or, to stop offering it, {L("Open the subject")}, untick November 2025 under
-{L("Earlier exams a retake carries from")}, and {L("Save")}.)</li></ol>''',
+{L("Earlier exams a retake carries from")}, and {L("Save")}.)</li></ol>
+<p>In the subject's editor the same choice is the box {L("Keep the older exams of this subject, and take them off the list to check (saved with the subject)")};
+once kept, the editor says {L("You kept it: it is no longer on the list to check.")} A copy of the session keeps it so.</p>''',
      form=['Physics A.S./A.L.: “A.2. Self Study 50% (Carry forward on November 2025)”.'],
      see=f'''the line leaves. Four lines are left: {L("Waiting for the admin: …")} (the admin's, [[admin-date]]), the dates
 ([[pay-by]]), the prices (next step) and the teacher to be confirmed.''', img=['a-check-keep', 'a-check-reviewed'])
@@ -146,7 +148,8 @@ step('Prices', where='the session.', do=f'''<ol><li>Click the tab {L("Prices")} 
 {L("Go to Prices")} works from Home; on this screen use the tab.)</li></ol>
 <p>The exam fees came pre-loaded from your latest lists: Cambridge June 2026, Edexcel June 2026, and Edexcel November 2026 where
 the June list has none. What no list holds is missing, and no course fee is set yet: a subject is not offered to families until
-every price it needs is set.</p>''',
+every price it needs is set. That is the check list's line
+{L("25 of 25 subjects are not offered to families: a price is not set (25 course fees, 9 exam fees).")}</p>''',
      see=f'''{L("Price lists in use")} ({L("None yet in this session.")}), {L("Paste a list as printed")},
 {L("Missing exam fees (9)")}, {L("Course fees")} and {L("Every exam fee")}.''', img='a-prices')
 
@@ -196,11 +199,13 @@ step('Pay by', where='the session, the dates in the header (scroll to the top).'
 <li>{L("Pay by")}: the day families should pay by. Pick it in the calendar or type it; it saves when you click elsewhere.</li></ol>
 <p>Under it, {L("Last day to pay: 3 days after it. Unpaid reservations are cancelled after that.")} The 3 days are set in
 [[agree-more]]. A family that reserves after the pay-by date has a few days of its own to pay.</p>
-<p>If the dates already shown are the ones you want, click {L("Keep them")} on the check list's dates line instead, and go on
-to [[refund]].</p>''', img='a-date-pay-by', key='pay-by')
+<p>If the dates already shown are the ones you want, click {L("Keep them")} on the check list's line
+{L("The dates are the defaults: pay by 31 Dec 2026, first lesson 1 Oct 2026.")} instead, and go on to [[refund]].</p>
+<p>Once families have reserved, a new pay-by date asks first, in a box {L("Before this is saved")}: for example
+{L("This moves the pay-by date of 3 unpaid reservations.")} Click {L("Save it")} or {L("Cancel")}.</p>''', see='once a date is saved, the dates line leaves the check list.', img='a-date-pay-by', key='pay-by')
 
 step('First lesson', where='the session, the dates.', do=f'''<ol><li>{L("First lesson")}: the day teaching starts. {L("The refund weeks count from it.")}</li></ol>''',
-     see='the check list\'s dates line has left: you set the dates.', img='a-date-first')
+     img='a-date-first')
 
 step('Reservations close (optional)', where='the session, the dates.', do=f'''<p>Leave {L("Reservations close (optional)")} empty
 to close by hand: Home then says {L("Reservations close when you switch them off")}. You can also close one subject at a time, as you
@@ -223,8 +228,8 @@ step('Self study, grades, last day to pay', where=f'{L("What families agree to")
 <li>{L("Self study pays")}: {L("50% of the course fee")}, and the whole exam fee, as on your forms (“Self Study 50% fees”).</li>
 <li>{L("Grades that may reserve")}: {L("Grade 11")}, {L("Grade 12")} and {L("Graduates retaking")}. No form lists a grade-10
 class.</li>
-<li>{L("Last day to pay")}: {L("3 days after the pay-by date")}. Unpaid reservations are cancelled after it, or at the board's
-deadline if that is earlier.</li>
+<li>{L("Last day to pay")}: {L("3 days after the pay-by date")} (or another number of days, or {L("the pay-by date itself")}).
+Unpaid reservations are cancelled after it, or at the board's deadline if that is earlier.</li>
 <li>{L("Extra questions")} (optional): a question you want families to answer; the answers go into the reservations export and
 never change a price or who may reserve.</li></ul>
 <ol><li>Change any of them only if the school's rule changed; each saves when changed.</li></ol>''', img='a-agree-more', key='agree-more')
@@ -337,7 +342,7 @@ step('Use it', where=f'{L("Prices")}, under the pasted list.', do=f'''<ol><li>Ch
 figures again.)''', img='c-read-cambridge')
 
 step("Edexcel's new list", where=f'{L("Prices")}, {L("Paste a list as printed")}.', do=f'''<ol><li>{L("Board")}:
-{L("Pearson Edexcel")}, paste, {L("Read the list")}, {L("Use these prices")}.</li></ol>''')
+{L("Pearson Edexcel")}, paste, {L("Read the list")}, {L("Use these prices")}.</li></ol>''', img='c-read-edexcel')
 
 step('What is left: missing fees and course fees', where=f'{L("Prices")}.', do=f'''<p>The fees you typed last year came across:
 {L("Missing exam fees (0)")} unless the school added a row. The course fees came across too.</p>
@@ -352,7 +357,7 @@ step("The boards' June 2028 deadlines", who=ADMIN, where='June 2028, the check l
 {L("Entry deadline")} and click {L("Save the date")}.</li></ol>''', see='the three lines leave.', img='c-admin-dates', key='copy-admin')
 
 step('Prices final', where='June 2028, the header.', do=f'''<ol><li>When the prices are this year's, switch {L("Prices final")}
-on. The line about last cycle's prices leaves.</li></ol>''')
+on. The line about last cycle's prices leaves.</li></ol>''', img='c-prices-final')
 
 step('Open', where='June 2028, the header.', do=f'''<ol><li>Switch {L("Accepting reservations")} on.</li></ol>''',
      see=f'''{L("Accepting reservations")}; on {L("Sessions")}, June 2028 {L("copied from June 2027")} beside June 2027 and its
