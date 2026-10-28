@@ -59,11 +59,12 @@ export default async function ReceiptPrintPage({
   const rows: [string, string][] = reg
     ? [
         ['Subject', `${reg.subject.name} (${reg.subject.code})`],
-        // F6: the sheet's and the forms' words — "Board", "Board fee" — and amounts as the screens write them.
+        // F6: the sheet's and the forms' words — "Board" — and amounts as the screens write them; the board's part of
+        // the price is the exam fee, as every family screen names it (P4a).
         ['Board', COUNCILS[reg.subject.council] ?? reg.subject.council],
         ['Session', reg.session.name],
         ['Course fee', egp(reg.courseFeeAtRegistration)],
-        ['Board fee', egp(reg.registrationFeeAtRegistration)],
+        ['Exam fee', egp(reg.registrationFeeAtRegistration)],
         ['Total paid', egp(reg.priceAtRegistration)],
       ]
     : ch
@@ -73,7 +74,7 @@ export default async function ReceiptPrintPage({
   return (
     <div className="mx-auto max-w-md p-8 print:p-0 print:max-w-none">
       <div className="border border-border rounded-xl p-8 print:border-0 print:rounded-none bg-card print:bg-white">
-        <PrintHeading schoolName={schoolName} subtitle={reg ? 'Subject Registration Receipt' : 'Receipt'} className="text-center border-b border-border pb-4 mb-4" />
+        <PrintHeading schoolName={schoolName} subtitle={reg ? 'Subject reservation receipt' : 'Receipt'} className="text-center border-b border-border pb-4 mb-4" />
 
         <p className="text-center text-2xl font-bold tracking-widest font-mono text-foreground print:text-black mb-6">
           {receipt.receiptNumber}

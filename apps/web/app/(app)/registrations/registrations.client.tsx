@@ -80,7 +80,7 @@ function canRevertApproval(reg: Registration, userId: string): boolean {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   // F8-12: each of the page's dialogs (Request Drop, Drop Subject, the swaps) is a dialog to a screen reader, named by its title.
-  const titleId = `registrations-dialog-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+  const titleId = `reservations-dialog-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="bg-card rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-border">
@@ -271,7 +271,7 @@ function RegistrationCard({
       {/* Pending change request notice (M-18) */}
       {canChange && !isCoreProtected && hasPendingChange && (
         <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 dark:border-amber-700 rounded-lg p-2">
-          A drop/swap request for this registration is already pending approval. Cancel it from the pending requests page before submitting a new one.
+          A drop or swap request for this reservation is already waiting for approval. Cancel it under My requests before asking again.
         </div>
       )}
 
@@ -621,9 +621,9 @@ function DirectSwapModal({
             <p className={`text-xs mt-1 ${diff > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
               Old subject refunded per the refund policy below.
               {diff > 0
-                ? ` New registration (${formatEgp(newPrice)}) will require payment.`
+                ? ` The new reservation (${formatEgp(newPrice)}) is to be paid.`
                 : diff < 0
-                ? ` New registration is ${formatEgp(Math.abs(diff))} cheaper, leaving that amount available if the balance is used at checkout.`
+                ? ` The new reservation is ${formatEgp(Math.abs(diff))} cheaper, leaving that amount available if the balance is used at checkout.`
                 : ' Same price — the full amount goes to the balance, then the same amount is paid.'}
             </p>
           </div>
@@ -775,14 +775,14 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-foreground font-display mb-2">No Registrations Yet</h2>
+          <h2 className="text-xl font-semibold text-foreground font-display mb-2">No reservations yet</h2>
           <p className="text-muted-foreground text-sm mb-6">
             {isParent
-              ? 'No subjects have been registered for your children yet.'
-              : 'You have not registered for any subjects yet.'}
+              ? 'Nothing is reserved for your children yet.'
+              : 'You have not reserved any subjects yet.'}
           </p>
           <Link href={"/register" as never}>
-            <Button>Register Subjects</Button>
+            <Button>Reserve subjects</Button>
           </Link>
         </div>
       </div>

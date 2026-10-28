@@ -228,10 +228,10 @@ export default function ApprovalsClient(): React.JSX.Element {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-brand-800 dark:text-brand-300 font-display">
-                Registrations Approved
+                Approved
               </p>
               <p className="text-sm text-brand-700 dark:text-brand-400 mt-1">
-                {approvedCheckoutIds.length} registration{approvedCheckoutIds.length !== 1 ? 's' : ''} approved successfully. Proceed to payment to finalize.
+                <span>{approvedCheckoutIds.length}</span> <span>{approvedCheckoutIds.length === 1 ? 'reservation approved: it is now waiting for payment.' : 'reservations approved: they are now waiting for payment.'}</span>
               </p>
               <div className="mt-3 flex gap-2">
                 <Link href={`/checkout?ids=${approvedCheckoutIds.join(',')}` as never}>
@@ -281,7 +281,7 @@ export default function ApprovalsClient(): React.JSX.Element {
               </svg>
             </div>
             <p className="text-sm text-brand-800 dark:text-brand-300">
-              <strong>{approvedCheckoutIds.length} registration{approvedCheckoutIds.length !== 1 ? 's' : ''}</strong> approved — payment required to finalize.
+              <strong>{approvedCheckoutIds.length}</strong> <span>{approvedCheckoutIds.length === 1 ? 'reservation approved: it is now waiting for payment.' : 'reservations approved: they are now waiting for payment.'}</span>
             </p>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -490,11 +490,11 @@ export default function ApprovalsClient(): React.JSX.Element {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-xl shadow-xl border border-border w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-foreground font-display">
-              Approve {selectedIds.size} Registration{selectedIds.size !== 1 ? 's' : ''}
+              <span>Approve</span> <span>{selectedIds.size}</span> <span>{selectedIds.size === 1 ? 'reservation' : 'reservations'}</span>
             </h3>
 
             <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-              Total: <strong>{formatEgp(selectedTotal)}</strong> — payment will be required to finalize these registrations.
+              <span>Total:</span> <strong>{formatEgp(selectedTotal)}</strong> <span>— approved, they wait for payment.</span>
             </div>
 
             <div>
@@ -541,11 +541,11 @@ export default function ApprovalsClient(): React.JSX.Element {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-xl shadow-xl border border-border w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-foreground font-display">
-              Reject {selectedIds.size} Registration{selectedIds.size !== 1 ? 's' : ''}
+              <span>Reject</span> <span>{selectedIds.size}</span> <span>{selectedIds.size === 1 ? 'reservation' : 'reservations'}</span>
             </h3>
 
             <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-              This action is permanent. Rejected registrations cannot be un-rejected.
+              A rejected reservation cannot be brought back: your child can ask again.
             </div>
 
             <div>

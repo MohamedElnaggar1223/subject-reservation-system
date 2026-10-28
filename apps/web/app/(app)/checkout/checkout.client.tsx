@@ -263,7 +263,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
         <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
           <p className="text-destructive font-medium">Unable to load checkout details.</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Verify the registrations belong to a linked child and are ready for payment.
+            Check that these reservations belong to your child and are waiting for payment.
           </p>
           <Button
             variant="outline"
@@ -310,11 +310,11 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                 </svg>
               </div>
               <h1 className="text-xl font-bold text-foreground font-display">
-                {completed ? 'Payment Complete' : 'Payment started'}
+                {completed ? 'Payment complete' : 'Payment started'}
               </h1>
               <p className="text-sm text-muted-foreground text-center">
                 {completed
-                  ? 'Your registrations have been confirmed — no payment was required because your balance covered the full amount.'
+                  ? 'Your reservations are paid: your balance covered the full amount.'
                   : 'Follow the steps below to finish it.'}
               </p>
             </div>
@@ -379,8 +379,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   </p>
                   {refSubmitted ? (
                     <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg text-center text-sm text-emerald-700 dark:text-emerald-400">
-                      Reference submitted. The finance team will verify your transfer against the
-                      bank statement and confirm your registrations — usually within one school day.
+                      Reference submitted. The finance team checks your transfer against the bank
+                      statement, and then your reservations are paid — usually within one school day.
                     </div>
                   ) : (
                     <>
@@ -718,8 +718,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             {selectedMethod === 'instapay' && (
               <div className="mx-4 mb-4 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-lg text-xs text-violet-700 dark:text-violet-400">
                 You&apos;ll get the school&apos;s account details to transfer the exact amount via
-                InstaPay, then submit your transaction reference. The finance team verifies the
-                transfer before your registrations are confirmed.
+                InstaPay, then submit your transaction reference. The finance team checks the
+                transfer, and then your reservations are paid.
               </div>
             )}
           </div>

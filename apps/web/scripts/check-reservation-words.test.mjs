@@ -101,6 +101,35 @@ test('the words: plain words pass, every forbidden one is caught', () => {
   }
 });
 
+test('the older words on a screen are caught (the fix round of P4a): payment due, pending payment, board fee, registration', async () => {
+  const { hits } = await run({
+    'screen.tsx': [
+      'export const A = () => <p>Payment due 31 Dec</p>;',
+      "export const B = 'Pending Payment';",
+      'export const C = <span>Board fee</span>;',
+      "export const D = 'No registrations yet';",
+      'export const E = `${2} registration${"s"} approved`;',
+    ].join('\n'),
+  });
+  assert.equal(hits.length, 5, hits.join('\n'));
+  for (const w of ['Payment due', 'Pending Payment', 'Board fee', 'No registrations yet', 'registration']) assert.ok(hits.some((h) => h.includes(w)), w);
+});
+
+test('a route, a query key, a tested value and a shared component are not read for the older words', async () => {
+  const shared = [{ file: 'panel.tsx' }];
+  const { hits } = await run({
+    'screen.tsx': [
+      'export const a = <a href="/registrations">Your reservations</a>;',
+      "export const b = { queryKey: ['registrations', 'pending'] };",
+      "export const c = (t: string) => t.startsWith('Swap from registration');",
+      "export const d = '/registrations/history';",
+      'export const e = `/checkout?ids=${1}`;',
+    ].join('\n'),
+    'panel.tsx': 'export const P = () => <p>Registrations expired:</p>;',
+  }, { shared });
+  assert.deepEqual(hits, []);
+});
+
 test('the real tree is clean', async () => {
   const { hits } = await checkFamily();
   assert.deepEqual(hits, []);

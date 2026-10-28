@@ -28,7 +28,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
-import { apiResponse, gradeLabel, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS, CHANGE_REQUEST_STATUS_LABELS, formatEgp } from '@repo/validations';
+import { apiResponse, gradeLabel, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS, formatEgp } from '@repo/validations';
+import { LineStatusWords } from '~/components/reservations/statement';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -152,7 +153,7 @@ function HistoryCard({ reg }: { reg: HistoryRegistration }) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-foreground">{reg.subject.name}</span>
+              <span className="font-semibold text-foreground"><bdi data-i18n-skip="true">{reg.subject.name}</bdi></span>
               {reg.subject.code && (
                 <span className="text-xs text-muted-foreground">{reg.subject.code}</span>
               )}
@@ -164,7 +165,7 @@ function HistoryCard({ reg }: { reg: HistoryRegistration }) {
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_STYLES[reg.status] ?? 'bg-muted text-muted-foreground'}`}>
-              {REGISTRATION_STATUS_LABELS[reg.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? reg.status}
+              <LineStatusWords status={reg.status} />
             </span>
             <span className="text-sm font-bold text-foreground">{formatEgp(reg.priceAtRegistration)}</span>
           </div>
@@ -265,13 +266,13 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Registration History</h1>
+          <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Reservation history</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Full audit trail across all sessions.
           </p>
         </div>
         <Link href={"/registrations" as never}>
-          <Button variant="outline" size="sm">Back to Registrations</Button>
+          <Button variant="outline" size="sm">Back to my reservations</Button>
         </Link>
       </div>
 
@@ -300,7 +301,7 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
       {/* No child selected yet (parent) */}
       {isParent && !selectedChildId && (
         <div className="bg-card rounded-xl border border-border p-10 text-center text-sm text-muted-foreground">
-          Select a child above to view their registration history.
+          Pick a child above to see their reservation history.
         </div>
       )}
 
@@ -314,7 +315,7 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
       {/* Empty state */}
       {!isLoading && targetStudentId && history.length === 0 && (
         <div className="bg-card rounded-xl border border-border p-10 text-center">
-          <p className="text-muted-foreground text-sm">No registrations found.</p>
+          <p className="text-muted-foreground text-sm">No reservations found.</p>
           <Link href={"/register" as never} className="mt-4 inline-block text-sm text-primary hover:underline">
             Register for subjects
           </Link>
@@ -373,7 +374,7 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
                     if (count === 0) return null;
                     return (
                       <span key={s} className={`px-2 py-0.5 rounded-full ${STATUS_STYLES[s]}`}>
-                        {REGISTRATION_STATUS_LABELS[s]} x {count}
+                        <LineStatusWords status={s} /> × {count}
                       </span>
                     );
                   })}

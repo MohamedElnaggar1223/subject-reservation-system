@@ -71,7 +71,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.registration': 'Registration',
     'nav.registerSubjects': 'Reserve Subjects',
     'nav.statement': 'Statement',
-    'nav.myRegistrations': 'My Reservations',
+    'nav.myRegistrations': 'My reservations',
     'nav.history': 'History',
     'nav.approvals': 'Approvals',
     'nav.financial': 'Financial',

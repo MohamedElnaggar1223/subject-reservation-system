@@ -136,8 +136,8 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       setReverseTarget(null);
       done(
         v.moneyReturned
-          ? 'Payment reversed — registrations back to pending payment, receipts voided. The money returned counts as money out today.'
-          : 'Payment reversed — registrations back to pending payment, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.'
+          ? 'Payment reversed — its reservations wait for payment again, receipts voided. The money returned counts as money out today.'
+          : 'Payment reversed — its reservations wait for payment again, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.'
       );
     },
     onError: fail,
@@ -533,7 +533,7 @@ export default function DeskClient({ userRole, initialStudentId = null }: { user
       {reverseTarget && (
         <ReasonModal
           title="Reverse this payment?"
-          description={`${reverseTarget.label}. The registrations go back to pending payment and their receipts are voided — only possible while the paper has not left the desk. This is recorded in the audit trail.`}
+          description={`${reverseTarget.label}. Its reservations wait for payment again and their receipts are voided — only possible while the paper has not left the desk. This is recorded in the audit trail.`}
           label="Reason for the reversal"
           placeholder="e.g. Wrong student — money returned to the parent"
           confirmLabel="Reverse Payment"

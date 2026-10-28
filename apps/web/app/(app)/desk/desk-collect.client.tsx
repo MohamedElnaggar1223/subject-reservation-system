@@ -195,7 +195,7 @@ export function DeskCollectPanel({ studentId, summary, onDone, quoted = '' }: { 
         {owed.fees.map((f) => (
           <Row key={`f:${f.academicYear}`} checked={isOn(`f:${f.academicYear}`)} onChange={() => flip(`f:${f.academicYear}`)}
             title={<><span>School fee</span> <bdi dir="ltr">{f.academicYear}</bdi></>}
-            detail={f.push ? <><span>pushed, due</span> <Day iso={f.push.dueAt} /></> : <span>the registration gate asks for it</span>}
+            detail={f.push ? <><span>pushed, due</span> <Day iso={f.push.dueAt} /></> : <span>reserving needs it first</span>}
             amount={f.amount} />
         ))}
         {owed.lines.map((l) => (
@@ -364,7 +364,7 @@ export function AlsoCollect({ studentId, value, onChange }: { studentId: string;
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={value.schoolFeeYear === f.academicYear}
                 onChange={(e) => change({ ...value, schoolFeeYear: e.target.checked ? f.academicYear : undefined })} className="h-4 w-4" />
-              <span><span>School fee</span> <bdi dir="ltr">{f.academicYear}</bdi> <span className="text-xs text-muted-foreground">(collected first: the registration needs it)</span></span>
+              <span><span>School fee</span> <bdi dir="ltr">{f.academicYear}</bdi> <span className="text-xs text-muted-foreground">(collected first: reserving needs it)</span></span>
             </label>
             <Money amount={f.amount} />
           </li>
