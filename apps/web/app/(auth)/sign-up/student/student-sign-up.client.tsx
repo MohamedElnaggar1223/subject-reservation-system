@@ -6,6 +6,7 @@ import Link from "next/link";
 import { authClient } from "~/lib/auth-client";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { PasswordInput } from "~/components/ui/password-input";
 import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/utils";
 import AuthLayout from "~/components/auth-layout";
@@ -183,9 +184,8 @@ export default function StudentSignUpClient(): React.JSX.Element {
 
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             placeholder="At least 8 characters"
             autoComplete="new-password"
             required
@@ -200,9 +200,8 @@ export default function StudentSignUpClient(): React.JSX.Element {
 
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             placeholder="Confirm your password"
             autoComplete="new-password"
             required

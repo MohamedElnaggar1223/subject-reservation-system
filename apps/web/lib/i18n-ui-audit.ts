@@ -156,7 +156,9 @@ export const uiAuditArabic: Record<string, string> = {
 
   // ── Sign-in and sign-up ──
   "The school's subject reservations, in one place.": 'حجوزات المواد في المدرسة، في مكان واحد.',
-  'One account for the family, in place of a form for every subject.': 'حساب واحد للأسرة بدلًا من استمارة لكل مادة.',
+  'Everything for exam season, from choosing subjects to paying for them, without the paperwork.': 'كل ما تحتاجه لموسم الامتحانات، من اختيار المواد حتى دفع رسومها، دون أوراق.',
+  'Show password': 'إظهار كلمة المرور',
+  'Hide password': 'إخفاء كلمة المرور',
   "Reserve each child's subjects": 'احجز مواد كل ابن',
   'Pay at the school desk or by InstaPay': 'ادفع في مكتب المدرسة أو عبر إنستاباي',
   'See every receipt, and what is still owed': 'اطّلع على كل إيصال وعلى ما بقي مستحقًا',

@@ -91,7 +91,7 @@ function DefaultBranding() {
           The school&apos;s subject reservations, in one place.
         </h1>
         <p className="max-w-xs text-sm leading-relaxed text-white/80">
-          One account for the family, in place of a form for every subject.
+          Everything for exam season, from choosing subjects to paying for them, without the paperwork.
         </p>
       </div>
 

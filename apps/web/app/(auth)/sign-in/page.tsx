@@ -5,6 +5,7 @@ import Link from "next/link"
 import { authClient } from "~/lib/auth-client"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
+import { PasswordInput } from "~/components/ui/password-input"
 import { Label } from "~/components/ui/label"
 import AuthLayout from "~/components/auth-layout"
 import { getSignInError, getNetworkError } from "~/lib/auth-errors"
@@ -128,10 +129,9 @@ export default function SignInPage(): React.JSX.Element {
               Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             required
             placeholder="Enter your password"
